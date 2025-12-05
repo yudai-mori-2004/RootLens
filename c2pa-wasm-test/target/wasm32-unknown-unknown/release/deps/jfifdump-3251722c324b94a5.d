@@ -1,0 +1,11 @@
+/home/moodai/hobbyspace/rootscan/c2pa-wasm-test/target/wasm32-unknown-unknown/release/deps/libjfifdump-3251722c324b94a5.rmeta: /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/lib.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/error.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/handler.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/reader.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/text.rs
+
+/home/moodai/hobbyspace/rootscan/c2pa-wasm-test/target/wasm32-unknown-unknown/release/deps/libjfifdump-3251722c324b94a5.rlib: /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/lib.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/error.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/handler.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/reader.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/text.rs
+
+/home/moodai/hobbyspace/rootscan/c2pa-wasm-test/target/wasm32-unknown-unknown/release/deps/jfifdump-3251722c324b94a5.d: /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/lib.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/error.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/handler.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/reader.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/text.rs
+
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/lib.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/error.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/handler.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/reader.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/jfifdump-0.5.1/src/text.rs:

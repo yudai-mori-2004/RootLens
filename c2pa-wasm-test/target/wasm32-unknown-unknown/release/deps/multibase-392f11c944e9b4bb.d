@@ -1,0 +1,11 @@
+/home/moodai/hobbyspace/rootscan/c2pa-wasm-test/target/wasm32-unknown-unknown/release/deps/libmultibase-392f11c944e9b4bb.rmeta: /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/lib.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/base.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/encoding.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/error.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/impls.rs
+
+/home/moodai/hobbyspace/rootscan/c2pa-wasm-test/target/wasm32-unknown-unknown/release/deps/libmultibase-392f11c944e9b4bb.rlib: /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/lib.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/base.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/encoding.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/error.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/impls.rs
+
+/home/moodai/hobbyspace/rootscan/c2pa-wasm-test/target/wasm32-unknown-unknown/release/deps/multibase-392f11c944e9b4bb.d: /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/lib.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/base.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/encoding.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/error.rs /home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/impls.rs
+
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/lib.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/base.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/encoding.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/error.rs:
+/home/moodai/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/multibase-0.9.2/src/impls.rs:
