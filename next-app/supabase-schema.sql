@@ -1,42 +1,69 @@
--- RootScan MVP Database Schema
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- RootScan Ver3 Database Schema
+-- cNFT (Compressed NFT) 対応版
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -- このファイルをSupabase SQL Editorで実行してください
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- media_proofs テーブル
+-- users テーブル（Privy連携）
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    -- Privy連携
+    privy_user_id TEXT NOT NULL UNIQUE,
+    wallet_address TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT,                              -- SMS認証用
+
+    -- プロフィール
+    display_name TEXT,
+    bio TEXT,
+
+    -- タイムスタンプ
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_wallet ON users(wallet_address);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_privy ON users(privy_user_id);
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- media_proofs テーブル（cNFTのキャッシュ + RootScan独自データ）
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CREATE TABLE IF NOT EXISTS media_proofs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
+    -- cNFTデータ（キャッシュ）
+    original_hash TEXT NOT NULL UNIQUE,      -- cNFTのoriginal_hash (SHA-256, hex)
+    c2pa_hash TEXT NOT NULL,                 -- cNFTのc2pa_hash (SHA-256, hex)
+    root_signer TEXT NOT NULL,               -- cNFTのroot_signer (CA名)
+    license_type TEXT NOT NULL,              -- cNFTのlicense_type
+
     -- Solana連携
-    content_id BYTEA NOT NULL UNIQUE,
-    solana_tx_id TEXT NOT NULL,
-
-    -- 所有者情報
-    owner_wallet TEXT NOT NULL,
-    owner_display_name TEXT,
-    owner_organization TEXT,
-
-    -- アクセス制御
-    access_token TEXT NOT NULL UNIQUE,
-    is_active BOOLEAN DEFAULT true,
-
-    -- ファイル情報
-    media_type TEXT NOT NULL,               -- 'image' | 'video'
-    file_format TEXT NOT NULL,              -- 'image/jpeg', 'video/mp4' 等
-    file_size BIGINT NOT NULL,
+    cnft_mint_address TEXT NOT NULL UNIQUE,  -- cNFTのmintアドレス
+    cnft_tree_address TEXT NOT NULL,         -- Merkle Tree アドレス
+    owner_wallet TEXT NOT NULL,              -- 現在の所有者ウォレット
 
     -- R2パス
-    original_file_path TEXT NOT NULL,       -- R2のキー (例: media/{content_id}/original.jpg)
-    sidecar_file_path TEXT NOT NULL,        -- サイドカーファイル
-    qr_watermarked_file_path TEXT,          -- QR透かし付きファイル (将来実装)
+    media_file_path TEXT NOT NULL,           -- 元メディアファイル (media/{original_hash}/original.{ext})
+    c2pa_file_path TEXT NOT NULL,            -- .c2paサイドカー (media/{original_hash}/metadata.c2pa)
 
-    -- プライバシー設定（JSON）
-    privacy_settings JSONB DEFAULT '{}',
+    -- メディア情報
+    media_type TEXT NOT NULL,                -- 'image' | 'video' | 'other'
+    file_format TEXT NOT NULL,               -- 'image/jpeg', 'video/mp4' 等
+    file_size BIGINT NOT NULL,
 
-    -- 価格設定（Step 2で有効化、現在は0固定）
-    price_cents INTEGER DEFAULT 0,
-    currency TEXT DEFAULT 'usd',
+    -- RootScan独自データ
+    price_lamports BIGINT DEFAULT 0,         -- 0 = 無料
+    title TEXT,                              -- 表示用タイトル
+    description TEXT,                        -- 説明文
+
+    -- キャッシュ管理
+    last_chain_sync TIMESTAMPTZ,             -- 最終チェーン同期日時
 
     -- タイムスタンプ
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -44,48 +71,69 @@ CREATE TABLE IF NOT EXISTS media_proofs (
 );
 
 -- インデックス
-CREATE INDEX IF NOT EXISTS idx_media_proofs_content_id ON media_proofs(content_id);
-CREATE INDEX IF NOT EXISTS idx_media_proofs_owner_wallet ON media_proofs(owner_wallet);
-CREATE INDEX IF NOT EXISTS idx_media_proofs_access_token ON media_proofs(access_token);
+CREATE INDEX IF NOT EXISTS idx_media_proofs_original_hash ON media_proofs(original_hash);
+CREATE INDEX IF NOT EXISTS idx_media_proofs_owner ON media_proofs(owner_wallet);
+CREATE INDEX IF NOT EXISTS idx_media_proofs_cnft ON media_proofs(cnft_mint_address);
 CREATE INDEX IF NOT EXISTS idx_media_proofs_created_at ON media_proofs(created_at DESC);
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- upload_sessions テーブル（2段階アップロードの管理用）
+-- purchases テーブル
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-CREATE TABLE IF NOT EXISTS upload_sessions (
+CREATE TABLE IF NOT EXISTS purchases (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    -- アップロード準備時に生成
-    upload_id TEXT NOT NULL UNIQUE,
-    original_hash BYTEA NOT NULL,
-    solana_tx_id TEXT NOT NULL,
-    owner_wallet TEXT NOT NULL,
+    -- 購入対象
+    media_proof_id UUID NOT NULL REFERENCES media_proofs(id),
 
-    -- ファイル情報
-    file_size BIGINT NOT NULL,
-    mime_type TEXT NOT NULL,
+    -- 購入者情報（Privy認証済み）
+    buyer_wallet TEXT NOT NULL,
+    buyer_email TEXT NOT NULL,
 
-    -- プライバシー設定
-    privacy_settings JSONB DEFAULT '{}',
+    -- 決済情報
+    solana_tx_signature TEXT NOT NULL,       -- SolanaPay トランザクション署名
+    amount_lamports BIGINT NOT NULL,
+    seller_wallet TEXT NOT NULL,             -- 支払い先（cNFT所有者）
 
-    -- ステータス管理
-    status TEXT DEFAULT 'pending',          -- 'pending' | 'uploaded' | 'completed' | 'failed'
-    error_message TEXT,
-
-    -- R2アップロード用
-    r2_key TEXT NOT NULL,                   -- R2に保存するキー
+    -- ダウンロード
+    download_token TEXT NOT NULL UNIQUE,     -- Presigned URL生成用トークン
+    download_expires_at TIMESTAMPTZ NOT NULL,-- URL有効期限
+    download_count INTEGER DEFAULT 0,
 
     -- タイムスタンプ
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    expires_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '1 hour'  -- 1時間で期限切れ
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- インデックス
-CREATE INDEX IF NOT EXISTS idx_upload_sessions_upload_id ON upload_sessions(upload_id);
-CREATE INDEX IF NOT EXISTS idx_upload_sessions_status ON upload_sessions(status);
-CREATE INDEX IF NOT EXISTS idx_upload_sessions_expires_at ON upload_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_purchases_buyer ON purchases(buyer_wallet);
+CREATE INDEX IF NOT EXISTS idx_purchases_buyer_email ON purchases(buyer_email);
+CREATE INDEX IF NOT EXISTS idx_purchases_download_token ON purchases(download_token);
+CREATE INDEX IF NOT EXISTS idx_purchases_media ON purchases(media_proof_id);
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- feature_vectors テーブル（Lens機能用・後日実装）
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+-- pgvector拡張を有効化（まだの場合）
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS feature_vectors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    media_proof_id UUID NOT NULL REFERENCES media_proofs(id),
+
+    -- ベクトル（pgvector）
+    embedding vector(512),                   -- 次元数はモデルによる
+
+    -- メタデータ
+    model_name TEXT NOT NULL,                -- 使用したモデル名
+
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ベクトル検索用インデックス
+CREATE INDEX IF NOT EXISTS idx_feature_vectors_embedding ON feature_vectors
+    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -- updated_at 自動更新トリガー
@@ -99,30 +147,42 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_media_proofs_updated_at BEFORE UPDATE ON media_proofs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_upload_sessions_updated_at BEFORE UPDATE ON upload_sessions
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Row Level Security (RLS) - 将来の認証機能用
+-- Row Level Security (RLS)
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
--- 現在はRLSを無効化（パブリックアクセス）
+-- RLSを有効化
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE media_proofs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE upload_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE purchases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE feature_vectors ENABLE ROW LEVEL SECURITY;
 
--- とりあえず全員読み取り可能
+-- 全員読み取り可能（証明書ページは公開）
 CREATE POLICY "Public read access" ON media_proofs
     FOR SELECT USING (true);
 
-CREATE POLICY "Public read access" ON upload_sessions
+CREATE POLICY "Public read access" ON feature_vectors
     FOR SELECT USING (true);
 
--- サーバーサイド（SERVICE_ROLE）は全権限
-CREATE POLICY "Service role all access" ON media_proofs
+-- 購入履歴は購入者本人のみ閲覧可能
+CREATE POLICY "Buyer can view own purchases" ON purchases
+    FOR SELECT USING (buyer_wallet = current_setting('request.jwt.claims', true)::json->>'wallet_address');
+
+-- サービスロールは全権限
+CREATE POLICY "Service role all access on users" ON users
     FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Service role all access" ON upload_sessions
+CREATE POLICY "Service role all access on media_proofs" ON media_proofs
+    FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service role all access on purchases" ON purchases
+    FOR ALL USING (true) WITH CHECK (true);
+
+CREATE POLICY "Service role all access on feature_vectors" ON feature_vectors
     FOR ALL USING (true) WITH CHECK (true);

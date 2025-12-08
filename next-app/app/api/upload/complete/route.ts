@@ -1,153 +1,109 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/app/lib/supabase';
-import { generateR2Key, getFileExtension } from '@/app/lib/r2';
-import { generateAccessToken, bytesToHex, getMediaType, generateVerificationUrl } from '@/app/lib/utils';
+/**
+ * アップロード完了API (Ver3)
+ * R2アップロード完了後、Supabaseに記録
+ */
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// POST /api/upload/complete
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+interface CompleteRequest {
+  original_hash: string;
+  c2pa_hash: string;
+  root_signer: string;
+  license_type: string;
+  cnft_mint_address: string;
+  cnft_tree_address: string;
+  owner_wallet: string;
+  media_type: string;
+  file_format: string;
+  file_size: number;
+  price_lamports?: number;
+  title?: string;
+  description?: string;
+  metadata_uri: string; // Arweave URI
+}
 
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { upload_id } = body;
+        const body: CompleteRequest = await request.json();
 
-        if (!upload_id) {
-            return NextResponse.json(
-                { error: 'Missing upload_id' },
-                { status: 400 }
-            );
-        }
+        console.log('💾 DB登録開始...');
+        console.log('Original Hash:', body.original_hash);
 
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 1. アップロードセッション取得
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 1. Supabaseクライアント作成
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!, // サーバーサイドなのでSERVICE_ROLE使用
+        );
 
-        const { data: session, error: sessionError } = await supabaseAdmin
-            .from('upload_sessions')
-            .select('*')
-            .eq('upload_id', upload_id)
-            .single();
+        // 2. R2パスを構築
+        const mediaFilePath = `media/${body.original_hash}/original.${getExtension(body.file_format)}`;
+        const c2paFilePath = `media/${body.original_hash}/metadata.c2pa`;
 
-        if (sessionError || !session) {
-            return NextResponse.json(
-                { error: 'Upload session not found' },
-                { status: 404 }
-            );
-        }
-
-        // セッション期限切れチェック
-        if (new Date(session.expires_at) < new Date()) {
-            return NextResponse.json(
-                { error: 'Upload session expired' },
-                { status: 410 }
-            );
-        }
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 2. R2にファイルがアップロードされているか確認
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        // TODO: 実際にR2にファイルが存在するか確認する
-        // （現時点では省略、クライアントがPresigned URLでアップロードしたと信頼）
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 3. C2PA署名処理（後で実装、現在はスキップ）
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        // TODO: Step 1.5で実装
-        // - R2からファイルをダウンロード
-        // - C2PA署名を付与（Ingredient参照）
-        // - プライバシーフィルタリング
-        // - QR透かし生成
-        // - サイドカー抽出
-        // - R2に保存
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 4. media_proofsテーブルにレコード作成
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        // session.original_hashはSupabaseから返されるBYTEAで、
-        // PostgreSQLが \x で始まるhex形式（\x + 64文字のhex）で返す
-        if (typeof session.original_hash !== 'string' || !session.original_hash.startsWith('\\x')) {
-            throw new Error(`Invalid original_hash format: ${typeof session.original_hash}`);
-        }
-
-        const contentIdHex = session.original_hash.substring(2);
-
-        // 検証: SHA-256ハッシュは必ず64文字（32バイト）
-        if (contentIdHex.length !== 64) {
-            throw new Error(`Invalid hash length: expected 64, got ${contentIdHex.length}`);
-        }
-        const extension = getFileExtension(session.mime_type);
-        const mediaType = getMediaType(session.mime_type);
-        const accessToken = generateAccessToken();
-
-        // content_idもバイト配列に変換
-        const contentIdBytes = Buffer.from(contentIdHex, 'hex');
-
-        const { data: mediaProof, error: mediaProofError } = await supabaseAdmin
+        // 3. media_proofsテーブルに挿入
+        const { data, error } = await supabase
             .from('media_proofs')
             .insert({
-                content_id: contentIdBytes,
-                solana_tx_id: session.solana_tx_id,
-                owner_wallet: session.owner_wallet,
-                access_token: accessToken,
-                media_type: mediaType,
-                file_format: session.mime_type,
-                file_size: session.file_size,
-                original_file_path: generateR2Key(contentIdHex, 'original', extension),
-                sidecar_file_path: generateR2Key(contentIdHex, 'sidecar', 'c2pa'),
-                qr_watermarked_file_path: null, // 将来実装
-                privacy_settings: session.privacy_settings,
+                original_hash: body.original_hash,
+                c2pa_hash: body.c2pa_hash,
+                root_signer: body.root_signer,
+                license_type: body.license_type,
+                cnft_mint_address: body.cnft_mint_address,
+                cnft_tree_address: body.cnft_tree_address,
+                owner_wallet: body.owner_wallet,
+                media_file_path: mediaFilePath,
+                c2pa_file_path: c2paFilePath,
+                media_type: body.media_type,
+                file_format: body.file_format,
+                file_size: body.file_size,
+                price_lamports: body.price_lamports || 0,
+                title: body.title,
+                description: body.description,
+                last_chain_sync: new Date().toISOString(),
             })
             .select()
             .single();
 
-        if (mediaProofError) {
-            console.error('Failed to create media_proof:', mediaProofError);
-
-            // セッションをfailedにマーク
-            await supabaseAdmin
-                .from('upload_sessions')
-                .update({ status: 'failed', error_message: mediaProofError.message })
-                .eq('upload_id', upload_id);
-
-            return NextResponse.json(
-                { error: 'Failed to create media proof record' },
-                { status: 500 }
-            );
+        if (error) {
+            console.error('❌ DB登録エラー:', error);
+            throw error;
         }
 
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 5. アップロードセッションを完了にマーク
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        console.log('✅ DB登録完了:', data.id);
 
-        await supabaseAdmin
-            .from('upload_sessions')
-            .update({ status: 'completed' })
-            .eq('upload_id', upload_id);
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 6. レスポンス
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 4. 証明書ページURLを生成
+        const proofUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proof/${body.original_hash}`;
 
         return NextResponse.json({
-            content_id: contentIdHex,
-            access_token: accessToken,
-            verification_url: generateVerificationUrl(contentIdHex),
-            files: {
-                original: generateR2Key(contentIdHex, 'original', extension),
-                sidecar: generateR2Key(contentIdHex, 'sidecar', 'c2pa'),
-                qr_watermarked: null, // 将来実装
-            },
+            success: true,
+            media_proof_id: data.id,
+            proof_url: proofUrl,
+            original_hash: body.original_hash,
         });
 
     } catch (error) {
-        console.error('Error in /api/upload/complete:', error);
+        console.error('❌ アップロード完了処理エラー:', error);
         return NextResponse.json(
-            { error: 'Internal server error' },
+            {
+                error: error instanceof Error ? error.message : 'Unknown error',
+            },
             { status: 500 }
         );
     }
+}
+
+/**
+ * Content-Typeから拡張子を推測
+ */
+function getExtension(contentType: string): string {
+    const mapping: Record<string, string> = {
+        'image/jpeg': 'jpg',
+        'image/png': 'png',
+        'image/webp': 'webp',
+        'image/avif': 'avif',
+        'video/mp4': 'mp4',
+        'video/quicktime': 'mov',
+    };
+
+    return mapping[contentType] || 'bin';
 }
