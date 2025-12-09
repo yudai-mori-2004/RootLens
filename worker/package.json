@@ -1,0 +1,24 @@
+{
+  "name": "@rootlens/worker",
+  "version": "4.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/worker.ts",
+    "build": "tsc",
+    "start": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@metaplex-foundation/mpl-bubblegum": "^5.0.2",
+    "@metaplex-foundation/umi": "^1.4.1",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
+    "@metaplex-foundation/umi-uploader-irys": "^1.4.1",
+    "@supabase/supabase-js": "^2.86.0",
+    "bullmq": "^5.36.3",
+    "ioredis": "^5.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

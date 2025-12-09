@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # 1. ジョブ管理用のRedis
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rootlens-network
+
+  # 2. Next.js (APIサーバー)
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - rootlens-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+  # 3. Worker (裏方処理) - 直列処理の心臓部
+  worker:
+    build: ./worker
+    env_file:
+      - .env.local
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - rootlens-network
+    volumes:
+      - ./worker:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+networks:
+  rootlens-network:
+    driver: bridge
