@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { createC2pa, C2pa } from 'c2pa';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
-
-/**
- * アップロードページ
- * Ver3仕様: C2PA検証 → cNFT mint → R2アップロード
- */
+import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
+import ProgressBar from '@/app/components/ProgressBar';
+import StepContainer from '@/app/components/StepContainer';
+import PrivacyWarning from '@/app/components/PrivacyWarning';
+import ProvenanceModal from '@/app/components/ProvenanceModal';
 
 interface C2PAValidationResult {
   isValid: boolean;
@@ -18,41 +18,49 @@ interface C2PAValidationResult {
 }
 
 interface FileHashes {
-  originalHash: string;  // 元ファイル全体のSHA-256
+  originalHash: string;
 }
 
+// ステップ定義
+const STEPS = [
+  { label: 'ウォレット接続', description: 'Solanaウォレットを接続' },
+  { label: 'ファイル選択', description: 'C2PA署名付きメディアを選択' },
+  { label: '検証とプライバシー', description: 'C2PA署名を検証し、公開情報を確認' },
+  { label: '価格・情報設定', description: '販売価格とメタデータを設定' },
+  { label: 'アップロード', description: 'cNFTを発行してアップロード' },
+];
+
 export default function UploadPage() {
+  const [currentStep, setCurrentStep] = useState(1);
   const [c2pa, setC2pa] = useState<C2pa | null>(null);
-  const [status, setStatus] = useState<string>('Wasmを準備中...');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // ファイルとC2PAデータ
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [manifestData, setManifestData] = useState<any>(null);
+  const [c2paSummary, setC2paSummary] = useState<C2PASummaryData | null>(null);
   const [validationResult, setValidationResult] = useState<C2PAValidationResult | null>(null);
   const [hashes, setHashes] = useState<FileHashes | null>(null);
+
+  // プライバシー同意
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
 
   // 価格設定
   const [price, setPrice] = useState<number>(0);
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
 
+  // 来歴モーダル
+  const [showProvenanceModal, setShowProvenanceModal] = useState(false);
+
+  // 完了状態
+  const [uploadResult, setUploadResult] = useState<{ hash: string } | null>(null);
+
   const { login, authenticated, logout } = usePrivy();
   const { wallets } = useWallets();
   const solanaWallet = wallets[0];
 
-  // 循環参照を回避するためのreplacer
-  const getCircularReplacer = () => {
-    const seen = new WeakSet();
-    return (key: string, value: any) => {
-      if (typeof value === "object" && value !== null) {
-        if (seen.has(value)) {
-          return "[Circular Reference]";
-        }
-        seen.add(value);
-      }
-      return value;
-    };
-  };
-
-  // 1. 初期化：ページ読み込み時にWasmをロードする
+  // C2PA WASM初期化
   useEffect(() => {
     const initC2pa = async () => {
       try {
@@ -61,110 +69,49 @@ export default function UploadPage() {
           workerSrc: '/c2pa.worker.min.js',
         });
         setC2pa(c2paInstance);
-        setStatus('準備完了！画像をドロップしてください。');
       } catch (err) {
         console.error('Wasm初期化エラー:', err);
-        setStatus('エラー: Wasmの読み込みに失敗しました');
       }
     };
-
     initC2pa();
   }, []);
 
+  // 認証状態が変わったらステップ2に進む
+  useEffect(() => {
+    if (authenticated && currentStep === 1) {
+      setCurrentStep(2);
+    }
+  }, [authenticated, currentStep]);
+
   const handleLogin = async () => {
     try {
+      setIsProcessing(true);
       await login();
     } catch (error) {
       console.error('ログインエラー:', error);
-      setStatus('ログインに失敗しました');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      setStatus('ログアウトしました');
-      // データをクリア
-      setManifestData(null);
-      setValidationResult(null);
-      setHashes(null);
-      setCurrentFile(null);
-    } catch (error) {
-      console.error('ログアウトエラー:', error);
-      setStatus('ログアウトに失敗しました');
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!c2pa || !e.target.files?.[0]) return;
     const file = e.target.files[0];
+
+    setIsProcessing(true);
     setCurrentFile(file);
-    setStatus('解析中...');
 
     try {
       // 1. C2PA解析
-      const { manifestStore } = await c2pa.read(file);
+      const { manifestStore, thumbnail } = await c2pa.read(file);
       setManifestData(manifestStore);
 
-      // 2. Root署名検証（簡易版）
-      const validation = validateC2PAManifest(manifestStore);
-      setValidationResult(validation);
+      // 2. サマリーデータ生成
+      const previewThumbnailUrl = thumbnail?.getUrl() || null;
+      const summary = await createManifestSummary(manifestStore, previewThumbnailUrl);
+      setC2paSummary(summary);
 
-      if (!validation.isValid) {
-        setStatus(`❌ 検証失敗: ${validation.error}`);
-        return;
-      }
-
-      // 3. ハッシュ計算
-      const buffer = await file.arrayBuffer();
-      const originalHashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-      const originalHash = Array.from(new Uint8Array(originalHashBuffer))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-
-      setHashes({ originalHash });
-      setStatus('✅ 検証成功！価格とメタデータを設定してください。');
-    } catch (err) {
-      console.error('ファイル処理エラー:', err);
-      setStatus('エラー: ファイルの処理に失敗しました');
-    }
-  };
-
-  /**
-   * Root証明書チェーンを抽出してBase64エンコード
-   */
-  function extractRootCertChain(manifestStore: any): string {
-    try {
-      // 最初のManifestまで遡る
-      let currentManifest = manifestStore?.activeManifest;
-
-      while (currentManifest?.ingredients?.length > 0) {
-        const parentIngredient = currentManifest.ingredients[0];
-        if (!parentIngredient.c2pa_manifest) break;
-        currentManifest = parentIngredient.c2pa_manifest;
-      }
-
-      // Root Manifestの証明書チェーンを取得
-      const certChain = currentManifest?.signature_info?.cert_chain || [];
-
-      // JSON文字列化してBase64エンコード
-      const certChainJson = JSON.stringify(certChain);
-      const certChainBase64 = btoa(certChainJson);
-
-      return certChainBase64;
-    } catch (err) {
-      console.error('証明書チェーン抽出エラー:', err);
-      // エラー時は空配列のBase64
-      return btoa(JSON.stringify([]));
-    }
-  }
-
-  /**
-   * C2PA Manifestを検証（簡易版）
-   */
-  function validateC2PAManifest(manifestStore: any): C2PAValidationResult {
-    try {
-      // 信頼済みリスト
+      // 3. 検証ロジック
       const trustedIssuers = [
         'Sony Corporation',
         'Google LLC',
@@ -172,74 +119,89 @@ export default function UploadPage() {
         'Leica Camera AG',
         'Nikon Corporation',
         'Canon Inc.',
-        'Unknown'
+        'Adobe Inc.'
       ];
 
-      // Active Manifestを取得
-      const activeManifest = manifestStore?.activeManifest;
+      const activeManifest = summary.activeManifest;
       if (!activeManifest) {
-        return {
+        setValidationResult({
           isValid: false,
           rootSigner: null,
           provenanceChain: [],
-          error: 'Active Manifestが見つかりません',
-        };
+          error: 'C2PAマニフェストが見つかりません',
+        });
+        setIsProcessing(false);
+        return;
       }
 
-      // Rootを特定（再帰的に遡る）
-      let currentManifest = activeManifest;
-      const provenanceChain = [currentManifest];
+      const issuer = activeManifest.signatureInfo.issuer || 'Unknown';
+      const isTrusted = trustedIssuers.some(trusted => issuer.includes(trusted));
+      const isAI = activeManifest.isAIGenerated;
 
-      while (currentManifest.ingredients?.length > 0) {
-        const parentIngredient = currentManifest.ingredients[0];
-        if (!parentIngredient.c2pa_manifest) break;
-        currentManifest = parentIngredient.c2pa_manifest;
-        provenanceChain.push(currentManifest);
-      }
-
-      const rootManifest = currentManifest;
-
-      // Root署名者を取得
-      const rootSigner = rootManifest.signature_info?.issuer || 'Unknown';
-
-      // 信頼リストに含まれるか確認
-      const isTrusted = trustedIssuers.some((issuer) =>
-        rootSigner.includes(issuer)
-      );
-
-      if (!isTrusted) {
-        return {
+      if (isAI) {
+        setValidationResult({
           isValid: false,
-          rootSigner,
-          provenanceChain,
-          error: `信頼されていない署名者: ${rootSigner}`,
-        };
+          rootSigner: issuer,
+          provenanceChain: [],
+          error: 'AI生成コンテンツはサポート対象外です（ハードウェア署名が必要です）',
+        });
+        setIsProcessing(false);
+        return;
+      } else if (!isTrusted) {
+        setValidationResult({
+          isValid: false,
+          rootSigner: issuer,
+          provenanceChain: [],
+          error: `信頼されていない署名者: ${issuer}`,
+        });
+        setIsProcessing(false);
+        return;
+      } else {
+        setValidationResult({
+          isValid: true,
+          rootSigner: issuer,
+          provenanceChain: [],
+        });
       }
 
-      return {
-        isValid: true,
-        rootSigner,
-        provenanceChain,
-      };
+      // 4. ハッシュ計算
+      const buffer = await file.arrayBuffer();
+      const originalHashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+      const originalHash = Array.from(new Uint8Array(originalHashBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      setHashes({ originalHash });
+
+      // ステップ3へ
+      setCurrentStep(3);
+
     } catch (err) {
-      console.error('C2PA検証エラー:', err);
-      return {
+      console.error('ファイル処理エラー:', err);
+      setValidationResult({
         isValid: false,
         rootSigner: null,
         provenanceChain: [],
-        error: '検証中にエラーが発生しました',
-      };
+        error: 'ファイルの処理に失敗しました',
+      });
+    } finally {
+      setIsProcessing(false);
     }
-  }
+  };
+
+  const handlePrivacyNext = () => {
+    if (privacyAcknowledged && validationResult?.isValid) {
+      setCurrentStep(4);
+    }
+  };
 
   const handleUpload = async () => {
     if (!currentFile || !hashes || !validationResult || !solanaWallet) {
-      setStatus('エラー: 必要な情報が揃っていません');
       return;
     }
 
     try {
-      setStatus('📤 Step 1/3: R2へアップロード中...');
+      setIsProcessing(true);
 
       // 1. Presigned URL取得（元ファイル）
       const presignedOriginalResponse = await fetch('/api/upload/presigned', {
@@ -286,9 +248,15 @@ export default function UploadPage() {
 
       const { presigned_url: presignedManifestUrl } = await presignedManifestResponse.json();
 
-      // 4. C2PA ManifestStore全体をJSON形式でR2にアップロード
+      // 4. Manifest JSONをアップロード
+      let summaryData = c2paSummary;
+      if (!summaryData) {
+        const { manifestStore, thumbnail } = await c2pa!.read(currentFile);
+        summaryData = await createManifestSummary(manifestStore, thumbnail?.getUrl() || null);
+      }
+
       const manifestJsonBlob = new Blob(
-        [JSON.stringify(manifestData, null, 2)],
+        [JSON.stringify(summaryData, null, 2)],
         { type: 'application/json' }
       );
       const uploadManifestResponse = await fetch(presignedManifestUrl, {
@@ -301,22 +269,20 @@ export default function UploadPage() {
         throw new Error('R2アップロード失敗（Manifest JSON）');
       }
 
-      setStatus('🚀 Step 2/3: Mintジョブを投入中...');
-
       // 5. Root証明書チェーンを抽出
       const rootCertChain = extractRootCertChain(manifestData);
 
-      // 6. Ver4のアップロードAPI呼び出し（ジョブをキューに追加）
+      // 6. アップロードAPI呼び出し
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userWallet: solanaWallet.address,
           originalHash: hashes.originalHash,
-          rootSigner: validationResult.rootSigner || 'Unknown',
+          rootSigner: summaryData?.activeManifest?.signatureInfo?.issuer || 'Unknown',
           rootCertChain: rootCertChain,
           mediaFilePath: `media/${hashes.originalHash}/original.${getExtension(currentFile.type)}`,
-          price: Math.floor(price * 1e9), // SOL → lamports
+          price: Math.floor(price * 1e9),
           title: title || undefined,
           description: description || undefined,
         }),
@@ -330,15 +296,13 @@ export default function UploadPage() {
       const uploadResult = await uploadResponse.json();
       const jobId = uploadResult.jobId;
 
-      setStatus(`⏳ Step 3/3: 処理中... (Job ID: ${jobId})`);
-
-      // 6. ジョブステータスをポーリング
+      // 7. ジョブステータスをポーリング
       let completed = false;
       let attempts = 0;
-      const maxAttempts = 60; // 最大60秒
+      const maxAttempts = 60;
 
       while (!completed && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒待つ
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
         const statusResponse = await fetch(`/api/job-status/${jobId}`);
         if (!statusResponse.ok) {
@@ -346,19 +310,17 @@ export default function UploadPage() {
         }
 
         const statusResult = await statusResponse.json();
-        console.log('Job status:', statusResult);
 
         if (statusResult.state === 'completed') {
           completed = true;
           if (statusResult.result?.success) {
-            setStatus(`🎉 アップロード完了！\n証明書URL: ${window.location.origin}/proof/${hashes.originalHash}`);
+            setUploadResult({ hash: hashes.originalHash });
+            setCurrentStep(5);
           } else {
             throw new Error(statusResult.result?.error || 'Mint処理失敗');
           }
         } else if (statusResult.state === 'failed') {
           throw new Error(statusResult.failedReason || 'ジョブ失敗');
-        } else {
-          setStatus(`⏳ 処理中... (${statusResult.state}, progress: ${statusResult.progress || 0}%)`);
         }
 
         attempts++;
@@ -370,9 +332,29 @@ export default function UploadPage() {
 
     } catch (err) {
       console.error('アップロードエラー:', err);
-      setStatus(`❌ エラー: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      alert(`エラー: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setIsProcessing(false);
     }
   };
+
+  function extractRootCertChain(manifestStore: any): string {
+    try {
+      let currentManifest = manifestStore?.activeManifest;
+      while (currentManifest?.ingredients?.length > 0) {
+        const parentIngredient = currentManifest.ingredients[0];
+        if (!parentIngredient.c2pa_manifest) break;
+        currentManifest = parentIngredient.c2pa_manifest;
+      }
+      const certChain = currentManifest?.signature_info?.cert_chain || [];
+      const certChainJson = JSON.stringify(certChain);
+      const certChainBase64 = btoa(certChainJson);
+      return certChainBase64;
+    } catch (err) {
+      console.error('証明書チェーン抽出エラー:', err);
+      return btoa(JSON.stringify([]));
+    }
+  }
 
   function getExtension(contentType: string): string {
     const mapping: Record<string, string> = {
@@ -386,115 +368,189 @@ export default function UploadPage() {
     return mapping[contentType] || 'bin';
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-4xl font-bold mb-2">RootLens Ver4</h1>
-        <p className="text-gray-600 mb-8">
-          C2PAハードウェア署名付きメディアをcNFT + Arweaveで証明
-        </p>
+  // ========== レンダリング ==========
 
-        {/* ステータス表示 */}
-        <div
-          className={`p-4 rounded-lg mb-8 text-center font-medium ${
-            status.includes('成功') || status.includes('✅')
-              ? 'bg-green-100 text-green-800'
-              : status.includes('エラー') || status.includes('❌')
-              ? 'bg-red-100 text-red-800'
-              : 'bg-blue-100 text-blue-800'
-          }`}
-        >
-          {status}
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4">
+      <div className="max-w-4xl mx-auto">
+        {/* ヘッダー */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            RootLens
+          </h1>
+          <p className="text-gray-600">
+            C2PAハードウェア署名付きメディアをcNFT + Arweaveで証明
+          </p>
         </div>
 
-        {/* Step 1: ウォレット接続 */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Step 1: ウォレット接続</h2>
+        {/* プログレスバー */}
+        <ProgressBar currentStep={currentStep} totalSteps={5} steps={STEPS} />
 
-          {!authenticated ? (
-            <button
-              onClick={handleLogin}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 w-full transition-colors"
-            >
-              ウォレットを接続して開始
-            </button>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">接続中</span>
+        {/* Step 1: ウォレット接続 */}
+        {currentStep === 1 && (
+          <StepContainer
+            title="ウォレット接続"
+            description="Solanaウォレットを接続してください"
+            onNext={authenticated ? () => setCurrentStep(2) : undefined}
+            nextLabel="次へ"
+            nextDisabled={!authenticated}
+            showBack={false}
+          >
+            {!authenticated ? (
+              <div className="text-center py-12">
+                <div className="mb-6">
+                  <span className="text-6xl">👛</span>
+                </div>
                 <button
-                  onClick={handleLogout}
-                  className="text-sm text-red-500 hover:text-red-700 underline"
+                  onClick={handleLogin}
+                  disabled={isProcessing}
+                  className="bg-blue-600 text-white px-8 py-4 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg text-lg"
+                >
+                  {isProcessing ? '接続中...' : 'ウォレットを接続'}
+                </button>
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-3xl">✅</span>
+                  <div>
+                    <p className="font-bold text-green-800">接続済み</p>
+                    <p className="text-sm text-green-600">ウォレットが接続されました</p>
+                  </div>
+                </div>
+                <div className="font-mono text-sm bg-white p-3 rounded border break-all">
+                  {solanaWallet?.address || 'アドレス取得中...'}
+                </div>
+                <button
+                  onClick={logout}
+                  className="mt-4 text-sm text-red-500 hover:text-red-700 underline"
                 >
                   ログアウト
                 </button>
               </div>
-              <div className="font-mono text-sm bg-gray-50 p-3 rounded border break-all">
-                {solanaWallet?.address || 'アドレス取得中...'}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Step 2: ファイル選択 */}
-        {authenticated && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4">Step 2: ファイル選択</h2>
-            <input
-              type="file"
-              onChange={handleFileChange}
-              accept="image/*"
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
-
-            {currentFile && (
-              <div className="mt-4 text-sm text-gray-600">
-                <p>ファイル名: {currentFile.name}</p>
-                <p>サイズ: {(currentFile.size / 1024 / 1024).toFixed(2)} MB</p>
-              </div>
             )}
-          </div>
+          </StepContainer>
         )}
 
-        {/* Step 3: 検証結果 */}
-        {validationResult && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4">Step 3: 検証結果</h2>
+        {/* Step 2: ファイル選択 */}
+        {currentStep === 2 && (
+          <StepContainer
+            title="ファイル選択"
+            description="C2PA署名付きメディアファイルを選択してください"
+            onBack={() => setCurrentStep(1)}
+            isLoading={isProcessing}
+          >
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-400 transition-colors">
+              <input
+                type="file"
+                onChange={handleFileSelect}
+                accept="image/*"
+                disabled={!c2pa || isProcessing}
+                className="hidden"
+                id="file-input"
+              />
+              <label htmlFor="file-input" className="cursor-pointer">
+                <div className="mb-4">
+                  <span className="text-6xl">📁</span>
+                </div>
+                <p className="text-lg font-medium text-gray-700 mb-2">
+                  ファイルをドラッグ＆ドロップ
+                </p>
+                <p className="text-sm text-gray-500 mb-4">または</p>
+                <span className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                  ファイルを選択
+                </span>
+                <p className="text-xs text-gray-400 mt-4">
+                  対応形式: JPEG, PNG, HEIC, MP4
+                  <br />
+                  C2PA署名が必要です
+                </p>
+              </label>
+            </div>
 
+            {currentFile && (
+              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-800">選択されたファイル</p>
+                <p className="text-sm text-blue-600">{currentFile.name}</p>
+                <p className="text-xs text-blue-500">
+                  {(currentFile.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+            )}
+          </StepContainer>
+        )}
+
+        {/* Step 3: 検証とプライバシー */}
+        {currentStep === 3 && validationResult && c2paSummary && (
+          <StepContainer
+            title="検証とプライバシー"
+            description="C2PA署名の検証結果と公開される情報を確認してください"
+            onBack={() => {
+              setCurrentStep(2);
+              setPrivacyAcknowledged(false);
+            }}
+            onNext={handlePrivacyNext}
+            nextLabel="次へ: 価格設定"
+            nextDisabled={!privacyAcknowledged || !validationResult.isValid}
+          >
+            {/* 検証結果 */}
             {validationResult.isValid ? (
-              <div className="space-y-3">
-                <div className="flex items-center text-green-700">
-                  <span className="text-2xl mr-2">✅</span>
-                  <span className="font-bold">ハードウェア署名検証済み</span>
-                </div>
-                <div className="text-sm">
-                  <p className="text-gray-600">Root署名者:</p>
-                  <p className="font-mono bg-gray-50 p-2 rounded">
-                    {validationResult.rootSigner}
+              <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-4">
+                <span className="text-4xl">✅</span>
+                <div className="flex-1">
+                  <p className="font-bold text-green-800 text-lg">ハードウェア署名検証済み</p>
+                  <p className="text-sm text-green-700">
+                    署名者: {validationResult.rootSigner}
                   </p>
-                </div>
-                <div className="text-sm">
-                  <p className="text-gray-600">来歴チェーン:</p>
-                  <p className="font-mono bg-gray-50 p-2 rounded">
-                    {validationResult.provenanceChain.length} 段階
+                  <p className="text-xs text-green-600 mt-1">
+                    このメディアは信頼できるカメラで撮影されました
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="text-red-700">
-                <span className="text-2xl mr-2">❌</span>
-                <span className="font-bold">{validationResult.error}</span>
+              <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-4">
+                <span className="text-4xl">❌</span>
+                <div className="flex-1">
+                  <p className="font-bold text-red-800 text-lg">検証失敗</p>
+                  <p className="text-sm text-red-700">{validationResult.error}</p>
+                </div>
               </div>
             )}
-          </div>
+
+            {/* 来歴詳細ボタン */}
+            {validationResult.isValid && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setShowProvenanceModal(true)}
+                  className="w-full bg-blue-50 border border-blue-200 rounded-lg p-4 hover:bg-blue-100 transition-colors text-blue-700 font-medium"
+                >
+                  📋 コンテンツの来歴を詳しく見る
+                </button>
+              </div>
+            )}
+
+            {/* プライバシー警告 */}
+            {validationResult.isValid && (
+              <PrivacyWarning
+                c2paSummary={c2paSummary}
+                onAcknowledge={setPrivacyAcknowledged}
+                acknowledged={privacyAcknowledged}
+              />
+            )}
+          </StepContainer>
         )}
 
-        {/* Step 4: 価格・ライセンス設定 */}
-        {validationResult?.isValid && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-bold mb-4">Step 4: 価格・ライセンス設定</h2>
-
-            <div className="space-y-4">
+        {/* Step 4: 価格・情報設定 */}
+        {currentStep === 4 && (
+          <StepContainer
+            title="価格・情報設定"
+            description="販売価格とメタデータを設定してください"
+            onBack={() => setCurrentStep(3)}
+            onNext={() => handleUpload()}
+            nextLabel="アップロード開始"
+            isLoading={isProcessing}
+          >
+            <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   タイトル（任意）
@@ -504,7 +560,7 @@ export default function UploadPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="例: 夕焼けの富士山"
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
@@ -517,7 +573,7 @@ export default function UploadPage() {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="例: 2025年1月、山梨県から撮影"
                   rows={3}
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
@@ -531,37 +587,72 @@ export default function UploadPage() {
                   onChange={(e) => setPrice(Number(e.target.value))}
                   min="0"
                   step="0.1"
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                <p className="text-xs text-gray-500 mt-1">0 = 無料ダウンロード</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 0 SOL = 無料ダウンロード
+                </p>
+              </div>
+            </div>
+          </StepContainer>
+        )}
+
+        {/* Step 5: 完了 */}
+        {currentStep === 5 && uploadResult && (
+          <StepContainer
+            title="アップロード完了！"
+            description="cNFTの発行が完了しました"
+            showBack={false}
+          >
+            <div className="text-center py-8">
+              <div className="mb-6">
+                <span className="text-8xl">🎉</span>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                証明書が発行されました
+              </h3>
+              <p className="text-gray-600 mb-8">
+                あなたのメディアはブロックチェーン上で永久に証明されます
+              </p>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                <p className="text-sm text-blue-600 mb-2">証明書URL</p>
+                <p className="font-mono text-sm break-all text-blue-900">
+                  {window.location.origin}/proof/{uploadResult.hash}
+                </p>
               </div>
 
+              <div className="flex gap-4 justify-center">
+                <a
+                  href={`/proof/${uploadResult.hash}`}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors"
+                >
+                  証明書を見る
+                </a>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `${window.location.origin}/proof/${uploadResult.hash}`
+                    );
+                    alert('URLをコピーしました');
+                  }}
+                  className="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-bold hover:bg-gray-300 transition-colors"
+                >
+                  URLをコピー
+                </button>
+              </div>
             </div>
-          </div>
+          </StepContainer>
         )}
 
-        {/* Step 5: アップロードボタン */}
-        {validationResult?.isValid && (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <button
-              onClick={handleUpload}
-              className="w-full bg-green-600 text-white px-6 py-4 rounded-lg font-bold hover:bg-green-700 transition-colors text-lg"
-            >
-              🚀 cNFTを発行してアップロード
-            </button>
-          </div>
-        )}
-
-        {/* デバッグ情報 */}
-        {hashes && (
-          <details className="mt-8 bg-gray-100 rounded-lg p-4">
-            <summary className="cursor-pointer font-mono text-sm">
-              デバッグ情報（開発用）
-            </summary>
-            <pre className="mt-4 text-xs overflow-auto">
-              {JSON.stringify({ hashes, validationResult }, getCircularReplacer(), 2)}
-            </pre>
-          </details>
+        {/* 来歴モーダル */}
+        {c2paSummary && (
+          <ProvenanceModal
+            isOpen={showProvenanceModal}
+            onClose={() => setShowProvenanceModal(false)}
+            c2paSummary={c2paSummary}
+            rootSigner={validationResult?.rootSigner}
+          />
         )}
       </div>
     </div>
