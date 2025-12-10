@@ -20,26 +20,35 @@ export interface ManifestSummary {
   label: string;
   title: string | null;
   format: string;
-  signatureInfo: {
-    issuer: string | null;
-    time: string | null;
-  };
-  claimGenerator: {
+  vendor: string | null;
+  claimGenerator: string | null; // User Agent string
+  claimGeneratorInfo: {
     name: string;
     version: string | null;
     icon: string | null;
   };
+  claimGeneratorHints: Record<string, unknown> | null;
+  instanceId: string | null;
+  signatureInfo: {
+    issuer: string | null;
+    time: string | null;
+  };
+  credentials: CredentialSummary[];
   producer: {
     name: string | null;
   } | null;
   ingredients: IngredientSummary[];
+  redactions: string[];
   assertions: {
     generativeInfo: any | null;
     exif: any | null;
     actions: ActionSummary[];
+    allAssertions: Record<string, any>; // 全てのassertion（生データ）
   };
   isAIGenerated: boolean;
   rootThumbnailUrl: string | null; // 追加: Root（始祖）のサムネイル
+  verifiedIdentities: VerifiedIdentitySummary[];
+  cawgIssuers: string[];
 }
 
 export interface IngredientSummary {
@@ -60,15 +69,36 @@ export interface ValidationSummary {
   errors: string[];
 }
 
+export interface CredentialSummary {
+  url: string | null;
+  issuer: string | null;
+  type: string | null;
+}
+
+export interface VerifiedIdentitySummary {
+  name: string | null;
+  identifier: string | null;
+  issuer: string | null;
+}
+
 /**
  * ManifestStoreを解析して、シリアライズ可能なサマリーデータを生成する
  */
 export async function createManifestSummary(
-  manifestStore: ManifestStore, 
+  manifestStore: ManifestStore | null | undefined,
   thumbnailUrl: string | null = null
 ): Promise<C2PASummaryData> {
+  // manifestStore自体がnullまたはundefinedの場合
+  if (!manifestStore) {
+    return {
+      activeManifest: null,
+      validationStatus: { isValid: false, errors: ['No manifest store found'] },
+      thumbnailUrl,
+    };
+  }
+
   const activeManifest = manifestStore.activeManifest;
-  
+
   if (!activeManifest) {
     return {
       activeManifest: null,
@@ -115,11 +145,25 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   };
 
   const generatorInfo = manifest.claimGeneratorInfo?.[0];
-  const claimGenerator = {
+  const claimGeneratorInfo = {
     name: generatorInfo?.name || 'Unknown',
     version: generatorInfo?.version || null,
     icon: null,
   };
+
+  // Credentials の抽出
+  const credentials: CredentialSummary[] = manifest.credentials?.map((cred: any) => ({
+    url: cred.url || null,
+    issuer: cred.issuer || null,
+    type: cred.type || null,
+  })) || [];
+
+  // Verified Identities の抽出
+  const verifiedIdentities: VerifiedIdentitySummary[] = manifest.verifiedIdentities?.map((identity: any) => ({
+    name: identity.name || null,
+    identifier: identity.identifier || null,
+    issuer: identity.issuer || null,
+  })) || [];
 
   // 2. アクション（タイムライン）とAI判定
   let actions: ActionSummary[] = [];
@@ -127,16 +171,12 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
 
   // アクションアサーションを取得するヘルパー
   const getActions = (m: Manifest) => {
-    // assertions が Map の場合 (c2pa SDKの標準)
-    if (m.assertions instanceof Map) {
-      return (m.assertions.get('c2pa.actions')?.[0] || m.assertions.get('c2pa.actions.v2')?.[0])?.data?.actions;
-    }
-    // assertions がオブジェクトで data 配列を持つ場合 (一部のシリアライズ形式)
-    if ((m.assertions as any)?.data) {
-        const actionsData = (m.assertions as any).data.find((a: any) => 
-            a.label === 'c2pa.actions' || a.label === 'c2pa.actions.v2'
-        );
-        return actionsData?.data?.actions;
+    // AssertionAccessorの data プロパティから取得
+    if (m.assertions && 'data' in m.assertions && Array.isArray(m.assertions.data)) {
+      const actionsAssertion = m.assertions.data.find((a: any) =>
+        a.label === 'c2pa.actions' || a.label === 'c2pa.actions.v2'
+      );
+      return actionsAssertion?.data?.actions;
     }
     return null;
   };
@@ -176,7 +216,32 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   // 4. その他のアサーション
   const generativeInfo = selectGenerativeInfo(manifest);
 
-  // 5. Rootサムネイルの探索 (追加)
+  // 5. 全てのassertionsを取得（生データ）
+  const allAssertions: Record<string, any> = {};
+
+  // AssertionAccessor の data プロパティからアサーションを取得
+  if (manifest.assertions && 'data' in manifest.assertions && Array.isArray(manifest.assertions.data)) {
+    // assertions.data は Assertion[] 形式
+    manifest.assertions.data.forEach((assertion: any) => {
+      if (assertion && assertion.label) {
+        const label = assertion.label;
+        const data = assertion.data || assertion;
+
+        // 同じラベルが複数ある場合は配列に
+        if (allAssertions[label]) {
+          if (Array.isArray(allAssertions[label])) {
+            allAssertions[label].push(data);
+          } else {
+            allAssertions[label] = [allAssertions[label], data];
+          }
+        } else {
+          allAssertions[label] = data;
+        }
+      }
+    });
+  }
+
+  // 6. Rootサムネイルの探索 (追加)
   const rootThumbnailBlobUrl = await findRootThumbnail(manifest);
   const rootThumbnailUrl = rootThumbnailBlobUrl ? await getBlobUrlAsDataUri(rootThumbnailBlobUrl) : null;
 
@@ -184,17 +249,26 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
     label: manifest.label,
     title: manifest.title,
     format: manifest.format,
+    vendor: manifest.vendor,
+    claimGenerator: manifest.claimGenerator,
+    claimGeneratorInfo,
+    claimGeneratorHints: manifest.claimGeneratorHints,
+    instanceId: manifest.instanceId,
     signatureInfo,
-    claimGenerator,
+    credentials,
     producer: selectProducer(manifest) ? { name: selectProducer(manifest)!.name } : null,
     ingredients,
+    redactions: manifest.redactions || [],
     assertions: {
       generativeInfo,
       exif: null,
       actions,
+      allAssertions,
     },
     isAIGenerated,
-    rootThumbnailUrl, // 追加
+    rootThumbnailUrl,
+    verifiedIdentities,
+    cawgIssuers: manifest.cawgIssuers || [],
   };
 }
 

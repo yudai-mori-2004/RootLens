@@ -29,10 +29,6 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
 
   return (
     <div>
-      <h3 className="text-lg font-bold text-gray-900 mb-6 border-b pb-2">
-        コンテンツの来歴 (Provenance Timeline)
-      </h3>
-
       <div className="relative border-l-2 border-gray-200 ml-3 space-y-8 pb-8">
         {/* 1. Root (Start) */}
         <div className="relative pl-8">

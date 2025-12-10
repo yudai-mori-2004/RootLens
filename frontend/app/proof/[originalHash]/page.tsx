@@ -4,6 +4,24 @@ import { useEffect, useState, use } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
 import ProvenanceTimeline from '@/app/components/ProvenanceTimeline';
+import ProvenanceModal from '@/app/components/ProvenanceModal';
+import TechnicalSpecsModal from '@/app/components/TechnicalSpecsModal';
+import { Button } from '@/components/ui/button';
+import {
+  CheckCircle,
+  XCircle,
+  Download,
+  ExternalLink,
+  Shield,
+  Clock,
+  User,
+  FileText,
+  AlertTriangle,
+  Sparkles,
+  Eye,
+  ClipboardList,
+  Info
+} from 'lucide-react';
 
 // クライアントサイドでのSupabase接続
 const supabase = createClient(
@@ -30,6 +48,10 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
   const [proof, setProof] = useState<ProofData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // モーダル状態
+  const [showProvenanceModal, setShowProvenanceModal] = useState(false);
+  const [showTechnicalModal, setShowTechnicalModal] = useState(false);
 
   useEffect(() => {
     async function fetchProof() {
@@ -103,16 +125,31 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-xl text-gray-600">証明書を読み込み中...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-lg text-gray-600 font-medium">証明書を読み込み中...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !proof) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-xl text-red-600">エラー: {error || 'データが見つかりません'}</div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="max-w-md bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-10 h-10 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">エラーが発生しました</h2>
+          <p className="text-gray-600">{error || 'データが見つかりません'}</p>
+          <Button
+            onClick={() => window.location.href = '/'}
+            className="mt-6 bg-indigo-600 hover:bg-indigo-700"
+          >
+            ホームに戻る
+          </Button>
+        </div>
       </div>
     );
   }
@@ -122,153 +159,278 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
   const solanaExplorer = process.env.NEXT_PUBLIC_SOLANA_EXPLORER_URL || 'https://orb.helius.dev/address';
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* ヘッダー */}
-        <div className="bg-blue-900 text-white p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold mb-1">RootLens Proof</h1>
-              <p className="text-blue-200 text-sm font-mono">#{proof.originalHash.slice(0, 8)}</p>
-            </div>
-            <div className="flex gap-2">
-              {proof.c2paData?.activeManifest?.isAIGenerated && (
-                 <div className="flex items-center bg-purple-600 text-white px-4 py-2 rounded-full font-bold">
-                   <span className="mr-2">🤖</span> AI生成
-                 </div>
-              )}
-              {proof.isValid ? (
-                <div className="flex items-center bg-green-500 text-white px-4 py-2 rounded-full font-bold">
-                  <span className="mr-2">✓</span> 検証済み
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/30 to-gray-50">
+        {/* ヘッダーバー */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img src="/icon_white.png" alt="RootLens" className="w-8 h-8" />
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">RootLens Proof</h1>
+                  <p className="text-xs text-gray-500 font-mono">#{proof.originalHash.slice(0, 16)}...</p>
                 </div>
-              ) : (
-                <div className="flex items-center bg-red-500 text-white px-4 py-2 rounded-full font-bold">
-                  <span className="mr-2">!</span> 検証失敗
-                </div>
-              )}
+              </div>
+              <div className="flex items-center gap-3">
+                {proof.c2paData?.activeManifest?.isAIGenerated && (
+                  <div className="flex items-center bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <Sparkles className="w-4 h-4 mr-1.5" />
+                    AI生成
+                  </div>
+                )}
+                {proof.isValid ? (
+                  <div className="flex items-center bg-green-100 text-green-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <CheckCircle className="w-4 h-4 mr-1.5" />
+                    検証済み
+                  </div>
+                ) : (
+                  <div className="flex items-center bg-red-100 text-red-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                    <AlertTriangle className="w-4 h-4 mr-1.5" />
+                    検証失敗
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* メインコンテンツ */}
-        <div className="p-8">
-          {/* サムネイルとタイトル */}
-          <div className="flex flex-col md:flex-row gap-8 mb-8">
-            {proof.c2paData?.thumbnailUrl ? (
-                <div className="w-full md:w-1/3 flex-shrink-0">
-                    <img 
-                        src={proof.c2paData.thumbnailUrl} 
-                        alt="Content Thumbnail" 
-                        className="w-full h-auto rounded-lg shadow-md border border-gray-200"
-                    />
-                </div>
-            ) : (
-                <div className="w-full md:w-1/3 flex-shrink-0 bg-gray-100 rounded-lg flex items-center justify-center h-48 md:h-auto text-gray-400">
-                    No Thumbnail
-                </div>
-            )}
-            
-            <div className="flex-1">
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                  {proof.title || '無題のドキュメント'}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* サムネイル＆検証ステータス */}
+          <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8">
+            <div className="grid md:grid-cols-2 gap-0">
+              {/* 左: サムネイル */}
+              <div className="relative bg-gray-900 aspect-video md:aspect-auto flex items-center justify-center">
+                {proof.c2paData?.thumbnailUrl ? (
+                  <img
+                    src={proof.c2paData.thumbnailUrl}
+                    alt="Content preview"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="text-gray-500 text-center p-8">
+                    <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">プレビューなし</p>
+                  </div>
+                )}
+                {/* 検証バッジ（オーバーレイ） */}
+                {proof.isValid && (
+                  <div className="absolute top-4 right-4">
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full blur-xl opacity-30 group-hover:opacity-50 transition-opacity" />
+                      <div className="relative rounded-full bg-white p-2 shadow-xl">
+                        <CheckCircle className="w-8 h-8 text-green-500" strokeWidth={2.5} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 右: メタ情報 */}
+              <div className="p-8 flex flex-col justify-center">
+                <h2 className="text-3xl font-bold text-gray-900 mb-3">
+                  {proof.title || '無題のコンテンツ'}
                 </h2>
                 {proof.description && (
-                  <p className="text-gray-600 mb-4">{proof.description}</p>
+                  <p className="text-gray-600 mb-6 leading-relaxed">{proof.description}</p>
                 )}
-                
+
+                {/* C2PA情報カード */}
                 {proof.c2paData?.activeManifest && (
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                        <p className="text-sm text-blue-800 font-bold mb-1">C2PA署名情報</p>
-                        <p className="text-sm text-gray-700">
-                            このコンテンツは <strong>{proof.c2paData.activeManifest.claimGenerator.name}</strong> によって生成され、
-                            <strong>{proof.c2paData.activeManifest.signatureInfo.issuer || 'Unknown'}</strong> によって署名されました。
+                  <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-5 mb-6">
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-full bg-indigo-100 p-2 mt-0.5">
+                        <Shield className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-indigo-900 mb-1 text-sm">C2PA署名情報</p>
+                        <p className="text-sm text-indigo-800 leading-relaxed">
+                          <strong>{proof.c2paData.activeManifest.claimGeneratorInfo.name}</strong> で作成され、
+                          <strong className="ml-1">{proof.c2paData.activeManifest.signatureInfo.issuer || 'Unknown'}</strong> により署名されました。
                         </p>
+                      </div>
                     </div>
+                  </div>
                 )}
+
+                {/* アクションボタン */}
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    onClick={() => setShowProvenanceModal(true)}
+                    variant="outline"
+                    className="flex-1 min-w-[140px]"
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    タイムライン
+                  </Button>
+                  <Button
+                    onClick={() => setShowTechnicalModal(true)}
+                    variant="outline"
+                    className="flex-1 min-w-[140px]"
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    技術仕様
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* 左カラム: 統合タイムライン */}
-            <div>
-              {proof.c2paData ? (
-                <ProvenanceTimeline
-                  c2paSummary={proof.c2paData}
-                  rootSigner={proof.rootSigner}
-                />
-              ) : (
-                <div className="text-gray-500 text-sm">
-                  来歴情報を読み込めませんでした
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* ブロックチェーン証明 */}
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="rounded-full bg-indigo-100 p-2">
+                  <Shield className="w-6 h-6 text-indigo-600" />
                 </div>
-              )}
-            </div>
+                <h3 className="text-xl font-bold text-gray-900">ブロックチェーン証明</h3>
+              </div>
 
-            {/* 右カラム: ブロックチェーン情報 */}
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 mb-4 border-b pb-2">
-                ブロックチェーン証明
-              </h3>
-              <dl className="space-y-4">
-                <div>
-                  <dt className="text-sm text-gray-500">Arweave Transaction</dt>
-                  <dd className="font-mono text-xs text-blue-600 break-all mt-1">
-                    <a 
+              <div className="space-y-6">
+                {/* Arweave */}
+                <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Arweave Transaction</p>
+                      <p className="text-sm text-gray-700 font-medium">永久保存データ</p>
+                    </div>
+                    <a
                       href={`${arweaveExplorer}/${proof.arweaveTxId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:underline"
+                      className="text-indigo-600 hover:text-indigo-700"
                     >
-                      {proof.arweaveTxId}
+                      <ExternalLink className="w-5 h-5" />
                     </a>
-                  </dd>
+                  </div>
+                  <p className="font-mono text-xs text-gray-600 break-all bg-white p-3 rounded border border-gray-200">
+                    {proof.arweaveTxId}
+                  </p>
                 </div>
-                <div>
-                  <dt className="text-sm text-gray-500">cNFT Asset ID</dt>
-                  <dd className="font-mono text-xs text-blue-600 break-all mt-1">
+
+                {/* Solana cNFT */}
+                <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Solana cNFT</p>
+                      <p className="text-sm text-gray-700 font-medium">所有権証明</p>
+                    </div>
                     <a
                       href={`${solanaExplorer}/${proof.cnftMintAddress}?cluster=devnet`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:underline"
+                      className="text-indigo-600 hover:text-indigo-700"
                     >
-                      {proof.cnftMintAddress}
+                      <ExternalLink className="w-5 h-5" />
                     </a>
-                  </dd>
+                  </div>
+                  <p className="font-mono text-xs text-gray-600 break-all bg-white p-3 rounded border border-gray-200">
+                    {proof.cnftMintAddress}
+                  </p>
                 </div>
-                <div>
-                  <dt className="text-sm text-gray-500">現在の所有者</dt>
-                  <dd className="font-mono text-xs text-gray-900 break-all mt-1">
-                    {proof.ownerWallet}
-                  </dd>
-                </div>
-              </dl>
 
-              {/* 購入アクション（プレースホルダー） */}
-              <div className="mt-8 bg-gray-50 rounded-xl p-6 border border-gray-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">元データをダウンロード</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {proof.priceLamports > 0 
-                        ? `${proof.priceLamports / 1e9} SOL` 
-                        : '無料'}
+                {/* 所有者 */}
+                <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <User className="w-5 h-5 text-gray-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">現在の所有者</p>
+                      <p className="font-mono text-xs text-gray-800 break-all bg-white p-3 rounded border border-gray-200 mt-2">
+                        {proof.ownerWallet}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 作成日時 */}
+                <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-5 h-5 text-gray-500 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">証明作成日時</p>
+                      <p className="text-sm text-gray-800 font-medium mt-2">
+                        {new Date(proof.createdAt).toLocaleString('ja-JP')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ダウンロード */}
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="rounded-full bg-green-100 p-2">
+                  <Download className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">元データ</h3>
+              </div>
+
+              <div className="space-y-4">
+                {/* 価格表示 */}
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 text-center border-2 border-indigo-200">
+                  <p className="text-sm text-gray-600 mb-2">価格</p>
+                  <p className="text-4xl font-bold text-gray-900">
+                    {proof.priceLamports > 0 ? (
+                      <>
+                        {(proof.priceLamports / 1e9).toFixed(3)}
+                        <span className="text-lg ml-2 text-gray-600">SOL</span>
+                      </>
+                    ) : (
+                      <span className="text-green-600">無料</span>
+                    )}
+                  </p>
+                </div>
+
+                {/* ダウンロードボタン */}
+                <Button
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg font-bold shadow-lg"
+                  disabled={true}
+                >
+                  <Download className="w-5 h-5 mr-2" />
+                  {proof.priceLamports > 0 ? '購入してダウンロード' : 'ダウンロード'}
+                </Button>
+
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      このファイルはC2PA署名とブロックチェーンにより真正性が保証されています
                     </p>
                   </div>
                 </div>
-                <button 
-                  className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={true} // まだ実装していないため
-                >
-                  {proof.priceLamports > 0 ? '購入してダウンロード' : 'ダウンロード'}
-                </button>
-                <p className="text-xs text-gray-500 mt-3 text-center">
-                  ※ このファイルはC2PA署名とブロックチェーンにより真正性が保証されています
-                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* モーダル群 */}
+      {proof.c2paData && (
+        <>
+          {/* タイムラインモーダル */}
+          <ProvenanceModal
+            isOpen={showProvenanceModal}
+            onClose={() => setShowProvenanceModal(false)}
+            c2paSummary={proof.c2paData}
+            rootSigner={proof.rootSigner}
+          />
+
+          {/* 技術仕様モーダル */}
+          <TechnicalSpecsModal
+            isOpen={showTechnicalModal}
+            onClose={() => setShowTechnicalModal(false)}
+            c2paSummary={proof.c2paData}
+            rootSigner={proof.rootSigner}
+            arweaveTxId={proof.arweaveTxId}
+            cnftMintAddress={proof.cnftMintAddress}
+            ownerWallet={proof.ownerWallet}
+            createdAt={proof.createdAt}
+            originalHash={proof.originalHash}
+          />
+        </>
+      )}
+    </>
   );
 }

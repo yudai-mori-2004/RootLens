@@ -1,6 +1,9 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+
 interface StepContainerProps {
-  title: string;
-  description?: string;
+  title: React.ReactNode;
+  description?: React.ReactNode;
   children: React.ReactNode;
   onNext?: () => void;
   onBack?: () => void;
@@ -22,52 +25,41 @@ export default function StepContainer({
   isLoading = false,
 }: StepContainerProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6 md:p-8">
-      {/* ヘッダー */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-        {description && <p className="text-gray-600 mt-2">{description}</p>}
-      </div>
+    <Card className="shadow-lg">
+      <CardHeader>
+        <CardTitle className="text-2xl">{title}</CardTitle>
+        {description && <CardDescription className="text-base">{description}</CardDescription>}
+      </CardHeader>
 
-      {/* コンテンツ */}
-      <div className="mb-8">{children}</div>
+      <CardContent>{children}</CardContent>
 
-      {/* ナビゲーションボタン */}
       {(onNext || onBack) && (
-        <div className="flex justify-between items-center pt-6 border-t">
+        <CardFooter className="flex justify-between border-t pt-6">
           {showBack && onBack ? (
-            <button
-              onClick={onBack}
-              disabled={isLoading}
-              className="px-6 py-2 text-gray-600 hover:text-gray-900 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
+            <Button onClick={onBack} disabled={isLoading} variant="ghost">
               ← 戻る
-            </button>
+            </Button>
           ) : (
             <div />
           )}
 
           {onNext && (
-            <button
-              onClick={onNext}
-              disabled={nextDisabled || isLoading}
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-2"
-            >
+            <Button onClick={onNext} disabled={nextDisabled || isLoading} size="lg">
               {isLoading ? (
                 <>
-                  <span className="animate-spin">⏳</span>
+                  <span className="animate-spin mr-2">⏳</span>
                   <span>処理中...</span>
                 </>
               ) : (
                 <>
                   <span>{nextLabel}</span>
-                  <span>→</span>
+                  <span className="ml-2">→</span>
                 </>
               )}
-            </button>
+            </Button>
           )}
-        </div>
+        </CardFooter>
       )}
-    </div>
+    </Card>
   );
 }
