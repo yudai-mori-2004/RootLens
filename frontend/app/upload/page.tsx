@@ -449,17 +449,21 @@ export default function UploadPage() {
   // ========== レンダリング ==========
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* ヘッダー */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            RootLens
-          </h1>
-          <p className="text-gray-600">
-            C2PAハードウェア署名付きメディアをcNFT + Arweaveで証明
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      {/* ヘッダーバー */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-3">
+            <img src="/icon_white.png" alt="RootLens" className="w-8 h-8" />
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">RootLens Upload</h1>
+              <p className="text-xs text-gray-500">C2PAハードウェア署名付きメディアを証明</p>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto py-12 px-4">
 
         {/* プログレスバー */}
         <ProgressBar currentStep={currentStep} totalSteps={5} steps={STEPS} />
