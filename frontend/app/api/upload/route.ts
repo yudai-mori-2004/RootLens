@@ -21,6 +21,9 @@ interface UploadRequest {
   // R2パス（アップロード済み）
   mediaFilePath: string;
 
+  // サムネイル公開URL（Arweave用）
+  thumbnailPublicUrl?: string;
+
   // RootLens独自データ
   price: number;
   title?: string;
@@ -42,6 +45,7 @@ export async function POST(request: NextRequest) {
       rootSigner: body.rootSigner,
       rootCertChain: body.rootCertChain,
       mediaFilePath: body.mediaFilePath,
+      thumbnailPublicUrl: body.thumbnailPublicUrl,
       price: body.price,
       title: body.title,
       description: body.description,

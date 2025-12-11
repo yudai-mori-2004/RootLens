@@ -54,8 +54,7 @@ CREATE TABLE IF NOT EXISTS media_proofs (
     description TEXT,                        -- 説明文
 
     -- 状態管理
-    is_burned BOOLEAN DEFAULT FALSE,         -- cNFTがBurnされたか
-    is_deleted BOOLEAN DEFAULT FALSE,        -- 違法コンテンツ等で削除されたか
+    is_public BOOLEAN DEFAULT FALSE,        -- 証明書ページを公開中か否か
 
     -- タイムスタンプ
     created_at TIMESTAMPTZ DEFAULT NOW(),

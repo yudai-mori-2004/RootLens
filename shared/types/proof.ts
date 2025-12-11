@@ -9,6 +9,7 @@ export interface ArweaveProofMetadata {
   name: string;            // "RootLens Proof #abc123ef"
   symbol: string;          // "RLENS"
   description: string;     // "Media authenticity proof verified by RootLens"
+  image?: string;          // サムネイル画像URL（R2 public bucketへのリンク）
   target_asset_id: string; // 予測したcNFTアドレス
   attributes: ProofAttribute[];
 }

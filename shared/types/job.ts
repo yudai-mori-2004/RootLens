@@ -19,6 +19,9 @@ export interface MintJobData {
   // R2パス（アップロード済み）
   mediaFilePath: string;     // media/{originalHash}/original.{ext}
 
+  // サムネイル公開URL（Arweave用）
+  thumbnailPublicUrl?: string;  // R2 public bucketのURL
+
   // RootLens独自データ
   price: number;          // lamports単位（0 = 無料）
   title?: string;

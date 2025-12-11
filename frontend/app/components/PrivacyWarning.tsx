@@ -486,18 +486,21 @@ export default function PrivacyWarning({
           <ScrollArea className="px-6 pb-6 max-h-[calc(90vh-8rem)]">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
               {allMetadata.map((item, index) => {
+                // valueを文字列に変換
+                const valueStr = typeof item.value === 'string' ? item.value : String(item.value);
+
                 // JSON文字列かどうか判定（改行を含むか、[]や{}で始まる）
-                const isJson = item.value.includes('\n') || item.value.startsWith('[') || item.value.startsWith('{');
+                const isJson = valueStr.includes('\n') || valueStr.startsWith('[') || valueStr.startsWith('{');
 
                 return (
                   <div key={index} className={`flex flex-col ${isJson ? 'md:col-span-2' : ''}`}>
                     <p className="text-gray-500 text-xs mb-0.5">{item.label}</p>
                     {isJson ? (
                       <pre className="text-gray-900 text-xs bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto">
-                        {item.value}
+                        {valueStr}
                       </pre>
                     ) : (
-                      <p className="text-gray-900 font-medium break-all">{item.value}</p>
+                      <p className="text-gray-900 font-medium break-all">{valueStr}</p>
                     )}
                   </div>
                 );

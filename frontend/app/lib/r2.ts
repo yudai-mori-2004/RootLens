@@ -14,7 +14,19 @@ const r2Client = new S3Client({
     },
 });
 
+// Public Bucket用クライアント（同じ認証情報を使用）
+const r2PublicClient = new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    },
+});
+
 const BUCKET_NAME = process.env.R2_BUCKET_NAME!;
+const PUBLIC_BUCKET_NAME = process.env.R2_PUBLIC_BUCKET_NAME!;
+const PUBLIC_BUCKET_URL = process.env.R2_PUBLIC_BUCKET_URL!;
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Presigned URL生成（アップロード用）
@@ -84,4 +96,54 @@ export function getFileExtension(mimeType: string): string {
     };
 
     return mimeToExt[mimeType] || 'bin';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Public Bucketへの直接アップロード（サムネイル・manifest用）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export async function uploadThumbnailToPublicBucket(
+    originalHash: string,
+    thumbnailBlob: Blob
+): Promise<string> {
+    const key = `media/${originalHash}/thumbnail.jpg`;
+
+    const command = new PutObjectCommand({
+        Bucket: PUBLIC_BUCKET_NAME,
+        Key: key,
+        Body: Buffer.from(await thumbnailBlob.arrayBuffer()),
+        ContentType: 'image/jpeg',
+    });
+
+    await r2PublicClient.send(command);
+
+    // 公開URLを返す
+    return `${PUBLIC_BUCKET_URL}/${key}`;
+}
+
+export async function uploadManifestToPublicBucket(
+    originalHash: string,
+    manifestData: any
+): Promise<string> {
+    const key = `media/${originalHash}/manifest.json`;
+
+    const command = new PutObjectCommand({
+        Bucket: PUBLIC_BUCKET_NAME,
+        Key: key,
+        Body: JSON.stringify(manifestData, null, 2),
+        ContentType: 'application/json',
+    });
+
+    await r2PublicClient.send(command);
+
+    // 公開URLを返す
+    return `${PUBLIC_BUCKET_URL}/${key}`;
+}
+
+export function getPublicThumbnailUrl(originalHash: string): string {
+    return `${PUBLIC_BUCKET_URL}/media/${originalHash}/thumbnail.jpg`;
+}
+
+export function getPublicManifestUrl(originalHash: string): string {
+    return `${PUBLIC_BUCKET_URL}/media/${originalHash}/manifest.json`;
 }

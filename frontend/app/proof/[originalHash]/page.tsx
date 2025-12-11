@@ -2,10 +2,13 @@
 
 import { useEffect, useState, use } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { usePrivy } from '@privy-io/react-auth';
+import { useWallets } from '@privy-io/react-auth/solana';
 import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
 import ProvenanceTimeline from '@/app/components/ProvenanceTimeline';
 import ProvenanceModal from '@/app/components/ProvenanceModal';
 import TechnicalSpecsModal from '@/app/components/TechnicalSpecsModal';
+import PurchaseModal from '@/app/components/PurchaseModal';
 import { Button } from '@/components/ui/button';
 import {
   CheckCircle,
@@ -20,7 +23,9 @@ import {
   Sparkles,
   Eye,
   ClipboardList,
-  Info
+  Info,
+  RefreshCw,
+  EyeOff
 } from 'lucide-react';
 
 // クライアントサイドでのSupabase接続
@@ -30,6 +35,7 @@ const supabase = createClient(
 );
 
 interface ProofData {
+  mediaProofId: string;
   originalHash: string;
   rootSigner: string;
   createdAt: string;
@@ -41,6 +47,7 @@ interface ProofData {
   ownerWallet: string;
   isValid: boolean;
   c2paData: C2PASummaryData | null;
+  isPublic: boolean;
 }
 
 export default function ProofPage({ params }: { params: Promise<{ originalHash: string }> }) {
@@ -49,9 +56,55 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Privy Hooks
+  const { authenticated } = usePrivy();
+  const { wallets } = useWallets();
+  const solanaWallet = wallets[0];
+  const userWalletAddress = solanaWallet?.address;
+
+  // 購入状態
+  const [isPurchased, setIsPurchased] = useState(false);
+  const [downloadToken, setDownloadToken] = useState<string | null>(null);
+  const [checkingPurchase, setCheckingPurchase] = useState(false);
+  const [isOwner, setIsOwner] = useState(false); // 所有者判定を追加
+  const [accessAllowed, setAccessAllowed] = useState(false); // アクセス可否の状態（初期値はfalse＝拒否）
+  const [checkingAccess, setCheckingAccess] = useState(true); // アクセス権限チェック中かどうか
+
   // モーダル状態
   const [showProvenanceModal, setShowProvenanceModal] = useState(false);
   const [showTechnicalModal, setShowTechnicalModal] = useState(false);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+
+  // 購入状態と所有者状態の確認
+  useEffect(() => {
+    async function checkAccessStatus() {
+      // proofがまだロードされていない場合は何もしない（loading状態のまま）
+      if (!proof) return;
+
+      setCheckingAccess(true);
+
+      const currentIsOwner = authenticated && userWalletAddress === proof.ownerWallet;
+      setIsOwner(currentIsOwner);
+
+      // 公開コンテンツなら無条件で許可
+      if (proof.isPublic) {
+        setAccessAllowed(true);
+      } else {
+        // 非公開の場合、所有者または購入者のみ許可
+        // isPurchasedは非同期でチェックされるため、ここでの値は最新でない可能性があるが、
+        // isPurchasedがtrueになったタイミングでこのuseEffectが再発火するので問題ない
+        if (currentIsOwner || isPurchased) {
+          setAccessAllowed(true);
+        } else {
+          setAccessAllowed(false);
+        }
+      }
+      
+      setCheckingAccess(false);
+    }
+
+    checkAccessStatus();
+  }, [proof, authenticated, userWalletAddress, isPurchased]);
 
   useEffect(() => {
     async function fetchProof() {
@@ -62,7 +115,7 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
         // 1. Supabaseから基本情報を取得
         const { data: dbData, error: dbError } = await supabase
           .from('media_proofs')
-          .select('*')
+          .select('*, is_public') // is_public カラムも選択
           .eq('original_hash', originalHash)
           .single();
 
@@ -78,15 +131,20 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
         }
         const arweaveData = await arweaveResponse.json();
 
-        // 3. R2からManifest JSONを取得
+        // 3. Public BucketからManifest JSONを取得
         let c2paData: C2PASummaryData | null = null;
-        try {
-          const manifestResponse = await fetch(`/api/proof/${originalHash}/manifest`);
-          if (manifestResponse.ok) {
-            c2paData = await manifestResponse.json();
+        // 非公開コンテンツの場合、所有者でない場合はc2paDataの取得をスキップ
+        if (dbData.is_public || userWalletAddress === dbData.owner_wallet) {
+          try {
+            const publicBucketUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_BUCKET_URL;
+            const manifestUrl = `${publicBucketUrl}/media/${originalHash}/manifest.json`;
+            const manifestResponse = await fetch(manifestUrl);
+            if (manifestResponse.ok) {
+              c2paData = await manifestResponse.json();
+            }
+          } catch (e) {
+            console.warn('Manifest取得失敗:', e);
           }
-        } catch (e) {
-          console.warn('Manifest取得失敗:', e);
         }
 
         // 4. データ整形
@@ -97,6 +155,7 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
         const isValid = arweaveData.target_asset_id === dbData.cnft_mint_address;
 
         setProof({
+          mediaProofId: dbData.id,
           originalHash: dbData.original_hash,
           rootSigner: rootSignerAttr?.value || 'Unknown',
           createdAt: createdAtAttr?.value || dbData.created_at,
@@ -108,6 +167,7 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
           ownerWallet: dbData.owner_wallet,
           isValid,
           c2paData,
+          isPublic: dbData.is_public, // isPublic カラムをセット
         });
 
       } catch (err) {
@@ -121,28 +181,35 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
     if (originalHash) {
       fetchProof();
     }
-  }, [originalHash]);
+  }, [originalHash, userWalletAddress]);
 
-  if (loading) {
+  if (loading || checkingAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="text-center space-y-4">
           <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-lg text-gray-600 font-medium">証明書を読み込み中...</p>
+          <p className="text-lg text-gray-600 font-medium">読み込み中...</p>
         </div>
       </div>
     );
   }
 
-  if (error || !proof) {
+  if (error || !proof || !accessAllowed) { // accessAllowed もチェック
+    // アクセスが許可されていない、またはエラーの場合の表示
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
         <div className="max-w-md bg-white rounded-2xl shadow-xl p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <XCircle className="w-10 h-10 text-red-500" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">エラーが発生しました</h2>
-          <p className="text-gray-600">{error || 'データが見つかりません'}</p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">
+            {accessAllowed === false ? 'アクセスが拒否されました' : 'エラーが発生しました'}
+          </h2>
+          <p className="text-gray-600">
+            {accessAllowed === false ?
+             'このコンテンツは非公開に設定されているため、アクセスできません。' :
+             (error || 'データが見つかりません')}
+          </p>
           <Button
             onClick={() => window.location.href = '/'}
             className="mt-6 bg-indigo-600 hover:bg-indigo-700"
@@ -173,6 +240,12 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {!proof.isPublic && (
+                    <div className="flex items-center bg-yellow-100 text-yellow-800 px-3 py-1.5 rounded-full text-sm font-medium">
+                        <EyeOff className="w-4 h-4 mr-1.5" />
+                        非公開
+                    </div>
+                )}
                 {proof.c2paData?.activeManifest?.isAIGenerated && (
                   <div className="flex items-center bg-purple-100 text-purple-800 px-3 py-1.5 rounded-full text-sm font-medium">
                     <Sparkles className="w-4 h-4 mr-1.5" />
@@ -194,6 +267,7 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
             </div>
           </div>
         </div>
+
 
         {/* メインコンテンツ */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -384,13 +458,39 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
                 </div>
 
                 {/* ダウンロードボタン */}
-                <Button
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg font-bold shadow-lg"
-                  disabled={true}
-                >
-                  <Download className="w-5 h-5 mr-2" />
-                  {proof.priceLamports > 0 ? '購入してダウンロード' : 'ダウンロード'}
-                </Button>
+                {isPurchased && downloadToken ? (
+                  <div className="space-y-3">
+                     <div className="flex items-center justify-center gap-2 text-green-600 bg-green-50 p-3 rounded-lg border border-green-200">
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="font-medium">購入済み</span>
+                     </div>
+                     <Button
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg font-bold shadow-lg"
+                      onClick={() => window.open(`/api/download/${downloadToken}`, '_blank')}
+                    >
+                      <RefreshCw className="w-5 h-5 mr-2" />
+                      再ダウンロード
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-6 text-lg font-bold shadow-lg"
+                    onClick={() => setShowPurchaseModal(true)}
+                    disabled={checkingPurchase}
+                  >
+                    {checkingPurchase ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                        確認中...
+                      </span>
+                    ) : (
+                      <>
+                        <Download className="w-5 h-5 mr-2" />
+                        {proof.priceLamports > 0 ? '購入してダウンロード' : 'ダウンロード'}
+                      </>
+                    )}
+                  </Button>
+                )}
 
                 <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
                   <div className="flex items-start gap-2">
@@ -430,6 +530,31 @@ export default function ProofPage({ params }: { params: Promise<{ originalHash: 
             originalHash={proof.originalHash}
           />
         </>
+      )}
+
+      {/* 購入モーダル */}
+      {proof && (
+        <PurchaseModal
+          isOpen={showPurchaseModal}
+          onClose={() => {
+            setShowPurchaseModal(false);
+            // モーダルが閉じられたら購入状態を再確認
+            if (authenticated && userWalletAddress) {
+               // 簡易的に再チェック（関数をuseEffect外に出すか、依存配列で制御するかだが、
+               // ここでは単純にwindow reloadでも良いがUX悪いので、state更新関数を渡すのがベスト）
+               // 今回はPurchaseModalにonSuccessを追加するのが綺麗。
+            }
+          }}
+          onSuccess={(token) => {
+            setIsPurchased(true);
+            setDownloadToken(token);
+            setShowPurchaseModal(false);
+          }}
+          mediaProofId={proof.mediaProofId}
+          priceLamports={proof.priceLamports}
+          sellerWallet={proof.ownerWallet}
+          title={proof.title}
+        />
       )}
     </>
   );

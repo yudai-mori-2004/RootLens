@@ -152,7 +152,8 @@ export default function UploadPage() {
         'Leica Camera AG',
         'Nikon Corporation',
         'Canon Inc.',
-        'Adobe Inc.'
+        'Adobe Inc.',
+        'OpenAI'
       ];
 
       const activeManifest = summary.activeManifest;
@@ -309,48 +310,34 @@ export default function UploadPage() {
         throw new Error('R2アップロード失敗（元ファイル）');
       }
 
-      // 3. Presigned URL取得（Manifest JSON）
-      const presignedManifestResponse = await fetch('/api/upload/presigned', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          original_hash: hashes.originalHash,
-          file_type: 'manifest',
-          content_type: 'application/json',
-        }),
-      });
-
-      if (!presignedManifestResponse.ok) {
-        throw new Error('Presigned URL取得失敗（Manifest JSON）');
-      }
-
-      const { presigned_url: presignedManifestUrl } = await presignedManifestResponse.json();
-
-      // 4. Manifest JSONをアップロード
+      // 3. サムネイルとManifestをPublic Bucketにアップロード
       let summaryData = c2paSummary;
       if (!summaryData) {
         const { manifestStore, thumbnail } = await c2pa!.read(currentFile);
         summaryData = await createManifestSummary(manifestStore, thumbnail?.getUrl() || null);
       }
 
-      const manifestJsonBlob = new Blob(
-        [JSON.stringify(summaryData, null, 2)],
-        { type: 'application/json' }
-      );
-      const uploadManifestResponse = await fetch(presignedManifestUrl, {
-        method: 'PUT',
+      const publicUploadResponse = await fetch('/api/upload/public', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: manifestJsonBlob,
+        body: JSON.stringify({
+          original_hash: hashes.originalHash,
+          thumbnail_data_uri: summaryData.thumbnailUrl,
+          manifest_data: summaryData,
+        }),
       });
 
-      if (!uploadManifestResponse.ok) {
-        throw new Error('R2アップロード失敗（Manifest JSON）');
+      if (!publicUploadResponse.ok) {
+        throw new Error('Public Bucketアップロード失敗');
       }
 
-      // 5. Root証明書チェーンを抽出
+      const publicUploadResult = await publicUploadResponse.json();
+      console.log('✅ Public Bucketアップロード完了:', publicUploadResult);
+
+      // 4. Root証明書チェーンを抽出
       const rootCertChain = extractRootCertChain(manifestData);
 
-      // 6. アップロードAPI呼び出し
+      // 5. アップロードAPI呼び出し
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -360,6 +347,7 @@ export default function UploadPage() {
           rootSigner: summaryData?.activeManifest?.signatureInfo?.issuer || 'Unknown',
           rootCertChain: rootCertChain,
           mediaFilePath: `media/${hashes.originalHash}/original.${getExtension(currentFile.type)}`,
+          thumbnailPublicUrl: publicUploadResult.thumbnail_url,
           price: Math.floor(price * 1e9),
           title: title || undefined,
           description: description || undefined,
@@ -374,7 +362,7 @@ export default function UploadPage() {
       const uploadResult = await uploadResponse.json();
       const jobId = uploadResult.jobId;
 
-      // 7. ジョブステータスをポーリング
+      // 6. ジョブステータスをポーリング
       let completed = false;
       let attempts = 0;
       const maxAttempts = 60;

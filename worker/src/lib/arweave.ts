@@ -17,6 +17,7 @@ export async function uploadToArweave(data: {
   rootSigner: string;
   rootCertChain: string;
   predictedAssetId: string;
+  thumbnailPublicUrl?: string;
 }): Promise<string> {
   const umi = getUmi();
 
@@ -27,7 +28,7 @@ export async function uploadToArweave(data: {
     })
   );
 
-  // Arweaveメタデータを構築（最小限の4フィールド）
+  // Arweaveメタデータを構築（最小限の4フィールド + 画像URL）
   const proofMetadata: ArweaveProofMetadata = {
     name: `RootLens Proof #${data.originalHash.slice(0, 8)}`,
     symbol: 'RLENS',
@@ -40,6 +41,11 @@ export async function uploadToArweave(data: {
       { trait_type: 'created_at', value: new Date().toISOString() },
     ],
   };
+
+  // サムネイル公開URLがある場合、imageフィールドに追加
+  if (data.thumbnailPublicUrl) {
+    proofMetadata.image = data.thumbnailPublicUrl;
+  }
 
   console.log('   Uploading metadata:', JSON.stringify(proofMetadata, null, 2));
 

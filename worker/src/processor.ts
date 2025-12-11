@@ -55,6 +55,7 @@ export async function processMint(
       rootSigner: data.rootSigner,
       rootCertChain: data.rootCertChain,
       predictedAssetId,
+      thumbnailPublicUrl: data.thumbnailPublicUrl,
     });
     console.log(`   Arweave URI: ${arweaveUri}`);
 
