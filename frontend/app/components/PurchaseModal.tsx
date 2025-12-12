@@ -1,15 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets, useSignAndSendTransaction } from '@privy-io/react-auth/solana';
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, Wallet, Mail, Check, AlertCircle } from 'lucide-react';
+import { Loader2, Wallet, Check, AlertCircle } from 'lucide-react';
 import bs58 from 'bs58';
 
 interface PurchaseModalProps {
@@ -37,18 +35,10 @@ export default function PurchaseModal({
   const solanaWallet = wallets[0];
   const buyerWallet = solanaWallet?.address;
 
-  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'email' | 'payment' | 'success'>('email');
+  const [step, setStep] = useState<'confirm' | 'payment' | 'success'>('confirm');
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
   const [lastSignature, setLastSignature] = useState<string | null>(null);
-
-  // Privyからメールアドレスを自動取得
-  useEffect(() => {
-    if (user?.email?.address) {
-      setEmail(user.email.address);
-    }
-  }, [user]);
 
   const handlePurchase = async () => {
     if (!authenticated) {
@@ -58,18 +48,6 @@ export default function PurchaseModal({
 
     if (!buyerWallet) {
       toast.error('ウォレットが接続されていません');
-      return;
-    }
-
-    if (!email) {
-      toast.error('メールアドレスを入力してください');
-      return;
-    }
-
-    // メールアドレスの簡易バリデーション
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error('有効なメールアドレスを入力してください');
       return;
     }
 
@@ -157,7 +135,6 @@ export default function PurchaseModal({
         body: JSON.stringify({
           mediaProofId,
           buyerWallet,
-          buyerEmail: email,
           txSignature,
         }),
       });
@@ -179,15 +156,14 @@ export default function PurchaseModal({
     } catch (error: any) {
       console.error('=== Purchase Error ===', error);
       toast.error(error.message || '購入処理に失敗しました');
-      setStep('email');
+      setStep('confirm');
     } finally {
       setLoading(false);
     }
   };
 
   const handleClose = () => {
-    setStep('email');
-    setEmail('');
+    setStep('confirm');
     setDownloadToken(null);
     onClose();
   };
@@ -211,8 +187,8 @@ export default function PurchaseModal({
           </DialogTitle>
         </DialogHeader>
 
-        {/* メール入力ステップ */}
-        {step === 'email' && (
+        {/* 購入確認ステップ */}
+        {step === 'confirm' && (
           <div className="space-y-4">
             <div className="bg-indigo-50 border-2 border-indigo-200 rounded-lg p-4 text-center">
               <p className="text-sm text-gray-600 mb-1">価格</p>
@@ -221,46 +197,9 @@ export default function PurchaseModal({
                 <span className="text-lg ml-2 text-gray-600">SOL</span>
               </p>
               <p className="text-xs text-gray-500 mt-2 break-all">
-                宛先: {sellerWallet}
+                送金先: {sellerWallet}
               </p>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-2">
-                <Mail className="w-4 h-4" />
-                メールアドレス {!email && <span className="text-red-500">*</span>}
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
-              />
-              {user?.email?.address ? (
-                <p className="text-xs text-green-600 flex items-center gap-1">
-                  <Check className="w-3 h-3" />
-                  Privyアカウントのメールアドレスを使用
-                </p>
-              ) : (
-                <p className="text-xs text-gray-500">
-                  ダウンロードリンクをこのアドレスに送信します
-                </p>
-              )}
-            </div>
-
-            {authenticated && !user?.email?.address && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-blue-800">
-                    <p className="font-medium mb-1">メールアドレスの入力が必要です</p>
-                    <p>Privyアカウントにメールアドレスが登録されていないため、手動で入力してください。</p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {!authenticated && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
@@ -270,9 +209,19 @@ export default function PurchaseModal({
               </div>
             )}
 
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-800">
+                  <p className="font-medium mb-1">購入後のダウンロード</p>
+                  <p>購入完了後、このページまたはダッシュボードからダウンロードできます（24時間有効）</p>
+                </div>
+              </div>
+            </div>
+
             <Button
               onClick={handlePurchase}
-              disabled={loading || !email}
+              disabled={loading}
               className="w-full bg-indigo-600 hover:bg-indigo-700"
             >
               {loading ? (

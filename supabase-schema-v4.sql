@@ -38,11 +38,11 @@ CREATE TABLE IF NOT EXISTS media_proofs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     -- Arweave連携（証明データの参照元）
-    arweave_tx_id TEXT NOT NULL UNIQUE,      -- ArweaveトランザクションID
+    arweave_tx_id TEXT UNIQUE,      -- ArweaveトランザクションID (初期登録時はNULL許容)
 
     -- cNFT連携（所有権管理）
-    cnft_mint_address TEXT NOT NULL UNIQUE,  -- cNFTのAsset ID
-    owner_wallet TEXT NOT NULL,              -- 現在の所有者ウォレット
+    cnft_mint_address TEXT UNIQUE,  -- cNFTのAsset ID (初期登録時はNULL許容)
+    owner_wallet TEXT,              -- 現在の所有者ウォレット (初期登録時はNULL許容)
 
     -- R2パス導出用（最小限のキャッシュ）
     original_hash TEXT NOT NULL UNIQUE,      -- パス導出用: media/{original_hash}/...
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS feature_vectors (
     media_proof_id UUID NOT NULL REFERENCES media_proofs(id),
 
     -- ベクトル（pgvector）
-    embedding vector(512),                   -- 次元数はモデルによる
+    embedding vector(768),                   -- 次元数はモデルによる
 
     -- メタデータ
     model_name TEXT NOT NULL,                -- 使用したモデル名
@@ -125,8 +125,9 @@ CREATE TABLE IF NOT EXISTS feature_vectors (
 );
 
 -- ベクトル検索用インデックス
-CREATE INDEX IF NOT EXISTS idx_feature_vectors_embedding ON feature_vectors
-    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- データ数が少ない場合（数千件以下）はインデックス不要（IVFFlatは検索漏れの原因になるため削除）
+-- CREATE INDEX IF NOT EXISTS idx_feature_vectors_embedding ON feature_vectors
+--    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 -- updated_at 自動更新トリガー
@@ -179,3 +180,48 @@ CREATE POLICY "Service role all access on purchases" ON purchases
 
 CREATE POLICY "Service role all access on feature_vectors" ON feature_vectors
     FOR ALL USING (true) WITH CHECK (true);
+
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- Lens機能: ベクトル類似度検索関数
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CREATE OR REPLACE FUNCTION search_similar_images(
+  query_embedding vector(768),
+  match_count int DEFAULT 20
+)
+RETURNS TABLE (
+  media_proof_id uuid,
+  similarity float,
+  arweave_tx_id text,
+  cnft_mint_address text,
+  original_hash text,
+  file_extension text,
+  title text,
+  description text,
+  price_lamports bigint,
+  owner_wallet text,
+  created_at timestamptz
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    mp.id AS media_proof_id,
+    1 - (fv.embedding <=> query_embedding) AS similarity,
+    mp.arweave_tx_id,
+    mp.cnft_mint_address,
+    mp.original_hash,
+    mp.file_extension,
+    mp.title,
+    mp.description,
+    mp.price_lamports,
+    mp.owner_wallet,
+    mp.created_at
+  FROM feature_vectors fv
+  JOIN media_proofs mp ON fv.media_proof_id = mp.id
+  WHERE mp.is_public = true
+  ORDER BY fv.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$;

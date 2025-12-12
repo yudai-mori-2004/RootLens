@@ -27,15 +27,15 @@ export async function processMint(
     onProgress(5);
     console.log('🔍 Step 1: Checking for existing proof...');
 
-    const existingProof = await checkExistingProof(data.originalHash);
-    if (existingProof) {
-      console.log('ℹ️  Proof already exists, returning existing data');
-      return {
-        success: true,
-        arweaveTxId: existingProof.arweaveTxId,
-        cnftMintAddress: existingProof.cnftMintAddress,
-      };
-    }
+    // const existingProof = await checkExistingProof(data.originalHash);
+    // if (existingProof) {
+    //   console.log('ℹ️  Proof already exists, returning existing data');
+    //   return {
+    //     success: true,
+    //     arweaveTxId: existingProof.arweaveTxId,
+    //     cnftMintAddress: existingProof.cnftMintAddress,
+    //   };
+    // }
 
     // === 2. 次のcNFTアドレスを予測（mint直前に再取得） ===
     onProgress(15);
@@ -86,7 +86,7 @@ export async function processMint(
     // ファイル拡張子を抽出（例: "media/abc123.../original.jpg" → "jpg"）
     const fileExtension = data.mediaFilePath.split('.').pop() || 'bin';
 
-    await saveToDatabase({
+    const savedProof = await saveToDatabase({
       arweaveTxId: arweaveUri.replace('https://gateway.irys.xyz/', ''),
       cnftMintAddress: actualAssetId,
       ownerWallet: data.userWallet,
@@ -97,6 +97,8 @@ export async function processMint(
       description: data.description,
     });
 
+    // === 7. CLIP特徴量抽出（Lens機能） ===
+    // Skipped: Feature extraction is now handled by lens-worker during upload.
     onProgress(100);
     console.log('✅ All steps completed successfully!');
 
@@ -136,10 +138,15 @@ async function checkExistingProof(
 
     if (error) {
       if (error.code === 'PGRST116') {
-        // Not found - これは正常
+        // Not found
         return null;
       }
       throw error;
+    }
+
+    // If cNFT is not minted yet, treat as not existing (proceed to mint)
+    if (!data.cnft_mint_address) {
+      return null;
     }
 
     return {
@@ -151,3 +158,5 @@ async function checkExistingProof(
     return null;
   }
 }
+
+

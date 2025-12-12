@@ -1,0 +1,4 @@
+# Supabase Configuration
+HF_API_TOKEN=
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_SERVICE_KEY=your-service-role-key-here

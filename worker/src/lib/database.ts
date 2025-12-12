@@ -28,23 +28,27 @@ export async function saveToDatabase(data: {
   priceLamports: number;
   title?: string;
   description?: string;
-}): Promise<void> {
-  const { error } = await supabase.from('media_proofs').insert({
-    arweave_tx_id: data.arweaveTxId,
-    cnft_mint_address: data.cnftMintAddress,
-    owner_wallet: data.ownerWallet,
-    original_hash: data.originalHash,
-    file_extension: data.fileExtension,
-    price_lamports: data.priceLamports,
-    title: data.title,
-    description: data.description,
-    is_burned: false,
-    is_deleted: false,
-  });
+}): Promise<{ id: string }> {
+  const { data: upsertedData, error } = await supabase
+    .from('media_proofs')
+    .upsert({
+      original_hash: data.originalHash, // Conflict target
+      arweave_tx_id: data.arweaveTxId,
+      cnft_mint_address: data.cnftMintAddress,
+      owner_wallet: data.ownerWallet,
+      file_extension: data.fileExtension,
+      price_lamports: data.priceLamports,
+      title: data.title,
+      description: data.description,
+      is_public: true,
+    }, { onConflict: 'original_hash' })
+    .select('id')
+    .single();
 
   if (error) {
     throw new Error(`Database save failed: ${error.message}`);
   }
 
-  console.log('   Successfully saved to database');
+  console.log('   Successfully saved to database (upsert)');
+  return { id: upsertedData.id };
 }

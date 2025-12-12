@@ -8,8 +8,7 @@
 export interface PurchaseRequest {
   mediaProofId: string;        // 購入対象のmedia_proof_id
   buyerWallet: string;          // 購入者ウォレットアドレス
-  buyerEmail: string;           // 購入者メールアドレス
-  txSignature: string;          // SolanaトランザクションシグネチャURL
+  txSignature: string;          // Solanaトランザクションシグネチャ (Base58エンコード)
 }
 
 /**
@@ -30,7 +29,6 @@ export interface DownloadTokenData {
   mediaProofId?: string;
   originalHash?: string;
   fileExtension?: string;
-  buyerEmail?: string;
   expiresAt?: string;
   downloadCount?: number;
   error?: string;

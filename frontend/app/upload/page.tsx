@@ -274,6 +274,54 @@ export default function UploadPage() {
     }
   };
 
+  const resizeImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context not available'));
+          return;
+        }
+
+        const MAX_SIZE = 512;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height = Math.round(height * (MAX_SIZE / width));
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width = Math.round(width * (MAX_SIZE / height));
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Canvas to Blob failed'));
+            }
+          },
+          'image/jpeg',
+          0.8
+        );
+      };
+      img.onerror = (error) => reject(error);
+    });
+  };
+
   const handleUpload = async () => {
     if (!currentFile || !hashes || !validationResult || !solanaWallet) {
       return;
@@ -309,6 +357,39 @@ export default function UploadPage() {
       if (!uploadOriginalResponse.ok) {
         throw new Error('R2アップロード失敗（元ファイル）');
       }
+
+      // 2.5 Lens Workerで処理 (ベクトル化 + DB初期登録)
+      const lensWorkerUrl = process.env.NEXT_PUBLIC_LENS_WORKER_URL;
+      if (!lensWorkerUrl) {
+        throw new Error('System Error: LENS_WORKER_URL is not configured');
+      }
+      
+      console.log('Processing with Lens Worker:', lensWorkerUrl);
+
+      // 高速化のため画像をリサイズしてWorkerへ送信
+      const resizedBlob = await resizeImage(currentFile);
+      const resizedFile = new File([resizedBlob], currentFile.name, { type: 'image/jpeg' });
+
+      const formData = new FormData();
+      formData.append('image', resizedFile);
+      formData.append('originalHash', hashes.originalHash);
+      formData.append('fileExtension', getExtension(currentFile.type));
+
+      const workerResponse = await fetch(`${lensWorkerUrl}/process`, {
+        method: 'POST',
+        body: formData, // Content-Typeは自動設定されるため指定しない
+      });
+
+      if (!workerResponse.ok) {
+         const errorText = await workerResponse.text();
+         console.warn(`Lens Worker process failed: ${errorText}`);
+         // Lens処理失敗は致命的エラーにするか？一旦続行させるがIDは取れない
+      }
+
+      const workerResult = await workerResponse.json().catch(() => ({}));
+      const mediaProofId = workerResult.id;
+      console.log('✅ Lens Worker Process Complete. ID:', mediaProofId);
+
 
       // 3. サムネイルとManifestをPublic Bucketにアップロード
       let summaryData = c2paSummary;
@@ -351,6 +432,7 @@ export default function UploadPage() {
           price: Math.floor(price * 1e9),
           title: title || undefined,
           description: description || undefined,
+          mediaProofId: mediaProofId, // Workerから取得したIDを渡す
         }),
       });
 

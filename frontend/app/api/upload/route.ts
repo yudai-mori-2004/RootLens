@@ -28,6 +28,9 @@ interface UploadRequest {
   price: number;
   title?: string;
   description?: string;
+
+  // Lens Workerによって生成されたID
+  mediaProofId?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -49,6 +52,7 @@ export async function POST(request: NextRequest) {
       price: body.price,
       title: body.title,
       description: body.description,
+      mediaProofId: body.mediaProofId,
     };
 
     // 2. ジョブをキューに追加

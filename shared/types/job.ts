@@ -6,26 +6,16 @@
  * Mintジョブのデータ構造（最小限設計）
  */
 export interface MintJobData {
-  // ユーザー情報
   userWallet: string;
-
-  // ハッシュ値（C2PA検証済み）
-  originalHash: string;  // 元メディアファイルのSHA-256
-
-  // C2PA情報（最小限）
-  rootSigner: string;       // Root CA名（例: "Sony Corporation"）
-  rootCertChain: string;    // Base64エンコードされた証明書チェーン
-
-  // R2パス（アップロード済み）
-  mediaFilePath: string;     // media/{originalHash}/original.{ext}
-
-  // サムネイル公開URL（Arweave用）
-  thumbnailPublicUrl?: string;  // R2 public bucketのURL
-
-  // RootLens独自データ
-  price: number;          // lamports単位（0 = 無料）
+  originalHash: string;
+  rootSigner: string;
+  rootCertChain: string;
+  mediaFilePath: string;
+  thumbnailPublicUrl?: string;
+  price: number;
   title?: string;
   description?: string;
+  mediaProofId?: string;
 }
 
 /**

@@ -1,0 +1,20 @@
+name = "rootlens-lens-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# R2 Bucket Binding
+[[r2_buckets]]
+binding = "R2_PRIVATE"
+bucket_name = "rootlens-media"
+
+# Workers AI Binding
+[ai]
+binding = "AI"
+
+# Environment variables (本番環境用)
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+# Environment variables (開発環境用)
+[env.development]
+vars = { ENVIRONMENT = "development" }
