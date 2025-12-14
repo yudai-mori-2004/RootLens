@@ -4,16 +4,23 @@ import { useEffect, useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ExternalLink, Shield, Package, EyeOff, Eye, XCircle, ShoppingBag, Download } from 'lucide-react';
+import { Loader2, ExternalLink, Shield, Package, EyeOff, Eye, XCircle, ShoppingBag, Download, FileText, ArrowRight, Plus, PenTool, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
 import Link from 'next/link';
+import Header from '@/app/components/Header';
+import { Badge } from '@/components/ui/badge';
+import LoadingState from '@/app/components/LoadingState';
+import EditAssetModal from '@/app/components/EditAssetModal';
+import AssetThumbnail from '@/app/components/AssetThumbnail';
 
 interface CreatorContent {
   mediaProofId: string;
   originalHash: string;
   cnftMintAddress: string;
   title: string;
+  description: string;
+  priceLamports: number;
   isPublic: boolean;
   thumbnailUrl?: string;
 }
@@ -37,57 +44,76 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [creatorContents, setCreatorContents] = useState<CreatorContent[]>([]);
   const [purchasedContents, setPurchasedContents] = useState<PurchasedContent[]>([]);
 
+  // ページネーション用の状態
+  const [ownedPage, setOwnedPage] = useState(1);
+  const [ownedTotal, setOwnedTotal] = useState(0);
+  const [ownedTotalPages, setOwnedTotalPages] = useState(0);
+  const [purchasedPage, setPurchasedPage] = useState(1);
+  const [purchasedTotal, setPurchasedTotal] = useState(0);
+  const [purchasedTotalPages, setPurchasedTotalPages] = useState(0);
+  const itemsPerPage = 20;
+
+  // 編集モーダル用の状態
+  const [editingContent, setEditingContent] = useState<CreatorContent | null>(null);
+
   // 認証チェックとコンテンツのフェッチ
-  useEffect(() => {
-    async function fetchContents() {
-      if (!authenticated || !userWalletAddress) {
-        setLoading(false);
+  async function fetchContents() {
+    if (!authenticated || !userWalletAddress) {
         if (authenticated && !userWalletAddress) {
             setError('ウォレットが接続されていません。');
         }
         return;
-      }
-
-      try {
-        setLoading(true);
-        setError(null);
-
-        // 並行して両方のデータを取得
-        const [creatorRes, purchasedRes] = await Promise.all([
-            fetch(`/api/creator-content?walletAddress=${userWalletAddress}`),
-            fetch(`/api/purchased-content?walletAddress=${userWalletAddress}`)
-        ]);
-
-        if (!creatorRes.ok) throw new Error('所有コンテンツの取得に失敗しました。');
-        if (!purchasedRes.ok) throw new Error('購入コンテンツの取得に失敗しました。');
-
-        const creatorData: CreatorContent[] = await creatorRes.json();
-        const purchasedData: PurchasedContent[] = await purchasedRes.json();
-
-        setCreatorContents(creatorData);
-        setPurchasedContents(purchasedData);
-
-      } catch (err) {
-        console.error('コンテンツ取得エラー:', err);
-        setError(err instanceof Error ? err.message : 'コンテンツの読み込み中にエラーが発生しました。');
-      } finally {
-        setLoading(false);
-      }
     }
 
-    fetchContents();
-  }, [authenticated, userWalletAddress]);
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 並行して両方のデータを取得（ページネーションパラメータ付き）
+      const [creatorRes, purchasedRes] = await Promise.all([
+          fetch(`/api/creator-content?walletAddress=${userWalletAddress}&page=${ownedPage}&limit=${itemsPerPage}`),
+          fetch(`/api/purchased-content?walletAddress=${userWalletAddress}&page=${purchasedPage}&limit=${itemsPerPage}`)
+      ]);
+
+      if (!creatorRes.ok) throw new Error('所有コンテンツの取得に失敗しました。');
+      if (!purchasedRes.ok) throw new Error('購入コンテンツの取得に失敗しました。');
+
+      const creatorData = await creatorRes.json();
+      const purchasedData = await purchasedRes.json();
+
+      setCreatorContents(creatorData.items || []);
+      setOwnedTotal(creatorData.total || 0);
+      setOwnedTotalPages(creatorData.totalPages || 0);
+
+      setPurchasedContents(purchasedData.items || []);
+      setPurchasedTotal(purchasedData.total || 0);
+      setPurchasedTotalPages(purchasedData.totalPages || 0);
+
+    } catch (err) {
+      console.error('コンテンツ取得エラー:', err);
+      setError(err instanceof Error ? err.message : 'コンテンツの読み込み中にエラーが発生しました。');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (authenticated && userWalletAddress) {
+        fetchContents();
+    } else {
+        setLoading(false);
+    }
+  }, [authenticated, userWalletAddress, ownedPage, purchasedPage]);
 
   const handleTogglePublic = async (mediaProofId: string, currentIsPublic: boolean) => {
     if (!userWalletAddress) {
       setError('ウォレットが接続されていません。');
       return;
     }
-    setLoading(true); // ボタンを押したときのローディング
     try {
       const response = await fetch('/api/creator-content/toggle-public', {
         method: 'POST',
@@ -97,7 +123,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           mediaProofId,
           walletAddress: userWalletAddress,
-          isPublic: !currentIsPublic, // 現在のisPublicの逆を設定
+          isPublic: !currentIsPublic,
         }),
       });
 
@@ -119,19 +145,27 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error('公開設定切り替えエラー:', err);
-      setError(err instanceof Error ? err.message : '公開設定の切り替え中にエラーが発生しました。');
-    } finally {
-      setLoading(false);
+      alert(err instanceof Error ? err.message : '公開設定の切り替え中にエラーが発生しました。');
     }
   };
 
   if (!authenticated) {
-    // 認証が完了するまで何も表示しないか、ローディング表示
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-lg text-gray-600 font-medium">認証中...</p>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header />
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <Card className="w-full max-w-md text-center p-8">
+            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Shield className="w-8 h-8 text-indigo-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">ウォレットを接続</h2>
+            <p className="text-gray-600 mb-8">
+              ダッシュボードを表示するには、ウォレットを接続してください。
+            </p>
+            <Button onClick={login} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              接続する
+            </Button>
+          </Card>
         </div>
       </div>
     );
@@ -139,172 +173,333 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="text-center space-y-4">
-          <Loader2 className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-lg text-gray-600 font-medium">コンテンツを読み込み中...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="max-w-md bg-white rounded-2xl shadow-xl p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XCircle className="w-10 h-10 text-red-500" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">エラーが発生しました</h2>
-          <p className="text-gray-600">{error}</p>
-          <Button
-            onClick={() => window.location.href = '/'}
-            className="mt-6 bg-indigo-600 hover:bg-indigo-700"
-          >
-            ホームに戻る
-          </Button>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <Header />
+        <LoadingState 
+          message="アセット情報を読み込んでいます..." 
+          subMessage="ブロックチェーンとデータベースから最新情報を取得中"
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/30 to-gray-50">
-      {/* ヘッダーバー (ProofPageのものを簡略化) */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src="/icon_white.png" alt="RootLens" className="w-8 h-8" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">マイページ</h1>
-                <p className="text-xs text-gray-500 font-mono">{userWalletAddress?.slice(0, 8)}...{userWalletAddress?.slice(-8)}</p>
-              </div>
-            </div>
-            {/* ここにログアウトボタンなどを配置可能 */}
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Header />
+
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">ダッシュボード</h1>
+            <p className="text-gray-500 mt-1">あなたのデジタル資産と購入履歴を管理します</p>
           </div>
+          <Button asChild className="bg-indigo-600 hover:bg-indigo-700 shadow-sm">
+            <Link href="/upload" className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              新規アセット作成
+            </Link>
+          </Button>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Tabs defaultValue="owned" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
-                <TabsTrigger value="owned">所有するコンテンツ</TabsTrigger>
-                <TabsTrigger value="purchased">購入したコンテンツ</TabsTrigger>
-            </TabsList>
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
+            <XCircle className="w-5 h-5" />
+            {error}
+          </div>
+        )}
 
-            {/* 所有するコンテンツタブ */}
-            <TabsContent value="owned" className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-bold text-gray-900">あなたが所有するコンテンツ</h2>
-                    <Button className="bg-indigo-600 hover:bg-indigo-700">
-                        <Link href="/upload">新規アップロード</Link>
-                    </Button>
+        <Tabs defaultValue="owned" className="space-y-8">
+          <TabsList className="bg-slate-100 p-1 rounded-xl border border-slate-200 w-full max-w-md mx-auto md:mx-0">
+            <TabsTrigger
+              value="owned"
+              className="flex-1 rounded-lg text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-700"
+            >
+              所有アセット ({ownedTotal})
+            </TabsTrigger>
+            <TabsTrigger
+              value="purchased"
+              className="flex-1 rounded-lg text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-700"
+            >
+              購入済み ({purchasedTotal})
+            </TabsTrigger>
+          </TabsList>
+
+          {/* 所有するコンテンツタブ */}
+          <TabsContent value="owned" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {creatorContents.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                  <Package className="w-8 h-8 text-slate-400" />
                 </div>
-
-                {creatorContents.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-                    <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">管理できるコンテンツがありません</h3>
-                    <p className="text-gray-600">あなたが作成・所有するコンテンツはまだありません。</p>
-                </div>
-                ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {creatorContents.map((content) => (
-                    <Card key={content.mediaProofId}>
-                        <CardHeader>
-                        <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden mb-3">
-                            {content.thumbnailUrl ? (
-                            <img src={content.thumbnailUrl} alt={content.title} className="w-full h-full object-cover" />
-                            ) : (
-                            <div className="flex items-center justify-center w-full h-full text-gray-400">
-                                <FileText className="w-10 h-10" />
-                            </div>
-                            )}
-                            <div className="absolute top-2 right-2">
-                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${content.isPublic ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                    {content.isPublic ? '公開中' : '非公開'}
-                                </span>
-                            </div>
-                        </div>
-                        <CardTitle className="truncate">{content.title || '無題のコンテンツ'}</CardTitle>
-                        <CardDescription className="font-mono text-xs">{content.cnftMintAddress.slice(0, 8)}...{content.cnftMintAddress.slice(-8)}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild className="flex-1">
-                            <Link href={`/proof/${content.originalHash}`}>
-                                詳細 <ExternalLink className="w-3 h-3 ml-1" />
-                            </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" className="flex-1"
-                                onClick={() => handleTogglePublic(content.mediaProofId, content.isPublic)}
-                                disabled={loading} // ローディング中はボタンを無効化
-                            >
-                                {content.isPublic ? <EyeOff className="w-3 h-3 mr-1" /> : <Eye className="w-3 h-3 mr-1" />}
-                                {content.isPublic ? '非公開' : '公開'}
-                            </Button>
-                        </div>
-                        </CardContent>
-                    </Card>
-                    ))}
-                </div>
-                )}
-            </TabsContent>
-
-            {/* 購入したコンテンツタブ */}
-            <TabsContent value="purchased" className="space-y-6">
-                <h2 className="text-2xl font-bold text-gray-900">購入したコンテンツ</h2>
-
-                {purchasedContents.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-                    <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">購入履歴がありません</h3>
-                    <p className="text-gray-600">まだコンテンツを購入していません。</p>
-                </div>
-                ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {purchasedContents.map((content) => (
-                    <Card key={content.purchaseId}>
-                        <CardHeader>
-                        <div className="relative w-full aspect-video bg-gray-100 rounded-lg overflow-hidden mb-3">
-                            {content.thumbnailUrl ? (
-                            <img src={content.thumbnailUrl} alt={content.title} className="w-full h-full object-cover" />
-                            ) : (
-                            <div className="flex items-center justify-center w-full h-full text-gray-400">
-                                <FileText className="w-10 h-10" />
-                            </div>
-                            )}
-                        </div>
-                        <CardTitle className="truncate">{content.title || '無題のコンテンツ'}</CardTitle>
-                        <CardDescription className="text-xs text-gray-500">
-                            購入日: {new Date(content.purchasedAt).toLocaleDateString('ja-JP')}
+                <h3 className="text-lg font-bold text-slate-900 mb-2">まだアセットがありません</h3>
+                <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
+                  C2PA検証済みのコンテンツをアップロードして、<br />
+                  世界で唯一のデジタル資産を作成しましょう。
+                </p>
+                <Button asChild variant="default" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-8">
+                  <Link href="/upload">
+                    作成を始める
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {creatorContents.map((content) => (
+                  <Card key={content.mediaProofId} className="overflow-hidden hover:shadow-md transition-all duration-300 border-slate-200 group bg-white rounded-xl p-0 gap-0">
+                    <div className="relative aspect-video bg-slate-100 overflow-hidden border-b border-slate-100">
+                      <AssetThumbnail
+                        src={content.thumbnailUrl}
+                        alt={content.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute top-2 right-2">
+                        <Badge 
+                          variant={content.isPublic ? "default" : "secondary"}
+                          className={`backdrop-blur-md shadow-sm border-0 ${content.isPublic ? 'bg-green-500/90 hover:bg-green-600' : 'bg-slate-500/90 hover:bg-slate-600 text-white'}`}
+                        >
+                          {content.isPublic ? '公開中' : '非公開'}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <CardHeader className="p-4 pb-2 space-y-1 relative">
+                      <div className="flex justify-between items-start">
+                        <CardTitle className="truncate text-sm font-bold text-slate-900 pr-6">
+                          {content.title || '無題のアセット'}
+                        </CardTitle>
+                        <button 
+                          onClick={() => setEditingContent(content)}
+                          className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded-full hover:bg-indigo-50 absolute top-2 right-2"
+                        >
+                          <PenTool className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {content.description && (
+                        <CardDescription className="text-xs text-slate-500 line-clamp-2 mb-2 h-8 leading-tight">
+                          {content.description}
                         </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" asChild className="flex-1">
-                            <Link href={`/proof/${content.originalHash}`}>
-                                詳細 <ExternalLink className="w-3 h-3 ml-1" />
-                            </Link>
-                            </Button>
-                            <Button 
-                                size="sm" 
-                                className="flex-1 bg-indigo-600 hover:bg-indigo-700"
-                                onClick={() => window.open(`/api/download/${content.downloadToken}`, '_blank')}
-                            >
-                                <Download className="w-3 h-3 mr-1" />
-                                再DL
-                            </Button>
+                      )}
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-2 border-t border-slate-100">
+                        <div className="flex items-center gap-1">
+                          <Shield className="w-3 h-3" />
+                          {content.cnftMintAddress.slice(0, 6)}...{content.cnftMintAddress.slice(-6)}
                         </div>
-                        </CardContent>
-                    </Card>
-                    ))}
+                        <span className="font-bold text-indigo-600">
+                          {content.priceLamports === 0 ? 'Free' : `${(content.priceLamports / 1e9).toFixed(2)} SOL`}
+                        </span>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent className="p-4 pt-2">
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <Button variant="outline" size="sm" asChild className="w-full text-xs h-8 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50">
+                          <Link href={`/asset/${content.originalHash}`}>
+                            詳細
+                          </Link>
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className={`w-full text-xs h-8 border ${content.isPublic ? 'text-slate-500 hover:text-slate-700 bg-slate-50 border-slate-200' : 'text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 border-green-200'}`}
+                          onClick={() => handleTogglePublic(content.mediaProofId, content.isPublic)}
+                        >
+                          {content.isPublic ? (
+                            <>
+                              <EyeOff className="w-3 h-3 mr-1" /> 非公開
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3 h-3 mr-1" /> 公開
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* ページネーション */}
+            {ownedTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOwnedPage(p => Math.max(1, p - 1))}
+                  disabled={ownedPage === 1}
+                  className="border-slate-200"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center gap-1">
+                  {(() => {
+                    const maxButtons = 7;
+                    const pages = [];
+                    let startPage = Math.max(1, ownedPage - Math.floor(maxButtons / 2));
+                    let endPage = Math.min(ownedTotalPages, startPage + maxButtons - 1);
+
+                    if (endPage - startPage < maxButtons - 1) {
+                      startPage = Math.max(1, endPage - maxButtons + 1);
+                    }
+
+                    for (let i = startPage; i <= endPage; i++) {
+                      pages.push(
+                        <Button
+                          key={i}
+                          variant={i === ownedPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setOwnedPage(i)}
+                          className={i === ownedPage ? "bg-indigo-600 hover:bg-indigo-700" : "border-slate-200"}
+                        >
+                          {i}
+                        </Button>
+                      );
+                    }
+                    return pages;
+                  })()}
                 </div>
-                )}
-            </TabsContent>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOwnedPage(p => Math.min(ownedTotalPages, p + 1))}
+                  disabled={ownedPage === ownedTotalPages}
+                  className="border-slate-200"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* 購入したコンテンツタブ */}
+          <TabsContent value="purchased" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {purchasedContents.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                  <ShoppingBag className="w-8 h-8 text-slate-400" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">購入履歴がありません</h3>
+                <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
+                  Lens機能を使って、信頼できる真正なコンテンツを探してみましょう。
+                </p>
+                <Button asChild variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-full px-8">
+                  <Link href="/lens">
+                    コンテンツを探す
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {purchasedContents.map((content) => (
+                  <Card key={content.purchaseId} className="overflow-hidden hover:shadow-md transition-all duration-300 border-slate-200 group bg-white rounded-xl p-0 gap-0">
+                    <div className="relative aspect-video bg-slate-100 overflow-hidden border-b border-slate-100">
+                      <AssetThumbnail
+                        src={content.thumbnailUrl}
+                        alt={content.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+                    </div>
+                    
+                    <CardHeader className="p-4 pb-2 space-y-1">
+                      <CardTitle className="truncate text-sm font-bold text-slate-900">
+                        {content.title || '無題のアセット'}
+                      </CardTitle>
+                      {/* 購入済みアイテムには説明と価格は表示しない */}
+                      <CardDescription className="text-xs text-slate-500 mt-1">
+                        購入日: {new Date(content.purchasedAt).toLocaleDateString('ja-JP')}
+                      </CardDescription>
+                    </CardHeader>
+                    
+                    <CardContent className="p-4 pt-2">
+                      <div className="flex flex-col gap-2 mt-1">
+                        <Button size="sm" className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all" onClick={() => window.open(`/api/download/${content.downloadToken}`, '_blank')}>
+                          <Download className="w-3 h-3 mr-1.5" />
+                          ダウンロード
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild className="w-full h-8 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-50">
+                          <Link href={`/asset/${content.originalHash}`} className="flex items-center justify-center">
+                            アセットページを確認 <ArrowRight className="w-3 h-3 ml-1" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* ページネーション */}
+            {purchasedTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-8">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPurchasedPage(p => Math.max(1, p - 1))}
+                  disabled={purchasedPage === 1}
+                  className="border-slate-200"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex items-center gap-1">
+                  {(() => {
+                    const maxButtons = 7;
+                    const pages = [];
+                    let startPage = Math.max(1, purchasedPage - Math.floor(maxButtons / 2));
+                    let endPage = Math.min(purchasedTotalPages, startPage + maxButtons - 1);
+
+                    if (endPage - startPage < maxButtons - 1) {
+                      startPage = Math.max(1, endPage - maxButtons + 1);
+                    }
+
+                    for (let i = startPage; i <= endPage; i++) {
+                      pages.push(
+                        <Button
+                          key={i}
+                          variant={i === purchasedPage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setPurchasedPage(i)}
+                          className={i === purchasedPage ? "bg-indigo-600 hover:bg-indigo-700" : "border-slate-200"}
+                        >
+                          {i}
+                        </Button>
+                      );
+                    }
+                    return pages;
+                  })()}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPurchasedPage(p => Math.min(purchasedTotalPages, p + 1))}
+                  disabled={purchasedPage === purchasedTotalPages}
+                  className="border-slate-200"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
-      </div>
+
+        {/* 編集モーダル */}
+        {editingContent && userWalletAddress && (
+          <EditAssetModal
+            isOpen={!!editingContent}
+            onClose={() => setEditingContent(null)}
+            onSuccess={() => {
+              setEditingContent(null);
+              fetchContents(); // リストを再取得
+            }}
+            mediaProofId={editingContent.mediaProofId}
+            currentTitle={editingContent.title}
+            currentDescription={editingContent.description}
+            currentPriceLamports={editingContent.priceLamports}
+            walletAddress={userWalletAddress}
+          />
+        )}
+      </main>
     </div>
   );
 }

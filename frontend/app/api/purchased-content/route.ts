@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const walletAddress = searchParams.get('walletAddress');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
 
     if (!walletAddress) {
       return NextResponse.json(
@@ -24,8 +26,31 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // purchasesテーブルから購入履歴を取得
+    if (page < 1 || limit < 1 || limit > 100) {
+      return NextResponse.json(
+        { error: 'Invalid pagination parameters' },
+        { status: 400 }
+      );
+    }
+
+    // まず総数を取得
+    const { count: totalCount, error: countError } = await supabase
+      .from('purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('buyer_wallet', walletAddress);
+
+    if (countError) {
+      console.error('Supabase count error:', countError);
+      throw new Error('購入履歴数の取得に失敗しました。');
+    }
+
+    if (!totalCount || totalCount === 0) {
+      return NextResponse.json({ items: [], total: 0, page, limit, totalPages: 0 });
+    }
+
+    // purchasesテーブルから購入履歴を取得（ページネーション適用）
     // media_proofsの情報も結合して取得
+    const offset = (page - 1) * limit;
     const { data: purchases, error } = await supabase
       .from('purchases')
       .select(`
@@ -41,7 +66,8 @@ export async function GET(req: NextRequest) {
         )
       `)
       .eq('buyer_wallet', walletAddress)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error('Supabase query error:', error);
@@ -49,30 +75,14 @@ export async function GET(req: NextRequest) {
     }
 
     if (!purchases || purchases.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json({ items: [], total: totalCount, page, limit, totalPages: Math.ceil(totalCount / limit) });
     }
 
-    // レスポンスの整形
+    // サムネイルURLはoriginal_hashから構築（R2パスは固定: media/{hash}/thumbnail.jpg）
     const publicBucketUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_BUCKET_URL;
 
-    // サムネイル取得を含むレスポンス生成
-    const formattedContent = await Promise.all(purchases.map(async (purchase: any) => {
+    const formattedContent = purchases.map((purchase: any) => {
       const proof = purchase.media_proofs;
-      let thumbnailUrl: string | undefined;
-
-      // サムネイルURLの取得
-      try {
-        if (publicBucketUrl) {
-          const manifestUrl = `${publicBucketUrl}/media/${proof.original_hash}/manifest.json`;
-          const manifestResponse = await fetch(manifestUrl);
-          if (manifestResponse.ok) {
-            const manifestData = await manifestResponse.json();
-            thumbnailUrl = manifestData.thumbnailUrl;
-          }
-        }
-      } catch (e) {
-        // console.warn(`Failed to fetch manifest for ${proof.original_hash}:`, e);
-      }
 
       return {
         purchaseId: purchase.id,
@@ -82,11 +92,17 @@ export async function GET(req: NextRequest) {
         cnftMintAddress: proof.cnft_mint_address,
         downloadToken: purchase.download_token,
         purchasedAt: purchase.created_at,
-        thumbnailUrl: thumbnailUrl,
+        thumbnailUrl: publicBucketUrl ? `${publicBucketUrl}/media/${proof.original_hash}/thumbnail.jpg` : undefined,
       };
-    }));
+    });
 
-    return NextResponse.json(formattedContent);
+    return NextResponse.json({
+      items: formattedContent,
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit),
+    });
 
   } catch (error) {
     console.error('Purchased content API error:', error);

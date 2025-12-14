@@ -20,10 +20,19 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const walletAddress = searchParams.get('walletAddress');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '20', 10);
 
     if (!walletAddress) {
       return NextResponse.json(
         { error: 'Wallet address is required' },
+        { status: 400 }
+      );
+    }
+
+    if (page < 1 || limit < 1 || limit > 100) {
+      return NextResponse.json(
+        { error: 'Invalid pagination parameters' },
         { status: 400 }
       );
     }
@@ -43,7 +52,7 @@ export async function GET(req: NextRequest) {
     const ownedAssets = heliusResponse.data.result.items;
 
     if (!ownedAssets || ownedAssets.length === 0) {
-      return NextResponse.json([]); // 所有するcNFTがない
+      return NextResponse.json({ items: [], total: 0, page, limit, totalPages: 0 }); // 所有するcNFTがない
     }
 
     // 所有するcNFTのミントアドレスリストを作成
@@ -51,10 +60,30 @@ export async function GET(req: NextRequest) {
 
     // 2. Supabaseで、Heliusから取得したcNFTのミントアドレスに紐づくコンテンツを検索
     // Heliusが所有権を保証しているため、Supabase上のowner_walletによるフィルタリングは行わない（古い可能性があるため）
+
+    // まず総数を取得
+    const { count: totalCount, error: countError } = await supabase
+      .from('media_proofs')
+      .select('id', { count: 'exact', head: true })
+      .in('cnft_mint_address', ownedCnftMintAddresses);
+
+    if (countError) {
+      console.error('Supabase count error:', countError);
+      throw new Error('コンテンツ数の取得に失敗しました。');
+    }
+
+    if (!totalCount || totalCount === 0) {
+      return NextResponse.json({ items: [], total: 0, page, limit });
+    }
+
+    // ページネーションを適用してデータを取得
+    const offset = (page - 1) * limit;
     const { data: creatorContents, error: supabaseError } = await supabase
       .from('media_proofs')
-      .select('id, original_hash, cnft_mint_address, title, owner_wallet, is_public')
-      .in('cnft_mint_address', ownedCnftMintAddresses);
+      .select('id, original_hash, cnft_mint_address, title, description, price_lamports, owner_wallet, is_public')
+      .in('cnft_mint_address', ownedCnftMintAddresses)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (supabaseError) {
       console.error('Supabase query error:', supabaseError);
@@ -62,53 +91,44 @@ export async function GET(req: NextRequest) {
     }
 
     if (!creatorContents || creatorContents.length === 0) {
-      return NextResponse.json([]);
+      return NextResponse.json({ items: [], total: totalCount, page, limit });
     }
 
-    // 各コンテンツのManifest JSONをR2から取得してサムネイルURLを抽出
+    // owner_walletの更新が必要なコンテンツを抽出してバッチ更新
+    const outdatedOwners = creatorContents.filter((content: any) => content.owner_wallet !== walletAddress);
+    if (outdatedOwners.length > 0) {
+      console.log(`Batch updating ${outdatedOwners.length} owner_wallet records`);
+      const { error: batchUpdateError } = await supabase
+        .from('media_proofs')
+        .update({ owner_wallet: walletAddress })
+        .in('id', outdatedOwners.map((c: any) => c.id));
+
+      if (batchUpdateError) {
+        console.error('Failed to batch update owner_wallet:', batchUpdateError);
+      }
+    }
+
+    // サムネイルURLはoriginal_hashから構築（R2パスは固定: media/{hash}/thumbnail.jpg）
     const publicBucketUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_BUCKET_URL;
 
-    const finalContents = await Promise.all(creatorContents.map(async (content: any) => {
-      // Supabaseの所有者情報が古い場合、現在の所有者（閲覧者）に更新する
-      // Heliusで所有していることは確認済みなので、ここで同期を行う
-      if (content.owner_wallet !== walletAddress) {
-        console.log(`Updating owner for proof ${content.id}: ${content.owner_wallet} -> ${walletAddress}`);
-        const { error: updateError } = await supabase
-          .from('media_proofs')
-          .update({ owner_wallet: walletAddress })
-          .eq('id', content.id);
-        
-        if (updateError) {
-          console.error('Failed to update owner_wallet:', updateError);
-        }
-      }
-
-      let thumbnailUrl: string | undefined;
-
-      try {
-        if (publicBucketUrl) {
-          const manifestUrl = `${publicBucketUrl}/media/${content.original_hash}/manifest.json`;
-          const manifestResponse = await fetch(manifestUrl);
-          if (manifestResponse.ok) {
-            const manifestData = await manifestResponse.json();
-            thumbnailUrl = manifestData.thumbnailUrl;
-          }
-        }
-      } catch (e) {
-        console.warn(`Failed to fetch manifest for ${content.original_hash}:`, e);
-      }
-
-      return {
-        mediaProofId: content.id,
-        originalHash: content.original_hash,
-        cnftMintAddress: content.cnft_mint_address,
-        title: content.title || '無題のコンテンツ',
-        thumbnailUrl: thumbnailUrl,
-        isPublic: content.is_public, // is_public カラムを追加
-      };
+    const finalContents = creatorContents.map((content: any) => ({
+      mediaProofId: content.id,
+      originalHash: content.original_hash,
+      cnftMintAddress: content.cnft_mint_address,
+      title: content.title || '無題のコンテンツ',
+      description: content.description,
+      priceLamports: content.price_lamports,
+      thumbnailUrl: publicBucketUrl ? `${publicBucketUrl}/media/${content.original_hash}/thumbnail.jpg` : undefined,
+      isPublic: content.is_public,
     }));
 
-    return NextResponse.json(finalContents);
+    return NextResponse.json({
+      items: finalContents,
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit),
+    });
 
   } catch (error) {
     console.error('Creator content API error:', error);

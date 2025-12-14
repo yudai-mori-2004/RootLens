@@ -3,6 +3,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { irysUploader } from '@metaplex-foundation/umi-uploader-irys';
+import { createGenericFileFromJson } from '@metaplex-foundation/umi';
 import { getUmi } from './solana';
 import type { ArweaveProofMetadata } from '../../../shared/types';
 
@@ -50,7 +51,20 @@ export async function uploadToArweave(data: {
   console.log('   Uploading metadata:', JSON.stringify(proofMetadata, null, 2));
 
   // Arweaveにアップロード（RootLensサーバーのウォレットで署名される）
-  const metadataUri = await umi.uploader.uploadJson(proofMetadata);
+  // ⚠️ umi-uploader-irysの実装では、uploadメソッドのoptions.tagsは無視され、
+  // file.tagsのみが使用されるため、ファイル作成時にタグを埋め込む必要がある。
+  const file = createGenericFileFromJson(proofMetadata, 'metadata.json', {
+    contentType: 'application/json',
+    tags: [
+      { name: 'original_hash', value: data.originalHash },
+      { name: 'App-Name', value: 'RootLens' },
+    ]
+  });
+
+  // uploadメソッド自体のoptionsにはtagsを渡しても無視される
+  const [metadataUri] = await umi.uploader.upload([file]);
+
+  console.log(`   ✓ Uploaded with tags: original_hash=${data.originalHash}`);
 
   return metadataUri;
 }

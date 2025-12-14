@@ -1,5 +1,5 @@
 import { C2PASummaryData } from '@/app/lib/c2pa-parser';
-import { AlertTriangle, Lock, Calendar, Camera, User, PenTool, Info, Cloud, ChevronDown, FileText, MapPin, Shield, Code, BookOpen, GitBranch } from 'lucide-react';
+import { AlertTriangle, Lock, Calendar, Camera, User, PenTool, Info, Cloud, ChevronDown, FileText, MapPin, Shield, Code, BookOpen, GitBranch, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import ProvenanceModal from './ProvenanceModal';
@@ -306,7 +306,7 @@ export default function PrivacyWarning({
       {/* 簡易表示（重要情報のみ） */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
-          <h5 className="font-bold text-gray-900 text-lg">公開される情報</h5>
+          <h5 className="font-bold text-gray-900 text-lg">抽出されたC2PAメタデータ</h5>
         </div>
 
         <div className="p-6 space-y-6">
@@ -319,7 +319,7 @@ export default function PrivacyWarning({
             <div className="pl-6 space-y-2 text-sm">
               {importantInfo.title && (
                 <div className="flex justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-gray-500">タイトル</span>
+                  <span className="text-gray-500">コンテンツタイトル</span>
                   <span className="font-medium text-gray-900">{importantInfo.title}</span>
                 </div>
               )}
@@ -337,7 +337,7 @@ export default function PrivacyWarning({
               )}
               {importantInfo.generator && (
                 <div className="flex justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-gray-500">生成元</span>
+                  <span className="text-gray-500">クレームジェネレーター</span>
                   <span className="font-medium text-gray-900">{importantInfo.generator}</span>
                 </div>
               )}
@@ -352,8 +352,11 @@ export default function PrivacyWarning({
                 <span>AI学習・マイニング制約</span>
               </div>
               <div className="pl-6 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
-                <p className="text-sm text-indigo-900 font-medium">
-                  このコンテンツはAI学習・推論への使用が制限されています
+                <p className="text-sm text-indigo-900 font-medium mb-1">
+                  このコンテンツはAI学習・推論モデルへの利用が制限されるよう記録されています。
+                </p>
+                <p className="text-xs text-indigo-800/80">
+                  ただし、これは強制力のある技術的な制御ではありません。利用者の倫理的判断を促すための情報です。
                 </p>
               </div>
             </div>
@@ -382,15 +385,15 @@ export default function PrivacyWarning({
             </div>
             <div className="pl-6 space-y-2">
               <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600">位置情報</span>
+                <span className="text-sm text-gray-600">位置情報 (GPSなど)</span>
                 <span className={`text-sm font-medium px-3 py-1 rounded-full ${importantInfo.hasLocation ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                  {importantInfo.hasLocation ? '含まれています' : '含まれていません'}
+                  {importantInfo.hasLocation ? '含む' : '含まない'}
                 </span>
               </div>
               <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600">Exif情報（カメラ設定等）</span>
+                <span className="text-sm text-gray-600">Exif情報 (カメラ設定、撮影機材など)</span>
                 <span className={`text-sm font-medium px-3 py-1 rounded-full ${importantInfo.hasExif ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                  {importantInfo.hasExif ? '含まれています' : '含まれていません'}
+                  {importantInfo.hasExif ? '含む' : '含まない'}
                 </span>
               </div>
             </div>
@@ -406,7 +409,7 @@ export default function PrivacyWarning({
                 className="border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300"
               >
                 <GitBranch className="w-4 h-4 mr-2" />
-                タイムライン
+                来歴タイムライン
               </Button>
               {/* すべてのメタデータ詳細 */}
               <Button
@@ -415,7 +418,7 @@ export default function PrivacyWarning({
                 className="border-gray-200 hover:bg-gray-50"
               >
                 <Code className="w-4 h-4 mr-2" />
-                メタデータの詳細
+                メタデータ詳細
               </Button>
               {/* 仕組みとデータ取り扱い */}
               <Button
@@ -424,7 +427,7 @@ export default function PrivacyWarning({
                 className="border-gray-200 hover:bg-gray-50"
               >
                 <BookOpen className="w-4 h-4 mr-2" />
-                データの取り扱い技術
+                RootLensの仕組み
               </Button>
             </div>
           </div>
@@ -432,21 +435,26 @@ export default function PrivacyWarning({
       </div>
 
       {/* 同意チェックボックス */}
-      <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:border-indigo-300 transition-all duration-200">
         <label className="flex items-start gap-4 cursor-pointer group">
-          <input
-            type="checkbox"
-            checked={acknowledged}
-            onChange={(e) => onAcknowledge(e.target.checked)}
-            className="mt-0.5 w-6 h-6 text-indigo-600 rounded-md focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-          />
+          <div className="relative flex items-center mt-1">
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(e) => onAcknowledge(e.target.checked)}
+              className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-slate-300 shadow-sm transition-all checked:border-indigo-600 checked:bg-indigo-600 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            />
+            <Check className="pointer-events-none absolute left-1/2 top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200" strokeWidth={3} />
+          </div>
           <div className="flex-1">
-            <span className="font-semibold text-indigo-900 block mb-1.5 text-base">
-              公開に同意する
+            <span className="block text-base font-bold text-slate-900 mb-1 group-hover:text-indigo-700 transition-colors">
+              公開とデータ取り扱いに同意する
             </span>
-            <span className="text-sm text-indigo-800 leading-relaxed">
-              上記の情報とファイル本体が公開されることを理解し、同意します。
-            </span>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              上記のマニフェスト情報（撮影データ・編集履歴）およびコンテンツが、
+              <strong className="text-slate-900 font-semibold mx-1 border-b-2 border-indigo-100">一般公開</strong>
+              されることを理解し、同意します。
+            </p>
           </div>
         </label>
       </div>
@@ -461,52 +469,79 @@ export default function PrivacyWarning({
 
       {/* 仕組みとデータ取り扱いモーダル */}
       <Dialog open={showTechnicalModal} onOpenChange={setShowTechnicalModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle>仕組みとデータの取り扱いについて</DialogTitle>
-            <DialogDescription>
-              RootLensがどのように真正性を証明するか、詳しい技術情報
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="px-6 pb-6 max-h-[calc(90vh-8rem)]">
-            <TechnicalDetailsSection />
-          </ScrollArea>
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-white shadow-2xl rounded-xl sm:rounded-2xl flex flex-col overflow-hidden border border-slate-100 gap-0">
+          
+          {/* ヘッダー (固定) */}
+          <div className="bg-white border-b border-slate-100 px-6 py-5 shrink-0 z-10 sticky top-0">
+            <DialogHeader className="text-left space-y-1">
+              <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-indigo-50 rounded-xl border border-indigo-100 shrink-0">
+                      <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
+                  </div>
+                  <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      仕組みとデータの取り扱い
+                  </DialogTitle>
+              </div>
+              <DialogDescription className="text-slate-500 text-sm mt-2 sm:ml-14 leading-relaxed">
+                  RootLensがどのように真正性を証明するか、詳しい技術情報
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          {/* スクロールエリア */}
+          <div className="flex-1 w-full min-h-0 overflow-y-auto px-6 pb-8 pt-0 scroll-smooth">
+            <div className="pt-6 pb-6">
+              <TechnicalDetailsSection />
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* すべての技術情報モーダル */}
       <Dialog open={showAllMetadataModal} onOpenChange={setShowAllMetadataModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle>すべての技術情報</DialogTitle>
-            <DialogDescription>
-              このファイルに含まれるすべてのC2PAメタデータ（開発者・専門家向け）
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="px-6 pb-6 max-h-[calc(90vh-8rem)]">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-              {allMetadata.map((item, index) => {
-                // valueを文字列に変換
-                const valueStr = typeof item.value === 'string' ? item.value : String(item.value);
-
-                // JSON文字列かどうか判定（改行を含むか、[]や{}で始まる）
-                const isJson = valueStr.includes('\n') || valueStr.startsWith('[') || valueStr.startsWith('{');
-
-                return (
-                  <div key={index} className={`flex flex-col ${isJson ? 'md:col-span-2' : ''}`}>
-                    <p className="text-gray-500 text-xs mb-0.5">{item.label}</p>
-                    {isJson ? (
-                      <pre className="text-gray-900 text-xs bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto">
-                        {valueStr}
-                      </pre>
-                    ) : (
-                      <p className="text-gray-900 font-medium break-all">{valueStr}</p>
-                    )}
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-white shadow-2xl rounded-xl sm:rounded-2xl flex flex-col overflow-hidden border border-slate-100 gap-0">
+          
+          {/* ヘッダー (固定) */}
+          <div className="bg-white border-b border-slate-100 px-6 py-5 shrink-0 z-10 sticky top-0">
+            <DialogHeader className="text-left space-y-1">
+              <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 shrink-0">
+                      <Code className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600" />
                   </div>
-                );
-              })}
+                  <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      すべての技術情報
+                  </DialogTitle>
+              </div>
+              <DialogDescription className="text-slate-500 text-sm mt-2 sm:ml-14 leading-relaxed">
+                  このファイルに含まれるすべてのC2PAメタデータ（開発者・専門家向け）
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          {/* スクロールエリア */}
+          <div className="flex-1 w-full min-h-0 overflow-y-auto px-6 pb-8 pt-0 scroll-smooth">
+            <div className="pt-6 pb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                {allMetadata.map((item, index) => {
+                  const valueStr = typeof item.value === 'string' ? item.value : String(item.value);
+                  const isJson = valueStr.includes('\n') || valueStr.startsWith('[') || valueStr.startsWith('{');
+
+                  return (
+                    <div key={index} className={`flex flex-col ${isJson ? 'md:col-span-2' : ''}`}>
+                      <p className="text-gray-500 text-xs mb-0.5">{item.label}</p>
+                      {isJson ? (
+                        <pre className="text-gray-900 text-xs bg-gray-50 p-2 rounded border border-gray-200 overflow-x-auto font-mono">
+                          {valueStr}
+                        </pre>
+                      ) : (
+                        <p className="text-gray-900 font-medium break-all">{valueStr}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

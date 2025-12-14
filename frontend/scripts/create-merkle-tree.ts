@@ -23,7 +23,7 @@ const RPC_URL = 'https://api.devnet.solana.com';
 const KEYPAIR_PATH = process.env.WALLET_KEYPAIR_PATH || './wallet-keypair.json';
 
 // Tree設定（MVP用: 小規模）
-const MAX_DEPTH = 14;          // 最大 2^14 = 16,384 cNFT
+const MAX_DEPTH = 20;          // 最大 2^14 = 16,384 cNFT
 const MAX_BUFFER_SIZE = 64;    // 同時mint数
 const CANOPY_DEPTH = 11;       // 検証コスト削減用キャッシュ
 

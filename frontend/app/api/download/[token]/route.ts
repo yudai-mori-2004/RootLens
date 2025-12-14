@@ -36,7 +36,6 @@ export async function GET(
       .select(`
         id,
         media_proof_id,
-        buyer_email,
         download_token,
         download_expires_at,
         download_count,

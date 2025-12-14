@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS users (
     -- Privy連携
     privy_user_id TEXT NOT NULL UNIQUE,
     wallet_address TEXT NOT NULL,
-    email TEXT NOT NULL,
     phone TEXT,                              -- SMS認証用
 
     -- プロフィール
@@ -27,7 +26,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_wallet ON users(wallet_address);
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_privy ON users(privy_user_id);
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -81,7 +79,6 @@ CREATE TABLE IF NOT EXISTS purchases (
 
     -- 購入者情報（Privy認証済み）
     buyer_wallet TEXT NOT NULL,
-    buyer_email TEXT NOT NULL,
 
     -- 決済情報
     solana_tx_signature TEXT NOT NULL,       -- SolanaPay トランザクション署名
@@ -99,7 +96,6 @@ CREATE TABLE IF NOT EXISTS purchases (
 
 -- インデックス
 CREATE INDEX IF NOT EXISTS idx_purchases_buyer ON purchases(buyer_wallet);
-CREATE INDEX IF NOT EXISTS idx_purchases_buyer_email ON purchases(buyer_email);
 CREATE INDEX IF NOT EXISTS idx_purchases_download_token ON purchases(download_token);
 CREATE INDEX IF NOT EXISTS idx_purchases_media ON purchases(media_proof_id);
 

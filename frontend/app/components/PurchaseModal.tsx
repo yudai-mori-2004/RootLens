@@ -7,8 +7,9 @@ import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } f
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { Loader2, Wallet, Check, AlertCircle } from 'lucide-react';
+import { Loader2, Wallet, Check, AlertCircle, ShoppingBag, Download, ArrowRight, ExternalLink } from 'lucide-react';
 import bs58 from 'bs58';
+import LoadingState from '@/app/components/LoadingState';
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -40,104 +41,111 @@ export default function PurchaseModal({
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
   const [lastSignature, setLastSignature] = useState<string | null>(null);
 
-  const handlePurchase = async () => {
-    if (!authenticated) {
-      login();
-      return;
-    }
+  const isFree = priceLamports === 0;
 
-    if (!buyerWallet) {
-      toast.error('ウォレットが接続されていません');
-      return;
+  const handlePurchase = async () => {
+    if (!isFree) {
+      if (!authenticated) {
+        login();
+        return;
+      }
+
+      if (!buyerWallet) {
+        toast.error('ウォレットが接続されていません');
+        return;
+      }
     }
 
     setLoading(true);
 
     try {
-      // Solanaウォレットの存在確認
-      if (!solanaWallet) {
-        throw new Error('Solanaウォレットが見つかりません');
-      }
+      let txSignature: string;
 
-      // 1. トランザクション作成
-      const connection = new Connection(
-        process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com',
-        'confirmed'
-      );
-
-      const buyerPubkey = new PublicKey(buyerWallet);
-      const sellerPubkey = new PublicKey(sellerWallet);
-
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: buyerPubkey,
-          toPubkey: sellerPubkey,
-          lamports: priceLamports,
-        })
-      );
-
-      // 最新のblockhashを取得
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-      transaction.recentBlockhash = blockhash;
-      transaction.feePayer = buyerPubkey;
-
-      setStep('payment');
-
-      // 2. トランザクションをシリアライズ
-      const serializedTransaction = transaction.serialize({
-        requireAllSignatures: false,
-        verifySignatures: false,
-      });
-
-      // 3. useSignAndSendTransactionフックで署名・送信
-      const txResult = await signAndSendTransaction({
-        transaction: serializedTransaction,
-        wallet: solanaWallet,
-      });
-      
-      // 結果からシグネチャを抽出
-      let txSignature: string | undefined;
-      
-      if (typeof txResult === 'string') {
-        txSignature = txResult;
-      } else if (typeof txResult === 'object' && txResult !== null) {
-        // @ts-ignore - 戻り値の型定義が不完全な場合の対策
-        const sig = txResult.signature || txResult.transactionHash;
-        
-        if (typeof sig === 'string') {
-          txSignature = sig;
-        } else if (sig && typeof sig === 'object' && 'data' in sig && Array.isArray(sig.data)) {
-          // Buffer形式のオブジェクト { type: 'Buffer', data: [...] } の場合
-          txSignature = bs58.encode(new Uint8Array(sig.data));
-        } else if (sig instanceof Uint8Array) {
-          // Uint8Arrayの場合
-          txSignature = bs58.encode(sig);
+      if (isFree) {
+        setStep('payment');
+        txSignature = `free_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        setLastSignature(null);
+      } else {
+        setStep('payment');
+        if (!solanaWallet) {
+          throw new Error('Solanaウォレットが見つかりません');
         }
+
+        const connection = new Connection(
+          process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com',
+          'confirmed'
+        );
+
+        const buyerPubkey = new PublicKey(buyerWallet);
+        const sellerPubkey = new PublicKey(sellerWallet);
+
+        const transaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: buyerPubkey,
+            toPubkey: sellerPubkey,
+            lamports: priceLamports,
+          })
+        );
+
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = buyerPubkey;
+
+        const serializedTransaction = transaction.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        });
+
+        const txResult = await signAndSendTransaction({
+          transaction: serializedTransaction,
+          wallet: solanaWallet,
+        });
+
+        let extractedSignature: string | undefined;
+
+        if (typeof txResult === 'string') {
+          extractedSignature = txResult;
+        } else if (typeof txResult === 'object' && txResult !== null) {
+          // @ts-ignore
+          const sig = txResult.signature || txResult.transactionHash;
+
+          if (typeof sig === 'string') {
+            extractedSignature = sig;
+          } else if (sig && typeof sig === 'object' && 'data' in sig && Array.isArray(sig.data)) {
+            extractedSignature = bs58.encode(new Uint8Array(sig.data));
+          } else if (sig instanceof Uint8Array) {
+            extractedSignature = bs58.encode(sig);
+          }
+        }
+
+        if (!extractedSignature || typeof extractedSignature !== 'string') {
+          throw new Error(`トランザクションシグネチャが無効です: ${JSON.stringify(txResult)}`);
+        }
+
+        await connection.confirmTransaction({
+          signature: extractedSignature,
+          blockhash,
+          lastValidBlockHeight
+        }, 'confirmed');
+
+        txSignature = extractedSignature;
+        setLastSignature(txSignature);
       }
 
-      if (!txSignature || typeof txSignature !== 'string') {
-        throw new Error(`トランザクションシグネチャが無効です: ${JSON.stringify(txResult)}`);
-      }
-
-      // 3. トランザクション確認を待つ
-      await connection.confirmTransaction({
-        signature: txSignature,
-        blockhash,
-        lastValidBlockHeight
-      }, 'confirmed');
-
-      setLastSignature(txSignature);
-
-      // 5. 購入記録API呼び出し
       const response = await fetch('/api/purchase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mediaProofId,
-          buyerWallet,
+          buyerWallet: buyerWallet || 'anonymous',
           txSignature,
         }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `購入記録に失敗しました (${response.status})`);
+      }
 
       const result = await response.json();
 
@@ -147,15 +155,20 @@ export default function PurchaseModal({
 
       setDownloadToken(result.downloadToken);
       setStep('success');
-      toast.success('購入が完了しました！');
-      
+      toast.success('処理が完了しました！');
+
+      if (isFree) {
+        const downloadUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/download/${result.downloadToken}`;
+        window.open(downloadUrl, '_blank');
+      }
+
       if (onSuccess) {
         onSuccess(result.downloadToken);
       }
 
     } catch (error: any) {
       console.error('=== Purchase Error ===', error);
-      toast.error(error.message || '購入処理に失敗しました');
+      toast.error(error.message || '処理に失敗しました');
       setStep('confirm');
     } finally {
       setLoading(false);
@@ -172,131 +185,167 @@ export default function PurchaseModal({
     ? `${process.env.NEXT_PUBLIC_APP_URL}/api/download/${downloadToken}`
     : null;
 
-  // トランザクションエクスプローラーのURLを生成 (Devnetデフォルト)
-  const getExplorerUrl = (signature: string) => {
-    const baseUrl = 'https://solscan.io/tx';
-    return `${baseUrl}/${signature}?cluster=devnet`;
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {step === 'success' ? '購入完了' : title || 'コンテンツを購入'}
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* 購入確認ステップ */}
-        {step === 'confirm' && (
-          <div className="space-y-4">
-            <div className="bg-indigo-50 border-2 border-indigo-200 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-600 mb-1">価格</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {(priceLamports / LAMPORTS_PER_SOL).toFixed(3)}
-                <span className="text-lg ml-2 text-gray-600">SOL</span>
-              </p>
-              <p className="text-xs text-gray-500 mt-2 break-all">
-                送金先: {sellerWallet}
-              </p>
-            </div>
-
-            {!authenticated && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-sm text-yellow-800">
-                  購入にはウォレット接続が必要です
-                </p>
-              </div>
-            )}
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-xs text-blue-800">
-                  <p className="font-medium mb-1">購入後のダウンロード</p>
-                  <p>購入完了後、このページまたはダッシュボードからダウンロードできます（24時間有効）</p>
-                </div>
-              </div>
-            </div>
-
-            <Button
-              onClick={handlePurchase}
-              disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  処理中...
-                </>
-              ) : authenticated ? (
-                <>
-                  <Wallet className="w-4 h-4 mr-2" />
-                  購入する
-                </>
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-white shadow-2xl rounded-xl border border-slate-100">
+        
+        {/* Custom Header */}
+        <div className="bg-white border-b border-slate-100 px-6 py-5 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl border shrink-0 bg-blue-600 border-blue-700">
+              {step === 'success' ? (
+                 <Check className="w-6 h-6 text-white" />
+              ) : isFree ? (
+                 <Download className="w-6 h-6 text-white" />
               ) : (
-                <>
-                  <Wallet className="w-4 h-4 mr-2" />
-                  ウォレット接続して購入
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {/* 決済処理中 */}
-        {step === 'payment' && (
-          <div className="flex flex-col items-center justify-center py-8 space-y-4">
-            <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-            <p className="text-gray-600">トランザクションを送信中...</p>
-          </div>
-        )}
-
-        {/* 成功ステップ */}
-        {step === 'success' && (
-          <div className="space-y-4">
-            <div className="flex flex-col items-center justify-center py-6 space-y-3">
-              <div className="rounded-full bg-green-100 p-3">
-                <Check className="w-8 h-8 text-green-600" />
-              </div>
-              <p className="text-lg font-semibold text-gray-900">購入完了！</p>
-              <p className="text-sm text-gray-600 text-center">
-                ダウンロードリンクを<br />
-                <span className="font-medium">{email}</span><br />
-                に送信しました
-              </p>
-              {lastSignature && (
-                <a
-                  href={`https://solscan.io/tx/${lastSignature}?cluster=devnet`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
-                >
-                  トランザクションを確認 <Loader2 className="w-3 h-3" />
-                </a>
+                 <ShoppingBag className="w-6 h-6 text-white" />
               )}
             </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+                {step === 'success' ? '完了しました' : isFree ? 'ダウンロード' : 'コンテンツの購入'}
+              </DialogTitle>
+              {step === 'confirm' && (
+                <p className="text-sm text-slate-500 mt-0.5">
+                    {title || (isFree ? 'コンテンツをダウンロードします' : 'デジタル資産を購入します')}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
 
-            {downloadUrl && (
-              <Button
-                asChild
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
-              >
-                <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
-                  今すぐダウンロード
-                </a>
-              </Button>
+        {/* Content */}
+        <div className="p-6">
+            {step === 'confirm' && (
+            <div className="space-y-6">
+                {/* Price Display */}
+                <div className="relative rounded-2xl p-6 text-center border overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                    <p className="text-xs font-bold uppercase tracking-wider opacity-60 mb-2">
+                        {isFree ? 'Download Price' : 'Purchase Price'}
+                    </p>
+                    <div className="flex items-baseline justify-center gap-1">
+                         {isFree ? (
+                             <span className="text-4xl font-extrabold text-white">Free</span>
+                         ) : (
+                             <>
+                                <span className="text-4xl font-extrabold text-white">
+                                    {(priceLamports / LAMPORTS_PER_SOL).toFixed(3)}
+                                </span>
+                                <span className="text-lg font-bold text-blue-200">SOL</span>
+                             </>
+                         )}
+                    </div>
+                </div>
+
+                {/* Warnings */}
+                {!isFree && !authenticated && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex gap-3 items-start">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-800 font-medium">
+                        購入にはSolanaウォレットの接続が必要です
+                    </p>
+                </div>
+                )}
+                
+                {/* Action Button */}
+                <Button
+                    onClick={handlePurchase}
+                    disabled={loading}
+                    className="w-full h-12 text-base font-bold shadow-md hover:shadow-lg transition-all rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                    {loading ? (
+                        <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            処理中...
+                        </>
+                    ) : isFree ? (
+                        <>
+                            <Download className="w-5 h-5 mr-2" />
+                            今すぐダウンロード
+                        </>
+                    ) : authenticated ? (
+                        <>
+                            購入してダウンロード
+                            <ArrowRight className="w-5 h-5 ml-2" />
+                        </>
+                    ) : (
+                        <>
+                            <Wallet className="w-5 h-5 mr-2" />
+                            ウォレットを接続
+                        </>
+                    )}
+                </Button>
+                
+                <p className="text-center text-xs text-slate-400">
+                    {isFree 
+                        ? 'ダウンロードファイルにはC2PA署名が含まれています' 
+                        : '安全なブロックチェーン決済により即時処理されます'
+                    }
+                </p>
+            </div>
             )}
 
-            <Button
-              onClick={handleClose}
-              variant="outline"
-              className="w-full"
-            >
-              閉じる
-            </Button>
-          </div>
-        )}
+            {step === 'payment' && (
+                <div className="py-8">
+                    <LoadingState 
+                        fullScreen={false} 
+                        message={isFree ? "ダウンロード準備中..." : "トランザクション送信中..."}
+                        subMessage={isFree ? "サーバーからファイルを取得しています" : "ブロックチェーンで決済を処理しています"}
+                        className="bg-transparent p-0"
+                    />
+                </div>
+            )}
+
+            {step === 'success' && (
+                <div className="space-y-6">
+                    <div className="rounded-xl p-6 text-center border bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+                         <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-blue-500">
+                             <Check className="w-8 h-8 text-white" />
+                         </div>
+                         <h3 className="text-lg font-bold mb-1 text-white">
+                             {isFree ? '準備ができました' : '購入完了！'}
+                         </h3>
+                         <p className="text-sm text-blue-100">
+                             ダウンロードが自動的に開始されない場合は<br/>下のボタンをクリックしてください
+                         </p>
+                    </div>
+
+                    {lastSignature && (
+                         <div className="flex justify-center">
+                            <a
+                            href={`https://solscan.io/tx/${lastSignature}?cluster=devnet`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-mono text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-colors"
+                            >
+                                Transaction: {lastSignature.slice(0, 6)}...{lastSignature.slice(-6)}
+                                <ExternalLink className="w-3 h-3" />
+                            </a>
+                        </div>
+                    )}
+
+                    {downloadUrl && (
+                        <Button
+                            asChild
+                            className="w-full h-12 text-base font-bold bg-indigo-600 hover:bg-indigo-700 shadow-md rounded-xl"
+                        >
+                            <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
+                                <Download className="w-5 h-5 mr-2" />
+                                ファイルを保存
+                            </a>
+                        </Button>
+                    )}
+                    
+                    <Button
+                        onClick={handleClose}
+                        variant="ghost"
+                        className="w-full text-slate-500 hover:text-slate-700"
+                    >
+                        閉じる
+                    </Button>
+                </div>
+            )}
+        </div>
       </DialogContent>
     </Dialog>
   );

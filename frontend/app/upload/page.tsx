@@ -12,10 +12,15 @@ import ProvenanceModal from '@/app/components/ProvenanceModal';
 import TechnicalDetailsSection from '@/app/components/TechnicalDetailsSection';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Wallet, CheckCircle, XCircle, UploadCloud, Loader2, Info, Sparkles, Clipboard, Camera, AlertTriangle, Lock, Calendar, User, PenTool, BookOpen, Cog, Cloud, Link, FileText, DollarSign, ExternalLink } from 'lucide-react';
+
+import Header from '@/app/components/Header';
+import LoadingState, { LoadingStep } from '@/app/components/LoadingState';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 interface C2PAValidationResult {
   isValid: boolean;
@@ -41,6 +46,9 @@ export default function UploadPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [c2pa, setC2pa] = useState<C2pa | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showUploadProgressModal, setShowUploadProgressModal] = useState(false);
+  const [uploadProgressStep, setUploadProgressStep] = useState(0); // 0: 初期状態, 1-4: 各ステップ
+  const [uploadStatusMessage, setUploadStatusMessage] = useState('');
 
   // ファイルとC2PAデータ
   const [currentFile, setCurrentFile] = useState<File | null>(null);
@@ -153,7 +161,8 @@ export default function UploadPage() {
         'Nikon Corporation',
         'Canon Inc.',
         'Adobe Inc.',
-        'OpenAI'
+        'OpenAI',
+        'Samsung Galaxy'
       ];
 
       const activeManifest = summary.activeManifest;
@@ -324,13 +333,19 @@ export default function UploadPage() {
 
   const handleUpload = async () => {
     if (!currentFile || !hashes || !validationResult || !solanaWallet) {
+      alert('必要な情報が不足しています。');
       return;
     }
 
-    try {
-      setIsProcessing(true);
+    setShowUploadProgressModal(true);
+    setIsProcessing(true);
+    setUploadProgressStep(0);
+    setUploadStatusMessage('アップロード準備中...');
 
-      // 1. Presigned URL取得（元ファイル）
+    try {
+      // 1. Presigned URL取得（元ファイル）とR2アップロード
+      setUploadProgressStep(1);
+      setUploadStatusMessage('1/4: 元データを一時保存しています...');
       const presignedOriginalResponse = await fetch('/api/upload/presigned', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -347,7 +362,6 @@ export default function UploadPage() {
 
       const { presigned_url: presignedOriginalUrl } = await presignedOriginalResponse.json();
 
-      // 2. R2に元ファイルをアップロード
       const uploadOriginalResponse = await fetch(presignedOriginalUrl, {
         method: 'PUT',
         headers: { 'Content-Type': currentFile.type },
@@ -358,7 +372,9 @@ export default function UploadPage() {
         throw new Error('R2アップロード失敗（元ファイル）');
       }
 
-      // 2.5 Lens Workerで処理 (ベクトル化 + DB初期登録)
+      // 2. Lens Workerで処理 (ベクトル化 + DB初期登録)
+      setUploadProgressStep(2);
+      setUploadStatusMessage('2/4: 真正性を検証し、データを解析しています...');
       const lensWorkerUrl = process.env.NEXT_PUBLIC_LENS_WORKER_URL;
       if (!lensWorkerUrl) {
         throw new Error('System Error: LENS_WORKER_URL is not configured');
@@ -366,18 +382,15 @@ export default function UploadPage() {
       
       console.log('Processing with Lens Worker:', lensWorkerUrl);
 
-      // 高速化のため画像をリサイズしてWorkerへ送信
       const resizedBlob = await resizeImage(currentFile);
-      const resizedFile = new File([resizedBlob], currentFile.name, { type: 'image/jpeg' });
-
       const formData = new FormData();
-      formData.append('image', resizedFile);
+      formData.append('image', resizedBlob, 'search.jpg');
       formData.append('originalHash', hashes.originalHash);
       formData.append('fileExtension', getExtension(currentFile.type));
 
       const workerResponse = await fetch(`${lensWorkerUrl}/process`, {
         method: 'POST',
-        body: formData, // Content-Typeは自動設定されるため指定しない
+        body: formData,
       });
 
       if (!workerResponse.ok) {
@@ -392,6 +405,8 @@ export default function UploadPage() {
 
 
       // 3. サムネイルとManifestをPublic Bucketにアップロード
+      setUploadProgressStep(3);
+      setUploadStatusMessage('3/4: 証明データを保存しています...');
       let summaryData = c2paSummary;
       if (!summaryData) {
         const { manifestStore, thumbnail } = await c2pa!.read(currentFile);
@@ -418,7 +433,9 @@ export default function UploadPage() {
       // 4. Root証明書チェーンを抽出
       const rootCertChain = extractRootCertChain(manifestData);
 
-      // 5. アップロードAPI呼び出し
+      // 5. アップロードAPI呼び出し (ジョブ投入)
+      setUploadProgressStep(4);
+      setUploadStatusMessage('4/4: デジタル資産を発行しています...');
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -432,7 +449,7 @@ export default function UploadPage() {
           price: Math.floor(price * 1e9),
           title: title || undefined,
           description: description || undefined,
-          mediaProofId: mediaProofId, // Workerから取得したIDを渡す
+          mediaProofId: mediaProofId,
         }),
       });
 
@@ -441,13 +458,13 @@ export default function UploadPage() {
         throw new Error(error.error || 'ジョブ投入失敗');
       }
 
-      const uploadResult = await uploadResponse.json();
-      const jobId = uploadResult.jobId;
+      const uploadResultData = await uploadResponse.json();
+      const jobId = uploadResultData.jobId;
 
       // 6. ジョブステータスをポーリング
       let completed = false;
       let attempts = 0;
-      const maxAttempts = 60;
+      const maxAttempts = 60; // 60秒タイムアウト
 
       while (!completed && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -462,6 +479,10 @@ export default function UploadPage() {
         if (statusResult.state === 'completed') {
           completed = true;
           if (statusResult.result?.success) {
+            setUploadProgressStep(5);
+            setUploadStatusMessage('完了しました！');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            setShowUploadProgressModal(false);
             setUploadResult({ hash: hashes.originalHash });
             setCurrentStep(5);
           } else {
@@ -481,6 +502,7 @@ export default function UploadPage() {
     } catch (err) {
       console.error('アップロードエラー:', err);
       alert(`エラー: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setShowUploadProgressModal(false); // エラー時はモーダルを閉じる
     } finally {
       setIsProcessing(false);
     }
@@ -520,18 +542,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      {/* ヘッダーバー */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-3">
-            <img src="/icon_white.png" alt="RootLens" className="w-8 h-8" />
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">RootLens Upload</h1>
-              <p className="text-xs text-gray-500">C2PAハードウェア署名付きメディアを証明</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header />
 
       <div className="max-w-4xl mx-auto py-12 px-4">
 
@@ -542,7 +553,7 @@ export default function UploadPage() {
         {currentStep === 1 && (
           <StepContainer
             title="ウォレット接続"
-            description="RootLensを利用するには、Solanaウォレットが必要です"
+            description="撮影したコンテンツの所有権を証明するために、Solanaウォレットを接続してください"
             onNext={authenticated ? () => setCurrentStep(2) : undefined}
             nextLabel="次へ"
             nextDisabled={!authenticated}
@@ -555,8 +566,8 @@ export default function UploadPage() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">ウォレットを接続して開始</h3>
                 <p className="text-gray-500 text-center max-w-md mb-8">
-                  撮影したメディアの真正性を証明し、ブロックチェーンに記録するために、
-                  Solanaウォレットを使用して署名を行います。
+                  RootLensでは、コンテンツの権利をあなたのウォレットに直接紐付けます。<br />
+                  これにより、真正性の証明と権利の販売が可能になります。
                 </p>
                 <Button
                   onClick={handleLogin}
@@ -569,23 +580,21 @@ export default function UploadPage() {
               </div>
             ) : (
               <div className="py-4">
-                <div className="bg-white border border-gray-100 shadow-md rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group">
-                  {/* 装飾用の背景アクセント */}
-                  <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-full -mr-12 -mt-12 opacity-50 transition-transform group-hover:scale-110" />
-                  
-                  <div className="flex items-center gap-5 z-10 w-full">
-                    <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <CheckCircle className="w-7 h-7 text-green-600" />
+                <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 transition-all hover:border-slate-300">
+                  <div className="flex items-center gap-5 w-full">
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0 border border-slate-200">
+                      <Wallet className="w-6 h-6 text-slate-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-500 mb-1">Connected Wallet</p>
-                      <p className="text-lg font-mono font-bold text-gray-900 truncate">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Connected Wallet</p>
+                      <p className="text-lg font-mono font-bold text-slate-900 truncate">
                         {solanaWallet?.address || '読み込み中...'}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-xs text-green-700 font-medium">Verified & Active</span>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="flex items-center gap-1.5 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                            <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                            <span className="text-xs text-green-700 font-bold">Active</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -593,7 +602,7 @@ export default function UploadPage() {
                   <Button
                     onClick={logout}
                     variant="outline"
-                    className="flex-shrink-0 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                    className="flex-shrink-0 border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
                   >
                     切断する
                   </Button>
@@ -607,7 +616,7 @@ export default function UploadPage() {
         {currentStep === 2 && (
           <StepContainer
             title="ファイル選択"
-            description="C2PA署名付きメディアファイルを選択してください"
+            description="C2PA対応カメラで撮影されたファイルを選択してください"
             onBack={() => setCurrentStep(1)}
             isLoading={isProcessing}
           >
@@ -620,11 +629,11 @@ export default function UploadPage() {
                 className="group relative"
               >
                 <div className={`
-                  relative z-10 border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300
-                  flex flex-col items-center justify-center min-h-[300px]
+                  relative z-10 border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200
+                  flex flex-col items-center justify-center min-h-[320px]
                   ${isDragging 
-                    ? 'border-indigo-500 bg-indigo-50 scale-[1.01] shadow-lg' 
-                    : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-white hover:shadow-md'
+                    ? 'border-indigo-500 bg-indigo-50/50' 
+                    : 'border-slate-300 bg-slate-50 hover:border-indigo-400 hover:bg-white'
                   }
                 `}>
                   <input
@@ -636,66 +645,42 @@ export default function UploadPage() {
                     id="file-input"
                   />
                   <label htmlFor="file-input" className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
-                    <div className="mb-6 p-4 bg-white rounded-full shadow-sm ring-1 ring-gray-100 group-hover:scale-110 transition-transform duration-300">
-                      <UploadCloud className="w-12 h-12 text-indigo-500" />
+                    <div className={`mb-6 p-5 rounded-full transition-transform duration-300 ${isDragging ? 'bg-indigo-100 scale-110' : 'bg-white shadow-sm ring-1 ring-slate-100 group-hover:scale-105'}`}>
+                      <UploadCloud className={`w-10 h-10 ${isDragging ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-500'}`} />
                     </div>
                     
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">
-                      ファイルをドラッグ＆ドロップ
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">
+                      C2PA対応ファイルをアップロード
                     </h3>
-                    <p className="text-gray-500 mb-8 max-w-xs mx-auto text-sm">
-                      または、クリックしてファイルを選択してください
+                    <p className="text-slate-500 mb-8 max-w-xs mx-auto text-sm leading-relaxed">
+                      ここにファイルをドラッグ＆ドロップするか、<br/>クリックして選択してください
                     </p>
 
-                    <div className="bg-white border border-gray-200 text-gray-700 px-6 py-2.5 rounded-full font-medium shadow-sm hover:bg-gray-50 transition-colors text-sm flex items-center gap-2">
+                    <div className="bg-slate-900 text-white px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-slate-800 transition-all hover:shadow-lg text-sm flex items-center gap-2 transform active:scale-95">
                       <Cloud className="w-4 h-4" />
-                      ファイルを選択する
+                      ファイルを選択
                     </div>
                     
-                    <div className="mt-8 flex gap-4 text-xs text-gray-400 font-mono">
-                      <span className="bg-gray-100 px-2 py-1 rounded">JPEG</span>
-                      <span className="bg-gray-100 px-2 py-1 rounded">PNG</span>
-                      <span className="bg-gray-100 px-2 py-1 rounded">HEIC</span>
+                    <div className="mt-8 flex gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200">JPEG</span>
+                      <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200">PNG</span>
+                      <span className="bg-slate-100 px-2 py-1 rounded border border-slate-200">HEIC</span>
                     </div>
                   </label>
                 </div>
               </div>
             ) : (
-              <div className="py-12 px-6">
-                <div className="max-w-md mx-auto">
-                  <div className="text-center mb-10">
-                    <div className="inline-block relative">
-                      <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
-                      <div className="relative bg-white p-4 rounded-full shadow-md">
-                         <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
-                      </div>
-                    </div>
-                    <h3 className="mt-6 text-xl font-bold text-gray-900">解析を実行中...</h3>
-                    <p className="text-gray-500 mt-2">メディアに含まれるC2PA署名を検証しています</p>
-                  </div>
-
-                  <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Loader2 className="w-3 h-3 text-blue-600 animate-spin" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-700">C2PAマニフェストを読み込み中...</span>
-                    </div>
-                    <div className="flex items-center gap-3 opacity-50">
-                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-500">ハードウェア署名を検証</span>
-                    </div>
-                    <div className="flex items-center gap-3 opacity-50">
-                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-500">ハッシュ値を計算</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <LoadingState
+                fullScreen={false}
+                message="解析を実行中..."
+                subMessage="コンテンツに含まれるC2PA署名を検証しています"
+                steps={[
+                  { label: 'C2PAマニフェストを読み込み中...', status: 'loading' },
+                  { label: 'ハードウェア署名を検証', status: 'pending' },
+                  { label: 'ハッシュ値を計算', status: 'pending' },
+                ]}
+                className="py-12"
+              />
             )}
           </StepContainer>
         )}
@@ -705,60 +690,45 @@ export default function UploadPage() {
           <StepContainer
             title={
               validationResult.isValid ? (
-                <div className="flex flex-col items-center justify-center py-6 w-full">
-                  {/* 背景デコレーション */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-green-50/30 via-transparent to-transparent pointer-events-none" />
-
+                <div className="flex flex-col items-center justify-center py-4 w-full">
                   {/* サムネイル画像 + チェックマーク */}
                   <div className="relative mb-6 z-10">
                     {c2paSummary.thumbnailUrl ? (
                       <div className="relative group">
-                        {/* グロー効果 */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-400 rounded-2xl blur-xl opacity-20 group-hover:opacity-30 transition-opacity" />
-
-                        {/* 画像 */}
-                        <div className="relative">
+                        <div className="relative p-1 bg-white rounded-2xl shadow-lg border border-slate-100">
                           <img
                             src={c2paSummary.thumbnailUrl}
                             alt="Verified content"
-                            className="w-52 h-52 object-cover rounded-2xl shadow-2xl ring-4 ring-white ring-offset-4 ring-offset-green-100/50"
+                            className="w-48 h-48 object-cover rounded-xl"
                           />
-
                           {/* チェックマークバッジ */}
-                          <div className="absolute -bottom-4 -right-4 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 p-1 shadow-xl">
-                            <div className="rounded-full bg-white p-2.5">
-                              <CheckCircle className="w-10 h-10 text-green-500" strokeWidth={2.5} />
-                            </div>
+                          <div className="absolute -bottom-3 -right-3 rounded-full bg-white p-1.5 shadow-md border border-slate-100">
+                              <CheckCircle className="w-8 h-8 text-green-500 fill-green-50" strokeWidth={2} />
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="relative group">
-                        {/* グロー効果 */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full blur-2xl opacity-20 group-hover:opacity-30 transition-opacity" />
-
-                        {/* チェックマーク */}
-                        <div className="relative rounded-full bg-gradient-to-br from-green-50 to-emerald-50 p-6 ring-4 ring-white ring-offset-4 ring-offset-green-100/50 shadow-2xl animate-in fade-in zoom-in duration-500">
-                          <CheckCircle className="w-16 h-16 text-green-500" strokeWidth={2} />
-                        </div>
+                      <div className="relative rounded-full bg-slate-50 p-6 border border-slate-200 shadow-sm">
+                          <CheckCircle className="w-16 h-16 text-green-500" strokeWidth={1.5} />
                       </div>
                     )}
                   </div>
 
                   {/* タイトル */}
-                  <div className="text-center space-y-2 z-10">
-                    <span className="text-3xl font-bold bg-gradient-to-br from-green-600 via-emerald-600 to-teal-600 bg-clip-text text-transparent leading-tight block">
-                      本物のカメラでの撮影が証明されました
+                  <div className="text-center space-y-1 z-10">
+                    <span className="text-2xl font-bold text-slate-900 tracking-tight block">
+                      ハードウェア署名を確認
                     </span>
-                    <div className="flex items-center justify-center gap-2 text-green-700">
-                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      <span className="text-sm font-medium">C2PA Verified</span>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                        C2PA Validated
+                      </span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-2 w-full text-red-600">
-                  <div className="rounded-full bg-red-50 p-4 mb-3">
+                <div className="flex flex-col items-center justify-center py-4 w-full text-red-600">
+                  <div className="rounded-full bg-red-50 p-4 mb-3 border border-red-100">
                     <XCircle className="w-12 h-12" />
                   </div>
                   <span className="text-2xl font-bold">検証失敗</span>
@@ -767,23 +737,23 @@ export default function UploadPage() {
             }
             description={
               validationResult.isValid ? (
-                <div className="flex flex-col items-center w-full mt-3 space-y-4">
-                  <div className="inline-flex items-center gap-3 bg-gradient-to-r from-slate-50 to-gray-50 border border-slate-200 rounded-xl px-6 py-3 shadow-sm">
+                <div className="flex flex-col items-center w-full mt-2 space-y-4">
+                  <div className="inline-flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-5 py-2.5 shadow-sm">
                     <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100">
                       <Camera className="w-4 h-4 text-slate-600" />
                     </div>
                     <div className="text-left">
-                      <p className="text-xs text-slate-500 font-medium">Root Issuer</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Root Issuer</p>
                       <p className="text-sm text-slate-900 font-bold">{validationResult.rootSigner}</p>
                     </div>
                   </div>
-                  <p className="text-gray-600 text-sm text-center max-w-lg leading-relaxed">
-                    このコンテンツの真正性はC2PA技術によって数学的に証明されました。<br/>
-                    改ざんやAI生成ではないことが保証されています。
+                  <p className="text-slate-500 text-sm text-center max-w-md leading-relaxed">
+                    撮影デバイス由来のデジタル署名を確認しました。<br/>
+                    このコンテンツは「AI生成」や「改ざん」ではないことが証明されています。
                   </p>
                 </div>
               ) : (
-                <div className="text-center text-red-600 mt-2 font-medium bg-red-50 px-4 py-2 rounded-lg inline-block mx-auto">
+                <div className="text-center text-red-600 mt-2 font-medium bg-red-50 px-4 py-2 rounded-lg inline-block mx-auto border border-red-100 text-sm">
                   {validationResult.error}
                 </div>
               )
@@ -797,20 +767,17 @@ export default function UploadPage() {
             nextDisabled={!privacyAcknowledged || !validationResult.isValid}
           >
             {validationResult.isValid && (
-              <div className="mt-2 space-y-6">
-                {/* 導入メッセージ */}
-                <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-6 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-full bg-indigo-100 p-2.5 mt-0.5">
-                      <Info className="w-5 h-5 text-indigo-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-indigo-900 mb-2 text-base">これから行うこと</p>
-                      <p className="text-sm text-indigo-800 leading-relaxed">
-                        次へ進むと、あなたのコンテンツの真正性を<strong>永久的に証明できるページ</strong>が作成され、世界中の誰でもアクセスできるようになります。
-                      </p>
-                    </div>
-                  </div>
+              <div className="mt-4 space-y-6">
+                {/* 次のステップへの導入 */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center">
+                  <h4 className="text-lg font-bold text-slate-900 mb-2 flex items-center justify-center gap-2">
+                    <Sparkles className="w-5 h-5 text-indigo-500" />
+                    コンテンツの資産化と公開
+                  </h4>
+                  <p className="text-slate-600 text-sm max-w-lg mx-auto leading-relaxed">
+                    C2PA来歴を可視化したページを作成し、<br />
+                    このコンテンツを<strong className="text-indigo-600 font-bold">信頼できるデジタル資産</strong>として世界に公開します。
+                  </p>
                 </div>
 
                 {/* メタデータ表示 */}
@@ -829,7 +796,7 @@ export default function UploadPage() {
         {currentStep === 4 && (
           <StepContainer
             title="価格・情報設定"
-            description="販売価格とメタデータを設定してください"
+            description="公開ページに表示する情報と、資産としての販売価格を設定します"
             onBack={() => setCurrentStep(3)}
             onNext={() => handleUpload()}
             nextLabel="アップロード開始"
@@ -837,13 +804,13 @@ export default function UploadPage() {
           >
             <div className="space-y-6 py-4">
               {/* 設定カード */}
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4">
-                  <h5 className="font-bold text-gray-900 text-base flex items-center gap-2">
-                    <PenTool className="w-5 h-5 text-indigo-600" />
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+                  <h5 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                    <PenTool className="w-5 h-5 text-slate-500" />
                     コンテンツ情報
                   </h5>
-                  <p className="text-sm text-gray-600 mt-1">証明ページに表示される情報を設定します</p>
+                  <p className="text-xs text-slate-500 mt-1">公開ページに表示されるコンテンツ情報を入力してください</p>
                 </div>
 
                 <div className="p-6 space-y-6">
@@ -902,7 +869,7 @@ export default function UploadPage() {
                     <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mt-2">
                       <p className="text-xs text-indigo-800 flex items-start gap-2">
                         <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <span><strong>0 SOL</strong> に設定すると、誰でも無料でダウンロード可能になります</span>
+                        <span><strong>0 SOL</strong> に設定すると、フリー素材として無償で提供されます（資産としての記録は残ります）</span>
                       </p>
                     </div>
                   </div>
@@ -915,51 +882,43 @@ export default function UploadPage() {
         {/* Step 5: 完了 */}
         {currentStep === 5 && uploadResult && (
           <StepContainer
-            title="アップロード完了！"
+            title="デジタル資産化が完了しました"
             description="cNFTの発行が完了しました"
             showBack={false}
           >
-            <div className="flex flex-col items-center py-8 relative">
-              {/* 背景デコレーション */}
-              <div className="absolute inset-0 bg-gradient-to-b from-green-50/20 via-indigo-50/20 to-transparent pointer-events-none" />
-
+            <div className="flex flex-col items-center py-8">
               {/* 成功カード */}
-              <div className="w-full max-w-md relative z-10">
-                <div className="bg-white border-2 border-gray-200 rounded-2xl shadow-2xl overflow-hidden mb-8 relative group">
+              <div className="w-full max-w-md">
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden mb-8">
                   {/* トップバー */}
-                  <div className="h-1.5 bg-gradient-to-r from-green-400 via-emerald-400 to-teal-400" />
+                  <div className="h-1 bg-green-500" />
 
                   {/* コンテンツ */}
-                  <div className="p-8 text-center relative">
-                    {/* グロー効果 */}
-                    <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-32 h-32 bg-green-400/10 rounded-full blur-3xl" />
-
+                  <div className="p-8 text-center">
                     {/* チェックマークアイコン */}
                     <div className="relative mb-6">
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-emerald-400 rounded-full blur-xl opacity-20" />
-                      <div className="relative w-24 h-24 bg-gradient-to-br from-green-50 to-emerald-50 rounded-full flex items-center justify-center mx-auto ring-4 ring-white ring-offset-4 ring-offset-green-100/50 shadow-xl">
-                        <CheckCircle className="w-12 h-12 text-green-500" strokeWidth={2.5} />
+                      <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto border border-green-100">
+                        <CheckCircle className="w-10 h-10 text-green-500" strokeWidth={2} />
                       </div>
                     </div>
 
                     {/* タイトル */}
-                    <h3 className="text-2xl font-bold bg-gradient-to-br from-gray-900 to-gray-700 bg-clip-text text-transparent mb-2">
-                      証明書発行完了
+                    <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                      公開完了
                     </h3>
-                    <p className="text-gray-600 text-sm mb-6 leading-relaxed">
-                      あなたのメディアはブロックチェーン上に<br/>
-                      <strong className="text-green-600">永久に記録されました</strong>
+                    <p className="text-slate-600 text-sm mb-8 leading-relaxed">
+                      あなたのコンテンツは<strong className="text-green-600 font-bold">信頼できる資産</strong>として<br />ブロックチェーン上に記録されました
                     </p>
 
                     {/* URL表示 */}
-                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 text-left border-2 border-indigo-100 shadow-inner">
+                    <div className="bg-slate-50 rounded-xl p-4 text-left border border-slate-200">
                       <div className="flex items-center gap-2 mb-2">
-                        <Link className="w-4 h-4 text-indigo-600" />
-                        <p className="text-xs text-indigo-900 font-bold uppercase tracking-wider">Proof URL</p>
+                        <Link className="w-3.5 h-3.5 text-slate-500" />
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Public URL</p>
                       </div>
-                      <div className="flex items-center justify-between gap-2 bg-white rounded-lg p-3 border border-indigo-200">
+                      <div className="flex items-center justify-between gap-2 bg-white rounded-lg p-3 border border-slate-200 shadow-sm">
                         <code className="text-xs text-indigo-600 font-mono truncate flex-1 font-semibold">
-                          {window.location.origin}/proof/{uploadResult.hash}
+                          {window.location.origin}/asset/{uploadResult.hash}
                         </code>
                         <Button
                           size="sm"
@@ -967,7 +926,7 @@ export default function UploadPage() {
                           className="h-8 w-8 p-0 hover:bg-indigo-50 hover:text-indigo-700 transition-colors rounded-lg"
                           onClick={() => {
                             navigator.clipboard.writeText(
-                              `${window.location.origin}/proof/${uploadResult.hash}`
+                              `${window.location.origin}/asset/${uploadResult.hash}`
                             );
                             alert('URLをコピーしました');
                           }}
@@ -984,18 +943,18 @@ export default function UploadPage() {
                   <Button
                     asChild
                     size="lg"
-                    className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all border-0 rounded-xl"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all rounded-xl"
                   >
-                    <a href={`/proof/${uploadResult.hash}`} className="flex items-center justify-center gap-2">
+                    <a href={`/asset/${uploadResult.hash}`} className="flex items-center justify-center gap-2">
                       <ExternalLink className="w-5 h-5" />
-                      <span>証明書ページへ移動</span>
+                      <span>公開ページを見る</span>
                     </a>
                   </Button>
                   <Button
                     onClick={() => window.location.reload()}
                     variant="outline"
                     size="lg"
-                    className="flex-1 border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400 transition-all rounded-xl"
+                    className="flex-1 border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl"
                   >
                     続けてアップロード
                   </Button>
@@ -1004,6 +963,36 @@ export default function UploadPage() {
             </div>
           </StepContainer>
         )}
+
+        {/* アップロード進捗モーダル */}
+        <Dialog open={showUploadProgressModal}>
+          <DialogContent className="max-w-md p-0 overflow-hidden bg-transparent border-none shadow-none">
+            <DialogHeader>
+              <VisuallyHidden.Root>
+                <DialogTitle>アップロード進捗</DialogTitle>
+              </VisuallyHidden.Root>
+            </DialogHeader>
+            <div className="bg-white rounded-lg shadow-xl overflow-hidden">
+             <LoadingState
+                fullScreen={false}
+                message="コンテンツをデジタル資産化しています"
+                subMessage="この処理には数秒から数十秒かかります"
+                steps={[
+                  '元データのアップロード',
+                  '真正性の検証と解析',
+                  '証明データの保存',
+                  'デジタル資産の発行',
+                ].map((step, index) => ({
+                    label: step,
+                    status: uploadProgressStep > index + 1 ? 'success' : uploadProgressStep === index + 1 ? 'loading' : 'pending'
+                } as LoadingStep))}
+              />
+              <div className="text-center pb-6 px-6 text-sm text-gray-500">
+                <p>{uploadStatusMessage}</p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* 来歴モーダル */}
         {c2paSummary && (
