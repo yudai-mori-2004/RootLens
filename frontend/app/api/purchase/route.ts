@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { PurchaseRequest, PurchaseResponse } from '@/../../shared/types/purchase';
+import { PurchaseRequest, PurchaseResponse } from '@shared/types/purchase';
 import { randomBytes } from 'crypto';
 
 const supabase = createClient(
