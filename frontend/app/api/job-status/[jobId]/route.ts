@@ -31,7 +31,7 @@ export async function GET(
     // レスポンスを構築
     const response: JobStatusResponse = {
       jobId: job.id!,
-      state,
+      state: state as any,
       progress,
       result: job.returnvalue,
       failedReason,
