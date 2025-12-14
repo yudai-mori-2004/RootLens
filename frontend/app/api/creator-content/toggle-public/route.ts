@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       .update({ is_public: isPublic })
       .eq('id', mediaProofId)
       .eq('owner_wallet', walletAddress) // 二重チェック（Heliusでの所有とSupabase上の記録も一致しているか）
+      .select()
       .single();
 
     if (updateError) {

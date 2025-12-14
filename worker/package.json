@@ -14,6 +14,7 @@
     "@metaplex-foundation/umi-uploader-irys": "^1.4.1",
     "@supabase/supabase-js": "^2.86.0",
     "bullmq": "^5.36.3",
+    "express": "^4.18.2",
     "ioredis": "^5.4.2"
   },
   "devDependencies": {
