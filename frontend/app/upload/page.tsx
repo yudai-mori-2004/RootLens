@@ -237,15 +237,8 @@ export default function UploadPage() {
 
       setHashes({ originalHash });
 
-      // サムネイル用のリサイズ済み画像データURIを生成
-      const resizedBlobForPreview = await resizeImage(file);
-      const dataUriForPreview = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(resizedBlobForPreview);
-      });
-      setPreviewThumbnailDataUri(dataUriForPreview);
+      // デバッグ用: 計算されたハッシュ値をアラートで表示
+      alert(`Calculated Hash: ${originalHash}`);
 
       // 5. 重複チェック（既存の証明が存在しないか確認）
       console.log('🔍 重複チェック開始:', originalHash);
