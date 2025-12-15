@@ -1,3 +1,5 @@
+import { ArweaveProofMetadata } from '@shared/types';
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // RootLens - 検証ロジック ヘルパー関数
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -15,7 +17,7 @@ export function getIrysGatewayUrl(): string {
 /**
  * Arweaveメタデータを取得
  */
-export async function fetchArweaveMetadata(txId: string): Promise<unknown | null> {
+export async function fetchArweaveMetadata(txId: string): Promise<ArweaveProofMetadata | null> {
   try {
     const fetchBaseUrl = getIrysGatewayUrl();
     const response = await fetch(`${fetchBaseUrl}/${txId}`);
@@ -77,10 +79,11 @@ export async function fallbackToDatabase(
   if (!txIdFromDB) return null;
 
   const arweaveData = await fetchArweaveMetadata(txIdFromDB);
+  const metadata = arweaveData as ArweaveProofMetadata | null;
 
   return {
     arweaveTxId: txIdFromDB,
     arweaveData,
-    targetAssetId: arweaveData?.target_asset_id
+    targetAssetId: metadata?.target_asset_id
   };
 }

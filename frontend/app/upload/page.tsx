@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { createC2pa, C2pa, ManifestStore, Manifest } from 'c2pa';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
@@ -10,10 +11,10 @@ import PrivacyWarning from '@/app/components/PrivacyWarning';
 import ProvenanceModal from '@/app/components/ProvenanceModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Wallet, CheckCircle, XCircle, UploadCloud, Sparkles, Clipboard, Camera, AlertTriangle, Cloud, Link, ExternalLink } from 'lucide-react';
+import { Wallet, CheckCircle, XCircle, UploadCloud, Loader2, Info, Sparkles, Clipboard, Camera, AlertTriangle, Lock, PenTool, Cloud, Link, ExternalLink, FileText } from 'lucide-react';
 
 import Header from '@/app/components/Header';
 import LoadingState, { LoadingStep } from '@/app/components/LoadingState';
@@ -141,11 +142,12 @@ export default function UploadPage() {
         return;
       }
 
-      const { manifestStore, thumbnail } = readResult;
+      const { manifestStore } = readResult;
       setManifestData(manifestStore);
 
       // 2. サマリーデータ生成
-      const previewThumbnailUrl = thumbnail?.getUrl() || null;
+      const thumbnail = (readResult as any).thumbnail;
+      const previewThumbnailUrl = thumbnail?.getUrl().url || null;
       const summary = await createManifestSummary(manifestStore, previewThumbnailUrl);
       setC2paSummary(summary);
 
@@ -406,8 +408,10 @@ export default function UploadPage() {
       setUploadStatusMessage('3/4: 証明データを保存しています...');
       let summaryData = c2paSummary;
       if (!summaryData) {
-        const { manifestStore, thumbnail } = await c2pa!.read(currentFile);
-        summaryData = await createManifestSummary(manifestStore, thumbnail?.getUrl() || null);
+        const result = await c2pa!.read(currentFile);
+        const manifestStore = result.manifestStore;
+        const thumbnail = (result as any).thumbnail;
+        summaryData = await createManifestSummary(manifestStore, thumbnail?.getUrl().url || null);
       }
 
       const publicUploadResponse = await fetch('/api/upload/public', {
@@ -508,12 +512,12 @@ export default function UploadPage() {
   function extractRootCertChain(manifestStore: ManifestStore | null): string {
     try {
       let currentManifest: Manifest | undefined | null = manifestStore?.activeManifest;
-      while (currentManifest?.ingredients?.length > 0) {
-        const parentIngredient = currentManifest.ingredients[0];
+      while (currentManifest?.ingredients && currentManifest.ingredients.length > 0) {
+        const parentIngredient: any = currentManifest.ingredients[0];
         if (!parentIngredient.c2pa_manifest) break;
         currentManifest = parentIngredient.c2pa_manifest;
       }
-      const certChain = currentManifest?.signature_info?.cert_chain || [];
+      const certChain = (currentManifest?.signatureInfo as any)?.cert_chain || [];
       const certChainJson = JSON.stringify(certChain);
       const certChainBase64 = btoa(certChainJson);
       return certChainBase64;

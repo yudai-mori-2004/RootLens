@@ -211,15 +211,16 @@ export default function PrivacyWarning({
 
       // 特別な処理が必要なassertion
       if (assertionKey === 'stds.schema-org.CreativeWork') {
+        const data = assertionData as any;
         // Schema.orgのCreativeWorkは構造化データなので特別に処理
-        if (assertionData && typeof assertionData === 'object') {
-          if (assertionData['@type']) {
-            allMetadata.push({ label: 'コンテンツタイプ', value: assertionData['@type'] });
+        if (data && typeof data === 'object') {
+          if (data['@type']) {
+            allMetadata.push({ label: 'コンテンツタイプ', value: data['@type'] });
           }
 
           // 著者情報
-          if (assertionData.author && Array.isArray(assertionData.author)) {
-            assertionData.author.forEach((author: { '@id'?: string; name?: string }, index: number) => {
+          if (data.author && Array.isArray(data.author)) {
+            data.author.forEach((author: any, index: number) => {
               if (author['@id']) {
                 allMetadata.push({
                   label: `著者 ${index + 1}: プロフィールURL`,
@@ -240,9 +241,10 @@ export default function PrivacyWarning({
 
       // assertionデータを文字列化して表示
       if (assertionData && typeof assertionData === 'object' && !Array.isArray(assertionData)) {
+        const data = assertionData as any;
         // オブジェクトの場合は各フィールドを展開
-        Object.keys(assertionData).forEach((key) => {
-          const value = assertionData[key];
+        Object.keys(data).forEach((key) => {
+          const value = data[key];
 
           if (value === null || value === undefined || value === '') return;
 
@@ -346,7 +348,7 @@ export default function PrivacyWarning({
           </div>
 
           {/* AI学習制約 */}
-          {importantInfo.aiTrainingConstraints && (
+          {!!importantInfo.aiTrainingConstraints && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                 <Shield className="w-4 h-4 text-indigo-500" />

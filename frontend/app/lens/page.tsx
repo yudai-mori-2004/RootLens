@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, Loader2, Image as ImageIcon, Camera, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import NextImage from 'next/image';
 import Header from '@/app/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,7 +127,7 @@ export default function LensPage() {
   // 画像リサイズヘルパー
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
-      const img = new Image();
+      const img = new window.Image();
       img.src = URL.createObjectURL(file);
       img.onload = () => {
         const canvas = document.createElement('canvas');
@@ -318,7 +319,7 @@ export default function LensPage() {
               {selectedImage ? (
                 // 画像プレビューモード
                 <div className="relative h-48 md:h-64 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center group">
-                  <Image 
+                  <NextImage 
                     src={imagePreview || ''} // srcはstringが必須なので空文字をフォールバック
                     alt="Search Target" 
                     fill
@@ -416,7 +417,7 @@ export default function LensPage() {
                 >
                   <Card className="overflow-hidden border-slate-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 h-full">
                     <div className="relative aspect-square overflow-hidden bg-slate-100">
-                      <Image
+                      <NextImage
                         src={getThumbnailUrl(result.original_hash)}
                         alt={result.title || 'Untitled'}
                         fill

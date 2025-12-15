@@ -250,7 +250,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
               if (!arData) continue;
 
               if (tx.targetAssetId) {
-                const result = await checkSolanaAssetExists(tx.targetAssetId);
+                const checkResult = await checkSolanaAssetExists(tx.targetAssetId);
+                const result = checkResult as any;
                 if (result) {
                   arweaveTxId = tx.txId;
                   targetAssetId = tx.targetAssetId;
@@ -310,7 +311,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         if (verificationSource === 'db' && targetAssetId && !cnftData) {
           updateStep('cnft', 'loading');
           try {
-            const result = await checkSolanaAssetExists(targetAssetId);
+            const checkResult = await checkSolanaAssetExists(targetAssetId);
+            const result = checkResult as any;
             cnftData = result;
             if (result) {
               isBurned = result.burnt === true;
@@ -427,8 +429,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           createdAt: createdAtAttr?.value || new Date().toISOString(),
           arweaveTxId: arweaveTxId,
           cnftMintAddress: targetAssetId || '',
-          title: dbInfo.title,
-          description: dbInfo.description,
+          title: dbInfo.title ?? undefined,
+          description: dbInfo.description ?? undefined,
           priceLamports: dbInfo.price_lamports,
           ownerWallet: currentOwner,
           isValid: Boolean(isValid),

@@ -9,9 +9,6 @@ import {
   type Manifest,
   type ManifestStore,
   type Assertion,
-  type ClaimGenerator,
-  type Credential,
-  type Identity,
 } from 'c2pa';
 
 export interface C2PASummaryData {
@@ -21,7 +18,7 @@ export interface C2PASummaryData {
 }
 
 export interface ManifestSummary {
-  label: string;
+  label: string | null;
   title: string | null;
   format: string;
   vendor: string | null;
@@ -127,7 +124,8 @@ export async function createManifestSummary(
     finalThumbnailUrl = await getBlobUrlAsDataUri(thumbnailUrl);
   } else if (activeManifest.thumbnail) {
     try {
-        const blobUrl = activeManifest.thumbnail.getUrl();
+        // DisposableBlobUrl を string に変換
+        const blobUrl = activeManifest.thumbnail.getUrl().url; 
         finalThumbnailUrl = await getBlobUrlAsDataUri(blobUrl);
     } catch (e) {
         console.warn('Failed to get thumbnail from manifest:', e);
@@ -156,14 +154,14 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   };
 
   // Credentials の抽出
-  const credentials: CredentialSummary[] = manifest.credentials?.map((cred: Credential) => ({
+  const credentials: CredentialSummary[] = manifest.credentials?.map((cred: any) => ({
     url: cred.url || null,
     issuer: cred.issuer || null,
     type: cred.type || null,
   })) || [];
 
   // Verified Identities の抽出
-  const verifiedIdentities: VerifiedIdentitySummary[] = manifest.verifiedIdentities?.map((identity: Identity) => ({
+  const verifiedIdentities: VerifiedIdentitySummary[] = manifest.verifiedIdentities?.map((identity: any) => ({
     name: identity.name || null,
     identifier: identity.identifier || null,
     issuer: identity.issuer || null,
@@ -188,7 +186,7 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   const actionsList = getActions(manifest);
 
   if (actionsList) {
-    actions = actionsList.map((action: Record<string, unknown>) => {
+    actions = actionsList.map((action: any) => {
       const digitalSourceType = action.digitalSourceType as string | undefined;
       const description = action.description as string | undefined;
       const actionType = action.action as string | undefined;
@@ -287,7 +285,7 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
   // Ingredientsがない = Rootの可能性
   if (!manifest.ingredients || manifest.ingredients.length === 0) {
     try {
-      return manifest.thumbnail?.getUrl() || null;
+      return manifest.thumbnail?.getUrl().url || null;
     } catch {
       return null;
     }
@@ -305,7 +303,7 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
   // 親から取れなかったが、Ingredient自体がサムネイルを持っている場合
   if (parentIngredient?.thumbnail) {
       try {
-          return parentIngredient.thumbnail.getUrl();
+          return parentIngredient.thumbnail.getUrl().url;
       } catch {
           // ignore
       }
@@ -314,7 +312,7 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
   // ここまで来て見つからなければ、現在のマニフェストのサムネイルを返す（救済策）
   // 途切れたチェーンの最深部
   try {
-    return manifest.thumbnail?.getUrl() || null;
+    return manifest.thumbnail?.getUrl().url || null;
   } catch {
     return null;
   }
@@ -327,8 +325,8 @@ async function getBlobUrlAsDataUri(blobUrl: string | Blob): Promise<string | nul
     url = blobUrl;
   } else if (blobUrl instanceof Blob) {
     url = URL.createObjectURL(blobUrl);
-  } else if (typeof blobUrl === 'object' && blobUrl !== null && 'url' in blobUrl && typeof blobUrl.url === 'string') {
-    url = blobUrl.url;
+  } else if (typeof blobUrl === 'object' && blobUrl !== null && 'url' in blobUrl && typeof (blobUrl as any).url === 'string') {
+    url = (blobUrl as any).url;
   } else {
     return null; // 不明な型の場合はnullを返す
   }

@@ -32,7 +32,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                         // Mainnet用RPC（本番環境用）
                         'solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp':
                             'https://api.mainnet-beta.solana.com',
-                    },
+                    } as any,
                 },
             }}
         >

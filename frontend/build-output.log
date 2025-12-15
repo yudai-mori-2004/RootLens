@@ -1,0 +1,32 @@
+
+> frontend@0.1.0 build
+> next build --webpack
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/forest/WebCreations/RootLens/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/forest/WebCreations/RootLens/frontend/package-lock.json
+
+   ▲ Next.js 16.0.10 (webpack)
+   - Experiments (use with caution):
+     ✓ externalDir
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 29.9s
+   Running TypeScript ...
+Failed to compile.
+
+./app/asset/[originalHash]/page.tsx:430:11
+Type error: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+
+[0m [90m 428 |[39m           arweaveTxId[33m:[39m arweaveTxId[33m,[39m
+ [90m 429 |[39m           cnftMintAddress[33m:[39m targetAssetId [33m||[39m [32m''[39m[33m,[39m
+[31m[1m>[22m[39m[90m 430 |[39m           title[33m:[39m dbInfo[33m.[39mtitle[33m,[39m
+ [90m     |[39m           [31m[1m^[22m[39m
+ [90m 431 |[39m           description[33m:[39m dbInfo[33m.[39mdescription[33m,[39m
+ [90m 432 |[39m           priceLamports[33m:[39m dbInfo[33m.[39mprice_lamports[33m,[39m
+ [90m 433 |[39m           ownerWallet[33m:[39m currentOwner[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null
