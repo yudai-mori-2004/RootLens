@@ -3,40 +3,37 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
+import { RedisOptions } from 'ioredis';
 
 if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// 1. URL解析と再構築 (Workerと同じロジック)
 const urlObj = new URL(process.env.REDIS_URL);
-
-// Hostname修正
-if (urlObj.hostname.includes('railway.internal')) {
-  urlObj.hostname = 'redis';
+let redisHost = urlObj.hostname;
+if (redisHost.includes('railway.internal')) {
+  redisHost = 'redis';
 }
-// Username強制
-if (!urlObj.username) {
-  urlObj.username = 'default';
-}
-// IPv6対応
-urlObj.searchParams.set('family', '0');
 
-const finalRedisUrl = urlObj.toString();
-
-// 2. 接続作成
-const connection = new IORedis(finalRedisUrl, {
+// 純粋な設定オブジェクト
+const redisConfig: RedisOptions = {
+  host: redisHost,
+  port: parseInt(urlObj.port || '6379'),
+  password: urlObj.password,
+  username: undefined, // Usernameを除外
+  db: parseInt(urlObj.pathname.split('/')[1]) || 0,
+  family: 0,
   maxRetriesPerRequest: null,
   tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
     if (times > 3) return null;
     return Math.min(times * 50, 2000);
   },
-});
+};
 
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection,
+  // 設定オブジェクトを渡す
+  connection: redisConfig,
   defaultJobOptions: {
     attempts: 3,
     backoff: {

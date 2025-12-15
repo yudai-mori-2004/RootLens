@@ -1,9 +1,9 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Worker (The Final Combination)
+// RootLens Ver4 - BullMQ Worker (Config Object Strategy)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
+import IORedis, { RedisOptions } from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
 import { startServer } from './server';
@@ -15,60 +15,51 @@ if (!redisUrlRaw) {
   process.exit(1);
 }
 
-// 1. URLをパース
+// URLをパースして設定値を抽出
 const urlObj = new URL(redisUrlRaw);
 
-// 2. ホスト名をRailway内部DNS用 "redis" に書き換え (DNS安定化)
-const isRailwayInternal = urlObj.hostname.includes('railway.internal');
-if (isRailwayInternal) {
-  urlObj.hostname = 'redis';
+// ■ Railway用のホスト名調整
+// redis.railway.internal (FQDN) は不安定なため、短縮名 "redis" があればそちらを優先
+// または環境変数でホストが指定されていればそれを使う
+let redisHost = urlObj.hostname;
+if (redisHost.includes('railway.internal')) {
+  redisHost = 'redis';
 }
 
-// 3. ユーザー名を "default" に強制 (Redis 6+ ACL対応)
-if (!urlObj.username) {
-  urlObj.username = 'default';
-}
-
-// 4. クエリパラメータに family=0 を追加 (IPv6対応)
-urlObj.searchParams.set('family', '0');
-
-// 5. 文字列として再構築 (duplicate時の設定維持のため)
-const finalRedisUrl = urlObj.toString();
+// ■ 純粋な設定オブジェクトを作成 (これをBullMQに渡す)
+// インスタンスを渡すと duplicate() の挙動に依存するため、設定値を直接渡すのが最も安全
+const redisConfig: RedisOptions = {
+  host: redisHost,
+  port: parseInt(urlObj.port || '6379'),
+  password: urlObj.password,
+  username: undefined, // ★重要: defaultユーザー問題を避けるため明示的にundefinedにする
+  db: parseInt(urlObj.pathname.split('/')[1]) || 0,
+  family: 0, // IPv6/IPv4デュアルスタック対応 (Railway必須)
+  maxRetriesPerRequest: null, // BullMQ必須
+  tls: redisUrlRaw.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+};
 
 console.log('--- Redis Connection Setup ---');
-// パスワードを隠してログ出力
-console.log(`📡 Connecting to: ${finalRedisUrl.replace(/:[^:@]*@/, ':****@')}`);
+console.log(`📡 Connecting to: ${redisConfig.host}:${redisConfig.port}`);
+console.log(`🔑 Auth: Password=${redisConfig.password ? 'YES (****)' : 'NO'}, User=${redisConfig.username || 'NONE'}`);
 
-// 6. メイン接続の作成
-const connection = new IORedis(finalRedisUrl, {
-  maxRetriesPerRequest: null,
-  tls: redisUrlRaw.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
-});
+// --- 接続診断 ---
+// 設定オブジェクトを使ってテスト接続
+const diagnosticConnection = new IORedis(redisConfig);
 
-// --- 徹底的な診断ブロック ---
-connection.on('error', (err) => console.error('❌ Main Redis Error:', err.message));
+diagnosticConnection.on('error', (err) => console.error('❌ Diagnostic Redis Error:', err.message));
 
 (async () => {
   try {
-    console.log('🔍 Testing Main Connection...');
-    await connection.ping();
-    console.log('✅ Main Connection: PONG');
-
-    console.log('🔍 Testing Duplication (BullMQ Simulation)...');
-    // BullMQが内部で行うのと同じ "duplicate" をテスト
-    const dupConnection = connection.duplicate();
+    console.log('🔍 Testing Diagnostic Connection...');
+    await diagnosticConnection.ping();
+    console.log('✅ Diagnostic Connection: PONG (Auth OK)');
     
-    // 複製接続のエラーも捕捉
-    dupConnection.on('error', (err) => console.error('❌ Duplicate Redis Error:', err.message));
-    
-    await dupConnection.connect();
-    const dupPong = await dupConnection.ping();
-    console.log(`✅ Duplicate Connection: ${dupPong} (Auth inherited successfully)`);
-    await dupConnection.quit();
-
+    // 診断終了後は閉じる
+    await diagnosticConnection.quit();
   } catch (error) {
     console.error('🚨 Redis Diagnosis Failed:', error);
-    process.exit(1); // 接続できないなら即死させる
+    process.exit(1);
   }
 })();
 // ----------------
@@ -94,9 +85,10 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    // URL文字列で初期化したインスタンスを渡す
-    // これにより duplicate() されても URL (redis://default:pass@redis...) が維持される
-    connection: connection,
+    // ★重要★ 設定オブジェクトを直接渡す
+    // BullMQはこれを使って内部で new IORedis(config) を行うため、
+    // duplicate() に起因する設定欠落が起きない
+    connection: redisConfig,
     concurrency: 1,
   }
 );
@@ -111,7 +103,6 @@ startServer();
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 ${signal} received, closing worker...`);
   await worker.close();
-  await connection.quit();
   process.exit(0);
 };
 
