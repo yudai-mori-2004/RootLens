@@ -5,8 +5,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { mintQueue } from '@/app/lib/queue';
 import type { JobStatusResponse, JobStatus } from '@shared/types';
-// ...
-      state: state as JobStatus,
 
 export async function GET(
   request: NextRequest,
@@ -33,7 +31,7 @@ export async function GET(
     // レスポンスを構築
     const response: JobStatusResponse = {
       jobId: job.id!,
-      state: state as JobState,
+      state: state as JobStatus,
       progress,
       result: job.returnvalue,
       failedReason,
