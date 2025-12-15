@@ -3,29 +3,33 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
+import { RedisOptions } from 'ioredis';
 
 if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// 1. URL文字列にパラメータを追加
-const redisUrl = new URL(process.env.REDIS_URL);
-redisUrl.searchParams.set('family', '0'); // Railway IPv6必須
-const finalRedisUrl = redisUrl.toString();
+const urlObj = new URL(process.env.REDIS_URL);
+const isRailwayInternal = urlObj.hostname.includes('railway.internal');
+const useTLS = process.env.REDIS_URL.includes('rlwy.net');
 
-// 2. URL文字列を使ってインスタンス作成
-const connection = new IORedis(finalRedisUrl, {
+const redisConfig: RedisOptions = {
+  // Railway内部なら短縮名 "redis" を使用
+  host: isRailwayInternal ? 'redis' : urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  // usernameは省略
+  password: urlObj.password,
+  family: 0,
   maxRetriesPerRequest: null,
-  tls: finalRedisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
     if (times > 3) return null;
     return Math.min(times * 50, 2000);
   },
-});
+};
 
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection, 
+  connection: redisConfig,
   defaultJobOptions: {
     attempts: 3,
     backoff: {

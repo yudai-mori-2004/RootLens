@@ -1,9 +1,9 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Worker (Final URL String Fix)
+// RootLens Ver4 - BullMQ Worker (Railway Short-Name Fix)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Worker, Job } from 'bullmq';
-import IORedis from 'ioredis';
+import IORedis, { RedisOptions } from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
 import { startServer } from './server';
@@ -15,41 +15,56 @@ if (!redisUrlRaw) {
   process.exit(1);
 }
 
+// URLをパース
+const urlObj = new URL(redisUrlRaw);
+
 // ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-// 【修正の核心】手動パースをやめ、URL文字列を直接加工する
-// これにより、ioredisは複製(duplicate)時もこのURLを使い回すため
-// パスワードや設定が脱落することがなくなる
+// 【修正の核心】Railway推奨の「短縮ホスト名」を使用する
+// redis.railway.internal (FQDN) はNode.jsのIPv6解決で不安定になるため
+// 内部DNS名である "redis" を強制的に使用します。
 // ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
 
-// 1. URLオブジェクト化してパラメータを安全に追加
-const redisUrl = new URL(redisUrlRaw);
-redisUrl.searchParams.set('family', '0'); // Railway IPv6必須設定
+const isRailwayInternal = urlObj.hostname.includes('railway.internal');
+const useTLS = redisUrlRaw.includes('rlwy.net');
 
-// 2. 文字列に戻す (例: redis://:pass@host:6379?family=0)
-// この文字列の中に全ての認証情報が含まれている
-const finalRedisUrl = redisUrl.toString();
+const redisConfig: RedisOptions = {
+  // 1. ホスト名の強制書き換え
+  // Railway内部なら "redis"、外部(Public)なら元のまま
+  host: isRailwayInternal ? 'redis' : urlObj.hostname,
+  
+  port: parseInt(urlObj.port || '6379'),
+  
+  // 2. usernameを削除 (Legacy AUTHへのフォールバック)
+  // 'default' を明示するとduplicate時に問題が起きることがあるため削除
+  // username: urlObj.username || 'default', 
+  
+  password: urlObj.password,
+  
+  // 3. IPv6対応
+  family: 0, 
+  
+  maxRetriesPerRequest: null,
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
+};
 
 console.log('--- Redis Connection Setup ---');
-// ログにはパスワードを隠して表示
-console.log(`📡 Connecting to: ${finalRedisUrl.replace(/:[^:@]*@/, ':****@')}`);
-
-// 3. IORedisインスタンスを作成（設定オブジェクトではなく、URL文字列を渡す！）
-// TLSが必要な場合(Public接続)のみ、第2引数で補足する
-const connection = new IORedis(finalRedisUrl, {
-  maxRetriesPerRequest: null, // BullMQ必須
-  tls: finalRedisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
-});
+console.log(`📡 Connecting to: ${redisConfig.host}:${redisConfig.port}`);
+console.log(`🔑 Auth: Password=${redisConfig.password ? 'YES (****)' : 'NO'}`);
+console.log(`🌍 Family: ${redisConfig.family}`);
 
 // --- 接続診断 ---
-connection.on('connect', () => console.log('✅ Redis: TCP Connection established'));
-connection.on('ready', () => console.log('✅ Redis: Ready & Authenticated'));
-connection.on('error', (err) => console.error('❌ Redis Error:', err.message));
+const diagnosticConnection = new IORedis(redisConfig);
+
+diagnosticConnection.on('connect', () => console.log('✅ Diagnostic Redis: TCP Connection established'));
+diagnosticConnection.on('ready', () => console.log('✅ Diagnostic Redis: Ready & Authenticated'));
+diagnosticConnection.on('error', (err) => console.error('❌ Diagnostic Redis Error:', err.message));
 
 (async () => {
   try {
     console.log('🔍 Testing Redis Authentication...');
-    const pong = await connection.ping();
+    const pong = await diagnosticConnection.ping();
     console.log(`✅ Authentication Test Passed: ${pong}`);
+    await diagnosticConnection.quit();
   } catch (error) {
     console.error('🚨 Authentication Failed Details:', error);
   }
@@ -77,9 +92,8 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    // ★重要★ URL文字列から作ったインスタンスを渡す
-    // ioredisはURL由来のインスタンスを複製する際、URL情報を完全に維持する
-    connection: connection,
+    // 設定オブジェクトを渡す（BullMQがこれを使って接続を作成）
+    connection: redisConfig,
     concurrency: 1,
   }
 );
@@ -94,7 +108,6 @@ startServer();
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 ${signal} received, closing worker...`);
   await worker.close();
-  await connection.quit();
   process.exit(0);
 };
 
