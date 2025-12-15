@@ -19,7 +19,7 @@ const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
 const connection = new IORedis({
   host: urlObj.hostname,
   port: parseInt(urlObj.port || '6379'),
-  username: urlObj.username || 'default',
+  // usernameを指定しない（デフォルトユーザーを使用）
   password: urlObj.password,
   maxRetriesPerRequest: null,
   tls: useTLS ? { rejectUnauthorized: false } : undefined,
