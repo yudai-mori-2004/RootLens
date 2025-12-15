@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { createC2pa, C2pa } from 'c2pa';
+import { createC2pa, C2pa, ManifestStore, Manifest } from 'c2pa';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
 import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
@@ -9,14 +8,12 @@ import ProgressBar from '@/app/components/ProgressBar';
 import StepContainer from '@/app/components/StepContainer';
 import PrivacyWarning from '@/app/components/PrivacyWarning';
 import ProvenanceModal from '@/app/components/ProvenanceModal';
-import TechnicalDetailsSection from '@/app/components/TechnicalDetailsSection';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Wallet, CheckCircle, XCircle, UploadCloud, Loader2, Info, Sparkles, Clipboard, Camera, AlertTriangle, Lock, Calendar, User, PenTool, BookOpen, Cog, Cloud, Link, FileText, DollarSign, ExternalLink } from 'lucide-react';
+import { Wallet, CheckCircle, XCircle, UploadCloud, Sparkles, Clipboard, Camera, AlertTriangle, Cloud, Link, ExternalLink } from 'lucide-react';
 
 import Header from '@/app/components/Header';
 import LoadingState, { LoadingStep } from '@/app/components/LoadingState';
@@ -25,7 +22,7 @@ import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 interface C2PAValidationResult {
   isValid: boolean;
   rootSigner: string | null;
-  provenanceChain: any[];
+  provenanceChain: unknown[];
   error?: string;
 }
 
@@ -52,7 +49,7 @@ export default function UploadPage() {
 
   // ファイルとC2PAデータ
   const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [manifestData, setManifestData] = useState<any>(null);
+  const [manifestData, setManifestData] = useState<ManifestStore | null>(null);
   const [c2paSummary, setC2paSummary] = useState<C2PASummaryData | null>(null);
   const [validationResult, setValidationResult] = useState<C2PAValidationResult | null>(null);
   const [hashes, setHashes] = useState<FileHashes | null>(null);
@@ -508,9 +505,9 @@ export default function UploadPage() {
     }
   };
 
-  function extractRootCertChain(manifestStore: any): string {
+  function extractRootCertChain(manifestStore: ManifestStore | null): string {
     try {
-      let currentManifest = manifestStore?.activeManifest;
+      let currentManifest: Manifest | undefined | null = manifestStore?.activeManifest;
       while (currentManifest?.ingredients?.length > 0) {
         const parentIngredient = currentManifest.ingredients[0];
         if (!parentIngredient.c2pa_manifest) break;

@@ -15,7 +15,7 @@ export function getIrysGatewayUrl(): string {
 /**
  * Arweaveメタデータを取得
  */
-export async function fetchArweaveMetadata(txId: string): Promise<any | null> {
+export async function fetchArweaveMetadata(txId: string): Promise<unknown | null> {
   try {
     const fetchBaseUrl = getIrysGatewayUrl();
     const response = await fetch(`${fetchBaseUrl}/${txId}`);
@@ -36,7 +36,7 @@ export async function fetchArweaveMetadata(txId: string): Promise<any | null> {
  * 注意: Burn済みcNFTもresultに含まれます（result.burnt === true）
  * これにより、過去のSolanaチェーン履歴に残っているかを確認できます。
  */
-export async function checkSolanaAssetExists(assetId: string): Promise<any | null> {
+export async function checkSolanaAssetExists(assetId: string): Promise<unknown | null> {
   const heliusRpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
   if (!heliusRpcUrl) {
     throw new Error('Helius RPC URLが設定されていません');
@@ -70,7 +70,7 @@ export async function checkSolanaAssetExists(assetId: string): Promise<any | nul
  */
 export async function fallbackToDatabase(
   originalHash: string
-): Promise<{ arweaveTxId: string; arweaveData: any; targetAssetId?: string } | null> {
+): Promise<{ arweaveTxId: string; arweaveData: unknown; targetAssetId?: string } | null> {
   const { getArweaveTransactionFromDB } = await import('./irys-verification');
 
   const txIdFromDB = await getArweaveTransactionFromDB(originalHash);

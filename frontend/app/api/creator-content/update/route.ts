@@ -17,6 +17,10 @@ export async function POST(req: NextRequest) {
     // 1. 所有権の確認
     // 指定されたmediaProofIdのレコードを取得し、owner_walletが一致するか確認
     // ※ 厳密にはSolana上の所有権を確認すべきですが、DB上のowner_walletを信頼する形とします
+    interface MediaProof {
+      owner_wallet: string;
+    }
+
     const { data: proof, error: fetchError } = await supabase
       .from('media_proofs')
       .select('owner_wallet')
@@ -33,7 +37,12 @@ export async function POST(req: NextRequest) {
 
     // 2. データの更新
     // priceはlamports単位で保存されていると仮定（upload時の実装に基づく）
-    const updates: any = {};
+    interface MediaProofUpdate {
+      title?: string;
+      description?: string;
+      price_lamports?: number;
+    }
+    const updates: Partial<MediaProofUpdate> = {};
     if (title !== undefined) updates.title = title;
     if (description !== undefined) updates.description = description;
     if (price !== undefined) updates.price_lamports = price;

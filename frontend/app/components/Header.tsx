@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Wallet, LogOut, User, Menu, Search, Upload } from 'lucide-react';
+import { Wallet, LogOut, User, Search, Upload } from 'lucide-react';
 
 interface HeaderProps {
   isLandingPage?: boolean;

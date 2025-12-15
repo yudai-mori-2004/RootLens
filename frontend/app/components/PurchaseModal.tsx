@@ -106,8 +106,8 @@ export default function PurchaseModal({
         if (typeof txResult === 'string') {
           extractedSignature = txResult;
         } else if (typeof txResult === 'object' && txResult !== null) {
-          // @ts-ignore
-          const sig = txResult.signature || txResult.transactionHash;
+        // @ts-expect-error - Privyの型定義が不完全な可能性があるため
+        const sig: unknown = (txResult as { signature?: unknown; transactionHash?: unknown }).signature || (txResult as { signature?: unknown; transactionHash?: unknown }).transactionHash;
 
           if (typeof sig === 'string') {
             extractedSignature = sig;
@@ -166,9 +166,9 @@ export default function PurchaseModal({
         onSuccess(result.downloadToken);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('=== Purchase Error ===', error);
-      toast.error(error.message || '処理に失敗しました');
+      toast.error(error instanceof Error ? error.message : 'Unknown error');
       setStep('confirm');
     } finally {
       setLoading(false);

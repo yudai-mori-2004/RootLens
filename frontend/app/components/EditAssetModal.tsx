@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { PenTool, Save, X, Loader2, Sparkles, FileText } from 'lucide-react';
+import { PenTool, Save, Loader2, Sparkles, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface EditAssetModalProps {
@@ -78,7 +78,7 @@ export default function EditAssetModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !isSaving && onClose()}>
+    <Dialog open={isOpen} onOpenChange={() => !isSaving && onClose()}>
       <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-white shadow-2xl rounded-xl border border-slate-100 gap-0">
         
         {/* Header */}

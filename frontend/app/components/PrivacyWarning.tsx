@@ -72,21 +72,22 @@ export default function PrivacyWarning({
   };
 
   // オブジェクト内のハッシュ配列を16進数に変換
-  const convertHashArraysInObject = (obj: any): any => {
+  const convertHashArraysInObject = (obj: unknown): unknown => {
     if (Array.isArray(obj)) {
-      // 配列がすべて数値ならハッシュと判定
-      if (obj.length > 0 && obj.every((v: any) => typeof v === 'number' && v >= 0 && v <= 255)) {
+      if (obj.length > 0 && obj.every((v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 255)) {
         return `0x${bytesToHex(obj)}`;
       }
       return obj.map(item => convertHashArraysInObject(item));
     } else if (obj && typeof obj === 'object') {
-      const converted: any = {};
+      const converted: { [key: string]: unknown } = {};
       for (const key in obj) {
-        // 'hash' というキーの配列を特別扱い
-        if (key === 'hash' && Array.isArray(obj[key])) {
-          converted[key] = `0x${bytesToHex(obj[key])}`;
-        } else {
-          converted[key] = convertHashArraysInObject(obj[key]);
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const value = (obj as { [key: string]: unknown })[key];
+          if (key === 'hash' && Array.isArray(value) && value.every((v: unknown): v is number => typeof v === 'number')) {
+            converted[key] = `0x${bytesToHex(value)}`;
+          } else {
+            converted[key] = convertHashArraysInObject(value);
+          }
         }
       }
       return converted;
@@ -218,7 +219,7 @@ export default function PrivacyWarning({
 
           // 著者情報
           if (assertionData.author && Array.isArray(assertionData.author)) {
-            assertionData.author.forEach((author: any, index: number) => {
+            assertionData.author.forEach((author: { '@id'?: string; name?: string }, index: number) => {
               if (author['@id']) {
                 allMetadata.push({
                   label: `著者 ${index + 1}: プロフィールURL`,
@@ -246,7 +247,7 @@ export default function PrivacyWarning({
           if (value === null || value === undefined || value === '') return;
 
           // バイナリデータ（数値配列）の判定と省略表示
-          if (Array.isArray(value) && value.length > 0 && value.every((v: any) => typeof v === 'number')) {
+          if (Array.isArray(value) && value.length > 0 && value.every((v: unknown): v is number => typeof v === 'number')) {
             // バイナリデータは要約表示
             const byteLength = value.length;
             const preview = value.slice(0, 8).join(', ');

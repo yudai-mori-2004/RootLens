@@ -44,19 +44,38 @@ export async function GET(req: NextRequest) {
       method: 'getAssetsByOwner',
       params: {
         ownerAddress: walletAddress,
-        page: 1, // ページネーションを考慮（ここでは最初のページのみ）
-        limit: 1000, // 最大1000個まで取得
+        page: 1,
+        limit: 1000,
       },
     });
 
-    const ownedAssets = heliusResponse.data.result.items;
-
-    if (!ownedAssets || ownedAssets.length === 0) {
-      return NextResponse.json({ items: [], total: 0, page, limit, totalPages: 0 }); // 所有するcNFTがない
+    interface HeliusAsset {
+      id: string;
+      content?: {
+        json_uri?: string;
+      };
+      ownership?: {
+        owner: string;
+      };
+      compression?: {
+        compressed: boolean;
+        tree: string;
+        leaf_id: number;
+        seq: number;
+        asset_hash: string;
+        creator_hash: string;
+        leaf_delegate: string;
+        merkle_tree: string;
+      };
     }
 
-    // 所有するcNFTのミントアドレスリストを作成
-    const ownedCnftMintAddresses = ownedAssets.map((asset: any) => asset.id);
+    const ownedAssets: HeliusAsset[] = heliusResponse.data.result.items;
+
+    if (!ownedAssets || ownedAssets.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    const ownedCnftMintAddresses = ownedAssets.map((asset: HeliusAsset) => asset.id);
 
     // 2. Supabaseで、Heliusから取得したcNFTのミントアドレスに紐づくコンテンツを検索
     // Heliusが所有権を保証しているため、Supabase上のowner_walletによるフィルタリングは行わない（古い可能性があるため）
@@ -111,15 +130,46 @@ export async function GET(req: NextRequest) {
     // サムネイルURLはoriginal_hashから構築（R2パスは固定: media/{hash}/thumbnail.jpg）
     const publicBucketUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_BUCKET_URL;
 
-    const finalContents = creatorContents.map((content: any) => ({
-      mediaProofId: content.id,
-      originalHash: content.original_hash,
-      cnftMintAddress: content.cnft_mint_address,
-      title: content.title || '無題のコンテンツ',
-      description: content.description,
-      priceLamports: content.price_lamports,
-      thumbnailUrl: publicBucketUrl ? `${publicBucketUrl}/media/${content.original_hash}/thumbnail.jpg` : undefined,
-      isPublic: content.is_public,
+    const finalContents = await Promise.all(creatorContents.map(async (content: SupabaseCreatorContent) => {
+      // Supabaseの所有者情報が古い場合、現在の所有者（閲覧者）に更新する
+      // Heliusで所有していることは確認済みなので、ここで同期を行う
+      if (content.owner_wallet !== walletAddress) {
+        console.log(`Updating owner for proof ${content.id}: ${content.owner_wallet} -> ${walletAddress}`);
+        const { error: updateError } = await supabase
+          .from('media_proofs')
+          .update({ owner_wallet: walletAddress })
+          .eq('id', content.id);
+        
+        if (updateError) {
+          console.error('Failed to update owner_wallet:', updateError);
+        }
+      }
+
+      let thumbnailUrl: string | undefined;
+
+      try {
+        if (publicBucketUrl) {
+          const manifestUrl = `${publicBucketUrl}/media/${content.original_hash}/manifest.json`;
+          const manifestResponse = await fetch(manifestUrl);
+          if (manifestResponse.ok) {
+            const manifestData: { thumbnailUrl?: string } = await manifestResponse.json();
+            thumbnailUrl = manifestData.thumbnailUrl;
+          }
+        }
+      } catch (e) {
+        console.warn(`Failed to fetch manifest for ${content.original_hash}:`, e);
+      }
+
+      return {
+        mediaProofId: content.id,
+        originalHash: content.original_hash,
+        cnftMintAddress: content.cnft_mint_address,
+        title: content.title || '無題のコンテンツ',
+        description: content.description,
+        priceLamports: content.price_lamports,
+        thumbnailUrl: thumbnailUrl,
+        isPublic: content.is_public, // is_public カラムを追加
+      };
     }));
 
     return NextResponse.json({

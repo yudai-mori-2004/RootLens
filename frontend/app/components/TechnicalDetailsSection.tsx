@@ -1,11 +1,10 @@
-import { Lock, Cloud, Link, BookOpen, AlertTriangle, Database, FileText, CheckCircle, Fingerprint, Shield } from 'lucide-react';
+import { Cloud, BookOpen, AlertTriangle, Database, FileText, Shield } from 'lucide-react';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 import Image from 'next/image';
 
 export default function TechnicalDetailsSection() {

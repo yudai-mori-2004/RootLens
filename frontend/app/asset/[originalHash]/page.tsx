@@ -5,14 +5,12 @@ import { createClient } from '@supabase/supabase-js';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
 import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
-import ProvenanceTimeline from '@/app/components/ProvenanceTimeline';
 import ProvenanceModal from '@/app/components/ProvenanceModal';
 import TechnicalSpecsModal from '@/app/components/TechnicalSpecsModal';
 import PurchaseModal from '@/app/components/PurchaseModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
@@ -39,22 +37,17 @@ import {
   Sparkles,
   Eye,
   ClipboardList,
-  Info,
   RefreshCw,
-  EyeOff,
-  Fingerprint,
-  FileCode,
-  Check,
-  Lock,
-  Search,
   Database,
-  Link as LinkIcon,
   Wallet,
-  Camera
+  Camera,
+  Lock,
+  Check
 } from 'lucide-react';
 
 import Header from '@/app/components/Header';
 import Link from 'next/link';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import LoadingState from '@/app/components/LoadingState';
 
@@ -403,17 +396,23 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           }
         }
 
-        const rootSignerAttr = arweaveData.attributes.find((a: any) => a.trait_type === 'root_signer');
-        const createdAtAttr = arweaveData.attributes.find((a: any) => a.trait_type === 'created_at');
+        const rootSignerAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'root_signer');
+        const createdAtAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'created_at');
         const isValid = (verificationSource === 'db') ? true : (crossLinkValid && noDuplicates);
 
-        let dbInfo = { id: '', title: '', description: '', price_lamports: 0 };
+        interface DbProofInfo {
+          id: string;
+          title: string | null;
+          description: string | null;
+          price_lamports: number;
+        }
+        let dbInfo: DbProofInfo = { id: '', title: null, description: null, price_lamports: 0 };
         try {
           const { data } = await supabase
             .from('media_proofs')
             .select('id, title, description, price_lamports')
             .eq('original_hash', originalHash)
-            .single();
+            .single<DbProofInfo>();
           if (data) {
             dbInfo = data;
           }
@@ -511,11 +510,16 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
             {/* 左: 画像 (3/5) */}
             <div className="md:col-span-3 bg-slate-900 relative min-h-[400px] flex items-center justify-center p-4">
               {proof.c2paData?.thumbnailUrl ? (
-                <img
-                  src={proof.c2paData.thumbnailUrl}
-                  alt="Content preview"
-                  className="max-w-full max-h-[500px] object-contain w-auto h-auto rounded-md shadow-2xl"
-                />
+                <div className="relative w-full h-full max-w-full max-h-[500px]">
+                  <Image
+                    src={proof.c2paData.thumbnailUrl}
+                    alt="Content preview"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    style={{ objectFit: 'contain' }}
+                    className="rounded-md shadow-2xl"
+                  />
+                </div>
               ) : (
                 <div className="text-slate-500 text-center p-8">
                   <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -708,7 +712,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                             <p className="text-xs text-slate-400 font-medium mb-3">来歴証明 (Provenance)</p>
                             <div className="flex items-center gap-3">
                                 <div className="relative w-8 h-8 shrink-0">
-                                    <img src="/c2pa_logo.jpg" alt="C2PA Logo" className="w-full h-full object-cover rounded-full" />
+                                    <Image src="/c2pa_logo.jpg" alt="C2PA Logo" fill style={{ objectFit: 'contain' }} sizes="32px" className="rounded-full" />
                                     {proof.c2paData?.validationStatus.isValid ? (
                                         <CheckCircle className="w-4 h-4 text-green-500 absolute -bottom-1 -right-1 bg-slate-800 rounded-full" />
                                     ) : (
@@ -765,11 +769,10 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
-                                                                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                                                                                <img src="/arweave_logo.png" alt="Arweave Logo" className="w-full h-full object-cover" />
-                                                                            </div>                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
+                                                                                <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
+                                                                                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
+                                                                                        <Image src="/arweave_logo.png" alt="Arweave Logo" fill style={{ objectFit: 'contain' }} sizes="32px" />
+                                                                                    </div>                                            <div className="flex-1 min-w-0">                                                <div className="flex items-center gap-2">
                                                     <p className="font-bold text-lg text-white group-hover:underline decoration-indigo-500 decoration-2 underline-offset-4">
                                                         Arweave
                                                     </p>
@@ -813,11 +816,10 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                              <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
-                                                                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden">
-                                                                                <img src="/solana_logo.png" alt="Solana Logo" className="w-full h-full object-cover" />
-                                                                            </div>                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
+                                                                                <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
+                                                                                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
+                                                                                        <Image src="/solana_logo.png" alt="Solana Logo" fill style={{ objectFit: 'contain' }} sizes="32px" />
+                                                                                    </div>                                            <div className="flex-1 min-w-0">                                                <div className="flex items-center gap-2">
                                                     <p className="font-bold text-lg text-white group-hover:underline decoration-purple-500 decoration-2 underline-offset-4">
                                                         cNFT
                                                     </p>
@@ -996,7 +998,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
 }
 
 // 簡易アイコンコンポーネント
-function ArrowRightIcon(props: any) {
+function ArrowRightIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
         <svg
             {...props}

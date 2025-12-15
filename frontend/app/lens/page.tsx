@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Search, Loader2, Image as ImageIcon, Camera, X, ScanLine, ArrowRight } from 'lucide-react';
+import { Search, Loader2, Image as ImageIcon, Camera, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import NextImage from 'next/image';
 import Header from '@/app/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +33,7 @@ export default function LensPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [generatedCaption, setGeneratedCaption] = useState<string | null>(null);
+  const [_generatedCaption, setGeneratedCaption] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -222,9 +221,9 @@ export default function LensPage() {
         }, 100);
       }
 
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Search error:', error);
-      toast.error("検索中にエラーが発生しました");
+      toast.error(error instanceof Error ? error.message : "検索中にエラーが発生しました");
     } finally {
       setIsSearching(false);
     }
@@ -319,10 +318,12 @@ export default function LensPage() {
               {selectedImage ? (
                 // 画像プレビューモード
                 <div className="relative h-48 md:h-64 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center group">
-                  <img 
-                    src={imagePreview || undefined} 
+                  <Image 
+                    src={imagePreview || ''} // srcはstringが必須なので空文字をフォールバック
                     alt="Search Target" 
-                    className="h-full w-full object-contain"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    style={{ objectFit: 'contain' }}
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                      <Button variant="secondary" onClick={clearImage} className="rounded-full">
@@ -415,10 +416,12 @@ export default function LensPage() {
                 >
                   <Card className="overflow-hidden border-slate-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 h-full">
                     <div className="relative aspect-square overflow-hidden bg-slate-100">
-                      <img
+                      <Image
                         src={getThumbnailUrl(result.original_hash)}
                         alt={result.title || 'Untitled'}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        style={{ objectFit: 'cover' }}
                         loading="lazy"
                       />
                       <div className="absolute top-2 right-2">

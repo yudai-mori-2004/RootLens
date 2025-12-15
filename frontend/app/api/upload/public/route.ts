@@ -5,11 +5,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadThumbnailToPublicBucket, uploadManifestToPublicBucket, getPublicThumbnailUrl } from '@/app/lib/r2';
+import { C2PASummaryData } from '@/app/lib/c2pa-parser';
 
 interface PublicUploadRequest {
   original_hash: string;
   thumbnail_data_uri: string | null; // Data URI形式のサムネイル
-  manifest_data: any; // manifestオブジェクト
+  manifest_data: C2PASummaryData; // manifestオブジェクト
 }
 
 export async function POST(request: NextRequest) {

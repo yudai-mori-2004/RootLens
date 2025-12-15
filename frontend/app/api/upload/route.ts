@@ -4,7 +4,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { mintQueue } from '@/app/lib/queue';
-import { createClient } from '@supabase/supabase-js';
 import type { MintJobData } from '@shared/types';
 
 interface UploadRequest {

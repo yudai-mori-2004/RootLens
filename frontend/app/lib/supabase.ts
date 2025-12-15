@@ -33,7 +33,7 @@ export interface MediaProof {
     original_file_path: string;
     sidecar_file_path: string;
     qr_watermarked_file_path: string | null;
-    privacy_settings: Record<string, any>;
+    privacy_settings: Record<string, unknown>;
     price_cents: number;
     currency: string;
     created_at: string;

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ImageIcon } from 'lucide-react';
+import Image from 'next/image';
 
 interface AssetThumbnailProps {
   src?: string | null;
@@ -22,9 +23,10 @@ export default function AssetThumbnail({ src, alt, className = '' }: AssetThumbn
   }
 
   return (
-    <img
+    <Image
       src={src}
       alt={alt}
+      fill
       className={className}
       onError={() => setHasError(true)}
     />

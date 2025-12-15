@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { C2PASummaryData } from '@/app/lib/c2pa-parser';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // R2クライアント初期化
@@ -123,7 +124,7 @@ export async function uploadThumbnailToPublicBucket(
 
 export async function uploadManifestToPublicBucket(
     originalHash: string,
-    manifestData: any
+    manifestData: C2PASummaryData
 ): Promise<string> {
     const key = `media/${originalHash}/manifest.json`;
 

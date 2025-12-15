@@ -43,9 +43,13 @@ export async function POST(req: NextRequest) {
     }
 
     // mediaProofIdからcnft_mint_addressを取得
-    const { data: proofData, error: proofError } = await supabase
+    interface MediaProof {
+      owner_wallet: string;
+    }
+
+    const { data: proof, error: fetchError } = await supabase
       .from('media_proofs')
-      .select('cnft_mint_address')
+      .select('owner_wallet')
       .eq('id', mediaProofId)
       .single();
 

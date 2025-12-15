@@ -31,6 +31,20 @@ export async function GET(
     }
 
     // 1. purchasesテーブルからトークン検証
+    interface MediaProofFromPurchase {
+      original_hash: string;
+      file_extension: string;
+    }
+
+    interface PurchaseRecord {
+      id: string;
+      media_proof_id: string;
+      download_token: string;
+      download_expires_at: string;
+      download_count: number;
+      media_proofs: MediaProofFromPurchase;
+    }
+
     const { data: purchase, error: purchaseError } = await supabase
       .from('purchases')
       .select(`
@@ -42,7 +56,10 @@ export async function GET(
         media_proofs!inner(original_hash, file_extension)
       `)
       .eq('download_token', token)
-      .single();
+      .single<PurchaseRecord>();
+
+    if (purchaseError || !purchase) {
+      return NextResponse.json(
 
     if (purchaseError || !purchase) {
       return NextResponse.json(
@@ -83,7 +100,7 @@ export async function GET(
     }
 
     // 5. R2 Presigned URL生成（Private Bucket）
-    const mediaProof = purchase.media_proofs as any;
+    const mediaProof = purchase.media_proofs;
     const originalHash = mediaProof.original_hash;
     const fileExtension = mediaProof.file_extension;
 

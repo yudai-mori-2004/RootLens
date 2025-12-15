@@ -8,6 +8,10 @@ import {
   selectProducer,
   type Manifest,
   type ManifestStore,
+  type Assertion,
+  type ClaimGenerator,
+  type Credential,
+  type Identity,
 } from 'c2pa';
 
 export interface C2PASummaryData {
@@ -40,10 +44,10 @@ export interface ManifestSummary {
   ingredients: IngredientSummary[];
   redactions: string[];
   assertions: {
-    generativeInfo: any | null;
-    exif: any | null;
+    generativeInfo: unknown | null;
+    exif: unknown | null;
     actions: ActionSummary[];
-    allAssertions: Record<string, any>; // 全てのassertion（生データ）
+    allAssertions: Record<string, unknown>; // 全てのassertion（生データ）
   };
   isAIGenerated: boolean;
   rootThumbnailUrl: string | null; // 追加: Root（始祖）のサムネイル
@@ -152,14 +156,14 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   };
 
   // Credentials の抽出
-  const credentials: CredentialSummary[] = manifest.credentials?.map((cred: any) => ({
+  const credentials: CredentialSummary[] = manifest.credentials?.map((cred: Credential) => ({
     url: cred.url || null,
     issuer: cred.issuer || null,
     type: cred.type || null,
   })) || [];
 
   // Verified Identities の抽出
-  const verifiedIdentities: VerifiedIdentitySummary[] = manifest.verifiedIdentities?.map((identity: any) => ({
+  const verifiedIdentities: VerifiedIdentitySummary[] = manifest.verifiedIdentities?.map((identity: Identity) => ({
     name: identity.name || null,
     identifier: identity.identifier || null,
     issuer: identity.issuer || null,
@@ -171,12 +175,12 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
 
   // アクションアサーションを取得するヘルパー
   const getActions = (m: Manifest) => {
-    // AssertionAccessorの data プロパティから取得
     if (m.assertions && 'data' in m.assertions && Array.isArray(m.assertions.data)) {
-      const actionsAssertion = m.assertions.data.find((a: any) =>
+      const actionsAssertion = m.assertions.data.find((a: Assertion) =>
         a.label === 'c2pa.actions' || a.label === 'c2pa.actions.v2'
       );
-      return actionsAssertion?.data?.actions;
+      // actionsプロパティへのアクセスを許可させるために型アサーションを使用
+      return (actionsAssertion?.data as { actions?: unknown[] })?.actions;
     }
     return null;
   };
@@ -184,19 +188,23 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   const actionsList = getActions(manifest);
 
   if (actionsList) {
-    actions = actionsList.map((action: any) => {
+    actions = actionsList.map((action: Record<string, unknown>) => {
+      const digitalSourceType = action.digitalSourceType as string | undefined;
+      const description = action.description as string | undefined;
+      const actionType = action.action as string | undefined;
+
       const isAI = 
-        action.digitalSourceType === 'http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia' ||
-        action.description?.toLowerCase().includes('generative ai') ||
-        (action.action === 'c2pa.created' && action.description?.toLowerCase().includes('google generative ai')); 
+        digitalSourceType === 'http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia' ||
+        description?.toLowerCase().includes('generative ai') ||
+        (actionType === 'c2pa.created' && description?.toLowerCase().includes('google generative ai')); 
       
       if (isAI) isAIGenerated = true;
 
       return {
-        action: action.action,
-        description: action.description || null,
-        digitalSourceType: action.digitalSourceType || null,
-        when: action.when || null,
+        action: actionType || 'unknown',
+        description: description || null,
+        digitalSourceType: digitalSourceType || null,
+        when: action.when as string || null,
       };
     });
   }
@@ -217,12 +225,12 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   const generativeInfo = selectGenerativeInfo(manifest);
 
   // 5. 全てのassertionsを取得（生データ）
-  const allAssertions: Record<string, any> = {};
+  const allAssertions: Record<string, unknown> = {};
 
   // AssertionAccessor の data プロパティからアサーションを取得
   if (manifest.assertions && 'data' in manifest.assertions && Array.isArray(manifest.assertions.data)) {
     // assertions.data は Assertion[] 形式
-    manifest.assertions.data.forEach((assertion: any) => {
+    manifest.assertions.data.forEach((assertion: Assertion) => {
       if (assertion && assertion.label) {
         const label = assertion.label;
         const data = assertion.data || assertion;
@@ -230,7 +238,7 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
         // 同じラベルが複数ある場合は配列に
         if (allAssertions[label]) {
           if (Array.isArray(allAssertions[label])) {
-            allAssertions[label].push(data);
+            (allAssertions[label] as unknown[]).push(data);
           } else {
             allAssertions[label] = [allAssertions[label], data];
           }
@@ -313,13 +321,19 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
 }
 
 // Helper: Blob URL to Data URI
-async function getBlobUrlAsDataUri(blobUrl: string | any): Promise<string | null> {
-  let url = blobUrl;
-  if (typeof blobUrl === 'object' && blobUrl !== null && 'url' in blobUrl) {
-      url = blobUrl.url;
+async function getBlobUrlAsDataUri(blobUrl: string | Blob): Promise<string | null> {
+  let url: string = '';
+  if (typeof blobUrl === 'string') {
+    url = blobUrl;
+  } else if (blobUrl instanceof Blob) {
+    url = URL.createObjectURL(blobUrl);
+  } else if (typeof blobUrl === 'object' && blobUrl !== null && 'url' in blobUrl && typeof blobUrl.url === 'string') {
+    url = blobUrl.url;
+  } else {
+    return null; // 不明な型の場合はnullを返す
   }
 
-  if (typeof url !== 'string' || !url.startsWith('blob:')) return url; 
+  if (!url.startsWith('blob:')) return url; // blob: ではない場合はそのまま返す
   
   try {
     const res = await fetch(url);
@@ -336,5 +350,9 @@ async function getBlobUrlAsDataUri(blobUrl: string | any): Promise<string | null
   } catch (e) {
     console.error('❌ Failed to convert blob URL to Data URI:', e);
     return null;
+  } finally {
+    if (url.startsWith('blob:')) {
+      URL.revokeObjectURL(url); // オブジェクトURLを解放
+    }
   }
 }

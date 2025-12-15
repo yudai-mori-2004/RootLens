@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, ExternalLink, Shield, Package, EyeOff, Eye, XCircle, ShoppingBag, Download, FileText, ArrowRight, Plus, PenTool, ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
+import { Shield, Package, EyeOff, Eye, XCircle, ShoppingBag, Download, ArrowRight, Plus, PenTool, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/app/components/Header';
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +61,7 @@ export default function DashboardPage() {
   const [editingContent, setEditingContent] = useState<CreatorContent | null>(null);
 
   // 認証チェックとコンテンツのフェッチ
-  async function fetchContents() {
+  const fetchContents = useCallback(async () => {
     if (!authenticated || !userWalletAddress) {
         if (authenticated && !userWalletAddress) {
             setError('ウォレットが接続されていません。');
@@ -99,7 +99,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [authenticated, userWalletAddress, ownedPage, purchasedPage, itemsPerPage]);
 
   useEffect(() => {
     if (authenticated && userWalletAddress) {
@@ -337,7 +337,7 @@ export default function DashboardPage() {
                     const maxButtons = 7;
                     const pages = [];
                     let startPage = Math.max(1, ownedPage - Math.floor(maxButtons / 2));
-                    let endPage = Math.min(ownedTotalPages, startPage + maxButtons - 1);
+                    const endPage = Math.min(ownedTotalPages, startPage + maxButtons - 1);
 
                     if (endPage - startPage < maxButtons - 1) {
                       startPage = Math.max(1, endPage - maxButtons + 1);
@@ -420,7 +420,7 @@ export default function DashboardPage() {
                         </Button>
                         <Button variant="ghost" size="sm" asChild className="w-full h-8 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-50">
                           <Link href={`/asset/${content.originalHash}`} className="flex items-center justify-center">
-                            アセットページを確認 <ArrowRight className="w-3 h-3 ml-1" />
+                            資産ページを確認 <ArrowRight className="w-3 h-3 ml-1" />
                           </Link>
                         </Button>
                       </div>
@@ -447,7 +447,7 @@ export default function DashboardPage() {
                     const maxButtons = 7;
                     const pages = [];
                     let startPage = Math.max(1, purchasedPage - Math.floor(maxButtons / 2));
-                    let endPage = Math.min(purchasedTotalPages, startPage + maxButtons - 1);
+                    const endPage = Math.min(purchasedTotalPages, startPage + maxButtons - 1);
 
                     if (endPage - startPage < maxButtons - 1) {
                       startPage = Math.max(1, endPage - maxButtons + 1);

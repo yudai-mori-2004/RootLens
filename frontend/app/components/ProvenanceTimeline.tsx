@@ -2,6 +2,7 @@
 
 import { C2PASummaryData } from '@/app/lib/c2pa-parser';
 import { Camera, Edit3, ShieldCheck, Sparkles, User, Image as ImageIcon } from 'lucide-react';
+import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 
@@ -78,10 +79,13 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
                   <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm z-10">
                     編集前のスナップショット
                   </div>
-                  <img
+                  <Image
                     src={activeManifest.rootThumbnailUrl}
                     alt="Original captured content"
-                    className="w-full h-auto max-h-60 object-contain bg-slate-100/50"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    style={{ objectFit: 'contain' }}
+                    className="bg-slate-100/50"
                   />
                 </div>
               )}
@@ -167,10 +171,13 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
                   <div className="absolute top-2 left-2 bg-blue-600/90 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm z-10">
                     現在の画像
                   </div>
-                  <img
+                  <Image
                     src={c2paSummary.thumbnailUrl}
                     alt="Current version thumbnail"
-                    className="w-full h-auto max-h-60 object-contain bg-slate-50"
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    style={{ objectFit: 'contain' }}
+                    className="bg-slate-50"
                   />
                 </div>
               )}

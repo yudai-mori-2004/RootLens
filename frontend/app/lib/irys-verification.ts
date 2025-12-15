@@ -88,7 +88,7 @@ async function searchIrysByTag(
     throw new Error('Irys GraphQL query failed');
   }
 
-  return result.data.transactions.edges.map((edge: any) => ({
+  return result.data.transactions.edges.map((edge: { node: { id: string; timestamp: number } }) => ({
     id: edge.node.id,
     timestamp: Math.floor((edge.node.timestamp || 0) / 1000) // 秒単位に統一
   }));
