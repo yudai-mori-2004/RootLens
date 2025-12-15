@@ -242,7 +242,7 @@ export default function UploadPage() {
               isValid: false,
               rootSigner: null,
               provenanceChain: [],
-              error: `このファイルは既に証明が発行されています。証明書ページをご確認ください： /asset/${originalHash}`,
+              error: `このファイルは既に証明が発行されています。<br/>証明書ページをご確認ください： <a href="${process.env.NEXT_PUBLIC_APP_URL}/asset/${originalHash}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:text-indigo-700 underline font-bold break-all">${process.env.NEXT_PUBLIC_APP_URL}/asset/${originalHash}</a>`,
             });
             setCurrentStep(3);
             setIsProcessing(false);
@@ -793,7 +793,7 @@ export default function UploadPage() {
                 </div>
               ) : (
                 <div className="text-center text-red-600 mt-2 font-medium bg-red-50 px-4 py-2 rounded-lg inline-block mx-auto border border-red-100 text-sm">
-                  {validationResult.error}
+                  <span dangerouslySetInnerHTML={{ __html: validationResult.error || '' }} />
                 </div>
               )
             }
