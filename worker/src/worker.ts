@@ -1,110 +1,95 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Worker (Config Object Strategy)
+// Redis/BullMQ Deep Investigation Script
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-import { Worker, Job } from 'bullmq';
-import IORedis, { RedisOptions } from 'ioredis';
-import { processMint } from './processor';
-import type { MintJobData, MintJobResult } from '../../shared/types';
-import { startServer } from './server';
+import IORedis from 'ioredis';
 
 const redisUrlRaw = process.env.REDIS_URL;
+if (!redisUrlRaw) throw new Error('REDIS_URL is missing');
 
-if (!redisUrlRaw) {
-  console.error('❌ Redis configuration is missing. Set REDIS_URL.');
-  process.exit(1);
-}
-
-// URLをパースして設定値を抽出
 const urlObj = new URL(redisUrlRaw);
 
-// ■ Railway用のホスト名調整
-// redis.railway.internal (FQDN) は不安定なため、短縮名 "redis" があればそちらを優先
-// または環境変数でホストが指定されていればそれを使う
-let redisHost = urlObj.hostname;
-if (redisHost.includes('railway.internal')) {
-  redisHost = 'redis';
-}
-
-// ■ 純粋な設定オブジェクトを作成 (これをBullMQに渡す)
-// インスタンスを渡すと duplicate() の挙動に依存するため、設定値を直接渡すのが最も安全
-const redisConfig: RedisOptions = {
-  host: redisHost,
+// ■ 検証する設定パターン
+const config = {
+  host: urlObj.hostname.includes('railway.internal') ? 'redis' : urlObj.hostname,
   port: parseInt(urlObj.port || '6379'),
   password: urlObj.password,
-  username: undefined, // ★重要: defaultユーザー問題を避けるため明示的にundefinedにする
-  db: parseInt(urlObj.pathname.split('/')[1]) || 0,
-  family: 0, // IPv6/IPv4デュアルスタック対応 (Railway必須)
-  maxRetriesPerRequest: null, // BullMQ必須
-  tls: redisUrlRaw.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+  username: undefined, // 明示的にundefined
+  family: 0,
+  showFriendlyErrorStack: true, // エラー詳細を表示
+  enableOfflineQueue: false, // 接続前コマンドを即座にエラーにする（挙動確認用）
 };
 
-console.log('--- Redis Connection Setup ---');
-console.log(`📡 Connecting to: ${redisConfig.host}:${redisConfig.port}`);
-console.log(`🔑 Auth: Password=${redisConfig.password ? 'YES (****)' : 'NO'}, User=${redisConfig.username || 'NONE'}`);
+console.log('--- 🔍 Configuration Check ---');
+console.log('Host:', config.host);
+console.log('Port:', config.port);
+console.log('User:', config.username);
+console.log('Pass:', config.password ? `YES (Length: ${config.password.length})` : 'NO');
+console.log('------------------------------');
 
-// --- 接続診断 ---
-// 設定オブジェクトを使ってテスト接続
-const diagnosticConnection = new IORedis(redisConfig);
-
-diagnosticConnection.on('error', (err) => console.error('❌ Diagnostic Redis Error:', err.message));
-
-(async () => {
+async function runTests() {
+  // 【テスト1】単発接続 & INFOコマンド (診断接続と同じ)
+  console.log('\n--- 🧪 Test 1: Single Connection & INFO ---');
+  const client1 = new IORedis(config);
+  
+  client1.on('error', (e) => console.log('   [Client1 Error]', e.message));
+  
   try {
-    console.log('🔍 Testing Diagnostic Connection...');
-    await diagnosticConnection.ping();
-    console.log('✅ Diagnostic Connection: PONG (Auth OK)');
-    
-    // 診断終了後は閉じる
-    await diagnosticConnection.quit();
-  } catch (error) {
-    console.error('🚨 Redis Diagnosis Failed:', error);
-    process.exit(1);
+    await client1.connect();
+    console.log('   ✅ Client1: Connected');
+    const info = await client1.info();
+    console.log('   ✅ Client1: INFO command success (First line):', info.split('\n')[0]);
+  } catch (e) {
+    console.log('   ❌ Client1: Failed', e);
+  } finally {
+    await client1.quit();
   }
-})();
-// ----------------
 
-console.log('🚀 RootLens Worker starting...');
+  // 【テスト2】duplicate() の挙動確認 (BullMQはこれを使うことがある)
+  console.log('\n--- 🧪 Test 2: Duplicate Connection ---');
+  const primary = new IORedis(config);
+  const duplicated = primary.duplicate();
+  
+  duplicated.on('error', (e) => console.log('   [Dup Error]', e.message));
 
-// Worker作成
-const worker = new Worker<MintJobData, MintJobResult>(
-  'rootlens-mint-queue',
-  async (job: Job<MintJobData>) => {
-    console.log(`\n${'='.repeat(60)}`);
-    console.log(`📦 Processing job ${job.id}`);
+  try {
+    await duplicated.connect();
+    console.log('   ✅ Duplicate: Connected');
+    // 複製された接続がパスワードを保持しているか確認
+    console.log('   🔎 Duplicate Options Password:', duplicated.options.password ? 'YES' : 'MISSING');
     
-    try {
-      const result = await processMint(job.data, (progress) => {
-        job.updateProgress(progress);
-      });
-      console.log(`✅ Job ${job.id} completed!`);
-      return result;
-    } catch (error) {
-      console.error(`❌ Job ${job.id} failed:`, error);
-      throw error;
+    const ping = await duplicated.ping();
+    console.log('   ✅ Duplicate: PONG', ping);
+  } catch (e) {
+    console.log('   ❌ Duplicate: Failed', e);
+  } finally {
+    await primary.quit();
+    await duplicated.quit();
+  }
+
+  // 【テスト3】同時多発接続 (BullMQの起動時挙動シミュレーション)
+  // BullMQは起動時にBlocking用、Sub用など複数の接続を一気に作る
+  console.log('\n--- 🧪 Test 3: Concurrency / Race Condition Check ---');
+  const clients = [];
+  try {
+    for (let i = 0; i < 3; i++) {
+      console.log(`   🚀 Starting Client ${i}...`);
+      const c = new IORedis(config);
+      c.on('error', (err) => console.log(`   [Client ${i} Error]`, err.message));
+      // わざとawaitせずに次へ進む（非同期競合の誘発）
+      clients.push(c);
     }
-  },
-  {
-    // ★重要★ 設定オブジェクトを直接渡す
-    // BullMQはこれを使って内部で new IORedis(config) を行うため、
-    // duplicate() に起因する設定欠落が起きない
-    connection: redisConfig,
-    concurrency: 1,
+
+    // 全員がPINGを通せるか
+    await Promise.all(clients.map(async (c, i) => {
+      // 少し待ってからコマンド
+      await new Promise(r => setTimeout(r, 100)); 
+      const res = await c.ping();
+      console.log(`   ✅ Client ${i}: PONG`, res);
+      await c.quit();
+    }));
+  } catch (e) {
+    console.log('   ❌ Concurrency Test Failed', e);
   }
-);
+}
 
-// イベントハンドラ
-worker.on('ready', () => console.log('✅ Worker is ready and waiting for jobs...'));
-worker.on('error', (err) => console.error('⚠️  Worker error:', err));
-worker.on('failed', (job, err) => console.error(`❌ Job ${job?.id} failed:`, err.message));
-
-startServer();
-
-const gracefulShutdown = async (signal: string) => {
-  console.log(`\n🛑 ${signal} received, closing worker...`);
-  await worker.close();
-  process.exit(0);
-};
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+runTests().catch(console.error);
