@@ -39,22 +39,24 @@ const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
 console.log('🔐 Decoded password length:', urlObj.password?.length || 0);
 console.log('🔐 Expected password length: 32');
 
-// Redis接続オプション（BullMQのすべての接続で共有）
-const redisOptions = {
-  host: urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  // usernameを指定しない（--requirepass形式の認証）
-  password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined, // URLデコード
-  family: 0, // RailwayのIPv6対応：デュアルスタックルックアップを有効化
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false, // ★★★ 核心：INFOコマンドによるNOAUTHエラーを回避 ★★★
-  tls: useTLS ? { rejectUnauthorized: false } : undefined,
+// 新しいRedis接続を作成する関数（BullMQのduplicate()問題を回避）
+const createRedisConnection = () => {
+  return new IORedis({
+    host: urlObj.hostname,
+    port: parseInt(urlObj.port || '6379'),
+    password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined,
+    family: 0, // RailwayのIPv6対応
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false, // INFOコマンドによるNOAUTHエラーを回避
+    lazyConnect: true, // 明示的に接続を制御
+    tls: useTLS ? { rejectUnauthorized: false } : undefined,
+  });
 };
 
 console.log('🚀 RootLens Worker started...');
 console.log(`📡 Connecting to Redis via URL...`);
 
-// Worker作成（接続オプションを直接渡す）
+// Worker作成（新しいIORedisインスタンスを渡す）
 const worker = new Worker<MintJobData, MintJobResult>(
   'rootlens-mint-queue',
   async (job: Job<MintJobData>) => {
@@ -81,7 +83,7 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    connection: redisOptions, // ★ 接続オプションを渡す（BullMQが内部で接続を作成）
+    connection: createRedisConnection(), // ★ 新しいインスタンスを渡す（duplicate()問題を回避）
     concurrency: 1,  // ★★★ 最重要: 完全に1つずつ処理する設定 ★★★
   }
 );

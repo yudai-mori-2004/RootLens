@@ -16,27 +16,29 @@ const useTLS = process.env.REDIS_URL.includes('rlwy.net');
 // URL文字列から認証情報を抽出
 const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
 
-// Redis接続オプション（BullMQのすべての接続で共有）
-const redisOptions = {
-  host: urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  // usernameを指定しない（--requirepass形式の認証）
-  password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined, // URLデコード
-  family: 0, // RailwayのIPv6対応：デュアルスタックルックアップを有効化
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false, // ★★★ 核心：INFOコマンドによるNOAUTHエラーを回避 ★★★
-  tls: useTLS ? { rejectUnauthorized: false } : undefined,
-  retryStrategy: (times: number) => {
-    if (times > 3) {
-      return null; // 3回失敗したら諦める
-    }
-    return Math.min(times * 50, 2000);
-  },
+// 新しいRedis接続を作成する関数（BullMQのduplicate()問題を回避）
+const createRedisConnection = () => {
+  return new IORedis({
+    host: urlObj.hostname,
+    port: parseInt(urlObj.port || '6379'),
+    password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined,
+    family: 0, // RailwayのIPv6対応
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false, // INFOコマンドによるNOAUTHエラーを回避
+    lazyConnect: true, // 明示的に接続を制御
+    tls: useTLS ? { rejectUnauthorized: false } : undefined,
+    retryStrategy: (times: number) => {
+      if (times > 3) {
+        return null; // 3回失敗したら諦める
+      }
+      return Math.min(times * 50, 2000);
+    },
+  });
 };
 
 // Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection: redisOptions,
+  connection: createRedisConnection(),
   defaultJobOptions: {
     attempts: 3,                    // 最大3回リトライ
     backoff: {
