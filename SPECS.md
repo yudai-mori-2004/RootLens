@@ -1191,12 +1191,12 @@ MERKLE_TREE_ADDRESS=
 # ===== Helius (DAS API) =====
 HELIUS_API_KEY=
 
-# ===== Irys (Arweaveアップロード) =====
-IRYS_ADDRESS=https://devnet.irys.xyz       # devnet
-# IRYS_ADDRESS=https://node1.irys.xyz      # mainnet
+# ===== Arweave Gateway (Irys) =====
+ARWEAVE_GATEWAY=https://devnet.irys.xyz       # devnet
+# ARWEAVE_GATEWAY=https://node1.irys.xyz      # mainnet
 
 # ===== ビューワー =====
-NEXT_PUBLIC_ARWEAVE_GATEWAY=https://gateway.irys.xyz
+NEXT_PUBLIC_ARWEAVE_GATEWAY=https://devnet.irys.xyz
 NEXT_PUBLIC_ARWEAVE_EXPLORER_URL=https://devnet.irys.xyz/tx
 NEXT_PUBLIC_SOLANA_EXPLORER_URL=https://orb.helius.dev/address
 

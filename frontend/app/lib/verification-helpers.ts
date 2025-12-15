@@ -8,7 +8,7 @@ import { ArweaveProofMetadata } from '@shared/types';
  * Irys Gateway URLを取得
  */
 export function getIrysGatewayUrl(): string {
-  const irysAddress = process.env.NEXT_PUBLIC_IRYS_ADDRESS;
+  const irysAddress = process.env.NEXT_PUBLIC_ARWEAVE_GATEWAY;
   return irysAddress && irysAddress.includes('devnet')
     ? irysAddress
     : 'https://gateway.irys.xyz';

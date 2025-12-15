@@ -38,9 +38,9 @@ async function searchIrysByTag(
   limit: number = 100
 ): Promise<Array<{ id: string; timestamp: number }>> {
   // エンドポイント決定 (Devnet優先)
-  const irysAddress = process.env.NEXT_PUBLIC_IRYS_ADDRESS;
-  const GRAPHQL_ENDPOINT = irysAddress 
-    ? `${irysAddress}/graphql` 
+  const irysAddress = process.env.NEXT_PUBLIC_ARWEAVE_GATEWAY;
+  const GRAPHQL_ENDPOINT = irysAddress
+    ? `${irysAddress}/graphql`
     : 'https://gateway.irys.xyz/graphql';
 
   // Irys互換スキーマ (Simple)
@@ -138,7 +138,7 @@ export async function searchArweaveTransactionsByHash(
   }
 
   // 2. 詳細取得と検証 (Verification)
-  const irysAddress = process.env.NEXT_PUBLIC_IRYS_ADDRESS;
+  const irysAddress = process.env.NEXT_PUBLIC_ARWEAVE_GATEWAY;
   // Devnetなら devnet.irys.xyz, Mainnetなら gateway.irys.xyz
   const fetchBaseUrl = irysAddress && irysAddress.includes('devnet')
     ? irysAddress // https://devnet.irys.xyz

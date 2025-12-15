@@ -25,7 +25,7 @@ export async function uploadToArweave(data: {
   // Irys Uploaderを使用
   umi.use(
     irysUploader({
-      address: process.env.IRYS_ADDRESS || 'https://devnet.irys.xyz',
+      address: process.env.ARWEAVE_GATEWAY || 'https://devnet.irys.xyz',
     })
   );
 
