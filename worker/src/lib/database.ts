@@ -44,6 +44,7 @@ export async function saveToDatabase(data: {
   title?: string;
   description?: string;
 }): Promise<{ id: string }> {
+  const supabase = getSupabase();
   const { data: upsertedData, error } = await supabase
     .from('media_proofs')
     .upsert({
