@@ -36,6 +36,9 @@ console.log(`🔧 Connecting to Redis with TLS: ${useTLS ? 'ENABLED' : 'DISABLED
 // URL文字列から認証情報を抽出
 const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
 
+console.log('🔐 Decoded password length:', urlObj.password?.length || 0);
+console.log('🔐 Expected password length: 32');
+
 const connection = new IORedis({
   host: urlObj.hostname,
   port: parseInt(urlObj.port || '6379'),
@@ -43,6 +46,19 @@ const connection = new IORedis({
   password: urlObj.password,
   maxRetriesPerRequest: null,
   tls: useTLS ? { rejectUnauthorized: false } : undefined,
+});
+
+// 接続成功/失敗のイベントリスナー
+connection.on('connect', () => {
+  console.log('✅ Redis connection established');
+});
+
+connection.on('ready', () => {
+  console.log('✅ Redis ready to accept commands');
+});
+
+connection.on('error', (err) => {
+  console.error('❌ Redis connection error:', err.message);
 });
 
 console.log('🚀 RootLens Worker started...');
