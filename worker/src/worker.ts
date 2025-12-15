@@ -16,6 +16,9 @@ if (redisUrl) {
   const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
   console.log('Host:', urlObj.hostname);
   console.log('Port:', urlObj.port);
+  console.log('Username:', urlObj.username);
+  console.log('Password:', urlObj.password ? `***${urlObj.password.slice(-4)}` : 'MISSING');
+  console.log('Has @ symbol?', redisUrl.includes('@'));
   console.log('Is Railway Public?', redisUrl.includes('rlwy.net'));
   console.log('TLS Enabled?', redisUrl.includes('rlwy.net') ? 'YES' : 'NO');
 }
