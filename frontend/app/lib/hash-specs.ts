@@ -15,6 +15,7 @@ export interface DeviceHashSpec {
   matcher: string | RegExp; // signatureInfo.issuer に含まれる文字列または正規表現
   targetLabel: string;      // 採用するアサーションのラベル (完全一致)
   description: string;
+  isTrustedIssuer: boolean; // このIssuerがRootLensにとって信頼できるかどうか
 }
 
 export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
@@ -25,6 +26,7 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     matcher: 'Google LLC', // 完全一致または部分一致
     targetLabel: 'c2pa.hash.data.part',
     description: 'Googleデバイス(Pixel等)の署名は、部分ハッシュ(c2pa.hash.data.part)を主要な識別子として使用します。',
+    isTrustedIssuer: true, // Google LLCは信頼できる発行者
   },
   
   // 以下は動作確認が取れ次第、順次有効化します。
@@ -36,6 +38,7 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     matcher: /Sony/i,
     targetLabel: 'c2pa.hash.data',
     description: 'Sony製カメラは、C2PA標準のデータハッシュ(c2pa.hash.data)を使用します。',
+    isTrustedIssuer: true,
   },
   {
     id: 'leica-camera',
@@ -43,6 +46,7 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     matcher: /Leica/i,
     targetLabel: 'c2pa.hash.data',
     description: 'Leica製カメラは、C2PA標準のデータハッシュ(c2pa.hash.data)を使用します。',
+    isTrustedIssuer: true,
   },
   {
     id: 'nikon-camera',
@@ -50,6 +54,7 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     matcher: /Nikon/i,
     targetLabel: 'c2pa.hash.data',
     description: 'Nikon製カメラは、C2PA標準のデータハッシュ(c2pa.hash.data)を使用します。',
+    isTrustedIssuer: true,
   },
   {
     id: 'canon-camera',
@@ -57,6 +62,7 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     matcher: /Canon/i,
     targetLabel: 'c2pa.hash.data',
     description: 'Canon製カメラは、C2PA標準のデータハッシュ(c2pa.hash.data)を使用します。',
+    isTrustedIssuer: true,
   },
   {
     id: 'adobe-software',
@@ -64,6 +70,7 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     matcher: /Adobe/i,
     targetLabel: 'c2pa.hash.data',
     description: 'Adobe Photoshop / Lightroomなどの編集ソフトは、標準のデータハッシュを使用します。',
+    isTrustedIssuer: true,
   },
   {
     id: 'truepic',
@@ -71,8 +78,27 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     matcher: /Truepic/i,
     targetLabel: 'c2pa.hash.data',
     description: 'Truepic署名済みコンテンツは、標準のデータハッシュを使用します。',
+    isTrustedIssuer: true,
+  },
+  {
+    id: 'openai', // AI生成はTrustedIssuerではないが、判定は可能
+    vendor: 'OpenAI',
+    matcher: /OpenAI/i,
+    targetLabel: 'c2pa.hash.data', // AI生成物の場合、このハッシュを使うかは要検討
+    description: 'OpenAIによるAI生成コンテンツ。',
+    isTrustedIssuer: false, // AI生成物は信頼できない発行者として扱う
   }
   */
 ];
 
-// ルールにマッチしなかった場合は非対応（エラー）となります。
+// 信頼できるIssuerのリストを生成するヘルパー関数
+export function getTrustedIssuerNames(): string[] {
+  const trustedIssuers: string[] = [];
+  DEVICE_HASH_SPECS.forEach(spec => {
+    if (spec.isTrustedIssuer && typeof spec.matcher === 'string') {
+      trustedIssuers.push(spec.matcher);
+    }
+    // TODO: 正規表現 matcher の場合も考慮に入れるか
+  });
+  return trustedIssuers;
+}

@@ -10,7 +10,7 @@ import {
   type ManifestStore,
   type Assertion,
 } from 'c2pa';
-import { DEVICE_HASH_SPECS, DeviceHashSpec } from './hash-specs';
+import { DEVICE_HASH_SPECS, DeviceHashSpec, getTrustedIssuerNames } from './hash-specs';
 
 export interface C2PASummaryData {
   activeManifest: ManifestSummary | null;
@@ -52,6 +52,7 @@ export interface ManifestSummary {
   rootThumbnailUrl: string | null; // 追加: Root（始祖）のサムネイル
   verifiedIdentities: VerifiedIdentitySummary[];
   cawgIssuers: string[];
+  isTrustedIssuer: boolean; // 追加: このIssuerがRootLensで信頼されているか
 }
 
 export interface IngredientSummary {
@@ -320,6 +321,11 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
     }
   }
 
+  // Issuerが信頼できるかどうかの判定 (hash-specs.tsから取得)
+  const trustedIssuerNames = getTrustedIssuerNames();
+  const issuer = signatureInfo.issuer || '';
+  const isTrustedIssuer = trustedIssuerNames.some(trusted => issuer.includes(trusted));
+
   return {
     label: manifest.label,
     title: manifest.title,
@@ -345,6 +351,7 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
     rootThumbnailUrl,
     verifiedIdentities,
     cawgIssuers: manifest.cawgIssuers || [],
+    isTrustedIssuer, // 追加
   };
 }
 

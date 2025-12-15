@@ -3,10 +3,11 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import type { MintJobData, MintJobResult } from '../../shared/types';
-import { predictNextAssetId } from './lib/solana';
+import { predictNextAssetId, getUmi } from './lib/solana';
 import { uploadToArweave } from './lib/arweave';
 import { mintCNFT } from './lib/cnft';
 import { saveToDatabase } from './lib/database';
+import { searchArweaveTransactionsByHash, checkSolanaAssetExists } from './lib/verification';
 
 /**
  * Mint処理のメインロジック
@@ -23,22 +24,45 @@ export async function processMint(
   onProgress: (progress: number) => void
 ): Promise<MintJobResult> {
   try {
-    // === 0. 重複チェック（最終確認） ===
+    // === 0. 重複チェック（オンチェーン検証） ===
     onProgress(5);
-    console.log('🔍 Step 0: Checking for duplicate proof...');
+    console.log('🔍 Step 0: Checking for duplicate proof (On-Chain)...');
 
-    const { checkExistingProof } = await import('./lib/database');
-    const exists = await checkExistingProof(data.originalHash);
+    // サーバーウォレットアドレスを取得
+    const umi = getUmi();
+    const serverWalletAddress = umi.identity.publicKey.toString();
+    console.log(`   Current Server Wallet: ${serverWalletAddress}`);
 
-    if (exists) {
+    // Arweave検索
+    const arweaveTransactions = await searchArweaveTransactionsByHash(data.originalHash);
+    
+    // 自身のウォレットで発行された、かつSolana上に存在する証明を探す
+    let duplicateFound = false;
+    for (const tx of arweaveTransactions) {
+      if (tx.ownerAddress === serverWalletAddress) {
+        console.log(`   Checking Solana asset existence for: ${tx.targetAssetId}...`);
+        const exists = await checkSolanaAssetExists(tx.targetAssetId);
+        if (exists) {
+          console.error(`❌ Active duplicate proof found! (Asset: ${tx.targetAssetId})`);
+          duplicateFound = true;
+          break;
+        } else {
+          console.warn(`   ⚠️ Found Arweave TX but Solana asset missing (Burned or Invalid): ${tx.targetAssetId}`);
+        }
+      } else {
+        console.log(`   ℹ️ Found proof from another issuer (Ignored): ${tx.ownerAddress}`);
+      }
+    }
+
+    if (duplicateFound) {
       console.error('❌ Duplicate proof detected! Aborting mint process.');
       return {
         success: false,
-        error: 'このファイルは既に証明が発行されています。',
+        error: 'このファイルは既に証明が発行されています（同一発行元）。',
       };
     }
 
-    console.log('✅ No duplicate found - proceeding with mint');
+    console.log('✅ No active duplicate found from this issuer - proceeding with mint');
 
     // === 1. 次のcNFTアドレスを予測（mint直前に再取得） ===
     onProgress(15);

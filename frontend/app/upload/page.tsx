@@ -185,18 +185,6 @@ export default function UploadPage() {
       }
 
       // 3. 検証ロジック
-      const trustedIssuers = [
-        'Sony Corporation',
-        'Google LLC',
-        'Samsung Electronics',
-        'Leica Camera AG',
-        'Nikon Corporation',
-        'Canon Inc.',
-        'Adobe Inc.',
-        'OpenAI',
-        'Samsung Galaxy'
-      ];
-
       const activeManifest = summary.activeManifest;
       if (!activeManifest) {
         setValidationResult({
@@ -211,7 +199,7 @@ export default function UploadPage() {
       }
 
       const issuer = activeManifest.signatureInfo.issuer || 'Unknown';
-      const isTrusted = trustedIssuers.some(trusted => issuer.includes(trusted));
+      const isTrusted = activeManifest.isTrustedIssuer; // c2pa-parser.tsから判定結果を取得
       const isAI = activeManifest.isAIGenerated;
 
       if (isAI) {
