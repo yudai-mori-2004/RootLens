@@ -146,7 +146,6 @@ export default function TechnicalSpecsModal({
                     </div>
                 </div>
             </section>
-
             {/* コンテンツエリア：読みやすさ重視で1カラム構成に変更 */}
             <div className="space-y-12">
                 
