@@ -479,7 +479,8 @@ export default function UploadPage() {
 
         if (statusResult.state === 'completed') {
           completed = true;
-          if (statusResult.result?.success) {
+          // BullMQはジョブ結果を "returnvalue" に格納する
+          if (statusResult.returnvalue?.success) {
             setUploadProgressStep(5);
             setUploadStatusMessage('完了しました！');
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -487,7 +488,7 @@ export default function UploadPage() {
             setUploadResult({ hash: hashes.originalHash });
             setCurrentStep(5);
           } else {
-            throw new Error(statusResult.result?.error || 'Mint処理失敗');
+            throw new Error(statusResult.returnvalue?.error || 'Mint処理失敗');
           }
         } else if (statusResult.state === 'failed') {
           throw new Error(statusResult.failedReason || 'ジョブ失敗');
