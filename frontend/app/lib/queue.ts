@@ -16,10 +16,10 @@ const useTLS = process.env.REDIS_URL.includes('rlwy.net');
 // URL文字列から認証情報を抽出
 const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
 
-const connection = new IORedis({
+// Redis接続オプション（BullMQのすべての接続で共有）
+const redisOptions = {
   host: urlObj.hostname,
   port: parseInt(urlObj.port || '6379'),
-  // usernameを指定しない（デフォルトユーザーを使用）
   password: urlObj.password,
   family: 0, // ★ RailwayのIPv6対応：デュアルスタックルックアップを有効化
   maxRetriesPerRequest: null,
@@ -30,11 +30,11 @@ const connection = new IORedis({
     }
     return Math.min(times * 50, 2000);
   },
-});
+};
 
 // Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection,
+  connection: redisOptions,
   defaultJobOptions: {
     attempts: 3,                    // 最大3回リトライ
     backoff: {
@@ -49,13 +49,4 @@ export const mintQueue = new Queue('rootlens-mint-queue', {
       age: 7 * 24 * 3600,           // 失敗後7日間保持（調査用）
     },
   },
-});
-
-// 接続エラーハンドリング
-connection.on('error', (err) => {
-  console.error('Redis connection error:', err);
-});
-
-connection.on('connect', () => {
-  console.log('✅ Redis connected (Frontend)');
 });
