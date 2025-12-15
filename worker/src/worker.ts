@@ -15,39 +15,41 @@ if (!redisUrl) {
   process.exit(1);
 }
 
+// URL文字列から認証情報を抽出
+const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
+
+// ■ 共通の接続オプションを作成（これをBullMQに渡す）
+const redisOptions = {
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default', // Railway対応
+  password: urlObj.password,
+  family: 0, // IPv6対応
+  maxRetriesPerRequest: null,
+  tls: redisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+};
+
 console.log('--- Redis Connection Setup ---');
 
-// 手動パースをやめ、IORedisに任せる構成に変更
-// family: 0 は Railway の IPv6 対応に必須
-const connection = new IORedis(redisUrl, {
-  family: 0, 
-  maxRetriesPerRequest: null,
-  // TLSはURLに "rlwy.net" (Railway Public) が含まれる場合のみ有効化
-  tls: redisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
-});
+// ■ 診断用：単独で接続してテストする（BullMQとは無関係）
+const diagnosticConnection = new IORedis(redisOptions);
 
-// --- 接続診断ブロック (起動時に実行) ---
-connection.on('connect', () => console.log('✅ Redis: TCP Connection established'));
-connection.on('ready', () => console.log('✅ Redis: Ready & Authenticated'));
-connection.on('error', (err) => console.error('❌ Redis Error:', err.message));
+diagnosticConnection.on('connect', () => console.log('✅ Diagnostic Redis: TCP Connection established'));
+diagnosticConnection.on('ready', () => console.log('✅ Diagnostic Redis: Ready & Authenticated'));
+diagnosticConnection.on('error', (err) => console.error('❌ Diagnostic Redis Error:', err.message));
 
-// 強制的に認証確認を行う
 (async () => {
   try {
     console.log('🔍 Testing Redis Authentication...');
-    // パスワードが設定されているか長さだけで確認（ログに生パスワードは出さない）
-    const passLen = connection.options.password?.toString().length || 0;
-    console.log(`🔑 Configured Password Length: ${passLen}`);
-    
-    // PINGを送って AUTH が通っているか確認
-    const pong = await connection.ping();
+    const pong = await diagnosticConnection.ping();
     console.log(`✅ Authentication Test Passed: ${pong}`);
+    // テスト終わったらこの接続は閉じてOKだが、ログ用に開けておく
+    // await diagnosticConnection.quit(); 
   } catch (error) {
     console.error('🚨 Authentication Failed Details:', error);
-    // ここでエラーが出るなら、BullMQ以前に接続設定の問題
   }
 })();
-// --------------------------------------
+
 
 console.log('🚀 RootLens Worker starting...');
 
@@ -78,37 +80,26 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    // 作成した接続インスタンスをそのまま渡す（最も確実な方法）
-    connection: connection,
-    concurrency: 1,  // ★★★ 最重要: 完全に1つずつ処理する設定 ★★★
+    connection: redisOptions,
+    concurrency: 1,
   }
 );
 
 // イベントハンドラ
-worker.on('completed', (job, result) => {
-  console.log(`✅ Job ${job.id} completed!`, result);
+worker.on('ready', () => {
+  console.log('✅ Worker is ready and waiting for jobs...');
 });
-
-worker.on('failed', (job, err) => {
-  console.error(`❌ Job ${job?.id} failed:`, err.message);
-});
-
 worker.on('error', (err) => {
   console.error('⚠️  Worker error:', err);
 });
 
-worker.on('ready', () => {
-  console.log('✅ Worker is ready and waiting for jobs...');
-});
-
-// HTTPサーバー起動（ヘルスチェック & メトリクス）
+// サーバー起動と終了処理
 startServer();
 
-// Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 ${signal} received, closing worker...`);
   await worker.close();
-  await connection.quit(); // Redis接続も閉じる
+  await diagnosticConnection.quit();
   process.exit(0);
 };
 

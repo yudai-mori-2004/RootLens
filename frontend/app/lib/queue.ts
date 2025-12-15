@@ -9,23 +9,25 @@ if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// Frontend側もWorkerと同じ設定で統一
-// 手動パースをやめ、IORedisに任せる
-const connection = new IORedis(process.env.REDIS_URL, {
+// URL文字列から認証情報を抽出
+const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
+const useTLS = process.env.REDIS_URL.includes('rlwy.net');
+
+// ■ 接続オプションオブジェクトを作成
+const connectionOptions = {
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default',
+  password: urlObj.password,
   family: 0, // Railway IPv6対応
   maxRetriesPerRequest: null,
-  tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
-  retryStrategy: (times: number) => {
-    if (times > 3) {
-      return null; // 3回失敗したら諦める
-    }
-    return Math.min(times * 50, 2000);
-  },
-});
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
+};
 
 // Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection, // インスタンスを渡す
+  connection: connectionOptions, // インスタンスを渡す
+
   defaultJobOptions: {
     attempts: 3,                    // 最大3回リトライ
     backoff: {
