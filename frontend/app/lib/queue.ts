@@ -20,7 +20,7 @@ const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
 const redisOptions = {
   host: urlObj.hostname,
   port: parseInt(urlObj.port || '6379'),
-  username: urlObj.username || 'default', // Redis 8.x ACL対応
+  // usernameを指定しない（--requirepass形式の認証）
   password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined, // URLデコード
   family: 0, // RailwayのIPv6対応：デュアルスタックルックアップを有効化
   maxRetriesPerRequest: null,
