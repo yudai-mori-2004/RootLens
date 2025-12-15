@@ -56,6 +56,7 @@ export default function UploadPage() {
   const [c2paSummary, setC2paSummary] = useState<C2PASummaryData | null>(null);
   const [validationResult, setValidationResult] = useState<C2PAValidationResult | null>(null);
   const [hashes, setHashes] = useState<FileHashes | null>(null);
+  const [previewThumbnailDataUri, setPreviewThumbnailDataUri] = useState<string | null>(null); // 追加
 
   // プライバシー同意
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
@@ -236,6 +237,16 @@ export default function UploadPage() {
 
       setHashes({ originalHash });
 
+      // サムネイル用のリサイズ済み画像データURIを生成
+      const resizedBlobForPreview = await resizeImage(file);
+      const dataUriForPreview = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(resizedBlobForPreview);
+      });
+      setPreviewThumbnailDataUri(dataUriForPreview);
+
       // 5. 重複チェック（既存の証明が存在しないか確認）
       console.log('🔍 重複チェック開始:', originalHash);
       try {
@@ -268,6 +279,8 @@ export default function UploadPage() {
         console.log('✅ 重複なし - アップロード可能');
       } catch (err) {
         console.warn('⚠️ 重複チェックでエラー（続行）:', err);
+        // モバイルデバッグ用：エラー内容を表示
+        alert(`重複チェックエラー: ${err instanceof Error ? err.message : String(err)}`);
         // エラーが発生しても続行（ネットワークエラー等を考慮）
       }
 
@@ -787,11 +800,11 @@ export default function UploadPage() {
                 <div className="flex flex-col items-center justify-center py-4 w-full">
                   {/* サムネイル画像 + チェックマーク */}
                   <div className="relative mb-6 z-10">
-                    {c2paSummary.thumbnailUrl ? (
+                    {previewThumbnailDataUri ? (
                       <div className="relative group">
                         <div className="relative p-1 bg-white rounded-2xl shadow-lg border border-slate-100">
                           <img
-                            src={c2paSummary.thumbnailUrl}
+                            src={previewThumbnailDataUri}
                             alt="Verified content"
                             className="w-48 h-48 object-cover rounded-xl"
                           />
