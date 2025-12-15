@@ -18,22 +18,38 @@ const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
 
 // 新しいRedis接続を作成する関数（BullMQのduplicate()問題を回避）
 const createRedisConnection = () => {
-  return new IORedis({
+  const config: any = {
     host: urlObj.hostname,
     port: parseInt(urlObj.port || '6379'),
     password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined,
-    family: 0, // RailwayのIPv6対応
     maxRetriesPerRequest: null,
     enableReadyCheck: false, // INFOコマンドによるNOAUTHエラーを回避
-    lazyConnect: true, // 明示的に接続を制御
-    tls: useTLS ? { rejectUnauthorized: false } : undefined,
+    connectTimeout: 30000, // 30秒のタイムアウト
     retryStrategy: (times: number) => {
       if (times > 3) {
         return null; // 3回失敗したら諦める
       }
-      return Math.min(times * 50, 2000);
+      return Math.min(times * 1000, 3000);
     },
+  };
+
+  // TLS設定（Railway Public URLの場合）
+  if (useTLS) {
+    config.tls = {
+      rejectUnauthorized: false,
+      // Vercel環境でのTLS互換性を向上
+      minVersion: 'TLSv1.2',
+    };
+  }
+
+  console.log('🔗 Redis connection config:', {
+    host: config.host,
+    port: config.port,
+    useTLS,
+    hasPassword: !!config.password,
   });
+
+  return new IORedis(config);
 };
 
 
