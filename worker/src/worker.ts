@@ -12,6 +12,13 @@ const redisUrl = process.env.REDIS_URL;
 
 console.log('--- Redis Config Debug ---');
 console.log('REDIS_URL:', redisUrl ? 'Set (Hidden)' : 'Unset');
+if (redisUrl) {
+  const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
+  console.log('Host:', urlObj.hostname);
+  console.log('Port:', urlObj.port);
+  console.log('Is Railway Public?', redisUrl.includes('rlwy.net'));
+  console.log('TLS Enabled?', redisUrl.includes('rlwy.net') ? 'YES' : 'NO');
+}
 console.log('--------------------------');
 
 if (!redisUrl) {
@@ -19,10 +26,13 @@ if (!redisUrl) {
   process.exit(1);
 }
 
-// Railway Public URLはTLS必須
+// Railway Public URLはTLS必須、内部URLはTLS不要
+const useTLS = redisUrl.includes('rlwy.net');
+console.log(`🔧 Connecting to Redis with TLS: ${useTLS ? 'ENABLED' : 'DISABLED'}`);
+
 const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
-  tls: redisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
 });
 
 console.log('🚀 RootLens Worker started...');
