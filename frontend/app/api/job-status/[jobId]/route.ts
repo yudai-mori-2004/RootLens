@@ -1,8 +1,9 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver5 - Job Status API (Proxy to Railway Worker)
+// RootLens Ver5 - Job Status API (Direct BullMQ via Public Redis)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { NextRequest, NextResponse } from 'next/server';
+import { mintQueue } from '@/app/lib/queue';
 
 export async function GET(
   request: NextRequest,
@@ -11,26 +12,38 @@ export async function GET(
   try {
     const { jobId } = await params;
 
-    // Railway WorkerのAPIを呼び出す
-    const workerUrl = process.env.WORKER_URL || 'http://localhost:8080';
-    const response = await fetch(`${workerUrl}/api/job-status/${jobId}`);
+    // BullMQから直接ジョブ情報を取得
+    const job = await mintQueue.getJob(jobId);
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return NextResponse.json(
-          { error: 'Job not found' },
-          { status: 404 }
-        );
-      }
-      throw new Error(`Worker returned ${response.status}`);
+    if (!job) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Job not found'
+        },
+        { status: 404 }
+      );
     }
 
-    const result = await response.json();
-    return NextResponse.json(result);
+    const state = await job.getState();
+    const progress = job.progress;
+
+    return NextResponse.json({
+      success: true,
+      jobId: job.id,
+      state,
+      progress,
+      data: job.data,
+      returnvalue: job.returnvalue,
+      failedReason: job.failedReason,
+    });
   } catch (error) {
-    console.error('Job status API error:', error);
+    console.error('❌ Job status API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch job status' },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch job status'
+      },
       { status: 500 }
     );
   }
