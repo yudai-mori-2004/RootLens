@@ -9,26 +9,22 @@ import type { MintJobData, MintJobResult } from '../../shared/types';
 
 // Redis接続
 const redisUrl = process.env.REDIS_URL;
-const redisHost = process.env.REDIS_HOST;
-const redisPort = Number(process.env.REDIS_PORT) || 6379;
 
-if (!redisUrl && !redisHost) {
-  console.error('❌ Redis configuration is missing. Set REDIS_URL or REDIS_HOST.');
+console.log('--- Redis Config Debug ---');
+console.log('REDIS_URL:', redisUrl ? 'Set (Hidden)' : 'Unset');
+console.log('--------------------------');
+
+if (!redisUrl) {
+  console.error('❌ Redis configuration is missing. Set REDIS_URL.');
   process.exit(1);
 }
 
-const connection = redisUrl ? new IORedis(redisUrl, { maxRetriesPerRequest: null }) : new IORedis({
-  host: redisHost,
-  port: redisPort,
+const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
 console.log('🚀 RootLens Worker started...');
-if (redisUrl) {
-  console.log(`📡 Connecting to Redis via URL...`);
-} else {
-  console.log(`📡 Connecting to Redis at ${redisHost}:${redisPort}`);
-}
+console.log(`📡 Connecting to Redis via URL...`);
 
 // Worker作成
 const worker = new Worker<MintJobData, MintJobResult>(
