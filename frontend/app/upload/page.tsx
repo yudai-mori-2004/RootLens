@@ -229,16 +229,24 @@ export default function UploadPage() {
       }
 
       // 4. ハッシュ計算
-      const buffer = await file.arrayBuffer();
-      const originalHashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-      const originalHash = Array.from(new Uint8Array(originalHashBuffer))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
+      // C2PAのData Hash (c2pa.hash.data) を優先的に使用する。
+      // これにより、ファイル末尾のパディングやExifの軽微な変更によるファイル全体ハッシュの変化を無視できる。
+      let originalHash: string;
+      
+      if (summary.activeManifest?.dataHash) {
+        originalHash = summary.activeManifest.dataHash;
+        console.log('✅ Used C2PA Data Hash:', originalHash);
+      } else {
+        // フォールバック: ファイル全体のハッシュ計算
+        const buffer = await file.arrayBuffer();
+        const originalHashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        originalHash = Array.from(new Uint8Array(originalHashBuffer))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('');
+        console.warn('⚠️ C2PA Data Hash not found, using full file hash:', originalHash);
+      }
 
       setHashes({ originalHash });
-
-      // デバッグ用: 計算されたハッシュ値をアラートで表示
-      alert(`Calculated Hash: ${originalHash}`);
 
       // 5. 重複チェック（既存の証明が存在しないか確認）
       console.log('🔍 重複チェック開始:', originalHash);

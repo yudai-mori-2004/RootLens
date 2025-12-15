@@ -47,6 +47,7 @@ export interface ManifestSummary {
     allAssertions: Record<string, unknown>; // 全てのassertion（生データ）
   };
   isAIGenerated: boolean;
+  dataHash: string | null; // 追加: C2PA Data Hash (Hard Binding)
   rootThumbnailUrl: string | null; // 追加: Root（始祖）のサムネイル
   verifiedIdentities: VerifiedIdentitySummary[];
   cawgIssuers: string[];
@@ -80,6 +81,14 @@ export interface VerifiedIdentitySummary {
   name: string | null;
   identifier: string | null;
   issuer: string | null;
+}
+
+// Helper: Convert byte array to hex string
+function bytesToHex(bytes: number[] | Uint8Array): string {
+  if (bytes instanceof Uint8Array) {
+    return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -125,7 +134,7 @@ export async function createManifestSummary(
   } else if (activeManifest.thumbnail) {
     try {
         // DisposableBlobUrl を string に変換
-        const blobUrl = activeManifest.thumbnail.getUrl().url; 
+        const blobUrl = (activeManifest.thumbnail.getUrl() as any).url; 
         finalThumbnailUrl = await getBlobUrlAsDataUri(blobUrl);
     } catch (e) {
         console.warn('Failed to get thumbnail from manifest:', e);
@@ -251,6 +260,21 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   const rootThumbnailBlobUrl = await findRootThumbnail(manifest);
   const rootThumbnailUrl = rootThumbnailBlobUrl ? await getBlobUrlAsDataUri(rootThumbnailBlobUrl) : null;
 
+  // 7. Data Hash (c2pa.hash.data) の抽出
+  let dataHash: string | null = null;
+  // AssertionAccessor の data プロパティからアサーションを取得
+  if (manifest.assertions && 'data' in manifest.assertions && Array.isArray(manifest.assertions.data)) {
+    const hashAssertion = manifest.assertions.data.find((a: any) => a.label === 'c2pa.hash.data');
+    if (hashAssertion) {
+      const rawData = hashAssertion.data;
+      // c2pa.hash.data の構造: { exclusions: [...], hash: [...], name: '...', pad: ... }
+      // hash プロパティが実際のハッシュ値（バイト列）
+      if (rawData && rawData.hash && (Array.isArray(rawData.hash) || rawData.hash instanceof Uint8Array)) {
+         dataHash = bytesToHex(rawData.hash);
+      }
+    }
+  }
+
   return {
     label: manifest.label,
     title: manifest.title,
@@ -272,6 +296,7 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
       allAssertions,
     },
     isAIGenerated,
+    dataHash, // 追加
     rootThumbnailUrl,
     verifiedIdentities,
     cawgIssuers: manifest.cawgIssuers || [],
@@ -285,7 +310,7 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
   // Ingredientsがない = Rootの可能性
   if (!manifest.ingredients || manifest.ingredients.length === 0) {
     try {
-      return manifest.thumbnail?.getUrl().url || null;
+      return (manifest.thumbnail?.getUrl() as any).url || null;
     } catch {
       return null;
     }
@@ -303,7 +328,7 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
   // 親から取れなかったが、Ingredient自体がサムネイルを持っている場合
   if (parentIngredient?.thumbnail) {
       try {
-          return parentIngredient.thumbnail.getUrl().url;
+          return (parentIngredient.thumbnail.getUrl() as any).url;
       } catch {
           // ignore
       }
@@ -312,7 +337,7 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
   // ここまで来て見つからなければ、現在のマニフェストのサムネイルを返す（救済策）
   // 途切れたチェーンの最深部
   try {
-    return manifest.thumbnail?.getUrl().url || null;
+    return (manifest.thumbnail?.getUrl() as any).url || null;
   } catch {
     return null;
   }
