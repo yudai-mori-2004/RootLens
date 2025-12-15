@@ -29,7 +29,7 @@ console.log('--------------------------');
 
 // 新しいRedis接続を作成する関数
 const createRedisConnection = () => {
-  const config = {
+  const config: any = {
     host: urlObj.hostname,
     port: parseInt(urlObj.port || '6379'),
     password: urlObj.password,
