@@ -3,7 +3,7 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Queue } from 'bullmq';
-import { RedisOptions } from 'ioredis';
+import IORedis from 'ioredis';
 
 if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
@@ -11,28 +11,26 @@ if (!process.env.REDIS_URL) {
 
 const urlObj = new URL(process.env.REDIS_URL);
 
-// Workerと同じ設定
-const redisConfig: RedisOptions = {
-  host: urlObj.hostname.includes('railway.internal') ? 'redis' : urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  username: undefined, 
-  password: urlObj.password,
-  family: 0,
-  db: parseInt(urlObj.pathname.split('/')[1]) || 0,
+// Workerと同じロジック：ユーザー名削除とホスト名修正
+if (urlObj.hostname.includes('railway.internal')) {
+  urlObj.hostname = 'redis';
+}
+urlObj.username = ''; // ユーザー名削除
+urlObj.searchParams.set('family', '0');
+
+const finalRedisUrl = urlObj.toString();
+
+const connection = new IORedis(finalRedisUrl, {
   maxRetriesPerRequest: null,
-  
-  // ★ INFOコマンド無効化
-  enableReadyCheck: false,
-  
   tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
     if (times > 5) return null;
     return Math.min(times * 50, 2000);
   },
-};
+});
 
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection: redisConfig,
+  connection,
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: 'exponential', delay: 2000 },
