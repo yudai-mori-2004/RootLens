@@ -10,6 +10,7 @@ import {
   type ManifestStore,
   type Assertion,
 } from 'c2pa';
+import { DEVICE_HASH_SPECS, DeviceHashSpec } from './hash-specs';
 
 export interface C2PASummaryData {
   activeManifest: ManifestSummary | null;
@@ -260,18 +261,63 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   const rootThumbnailBlobUrl = await findRootThumbnail(manifest);
   const rootThumbnailUrl = rootThumbnailBlobUrl ? await getBlobUrlAsDataUri(rootThumbnailBlobUrl) : null;
 
-  // 7. Data Hash (c2pa.hash.data) の抽出
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 7. Data Hash の厳格な抽出 (RootLens Spec-Based Extraction)
+//
+// RootLensでは、デバイスごとの仕様定義 (hash-specs.ts) に基づき、
+// 決定論的（Deterministic）に originalHash を抽出します。
+// これにより、アサーションの順序や曖昧さに依存せず、常に一意のIDが保証されます。
+//
+// ※ 定義されていないデバイス（信頼リスト外）の場合、ハッシュは抽出されずエラーとなります。
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   let dataHash: string | null = null;
-  // AssertionAccessor の data プロパティからアサーションを取得
+  
   if (manifest.assertions && 'data' in manifest.assertions && Array.isArray(manifest.assertions.data)) {
-    const hashAssertion = manifest.assertions.data.find((a: any) => a.label === 'c2pa.hash.data');
-    if (hashAssertion) {
-      const rawData = hashAssertion.data as any;
-      // c2pa.hash.data の構造: { exclusions: [...], hash: [...], name: '...', pad: ... }
-      // hash プロパティが実際のハッシュ値（バイト列）
-      if (rawData && rawData.hash && (Array.isArray(rawData.hash) || rawData.hash instanceof Uint8Array)) {
-         dataHash = bytesToHex(rawData.hash);
+    const generatorName = manifest.claimGenerator || '';
+    
+    // 1. スペックのマッチング
+    let appliedSpec = DEVICE_HASH_SPECS.find(spec => {
+      if (spec.matcher instanceof RegExp) {
+        return spec.matcher.test(generatorName);
       }
+      return generatorName.includes(spec.matcher);
+    });
+
+    if (appliedSpec) {
+        console.log(`🔍 Applied Hash Spec: [${appliedSpec.vendor}] ${appliedSpec.description} (Target: ${appliedSpec.targetLabel})`);
+
+        // 2. 指定されたラベルのアサーションを検索
+        // find() は配列の先頭から検索するため、同名ラベルが複数ある場合は最初のアサーションが選ばれる。
+        // (通常、Part 0 やメインアセットが先頭に来るため、この挙動は仕様として許容する)
+        const hashAssertion = manifest.assertions.data.find((a: any) => a.label === appliedSpec!.targetLabel);
+
+        if (hashAssertion) {
+          const rawData = hashAssertion.data as any;
+          
+          // ハッシュバイト列の抽出
+          // パターンA: { hash: [...] } - 標準的
+          if (rawData?.hash && (Array.isArray(rawData.hash) || rawData.hash instanceof Uint8Array)) {
+             dataHash = bytesToHex(rawData.hash);
+          } 
+          // パターンB: { val: [...] } - 一部の実装
+          else if (rawData?.val && (Array.isArray(rawData.val) || rawData.val instanceof Uint8Array)) {
+             dataHash = bytesToHex(rawData.val);
+          }
+          // パターンC: データ自体が配列 - シンプルな構造
+          else if (Array.isArray(rawData) || rawData instanceof Uint8Array) {
+             dataHash = bytesToHex(rawData);
+          }
+
+          if (dataHash) {
+              console.log(`✅ Extracted Data Hash using spec [${appliedSpec.id}]:`, dataHash);
+          } else {
+              console.warn(`⚠️ Target assertion found (${appliedSpec.targetLabel}) but failed to extract bytes. Structure:`, rawData);
+          }
+        } else {
+            console.warn(`⚠️ Target assertion (${appliedSpec.targetLabel}) NOT found for spec [${appliedSpec.id}]. ClaimGenerator: ${generatorName}`);
+        }
+    } else {
+        console.warn(`⛔ No matching hash spec found for ClaimGenerator: "${generatorName}". This device is NOT trusted by RootLens.`);
     }
   }
 

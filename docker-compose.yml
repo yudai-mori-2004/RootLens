@@ -15,18 +15,6 @@ services:
       - /app/node_modules
       - /app/.next
 
-  # Worker (BullMQ処理) - Upstash Redisに接続
-  worker:
-    build: ./worker
-    env_file:
-      - .env.local
-    networks:
-      - rootlens-network
-    volumes:
-      - ./worker:/app
-      - /app/node_modules
-    restart: unless-stopped
-
 networks:
   rootlens-network:
     driver: bridge

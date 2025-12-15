@@ -170,6 +170,20 @@ export default function UploadPage() {
       const summary = await createManifestSummary(manifestStore, previewThumbnailUrl);
       setC2paSummary(summary);
 
+      // 2.5. C2PA検証ステータスの確認
+      if (!summary.validationStatus.isValid) {
+        const errorErrors = summary.validationStatus.errors.join(', ');
+        setValidationResult({
+          isValid: false,
+          rootSigner: null,
+          provenanceChain: [],
+          error: `ファイルの改ざんが検知されました (C2PA Validation Failed): ${errorErrors}`,
+        });
+        setIsProcessing(false);
+        setCurrentStep(3); // エラー表示のためStep 3へ
+        return;
+      }
+
       // 3. 検証ロジック
       const trustedIssuers = [
         'Sony Corporation',
@@ -237,13 +251,8 @@ export default function UploadPage() {
         originalHash = summary.activeManifest.dataHash;
         console.log('✅ Used C2PA Data Hash:', originalHash);
       } else {
-        // フォールバック: ファイル全体のハッシュ計算
-        const buffer = await file.arrayBuffer();
-        const originalHashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-        originalHash = Array.from(new Uint8Array(originalHashBuffer))
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join('');
-        console.warn('⚠️ C2PA Data Hash not found, using full file hash:', originalHash);
+        // フォールバック削除: エラーにする
+        throw new Error('C2PA Data Hash (Hard Binding) が見つかりません。このファイルはRootLensで検証できません。');
       }
 
       setHashes({ originalHash });
