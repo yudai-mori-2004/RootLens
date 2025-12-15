@@ -3,29 +3,33 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
+import { RedisOptions } from 'ioredis';
 
 if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// 1. URLに family=0 を埋め込む
-const redisUrl = new URL(process.env.REDIS_URL);
-redisUrl.searchParams.set('family', '0'); // Railway IPv6対応
-const finalRedisUrl = redisUrl.toString();
+// URLをパースして設定オブジェクトを作成
+const urlObj = new URL(process.env.REDIS_URL);
 
-// 2. IORedisインスタンス作成
-const connection = new IORedis(finalRedisUrl, {
+const redisConfig: RedisOptions = {
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default',
+  password: urlObj.password,
+  family: 0, // Railway IPv6対応
   maxRetriesPerRequest: null,
-  tls: finalRedisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+  tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
-    if (times > 3) return null; // 3回失敗したら諦める
+    if (times > 3) return null;
     return Math.min(times * 50, 2000);
   },
-});
+};
 
+// Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection, 
+  // 設定オブジェクトを直接渡す
+  connection: redisConfig,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
