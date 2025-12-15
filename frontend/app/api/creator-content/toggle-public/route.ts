@@ -49,15 +49,15 @@ export async function POST(req: NextRequest) {
 
     const { data: proof, error: fetchError } = await supabase
       .from('media_proofs')
-      .select('owner_wallet')
+      .select('owner_wallet, cnft_mint_address')
       .eq('id', mediaProofId)
       .single();
 
-    if (proofError || !proofData) {
+    if (fetchError || !proof) {
       return NextResponse.json({ error: 'Content not found' }, { status: 404 });
     }
 
-    const cnftMintAddress = proofData.cnft_mint_address;
+    const cnftMintAddress = proof.cnft_mint_address;
 
     // 所有しているcNFTの中に、このコンテンツのcNFTが含まれているか確認
     const ownsTargetCnft = ownedAssets.some((asset: any) => asset.id === cnftMintAddress);
