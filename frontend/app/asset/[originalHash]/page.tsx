@@ -152,6 +152,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
   const [showProvenanceModal, setShowProvenanceModal] = useState(false);
   const [showTechnicalModal, setShowTechnicalModal] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showArweaveDialog, setShowArweaveDialog] = useState(false);
+  const [showCnftDialog, setShowCnftDialog] = useState(false);
 
   // ヘルパー: 検証ステップを更新
   const updateStep = (stepId: string, status: VerificationStep['status'], message?: string) => {
@@ -510,9 +512,9 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           <div className="grid md:grid-cols-5 gap-0">
             
             {/* 左: 画像 (3/5) */}
-            <div className="md:col-span-3 bg-slate-900 relative min-h-[400px] flex items-center justify-center p-4">
+            <div className="md:col-span-3 bg-slate-900 relative min-h-[250px] sm:min-h-[280px] md:min-h-[300px] flex items-center justify-center p-2 sm:p-3 md:p-4">
               {proof.c2paData?.thumbnailUrl ? (
-                <div className="relative w-full h-full max-w-full max-h-[500px]">
+                <div className="relative w-full h-full max-w-full max-h-[280px] sm:max-h-[320px] md:max-h-[380px]">
                   <Image
                     src={proof.c2paData.thumbnailUrl}
                     alt="Content preview"
@@ -624,7 +626,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <p className="text-xs font-medium opacity-80 mb-0.5">
-                                        {isPurchased ? '購入済み' : 'コンテンツ価格'}
+                                        {isPurchased ? '購入済み' : '来歴情報付きコンテンツ価格'}
                                     </p>
                                     <div className="flex items-baseline gap-2">
                                         {proof.priceLamports === 0 ? (

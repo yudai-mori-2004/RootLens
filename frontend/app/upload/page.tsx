@@ -1020,7 +1020,7 @@ export default function UploadPage() {
             description="cNFTの発行が完了しました"
             showBack={false}
           >
-            <div className="flex flex-col items-center py-8">
+            <div className="flex flex-col items-center py-8 px-4">
               {/* 成功カード */}
               <div className="w-full max-w-md">
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden mb-8">
@@ -1028,7 +1028,7 @@ export default function UploadPage() {
                   <div className="h-1 bg-green-500" />
 
                   {/* コンテンツ */}
-                  <div className="p-8 text-center">
+                  <div className="p-4 sm:p-6 md:p-8 text-center">
                     {/* チェックマークアイコン */}
                     <div className="relative mb-6">
                       <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto border border-green-100">
@@ -1045,13 +1045,13 @@ export default function UploadPage() {
                     </p>
 
                     {/* URL表示 */}
-                    <div className="bg-slate-50 rounded-xl p-4 text-left border border-slate-200">
+                    <div className="bg-slate-50 rounded-xl p-3 sm:p-4 text-left border border-slate-200">
                       <div className="flex items-center gap-2 mb-2">
                         <Link className="w-3.5 h-3.5 text-slate-500" />
                         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Public URL</p>
                       </div>
-                      <div className="flex items-center justify-between gap-2 bg-white rounded-lg p-3 border border-slate-200 shadow-sm">
-                        <code className="text-xs text-indigo-600 font-mono truncate flex-1 font-semibold">
+                      <div className="flex items-center justify-between gap-2 bg-white rounded-lg p-2 sm:p-3 border border-slate-200 shadow-sm">
+                        <code className="text-xs text-indigo-600 font-mono truncate flex-1 font-semibold break-all">
                           {window.location.origin}/asset/{uploadResult.hash}
                         </code>
                         <Button
@@ -1100,7 +1100,7 @@ export default function UploadPage() {
 
         {/* アップロード進捗モーダル */}
         <Dialog open={showUploadProgressModal}>
-          <DialogContent className="max-w-md p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogContent className="w-[95vw] sm:w-[90vw] max-w-md p-0 overflow-hidden bg-transparent border-none shadow-none" showCloseButton={false}>
             <DialogHeader>
               <VisuallyHidden.Root>
                 <DialogTitle>アップロード進捗</DialogTitle>
