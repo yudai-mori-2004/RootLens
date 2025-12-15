@@ -5,6 +5,8 @@ import { createC2pa, C2pa, ManifestStore, Manifest } from 'c2pa';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
 import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
+import { searchArweaveTransactionsByHash } from '@/app/lib/irys-verification';
+import { checkSolanaAssetExists } from '@/app/lib/verification-helpers';
 import ProgressBar from '@/app/components/ProgressBar';
 import StepContainer from '@/app/components/StepContainer';
 import PrivacyWarning from '@/app/components/PrivacyWarning';
