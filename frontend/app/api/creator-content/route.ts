@@ -69,6 +69,17 @@ export async function GET(req: NextRequest) {
       };
     }
 
+    interface SupabaseCreatorContent {
+      id: string;
+      original_hash: string;
+      cnft_mint_address: string;
+      title: string | null;
+      description: string | null;
+      price_lamports: number;
+      owner_wallet: string;
+      is_public: boolean;
+    }
+
     const ownedAssets: HeliusAsset[] = heliusResponse.data.result.items;
 
     if (!ownedAssets || ownedAssets.length === 0) {
