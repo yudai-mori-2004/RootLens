@@ -1,97 +1,121 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Worker (The URL String Solution)
+// RootLens Ver4 - BullMQ Worker (Direct Serial Processing)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
-import { startServer } from './server';
 
-const redisUrlRaw = process.env.REDIS_URL;
+// Redis接続
+const redisUrl = process.env.REDIS_URL;
 
-if (!redisUrlRaw) {
+console.log('--- Redis Config Debug ---');
+console.log('REDIS_URL:', redisUrl ? 'Set (Hidden)' : 'Unset');
+if (redisUrl) {
+  const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
+  console.log('Host:', urlObj.hostname);
+  console.log('Port:', urlObj.port);
+  console.log('Username:', urlObj.username);
+  console.log('Password:', urlObj.password ? `***${urlObj.password.slice(-4)}` : 'MISSING');
+  console.log('Has @ symbol?', redisUrl.includes('@'));
+  console.log('Is Railway Public?', redisUrl.includes('rlwy.net'));
+  console.log('TLS Enabled?', redisUrl.includes('rlwy.net') ? 'YES' : 'NO');
+}
+console.log('--------------------------');
+
+if (!redisUrl) {
   console.error('❌ Redis configuration is missing. Set REDIS_URL.');
   process.exit(1);
 }
 
-// 1. URLオブジェクトを作成
-const urlObj = new URL(redisUrlRaw);
+// Railway Public URLはTLS必須、内部URLはTLS不要
+const useTLS = redisUrl.includes('rlwy.net');
+console.log(`🔧 Connecting to Redis with TLS: ${useTLS ? 'ENABLED' : 'DISABLED'}`);
 
-// 2. ホスト名をRailway内部DNS用 "redis" に書き換え
-if (urlObj.hostname.includes('railway.internal')) {
-  urlObj.hostname = 'redis';
-}
+// URL文字列から認証情報を抽出
+const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
 
-// 3. ユーザー名を空文字にする (これが成功の鍵)
-// これにより redis://:password@host... という形式になり、
-// ioredisはこれを「レガシー認証（パスワードのみ）」として正しく処理します
-urlObj.username = '';
+console.log('🔐 Decoded password length:', urlObj.password?.length || 0);
+console.log('🔐 Expected password length: 32');
 
-// 4. IPv6対応
-urlObj.searchParams.set('family', '0');
+// Redis接続オプション（BullMQのすべての接続で共有）
+const redisOptions = {
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default', // Redis 8.x ACL対応
+  password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined, // URLデコード
+  family: 0, // RailwayのIPv6対応：デュアルスタックルックアップを有効化
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false, // ★★★ 核心：INFOコマンドによるNOAUTHエラーを回避 ★★★
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
+};
 
-// 5. 最終的なURL文字列を生成
-const finalRedisUrl = urlObj.toString();
+console.log('🚀 RootLens Worker started...');
+console.log(`📡 Connecting to Redis via URL...`);
 
-console.log('--- Redis Connection Setup ---');
-// パスワード部分を隠してログ出力
-console.log(`📡 Connecting to: ${finalRedisUrl.replace(/:[^:@]*@/, ':****@')}`);
-
-// 6. 文字列を使ってインスタンス作成
-// オプションは最小限（URLにある情報が最優先されるため）
-const connection = new IORedis(finalRedisUrl, {
-  maxRetriesPerRequest: null, // BullMQ必須
-  // Public接続の場合のみTLS有効化
-  tls: redisUrlRaw.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
-});
-
-// --- 接続診断 ---
-connection.on('connect', () => console.log('✅ Redis: TCP Connection established'));
-connection.on('ready', () => console.log('✅ Redis: Ready & Authenticated'));
-connection.on('error', (err) => console.error('❌ Redis Error:', err.message));
-
-console.log('🚀 RootLens Worker starting...');
-
-// Worker作成
+// Worker作成（接続オプションを直接渡す）
 const worker = new Worker<MintJobData, MintJobResult>(
   'rootlens-mint-queue',
   async (job: Job<MintJobData>) => {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`📦 Processing job ${job.id}`);
-    
+    console.log(`   User: ${job.data.userWallet}`);
+    console.log(`   Hash: ${job.data.originalHash}`);
+    console.log(`${'='.repeat(60)}\n`);
+
     try {
+      // ★ ここから下は「完全に1人ずつ」実行される ★
       const result = await processMint(job.data, (progress) => {
         job.updateProgress(progress);
       });
-      console.log(`✅ Job ${job.id} completed!`);
+
+      console.log(`\n✅ Job ${job.id} completed successfully!`);
+      console.log(`   Arweave TX: ${result.arweaveTxId}`);
+      console.log(`   cNFT: ${result.cnftMintAddress}\n`);
+
       return result;
     } catch (error) {
-      console.error(`❌ Job ${job.id} failed:`, error);
+      console.error(`\n❌ Job ${job.id} failed:`, error);
       throw error;
     }
   },
   {
-    // URL文字列から生成されたインスタンスを渡す
-    // 文字列由来のインスタンスは duplicate() されても設定が堅牢に維持される
-    connection: connection,
-    concurrency: 1,
+    connection: redisOptions, // ★ 接続オプションを渡す（BullMQが内部で接続を作成）
+    concurrency: 1,  // ★★★ 最重要: 完全に1つずつ処理する設定 ★★★
   }
 );
 
 // イベントハンドラ
-worker.on('ready', () => console.log('✅ Worker is ready and waiting for jobs...'));
-worker.on('error', (err) => console.error('⚠️  Worker error:', err));
-worker.on('failed', (job, err) => console.error(`❌ Job ${job?.id} failed:`, err.message));
+worker.on('completed', (job, result) => {
+  console.log(`✅ Job ${job.id} completed!`, result);
+});
 
+worker.on('failed', (job, err) => {
+  console.error(`❌ Job ${job?.id} failed:`, err.message);
+});
+
+worker.on('error', (err) => {
+  console.error('⚠️  Worker error:', err);
+});
+
+worker.on('ready', () => {
+  console.log('✅ Worker is ready and waiting for jobs...');
+});
+
+// HTTPサーバー起動（ヘルスチェック & メトリクス）
+import { startServer } from './server';
 startServer();
 
-const gracefulShutdown = async (signal: string) => {
-  console.log(`\n🛑 ${signal} received, closing worker...`);
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 SIGTERM received, closing worker...');
   await worker.close();
-  await connection.quit();
   process.exit(0);
-};
+});
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGINT', async () => {
+  console.log('\n🛑 SIGINT received, closing worker...');
+  await worker.close();
+  process.exit(0);
+});

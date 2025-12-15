@@ -1,40 +1,54 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - Frontend Queue Config
+// RootLens Ver4 - BullMQ Queue Configuration (Frontend)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 
+// Redis接続設定 - REDIS_URLのみを使用
 if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-const urlObj = new URL(process.env.REDIS_URL);
+// Railway Public URLはTLS必須
+const useTLS = process.env.REDIS_URL.includes('rlwy.net');
 
-// Workerと同じロジック：ユーザー名削除とホスト名修正
-if (urlObj.hostname.includes('railway.internal')) {
-  urlObj.hostname = 'redis';
-}
-urlObj.username = ''; // ユーザー名削除
-urlObj.searchParams.set('family', '0');
+// URL文字列から認証情報を抽出
+const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
 
-const finalRedisUrl = urlObj.toString();
-
-const connection = new IORedis(finalRedisUrl, {
+// Redis接続オプション（BullMQのすべての接続で共有）
+const redisOptions = {
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default', // Redis 8.x ACL対応
+  password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined, // URLデコード
+  family: 0, // RailwayのIPv6対応：デュアルスタックルックアップを有効化
   maxRetriesPerRequest: null,
-  tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+  enableReadyCheck: false, // ★★★ 核心：INFOコマンドによるNOAUTHエラーを回避 ★★★
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
-    if (times > 5) return null;
+    if (times > 3) {
+      return null; // 3回失敗したら諦める
+    }
     return Math.min(times * 50, 2000);
   },
-});
+};
 
+// Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection,
+  connection: redisOptions,
   defaultJobOptions: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 2000 },
-    removeOnComplete: { age: 24 * 3600, count: 1000 },
-    removeOnFail: { age: 7 * 24 * 3600 },
+    attempts: 3,                    // 最大3回リトライ
+    backoff: {
+      type: 'exponential',          // 指数バックオフ
+      delay: 2000,                  // 初回2秒待ち
+    },
+    removeOnComplete: {
+      age: 24 * 3600,               // 完了後24時間で削除
+      count: 1000,                  // 最大1000件保持
+    },
+    removeOnFail: {
+      age: 7 * 24 * 3600,           // 失敗後7日間保持（調査用）
+    },
   },
 });
