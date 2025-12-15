@@ -266,7 +266,7 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   if (manifest.assertions && 'data' in manifest.assertions && Array.isArray(manifest.assertions.data)) {
     const hashAssertion = manifest.assertions.data.find((a: any) => a.label === 'c2pa.hash.data');
     if (hashAssertion) {
-      const rawData = hashAssertion.data;
+      const rawData = hashAssertion.data as any;
       // c2pa.hash.data の構造: { exclusions: [...], hash: [...], name: '...', pad: ... }
       // hash プロパティが実際のハッシュ値（バイト列）
       if (rawData && rawData.hash && (Array.isArray(rawData.hash) || rawData.hash instanceof Uint8Array)) {
