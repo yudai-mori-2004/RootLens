@@ -20,6 +20,7 @@ const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
 const connectionOptions = {
   host: urlObj.hostname,
   port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default',
   password: urlObj.password,
   family: 0, // IPv6/IPv4デュアルスタック対応
   maxRetriesPerRequest: null,

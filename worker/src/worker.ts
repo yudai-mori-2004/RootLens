@@ -43,6 +43,7 @@ console.log('🔐 Expected password length: 32');
 const connectionOptions = {
   host: urlObj.hostname,
   port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default',
   password: urlObj.password,
   family: 0, // IPv6/IPv4デュアルスタック対応
   maxRetriesPerRequest: null,
