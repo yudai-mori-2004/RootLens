@@ -1,9 +1,9 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Worker (Railway Short-Name Fix)
+// RootLens Ver4 - BullMQ Worker (The Final Combination)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Worker, Job } from 'bullmq';
-import IORedis, { RedisOptions } from 'ioredis';
+import IORedis from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
 import { startServer } from './server';
@@ -15,58 +15,60 @@ if (!redisUrlRaw) {
   process.exit(1);
 }
 
-// URLをパース
+// 1. URLをパース
 const urlObj = new URL(redisUrlRaw);
 
-// ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-// 【修正の核心】Railway推奨の「短縮ホスト名」を使用する
-// redis.railway.internal (FQDN) はNode.jsのIPv6解決で不安定になるため
-// 内部DNS名である "redis" を強制的に使用します。
-// ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-
+// 2. ホスト名をRailway内部DNS用 "redis" に書き換え (DNS安定化)
 const isRailwayInternal = urlObj.hostname.includes('railway.internal');
-const useTLS = redisUrlRaw.includes('rlwy.net');
+if (isRailwayInternal) {
+  urlObj.hostname = 'redis';
+}
 
-const redisConfig: RedisOptions = {
-  // 1. ホスト名の強制書き換え
-  // Railway内部なら "redis"、外部(Public)なら元のまま
-  host: isRailwayInternal ? 'redis' : urlObj.hostname,
-  
-  port: parseInt(urlObj.port || '6379'),
-  
-  // 2. usernameを削除 (Legacy AUTHへのフォールバック)
-  // 'default' を明示するとduplicate時に問題が起きることがあるため削除
-  // username: urlObj.username || 'default', 
-  
-  password: urlObj.password,
-  
-  // 3. IPv6対応
-  family: 0, 
-  
-  maxRetriesPerRequest: null,
-  tls: useTLS ? { rejectUnauthorized: false } : undefined,
-};
+// 3. ユーザー名を "default" に強制 (Redis 6+ ACL対応)
+if (!urlObj.username) {
+  urlObj.username = 'default';
+}
+
+// 4. クエリパラメータに family=0 を追加 (IPv6対応)
+urlObj.searchParams.set('family', '0');
+
+// 5. 文字列として再構築 (duplicate時の設定維持のため)
+const finalRedisUrl = urlObj.toString();
 
 console.log('--- Redis Connection Setup ---');
-console.log(`📡 Connecting to: ${redisConfig.host}:${redisConfig.port}`);
-console.log(`🔑 Auth: Password=${redisConfig.password ? 'YES (****)' : 'NO'}`);
-console.log(`🌍 Family: ${redisConfig.family}`);
+// パスワードを隠してログ出力
+console.log(`📡 Connecting to: ${finalRedisUrl.replace(/:[^:@]*@/, ':****@')}`);
 
-// --- 接続診断 ---
-const diagnosticConnection = new IORedis(redisConfig);
+// 6. メイン接続の作成
+const connection = new IORedis(finalRedisUrl, {
+  maxRetriesPerRequest: null,
+  tls: redisUrlRaw.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+});
 
-diagnosticConnection.on('connect', () => console.log('✅ Diagnostic Redis: TCP Connection established'));
-diagnosticConnection.on('ready', () => console.log('✅ Diagnostic Redis: Ready & Authenticated'));
-diagnosticConnection.on('error', (err) => console.error('❌ Diagnostic Redis Error:', err.message));
+// --- 徹底的な診断ブロック ---
+connection.on('error', (err) => console.error('❌ Main Redis Error:', err.message));
 
 (async () => {
   try {
-    console.log('🔍 Testing Redis Authentication...');
-    const pong = await diagnosticConnection.ping();
-    console.log(`✅ Authentication Test Passed: ${pong}`);
-    await diagnosticConnection.quit();
+    console.log('🔍 Testing Main Connection...');
+    await connection.ping();
+    console.log('✅ Main Connection: PONG');
+
+    console.log('🔍 Testing Duplication (BullMQ Simulation)...');
+    // BullMQが内部で行うのと同じ "duplicate" をテスト
+    const dupConnection = connection.duplicate();
+    
+    // 複製接続のエラーも捕捉
+    dupConnection.on('error', (err) => console.error('❌ Duplicate Redis Error:', err.message));
+    
+    await dupConnection.connect();
+    const dupPong = await dupConnection.ping();
+    console.log(`✅ Duplicate Connection: ${dupPong} (Auth inherited successfully)`);
+    await dupConnection.quit();
+
   } catch (error) {
-    console.error('🚨 Authentication Failed Details:', error);
+    console.error('🚨 Redis Diagnosis Failed:', error);
+    process.exit(1); // 接続できないなら即死させる
   }
 })();
 // ----------------
@@ -92,8 +94,9 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    // 設定オブジェクトを渡す（BullMQがこれを使って接続を作成）
-    connection: redisConfig,
+    // URL文字列で初期化したインスタンスを渡す
+    // これにより duplicate() されても URL (redis://default:pass@redis...) が維持される
+    connection: connection,
     concurrency: 1,
   }
 );
@@ -108,6 +111,7 @@ startServer();
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 ${signal} received, closing worker...`);
   await worker.close();
+  await connection.quit();
   process.exit(0);
 };
 
