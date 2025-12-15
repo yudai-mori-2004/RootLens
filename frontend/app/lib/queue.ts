@@ -9,37 +9,35 @@ if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// URL文字列から認証情報を抽出
-const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
-const useTLS = process.env.REDIS_URL.includes('rlwy.net');
+// 1. URLに family=0 を埋め込む
+const redisUrl = new URL(process.env.REDIS_URL);
+redisUrl.searchParams.set('family', '0'); // Railway IPv6対応
+const finalRedisUrl = redisUrl.toString();
 
-// ■ 接続オプションオブジェクトを作成
-const connectionOptions = {
-  host: urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  username: urlObj.username || 'default',
-  password: urlObj.password,
-  family: 0, // Railway IPv6対応
+// 2. IORedisインスタンス作成
+const connection = new IORedis(finalRedisUrl, {
   maxRetriesPerRequest: null,
-  tls: useTLS ? { rejectUnauthorized: false } : undefined,
-};
+  tls: finalRedisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+  retryStrategy: (times: number) => {
+    if (times > 3) return null; // 3回失敗したら諦める
+    return Math.min(times * 50, 2000);
+  },
+});
 
-// Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection: connectionOptions, // インスタンスを渡す
-
+  connection, 
   defaultJobOptions: {
-    attempts: 3,                    // 最大3回リトライ
+    attempts: 3,
     backoff: {
-      type: 'exponential',          // 指数バックオフ
-      delay: 2000,                  // 初回2秒待ち
+      type: 'exponential',
+      delay: 2000,
     },
     removeOnComplete: {
-      age: 24 * 3600,               // 完了後24時間で削除
-      count: 1000,                  // 最大1000件保持
+      age: 24 * 3600,
+      count: 1000,
     },
     removeOnFail: {
-      age: 7 * 24 * 3600,           // 失敗後7日間保持（調査用）
+      age: 7 * 24 * 3600,
     },
   },
 });
