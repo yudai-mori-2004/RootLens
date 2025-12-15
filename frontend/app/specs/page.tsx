@@ -27,8 +27,8 @@ export default function SpecsPage() {
                   デバイス別ハッシュ抽出ルール
                 </h5>
                 <p className="text-sm text-slate-500 mt-1">
-                  以下の表は、特定の `claimGenerator`（コンテンツ生成元デバイスやソフトウェア）を識別した場合に適用されるルールを示します。
-                  これにより、常に同じデバイスから同じコンテンツIDが生成されます。
+                  以下の表は、特定の `Issuer`（署名発行者）を識別した場合に適用されるルールを示します。
+                  これにより、常に同じ署名元から同じコンテンツIDが生成されます。
                 </p>
               </div>
               <div className="p-0"> {/* テーブルを直接p-0で囲むことで余計なpaddingをなくす */}
@@ -39,7 +39,7 @@ export default function SpecsPage() {
                         ベンダー
                       </TableHead>
                       <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Claim Generator (Matcher)
+                        Issuer (Matcher)
                       </TableHead>
                       <TableHead className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         採用ハッシュラベル

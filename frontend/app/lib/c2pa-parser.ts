@@ -273,14 +273,14 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   let dataHash: string | null = null;
   
   if (manifest.assertions && 'data' in manifest.assertions && Array.isArray(manifest.assertions.data)) {
-    const generatorName = manifest.claimGenerator || '';
+    const issuerName = manifest.signatureInfo?.issuer || '';
     
-    // 1. スペックのマッチング
+    // 1. スペックのマッチング (Issuerベース)
     let appliedSpec = DEVICE_HASH_SPECS.find(spec => {
       if (spec.matcher instanceof RegExp) {
-        return spec.matcher.test(generatorName);
+        return spec.matcher.test(issuerName);
       }
-      return generatorName.includes(spec.matcher);
+      return issuerName.includes(spec.matcher);
     });
 
     if (appliedSpec) {
@@ -288,7 +288,6 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
 
         // 2. 指定されたラベルのアサーションを検索
         // find() は配列の先頭から検索するため、同名ラベルが複数ある場合は最初のアサーションが選ばれる。
-        // (通常、Part 0 やメインアセットが先頭に来るため、この挙動は仕様として許容する)
         const hashAssertion = manifest.assertions.data.find((a: any) => a.label === appliedSpec!.targetLabel);
 
         if (hashAssertion) {
@@ -314,10 +313,10 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
               console.warn(`⚠️ Target assertion found (${appliedSpec.targetLabel}) but failed to extract bytes. Structure:`, rawData);
           }
         } else {
-            console.warn(`⚠️ Target assertion (${appliedSpec.targetLabel}) NOT found for spec [${appliedSpec.id}]. ClaimGenerator: ${generatorName}`);
+            console.warn(`⚠️ Target assertion (${appliedSpec.targetLabel}) NOT found for spec [${appliedSpec.id}]. Issuer: ${issuerName}`);
         }
     } else {
-        console.warn(`⛔ No matching hash spec found for ClaimGenerator: "${generatorName}". This device is NOT trusted by RootLens.`);
+        console.warn(`⛔ No matching hash spec found for Issuer: "${issuerName}". This issuer is NOT trusted for hash extraction by RootLens.`);
     }
   }
 

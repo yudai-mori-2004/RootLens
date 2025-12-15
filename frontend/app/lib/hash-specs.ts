@@ -4,24 +4,32 @@
 // どのアサーションを「コンテンツ固有のID (originalHash)」として採用するかを定義する仕様書です。
 //
 // RootLensは、この定義に基づいて決定論的（Deterministic）にハッシュを抽出します。
-// これにより、アサーションの順序入れ替えなどの影響を受けず、常に一意のIDが生成されます。
+//
+// マッチング基準:
+// 以前は `claimGenerator` (ツール名) を使用していましたが、
+// より信頼性の高い `signatureInfo.issuer` (署名発行者) を基準に変更しました。
 
 export interface DeviceHashSpec {
   id: string;
   vendor: string;
-  matcher: string | RegExp; // claimGenerator (User Agent) に含まれる文字列または正規表現
+  matcher: string | RegExp; // signatureInfo.issuer に含まれる文字列または正規表現
   targetLabel: string;      // 採用するアサーションのラベル (完全一致)
   description: string;
 }
 
 export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
+  // Google (Pixel)
   {
     id: 'google-pixel',
     vendor: 'Google',
-    matcher: /Google|Pixel/i,
+    matcher: 'Google LLC', // 完全一致または部分一致
     targetLabel: 'c2pa.hash.data.part',
-    description: 'PixelシリーズなどのGoogleデバイスは、部分ハッシュ(c2pa.hash.data.part)を主要な識別子として使用します。',
+    description: 'Googleデバイス(Pixel等)の署名は、部分ハッシュ(c2pa.hash.data.part)を主要な識別子として使用します。',
   },
+  
+  // 以下は動作確認が取れ次第、順次有効化します。
+  // 現時点では正確なIssuer名とハッシュ構造が未確認のため、安全のため無効化しています。
+  /*
   {
     id: 'sony-camera',
     vendor: 'Sony',
@@ -64,6 +72,7 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
     targetLabel: 'c2pa.hash.data',
     description: 'Truepic署名済みコンテンツは、標準のデータハッシュを使用します。',
   }
+  */
 ];
 
 // ルールにマッチしなかった場合は非対応（エラー）となります。

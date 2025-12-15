@@ -257,6 +257,20 @@ export default function UploadPage() {
 
       setHashes({ originalHash });
 
+      // プレビュー画像の生成
+      try {
+        // resizeImageを使ってブラウザ表示用の軽量なDataURIを生成
+        const resizedBlob = await resizeImage(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+             setPreviewThumbnailDataUri(reader.result as string);
+        };
+        reader.readAsDataURL(resizedBlob);
+      } catch (e) {
+        console.warn('プレビュー生成失敗:', e);
+        // 失敗しても致命的ではないので続行
+      }
+
       // 5. 重複チェック（既存の証明が存在しないか確認）
       console.log('🔍 重複チェック開始:', originalHash);
       try {
