@@ -5,12 +5,13 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 
-// Redis接続設定
-const connection = new IORedis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: Number(process.env.REDIS_PORT) || 6379,
+// Redis接続設定 - REDIS_URLのみを使用
+if (!process.env.REDIS_URL) {
+  throw new Error('REDIS_URL environment variable is not set');
+}
+
+const connection = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
-  // 開発環境ではリトライを無効化してすぐにエラーを検知
   retryStrategy: (times: number) => {
     if (times > 3) {
       return null; // 3回失敗したら諦める
