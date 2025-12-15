@@ -33,7 +33,7 @@ export default function EditAssetModal({
   const [title, setTitle] = useState(currentTitle);
   const [description, setDescription] = useState(currentDescription);
   // 表示用はSOL単位、保存用はLamports
-  const [priceSol, setPriceSol] = useState(currentPriceLamports / 1_000_000_000);
+  const [priceSol, setPriceSol] = useState((currentPriceLamports / 1_000_000_000).toString());
   const [isSaving, setIsSaving] = useState(false);
 
   // モーダルが開くたびに初期値をセット
@@ -41,14 +41,15 @@ export default function EditAssetModal({
     if (isOpen) {
       setTitle(currentTitle);
       setDescription(currentDescription || '');
-      setPriceSol(currentPriceLamports / 1_000_000_000);
+      setPriceSol((currentPriceLamports / 1_000_000_000).toString());
     }
   }, [isOpen, currentTitle, currentDescription, currentPriceLamports]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const priceLamports = Math.floor(priceSol * 1_000_000_000);
+      const priceVal = parseFloat(priceSol);
+      const priceLamports = Math.floor((isNaN(priceVal) ? 0 : priceVal) * 1_000_000_000);
 
       const response = await fetch('/api/creator-content/update', {
         method: 'POST',
@@ -136,11 +137,24 @@ export default function EditAssetModal({
             <div className="relative">
               <Input
                 id="price"
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={priceSol}
-                onChange={(e) => setPriceSol(parseFloat(e.target.value))}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    // 数字とドットのみ許可
+                    if (/^\d*\.?\d*$/.test(val)) {
+                        setPriceSol(val);
+                    }
+                }}
+                onBlur={() => {
+                    if (priceSol === '' || priceSol === '.') {
+                        setPriceSol('0');
+                    } else {
+                        // 不要な0などを整理
+                        setPriceSol(parseFloat(priceSol).toString());
+                    }
+                }}
                 className="pl-4 pr-12 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 font-mono"
               />
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">

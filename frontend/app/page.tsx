@@ -11,7 +11,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { Check, X, Shield, Coins, Search, Camera, Lock, ArrowRight, ExternalLink } from 'lucide-react';
+import { Check, X, Shield, Coins, Search, Camera, Lock, ArrowRight, ExternalLink, X as XIcon } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -396,10 +396,13 @@ export default function Home() {
                 <span className="font-semibold text-slate-700">RootLens</span>
               </div>
               <div className="flex gap-8 text-sm text-slate-500">
-                <a href="#" className="hover:text-blue-600 transition-colors">Privacy Policy</a>
-                <a href="#" className="hover:text-blue-600 transition-colors">Terms of Service</a>
-                <a href="#" className="hover:text-blue-600 transition-colors flex items-center gap-1">
+                <Link href="/privacy-policy" className="hover:text-blue-600 transition-colors">Privacy Policy</Link>
+                <Link href="/terms" className="hover:text-blue-600 transition-colors">Terms of Service</Link>
+                <a href="https://github.com/yudai-mori-2004/RootLens" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors flex items-center gap-1">
                   GitHub <ExternalLink className="w-3 h-3" />
+                </a>
+                <a href="https://x.com/RootLens_sol" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors flex items-center gap-1">
+                  X <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
             </div>

@@ -28,20 +28,29 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 2. R2パス決定
+    // 2. R2パス決定 & バケット選択
     let key: string;
+    let bucket: string = process.env.R2_BUCKET_NAME!;
+
     if (file_type === 'manifest') {
+      // ManifestはPublic Bucket
+      bucket = process.env.R2_PUBLIC_BUCKET_NAME!;
       key = `media/${original_hash}/manifest.json`;
+    } else if (file_type === 'thumbnail') {
+      // サムネイルはPublic Bucket
+      bucket = process.env.R2_PUBLIC_BUCKET_NAME!;
+      key = `media/${original_hash}/thumbnail.jpg`;
     } else {
+      // オリジナルファイルはPrivate Bucket
       const extension = getExtensionFromContentType(content_type);
       key = `media/${original_hash}/original.${extension}`;
     }
 
-    console.log('📝 Presigned URL発行:', key);
+    console.log('📝 Presigned URL発行:', key, 'Bucket:', bucket);
 
     // 3. Presigned URL生成（アップロード用）
     const command = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
+      Bucket: bucket,
       Key: key,
       ContentType: content_type,
     });

@@ -62,6 +62,7 @@ export default function UploadPage() {
 
   // 価格設定
   const [price, setPrice] = useState<number>(0);
+  const [priceStr, setPriceStr] = useState('0');
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
 
@@ -106,6 +107,21 @@ export default function UploadPage() {
       setHasAutoAdvanced(false);
     }
   }, [authenticated, currentStep, hasAutoAdvanced]);
+
+  // 検証結果に応じてタイトルと説明を自動設定
+  useEffect(() => {
+    if (validationResult?.isValid && c2paSummary?.activeManifest && validationResult.rootSigner) {
+      const manifestTitle = c2paSummary.activeManifest.title || currentFile?.name.split('.')[0] || '';
+      setTitle(manifestTitle);
+
+      const rootSignerText = validationResult.rootSigner;
+      setDescription(`${rootSignerText}`);
+    } else {
+      // 無効になった場合や初期状態に戻す場合
+      setTitle('');
+      setDescription('');
+    }
+  }, [validationResult, c2paSummary, currentFile]);
 
   const handleLogin = async () => {
     try {
@@ -443,20 +459,59 @@ export default function UploadPage() {
       // 3. サムネイルとManifestをPublic Bucketにアップロード
       setUploadProgressStep(3);
       setUploadStatusMessage('3/4: 証明データを保存しています...');
+      
+      // 3-1. サムネイル生成 & 直接アップロード (Presigned URL)
+      const thumbnailBlob = await resizeImage(currentFile);
+      
+      // サムネイル用Presigned URL取得
+      const presignedThumbResponse = await fetch('/api/upload/presigned', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          original_hash: hashes.originalHash,
+          file_type: 'thumbnail',
+          content_type: 'image/jpeg',
+        }),
+      });
+
+      if (!presignedThumbResponse.ok) {
+        throw new Error('サムネイル用URL取得失敗');
+      }
+
+      const { presigned_url: thumbUrl } = await presignedThumbResponse.json();
+
+      // R2へ直接アップロード
+      const uploadThumbResponse = await fetch(thumbUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: thumbnailBlob,
+      });
+
+      if (!uploadThumbResponse.ok) {
+        console.warn('サムネイルアップロード失敗（続行します）');
+      }
+
+      // 3-2. Manifest生成
       let summaryData = c2paSummary;
+      // サムネイルURLはPublic URLを推定して設定
+      const publicThumbnailUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_BUCKET_URL}/media/${hashes.originalHash}/thumbnail.jpg`;
+      
       if (!summaryData) {
         const result = await c2pa!.read(currentFile);
         const manifestStore = result.manifestStore;
-        const thumbnail = (result as any).thumbnail;
-        summaryData = await createManifestSummary(manifestStore, thumbnail?.getUrl().url || null);
+        summaryData = await createManifestSummary(manifestStore, publicThumbnailUrl);
+      } else {
+        // 既存のsummaryDataのthumbnailUrlを更新
+        summaryData = { ...summaryData, thumbnailUrl: publicThumbnailUrl };
       }
 
+      // 3-3. ManifestをPublic Bucketにアップロード (API経由)
       const publicUploadResponse = await fetch('/api/upload/public', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           original_hash: hashes.originalHash,
-          thumbnail_data_uri: summaryData.thumbnailUrl,
+          thumbnail_data_uri: null, // 直接アップロードしたのでnull
           manifest_data: summaryData,
         }),
       });
@@ -484,7 +539,7 @@ export default function UploadPage() {
           rootCertChain: rootCertChain,
           mediaFilePath: `media/${hashes.originalHash}/original.${getExtension(currentFile.type)}`,
           thumbnailPublicUrl: publicUploadResult.thumbnail_url,
-          price: Math.floor(price * 1e9),
+          price: Math.floor(parseFloat(priceStr || '0') * 1e9),
           title: title || undefined,
           description: description || undefined,
           mediaProofId: mediaProofId,
@@ -894,11 +949,26 @@ export default function UploadPage() {
                     <div className="relative">
                       <Input
                         id="price"
-                        type="number"
-                        value={price}
-                        onChange={(e) => setPrice(Number(e.target.value))}
-                        min="0"
-                        step="0.1"
+                        type="text"
+                        inputMode="decimal"
+                        value={priceStr}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^\d*\.?\d*$/.test(val)) {
+                                setPriceStr(val);
+                                setPrice(parseFloat(val) || 0);
+                            }
+                        }}
+                        onBlur={() => {
+                            if (priceStr === '' || priceStr === '.') {
+                                setPriceStr('0');
+                                setPrice(0);
+                            } else {
+                                const val = parseFloat(priceStr);
+                                setPriceStr(val.toString());
+                                setPrice(val);
+                            }
+                        }}
                         className="pl-4 pr-16 focus-visible:ring-indigo-500 focus-visible:border-indigo-500 border-gray-300 font-mono text-lg rounded-lg transition-all"
                       />
                       <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
