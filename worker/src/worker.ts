@@ -1,9 +1,9 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Worker (Config Object Fix)
+// RootLens Ver4 - BullMQ Worker (Final URL String Fix)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Worker, Job } from 'bullmq';
-import IORedis, { RedisOptions } from 'ioredis';
+import IORedis from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
 import { startServer } from './server';
@@ -15,42 +15,41 @@ if (!redisUrlRaw) {
   process.exit(1);
 }
 
-// 1. URLをパースして設定オブジェクトを作成
-const urlObj = new URL(redisUrlRaw);
+// ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+// 【修正の核心】手動パースをやめ、URL文字列を直接加工する
+// これにより、ioredisは複製(duplicate)時もこのURLを使い回すため
+// パスワードや設定が脱落することがなくなる
+// ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
 
-// BullMQに渡すための「純粋な設定オブジェクト」を作成
-// これにより、BullMQが作成する全ての接続（Main, Blocking, Subscriber）で
-// 確実にこの設定が使われます。duplicate()の挙動に依存しません。
-const redisConfig: RedisOptions = {
-  host: urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  username: urlObj.username || 'default',
-  password: urlObj.password,
-  family: 0, // Railway IPv6対応
-  maxRetriesPerRequest: null, // BullMQの必須要件
-  // TLS設定: Public URLの場合のみ有効化
-  tls: redisUrlRaw.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
-};
+// 1. URLオブジェクト化してパラメータを安全に追加
+const redisUrl = new URL(redisUrlRaw);
+redisUrl.searchParams.set('family', '0'); // Railway IPv6必須設定
+
+// 2. 文字列に戻す (例: redis://:pass@host:6379?family=0)
+// この文字列の中に全ての認証情報が含まれている
+const finalRedisUrl = redisUrl.toString();
 
 console.log('--- Redis Connection Setup ---');
-// パスワードを隠してログ出力
-console.log(`📡 Connecting to: ${urlObj.hostname}:${urlObj.port}`);
-console.log(`🔑 Auth: User=${redisConfig.username}, Pass=${redisConfig.password ? '****' : 'NONE'}`);
+// ログにはパスワードを隠して表示
+console.log(`📡 Connecting to: ${finalRedisUrl.replace(/:[^:@]*@/, ':****@')}`);
 
-// --- 接続診断（設定オブジェクトが正しいか確認） ---
-const diagnosticConnection = new IORedis(redisConfig);
+// 3. IORedisインスタンスを作成（設定オブジェクトではなく、URL文字列を渡す！）
+// TLSが必要な場合(Public接続)のみ、第2引数で補足する
+const connection = new IORedis(finalRedisUrl, {
+  maxRetriesPerRequest: null, // BullMQ必須
+  tls: finalRedisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+});
 
-diagnosticConnection.on('connect', () => console.log('✅ Diagnostic Redis: TCP Connection established'));
-diagnosticConnection.on('ready', () => console.log('✅ Diagnostic Redis: Ready & Authenticated'));
-diagnosticConnection.on('error', (err) => console.error('❌ Diagnostic Redis Error:', err.message));
+// --- 接続診断 ---
+connection.on('connect', () => console.log('✅ Redis: TCP Connection established'));
+connection.on('ready', () => console.log('✅ Redis: Ready & Authenticated'));
+connection.on('error', (err) => console.error('❌ Redis Error:', err.message));
 
 (async () => {
   try {
     console.log('🔍 Testing Redis Authentication...');
-    const pong = await diagnosticConnection.ping();
+    const pong = await connection.ping();
     console.log(`✅ Authentication Test Passed: ${pong}`);
-    // 診断用接続は閉じる（リソース節約）
-    await diagnosticConnection.quit();
   } catch (error) {
     console.error('🚨 Authentication Failed Details:', error);
   }
@@ -78,9 +77,9 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    // ★重要★ インスタンスではなく「設定オブジェクト」を渡す
-    // BullMQはこれを使って必要な数だけ接続を新規作成します
-    connection: redisConfig,
+    // ★重要★ URL文字列から作ったインスタンスを渡す
+    // ioredisはURL由来のインスタンスを複製する際、URL情報を完全に維持する
+    connection: connection,
     concurrency: 1,
   }
 );
@@ -90,13 +89,12 @@ worker.on('ready', () => console.log('✅ Worker is ready and waiting for jobs..
 worker.on('error', (err) => console.error('⚠️  Worker error:', err));
 worker.on('failed', (job, err) => console.error(`❌ Job ${job?.id} failed:`, err.message));
 
-// サーバー起動
 startServer();
 
-// Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 ${signal} received, closing worker...`);
   await worker.close();
+  await connection.quit();
   process.exit(0);
 };
 
