@@ -66,6 +66,10 @@ worker.on('ready', () => {
   console.log('✅ Worker is ready and waiting for jobs...');
 });
 
+// HTTPサーバー起動（ヘルスチェック & メトリクス）
+import { startServer } from './server';
+startServer();
+
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('\n🛑 SIGTERM received, closing worker...');
