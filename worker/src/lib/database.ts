@@ -25,6 +25,34 @@ function getSupabase(): SupabaseClient {
 }
 
 /**
+ * 既存の証明データが存在するかチェック
+ *
+ * @returns 既存データが存在する場合は true
+ */
+export async function checkExistingProof(originalHash: string): Promise<boolean> {
+  const supabase = getSupabase();
+
+  const { data, error } = await supabase
+    .from('media_proofs')
+    .select('id, cnft_mint_address')
+    .eq('original_hash', originalHash)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('⚠️ Error checking existing proof:', error);
+    return false; // エラー時は続行を許可
+  }
+
+  if (data) {
+    console.log(`   Found existing proof: ${data.cnft_mint_address}`);
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * 証明データをデータベースに保存（最小限設計）
  *
  * 設計思想: すべての証明データはArweaveに保存。

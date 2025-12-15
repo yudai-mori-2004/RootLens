@@ -23,6 +23,23 @@ export async function processMint(
   onProgress: (progress: number) => void
 ): Promise<MintJobResult> {
   try {
+    // === 0. 重複チェック（最終確認） ===
+    onProgress(5);
+    console.log('🔍 Step 0: Checking for duplicate proof...');
+
+    const { checkExistingProof } = await import('./lib/database');
+    const exists = await checkExistingProof(data.originalHash);
+
+    if (exists) {
+      console.error('❌ Duplicate proof detected! Aborting mint process.');
+      return {
+        success: false,
+        error: 'このファイルは既に証明が発行されています。',
+      };
+    }
+
+    console.log('✅ No duplicate found - proceeding with mint');
+
     // === 1. 次のcNFTアドレスを予測（mint直前に再取得） ===
     onProgress(15);
     console.log('🔮 Step 1: Predicting next cNFT Asset ID (just before mint)...');

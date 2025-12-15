@@ -218,6 +218,41 @@ export default function UploadPage() {
 
       setHashes({ originalHash });
 
+      // 5. 重複チェック（既存の証明が存在しないか確認）
+      console.log('🔍 重複チェック開始:', originalHash);
+      try {
+        const existingProofs = await searchArweaveTransactionsByHash(originalHash);
+
+        if (existingProofs.length > 0) {
+          // Solanaチェーン上でcNFTが存在するか確認
+          let hasValidProof = false;
+          for (const proof of existingProofs) {
+            const cnftExists = await checkSolanaAssetExists(proof.targetAssetId);
+            if (cnftExists) {
+              hasValidProof = true;
+              console.log('❌ 既存の証明が見つかりました:', proof.targetAssetId);
+              break;
+            }
+          }
+
+          if (hasValidProof) {
+            setValidationResult({
+              isValid: false,
+              rootSigner: null,
+              provenanceChain: [],
+              error: `このファイルは既に証明が発行されています。証明書ページをご確認ください： /asset/${originalHash}`,
+            });
+            setCurrentStep(3);
+            setIsProcessing(false);
+            return;
+          }
+        }
+        console.log('✅ 重複なし - アップロード可能');
+      } catch (err) {
+        console.warn('⚠️ 重複チェックでエラー（続行）:', err);
+        // エラーが発生しても続行（ネットワークエラー等を考慮）
+      }
+
       // ステップ3へ
       setCurrentStep(3);
 
