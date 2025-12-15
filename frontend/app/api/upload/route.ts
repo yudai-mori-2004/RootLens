@@ -1,9 +1,8 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - Upload API (Job Submission)
+// RootLens Ver5 - Upload API (Proxy to Railway Worker)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { NextRequest, NextResponse } from 'next/server';
-import { mintQueue } from '@/app/lib/queue';
 import type { MintJobData } from '@shared/types';
 
 interface UploadRequest {
@@ -54,27 +53,32 @@ export async function POST(request: NextRequest) {
       mediaProofId: body.mediaProofId,
     };
 
-    // 2. ジョブをキューに追加
-    const job = await mintQueue.add('mint-nft', jobData, {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
+    // 2. Railway WorkerのAPIを呼び出す
+    const workerUrl = process.env.WORKER_URL || 'http://localhost:8080';
+    console.log(`🔄 Forwarding to Worker: ${workerUrl}/api/upload`);
+
+    const response = await fetch(`${workerUrl}/api/upload`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(jobData),
     });
 
-    console.log(`✅ Job ${job.id} added to queue`);
+    if (!response.ok) {
+      throw new Error(`Worker returned ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`✅ Worker response:`, result);
 
     // 3. レスポンス
-    return NextResponse.json({
-      success: true,
-      jobId: job.id,
-      message: '処理を開始しました。完了までお待ちください。',
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error('❌ Upload API error:', error);
     return NextResponse.json(
       {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }

@@ -5,18 +5,38 @@
 import express from 'express';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
+import type { MintJobData } from '../../shared/types';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+app.use(express.json()); // JSON body parser
 
-// Redis接続（メトリクス取得用）
-const connection = new IORedis({
-  host: process.env.REDIS_HOST || 'redis',
-  port: Number(process.env.REDIS_PORT) || 6379,
-  maxRetriesPerRequest: null,
-});
+const PORT = process.env.PORT || 8080;
 
-// Queue参照（メトリクス取得用）
+// Redis接続（Railway内部ネットワーク - パスワードなしで試す）
+const redisUrl = process.env.REDIS_URL;
+let connection: IORedis;
+
+if (redisUrl) {
+  const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
+  connection = new IORedis({
+    host: urlObj.hostname,
+    port: parseInt(urlObj.port || '6379'),
+    password: urlObj.password,
+    family: 0,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+} else {
+  connection = new IORedis({
+    host: 'redis.railway.internal',
+    port: 6379,
+    family: 0,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+}
+
+// Queue参照
 const queue = new Queue('rootlens-mint-queue', { connection });
 
 // ヘルスチェック
@@ -55,6 +75,74 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
+// ジョブ投入エンドポイント（Vercelから呼ばれる）
+app.post('/api/upload', async (req, res) => {
+  try {
+    const jobData: MintJobData = req.body;
+
+    console.log('📤 Received upload request from Vercel');
+    console.log(`   User: ${jobData.userWallet}`);
+    console.log(`   Hash: ${jobData.originalHash}`);
+
+    // ジョブをキューに追加
+    const job = await queue.add('mint-nft', jobData, {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 2000,
+      },
+    });
+
+    console.log(`✅ Job ${job.id} added to queue`);
+
+    res.json({
+      success: true,
+      jobId: job.id,
+      message: '処理を開始しました。完了までお待ちください。',
+    });
+  } catch (error) {
+    console.error('❌ Upload API error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ジョブステータス確認エンドポイント
+app.get('/api/job-status/:jobId', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = await queue.getJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        error: 'Job not found',
+      });
+    }
+
+    const state = await job.getState();
+    const progress = job.progress;
+
+    res.json({
+      success: true,
+      jobId: job.id,
+      state,
+      progress,
+      data: job.data,
+      returnvalue: job.returnvalue,
+      failedReason: job.failedReason,
+    });
+  } catch (error) {
+    console.error('❌ Job status error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
 // ルートパス
 app.get('/', (req, res) => {
   res.json({
@@ -64,6 +152,8 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       metrics: '/metrics',
+      upload: 'POST /api/upload',
+      jobStatus: 'GET /api/job-status/:jobId',
     },
   });
 });
