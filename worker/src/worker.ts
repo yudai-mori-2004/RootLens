@@ -44,6 +44,7 @@ const connection = new IORedis({
   port: parseInt(urlObj.port || '6379'),
   // usernameを指定しない（デフォルトユーザーを使用）
   password: urlObj.password,
+  family: 0, // ★ RailwayのIPv6対応：デュアルスタックルックアップを有効化
   maxRetriesPerRequest: null,
   tls: useTLS ? { rejectUnauthorized: false } : undefined,
 });
