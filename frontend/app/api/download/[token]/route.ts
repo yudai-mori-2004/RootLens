@@ -60,9 +60,6 @@ export async function GET(
 
     if (purchaseError || !purchase) {
       return NextResponse.json(
-
-    if (purchaseError || !purchase) {
-      return NextResponse.json(
         { error: 'Invalid or expired download token' },
         { status: 404 }
       );
