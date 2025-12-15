@@ -36,6 +36,7 @@ const createRedisConnection = () => {
   });
 };
 
+
 // Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
   connection: createRedisConnection(),
