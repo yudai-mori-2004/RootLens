@@ -2,12 +2,27 @@
 // RootLens Ver4 - Database Operations
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+let supabaseInstance: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient {
+  if (supabaseInstance) return supabaseInstance;
+
+  // workerはNext.jsではないため、SUPABASE_URLを明示的に参照
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    console.error('❌ Missing Supabase configuration');
+    console.error('   SUPABASE_URL:', url ? 'Set' : 'Unset');
+    console.error('   SUPABASE_SERVICE_ROLE_KEY:', key ? 'Set' : 'Unset');
+    throw new Error('Supabase configuration is missing. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Railway.');
+  }
+
+  supabaseInstance = createClient(url, key);
+  return supabaseInstance;
+}
 
 /**
  * 証明データをデータベースに保存（最小限設計）
