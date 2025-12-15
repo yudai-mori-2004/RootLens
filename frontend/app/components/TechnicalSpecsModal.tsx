@@ -146,10 +146,9 @@ export default function TechnicalSpecsModal({
                     </div>
                 </div>
             </section>
-            
+
             {/* コンテンツエリア：読みやすさ重視で1カラム構成に変更 */}
             <div className="space-y-12">
-                
                 {/* 1. C2PA署名の確認方法 */}
                 <section className="space-y-4">
                     <h4 className="flex items-center gap-3 font-bold text-slate-900 text-lg border-l-4 border-indigo-500 pl-4 py-1">
