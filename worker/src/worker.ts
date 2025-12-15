@@ -7,50 +7,52 @@ import IORedis from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
 
-// Redis接続
+// Redis接続設定（環境変数から直接取得でURL解析問題を回避）
 const redisUrl = process.env.REDIS_URL;
 
 console.log('--- Redis Config Debug ---');
 console.log('REDIS_URL:', redisUrl ? 'Set (Hidden)' : 'Unset');
-if (redisUrl) {
-  const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
-  console.log('Host:', urlObj.hostname);
-  console.log('Port:', urlObj.port);
-  console.log('Username:', urlObj.username);
-  console.log('Password:', urlObj.password ? `***${urlObj.password.slice(-4)}` : 'MISSING');
-  console.log('Has @ symbol?', redisUrl.includes('@'));
-  console.log('Is Railway Public?', redisUrl.includes('rlwy.net'));
-  console.log('TLS Enabled?', redisUrl.includes('rlwy.net') ? 'YES' : 'NO');
-}
-console.log('--------------------------');
 
 if (!redisUrl) {
   console.error('❌ Redis configuration is missing. Set REDIS_URL.');
   process.exit(1);
 }
 
-// Railway Public URLはTLS必須、内部URLはTLS不要
-const useTLS = redisUrl.includes('rlwy.net');
-console.log(`🔧 Connecting to Redis with TLS: ${useTLS ? 'ENABLED' : 'DISABLED'}`);
-
-// URL文字列から認証情報を抽出
+// URL解析
 const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
+const useTLS = redisUrl.includes('rlwy.net');
 
-console.log('🔐 Decoded password length:', urlObj.password?.length || 0);
-console.log('🔐 Expected password length: 32');
+console.log('Host:', urlObj.hostname);
+console.log('Port:', urlObj.port);
+console.log('TLS Enabled?', useTLS ? 'YES' : 'NO');
+console.log('--------------------------');
 
-// 新しいRedis接続を作成する関数（BullMQのduplicate()問題を回避）
+// 新しいRedis接続を作成する関数
 const createRedisConnection = () => {
-  return new IORedis({
+  const config = {
     host: urlObj.hostname,
     port: parseInt(urlObj.port || '6379'),
-    password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined,
-    family: 0, // RailwayのIPv6対応
+    password: urlObj.password,
+    family: 0,
     maxRetriesPerRequest: null,
-    enableReadyCheck: false, // INFOコマンドによるNOAUTHエラーを回避
-    lazyConnect: true, // 明示的に接続を制御
-    tls: useTLS ? { rejectUnauthorized: false } : undefined,
+    enableReadyCheck: false,
+    showFriendlyErrorStack: true,
+  };
+
+  if (useTLS) {
+    config.tls = { rejectUnauthorized: false };
+  }
+
+  console.log('📝 Creating Redis connection with config:', {
+    host: config.host,
+    port: config.port,
+    hasPassword: !!config.password,
+    passwordLength: config.password?.length || 0,
+    family: config.family,
+    enableReadyCheck: config.enableReadyCheck,
   });
+
+  return new IORedis(config);
 };
 
 console.log('🚀 RootLens Worker started...');
