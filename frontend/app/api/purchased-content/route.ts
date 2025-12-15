@@ -51,20 +51,6 @@ export async function GET(req: NextRequest) {
     // purchasesテーブルから購入履歴を取得（ページネーション適用）
     // media_proofsの情報も結合して取得
     const offset = (page - 1) * limit;
-    interface MediaProofFromPurchase {
-      id: string;
-      title: string | null;
-      original_hash: string;
-      cnft_mint_address: string;
-      description: string | null;
-    }
-
-    interface PurchaseRecord {
-      id: string;
-      download_token: string;
-      created_at: string;
-      media_proofs: MediaProofFromPurchase;
-    }
 
     const { data: purchases, error } = await supabase
       .from('purchases')
@@ -96,8 +82,10 @@ export async function GET(req: NextRequest) {
     // サムネイルURLはoriginal_hashから構築（R2パスは固定: media/{hash}/thumbnail.jpg）
     const publicBucketUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_BUCKET_URL;
 
-    const formattedContent = purchases.map((purchase: PurchaseRecord) => {
-      const proof = purchase.media_proofs;
+    const formattedContent = purchases.map((purchase: any) => {
+      // media_proofsが配列で返ってくる可能性があるため、配列なら最初の要素、そうでなければそのまま使用
+      const proof = Array.isArray(purchase.media_proofs) ? purchase.media_proofs[0] : purchase.media_proofs;
+
 
       return {
         purchaseId: purchase.id,
