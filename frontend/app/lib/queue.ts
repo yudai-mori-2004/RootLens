@@ -5,37 +5,27 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 
-// Redis接続設定 - REDIS_URLのみを使用
 if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// Railway Public URLはTLS必須
-const useTLS = process.env.REDIS_URL.includes('rlwy.net');
-
-// URL文字列から認証情報を抽出
-const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
-
-// ★★★ RailwayのIPv6対応: 接続オプションにfamily: 0を追加 ★★★
-const connectionOptions = {
-  host: urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  username: urlObj.username || 'default',
-  password: urlObj.password,
-  family: 0, // IPv6/IPv4デュアルスタック対応
+// Frontend側もWorkerと同じ設定で統一
+// 手動パースをやめ、IORedisに任せる
+const connection = new IORedis(process.env.REDIS_URL, {
+  family: 0, // Railway IPv6対応
   maxRetriesPerRequest: null,
-  tls: useTLS ? { rejectUnauthorized: false } : undefined,
+  tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
     if (times > 3) {
       return null; // 3回失敗したら諦める
     }
     return Math.min(times * 50, 2000);
   },
-};
+});
 
 // Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection: connectionOptions,
+  connection, // インスタンスを渡す
   defaultJobOptions: {
     attempts: 3,                    // 最大3回リトライ
     backoff: {

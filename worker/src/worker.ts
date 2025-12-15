@@ -6,52 +6,50 @@ import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
+import { startServer } from './server';
 
-// Redis接続
 const redisUrl = process.env.REDIS_URL;
-
-console.log('--- Redis Config Debug ---');
-console.log('REDIS_URL:', redisUrl ? 'Set (Hidden)' : 'Unset');
-if (redisUrl) {
-  const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
-  console.log('Host:', urlObj.hostname);
-  console.log('Port:', urlObj.port);
-  console.log('Username:', urlObj.username);
-  console.log('Password:', urlObj.password ? `***${urlObj.password.slice(-4)}` : 'MISSING');
-  console.log('Has @ symbol?', redisUrl.includes('@'));
-  console.log('Is Railway Public?', redisUrl.includes('rlwy.net'));
-  console.log('TLS Enabled?', redisUrl.includes('rlwy.net') ? 'YES' : 'NO');
-}
-console.log('--------------------------');
 
 if (!redisUrl) {
   console.error('❌ Redis configuration is missing. Set REDIS_URL.');
   process.exit(1);
 }
 
-// Railway Public URLはTLS必須、内部URLはTLS不要
-const useTLS = redisUrl.includes('rlwy.net');
-console.log(`🔧 Connecting to Redis with TLS: ${useTLS ? 'ENABLED' : 'DISABLED'}`);
+console.log('--- Redis Connection Setup ---');
 
-// URL文字列から認証情報を抽出
-const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
-
-console.log('🔐 Decoded password length:', urlObj.password?.length || 0);
-console.log('🔐 Expected password length: 32');
-
-// ★★★ RailwayのIPv6対応: 接続オプションにfamily: 0を追加 ★★★
-const connectionOptions = {
-  host: urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  username: urlObj.username || 'default',
-  password: urlObj.password,
-  family: 0, // IPv6/IPv4デュアルスタック対応
+// 手動パースをやめ、IORedisに任せる構成に変更
+// family: 0 は Railway の IPv6 対応に必須
+const connection = new IORedis(redisUrl, {
+  family: 0, 
   maxRetriesPerRequest: null,
-  tls: useTLS ? { rejectUnauthorized: false } : undefined,
-};
+  // TLSはURLに "rlwy.net" (Railway Public) が含まれる場合のみ有効化
+  tls: redisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+});
 
-console.log('🚀 RootLens Worker started...');
-console.log(`📡 Connecting to Redis with IPv6 support (family: 0)...`);
+// --- 接続診断ブロック (起動時に実行) ---
+connection.on('connect', () => console.log('✅ Redis: TCP Connection established'));
+connection.on('ready', () => console.log('✅ Redis: Ready & Authenticated'));
+connection.on('error', (err) => console.error('❌ Redis Error:', err.message));
+
+// 強制的に認証確認を行う
+(async () => {
+  try {
+    console.log('🔍 Testing Redis Authentication...');
+    // パスワードが設定されているか長さだけで確認（ログに生パスワードは出さない）
+    const passLen = connection.options.password?.toString().length || 0;
+    console.log(`🔑 Configured Password Length: ${passLen}`);
+    
+    // PINGを送って AUTH が通っているか確認
+    const pong = await connection.ping();
+    console.log(`✅ Authentication Test Passed: ${pong}`);
+  } catch (error) {
+    console.error('🚨 Authentication Failed Details:', error);
+    // ここでエラーが出るなら、BullMQ以前に接続設定の問題
+  }
+})();
+// --------------------------------------
+
+console.log('🚀 RootLens Worker starting...');
 
 // Worker作成
 const worker = new Worker<MintJobData, MintJobResult>(
@@ -80,7 +78,8 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    connection: connectionOptions,
+    // 作成した接続インスタンスをそのまま渡す（最も確実な方法）
+    connection: connection,
     concurrency: 1,  // ★★★ 最重要: 完全に1つずつ処理する設定 ★★★
   }
 );
@@ -103,18 +102,15 @@ worker.on('ready', () => {
 });
 
 // HTTPサーバー起動（ヘルスチェック & メトリクス）
-import { startServer } from './server';
 startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('\n🛑 SIGTERM received, closing worker...');
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n🛑 ${signal} received, closing worker...`);
   await worker.close();
+  await connection.quit(); // Redis接続も閉じる
   process.exit(0);
-});
+};
 
-process.on('SIGINT', async () => {
-  console.log('\n🛑 SIGINT received, closing worker...');
-  await worker.close();
-  process.exit(0);
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
