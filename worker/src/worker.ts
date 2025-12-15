@@ -39,13 +39,20 @@ const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
 console.log('🔐 Decoded password length:', urlObj.password?.length || 0);
 console.log('🔐 Expected password length: 32');
 
-// ★★★ RailwayのIPv6対応: family: 0 を含むURL文字列を作成 ★★★
-const redisUrlWithFamily = `${redisUrl}?family=0`;
+// ★★★ RailwayのIPv6対応: 接続オプションにfamily: 0を追加 ★★★
+const connectionOptions = {
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  password: urlObj.password,
+  family: 0, // IPv6/IPv4デュアルスタック対応
+  maxRetriesPerRequest: null,
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
+};
 
 console.log('🚀 RootLens Worker started...');
-console.log(`📡 Connecting to Redis via URL with family=0...`);
+console.log(`📡 Connecting to Redis with IPv6 support (family: 0)...`);
 
-// Worker作成（URL文字列を直接渡す - BullMQが推奨する方法）
+// Worker作成
 const worker = new Worker<MintJobData, MintJobResult>(
   'rootlens-mint-queue',
   async (job: Job<MintJobData>) => {
@@ -72,7 +79,7 @@ const worker = new Worker<MintJobData, MintJobResult>(
     }
   },
   {
-    connection: redisUrlWithFamily, // ★ URL文字列を渡す（family=0付き）
+    connection: connectionOptions,
     concurrency: 1,  // ★★★ 最重要: 完全に1つずつ処理する設定 ★★★
   }
 );
