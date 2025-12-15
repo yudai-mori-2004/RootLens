@@ -1,5 +1,5 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Worker (Direct Serial Processing)
+// RootLens Ver5 - BullMQ Worker (Upstash Redis)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Worker, Job } from 'bullmq';
@@ -7,52 +7,39 @@ import IORedis from 'ioredis';
 import { processMint } from './processor';
 import type { MintJobData, MintJobResult } from '../../shared/types';
 
-// Redis接続設定（環境変数から直接取得でURL解析問題を回避）
+// Redis接続設定
 const redisUrl = process.env.REDIS_URL;
 
 console.log('--- Redis Config Debug ---');
 console.log('REDIS_URL:', redisUrl ? 'Set (Hidden)' : 'Unset');
 
 if (!redisUrl) {
-  console.error('❌ Redis configuration is missing. Set REDIS_URL.');
+  console.error('❌ REDIS_URL environment variable is not set.');
   process.exit(1);
 }
 
-// URL解析
-const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
-const useTLS = redisUrl.includes('rlwy.net');
-
-console.log('Host:', urlObj.hostname);
-console.log('Port:', urlObj.port);
-console.log('TLS Enabled?', useTLS ? 'YES' : 'NO');
+console.log('Redis Type:', redisUrl.startsWith('rediss://') ? 'Upstash (TLS)' : 'Standard');
 console.log('--------------------------');
 
-// 新しいRedis接続を作成する関数
+// Upstash Redis用の接続設定
 const createRedisConnection = () => {
   const config: any = {
-    host: urlObj.hostname,
-    port: parseInt(urlObj.port || '6379'),
-    password: urlObj.password,
-    family: 0,
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
     showFriendlyErrorStack: true,
+    connectTimeout: 30000,
   };
 
-  if (useTLS) {
-    config.tls = { rejectUnauthorized: false };
+  // Upstash Redis (rediss://) の場合、TLSを有効化
+  if (redisUrl.startsWith('rediss://')) {
+    config.tls = {
+      rejectUnauthorized: true, // Upstashは正規の証明書を使用
+    };
   }
 
-  console.log('📝 Creating Redis connection with config:', {
-    host: config.host,
-    port: config.port,
-    hasPassword: !!config.password,
-    passwordLength: config.password?.length || 0,
-    family: config.family,
-    enableReadyCheck: config.enableReadyCheck,
-  });
+  console.log('📝 Creating Redis connection...');
 
-  return new IORedis(config);
+  return new IORedis(redisUrl, config);
 };
 
 console.log('🚀 RootLens Worker started...');

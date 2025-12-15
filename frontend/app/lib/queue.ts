@@ -1,55 +1,38 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RootLens Ver4 - BullMQ Queue Configuration (Frontend)
+// RootLens Ver5 - BullMQ Queue Configuration (Upstash Redis)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 
-// Redis接続設定 - REDIS_URLのみを使用
+// Redis接続設定
 if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// Railway Public URLはTLS必須
-const useTLS = process.env.REDIS_URL.includes('rlwy.net');
+console.log('🔗 Connecting to Redis...');
 
-// URL文字列から認証情報を抽出
-const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
-
-// 新しいRedis接続を作成する関数（BullMQのduplicate()問題を回避）
+// Upstash Redis用の接続設定
 const createRedisConnection = () => {
+  // REDIS_URL形式: rediss://default:password@host:port
+  const redisUrl = process.env.REDIS_URL!;
+
   const config: any = {
-    host: urlObj.hostname,
-    port: parseInt(urlObj.port || '6379'),
-    password: urlObj.password ? decodeURIComponent(urlObj.password) : undefined,
     maxRetriesPerRequest: null,
-    enableReadyCheck: false, // INFOコマンドによるNOAUTHエラーを回避
-    connectTimeout: 30000, // 30秒のタイムアウト
-    retryStrategy: (times: number) => {
-      if (times > 3) {
-        return null; // 3回失敗したら諦める
-      }
-      return Math.min(times * 1000, 3000);
-    },
+    enableReadyCheck: false,
+    connectTimeout: 30000,
   };
 
-  // TLS設定（Railway Public URLの場合）
-  if (useTLS) {
+  // Upstash Redis (rediss://) の場合、TLSを有効化
+  if (redisUrl.startsWith('rediss://')) {
     config.tls = {
-      rejectUnauthorized: false,
-      // Vercel環境でのTLS互換性を向上
-      minVersion: 'TLSv1.2',
+      rejectUnauthorized: true, // Upstashは正規の証明書を使用
     };
   }
 
-  console.log('🔗 Redis connection config:', {
-    host: config.host,
-    port: config.port,
-    useTLS,
-    hasPassword: !!config.password,
-  });
+  console.log('📡 Redis URL detected:', redisUrl.startsWith('rediss://') ? 'Upstash (TLS)' : 'Standard');
 
-  return new IORedis(config);
+  return new IORedis(redisUrl, config);
 };
 
 

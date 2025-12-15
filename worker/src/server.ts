@@ -12,29 +12,28 @@ app.use(express.json()); // JSON body parser
 
 const PORT = process.env.PORT || 8080;
 
-// Redis接続（Railway内部ネットワーク - パスワードなしで試す）
+// Upstash Redis接続
 const redisUrl = process.env.REDIS_URL;
-let connection: IORedis;
 
-if (redisUrl) {
-  const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
-  connection = new IORedis({
-    host: urlObj.hostname,
-    port: parseInt(urlObj.port || '6379'),
-    password: urlObj.password,
-    family: 0,
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-  });
-} else {
-  connection = new IORedis({
-    host: 'redis.railway.internal',
-    port: 6379,
-    family: 0,
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-  });
+if (!redisUrl) {
+  console.error('❌ REDIS_URL environment variable is not set.');
+  process.exit(1);
 }
+
+const config: any = {
+  maxRetriesPerRequest: null,
+  enableReadyCheck: false,
+  connectTimeout: 30000,
+};
+
+// Upstash Redis (rediss://) の場合、TLSを有効化
+if (redisUrl.startsWith('rediss://')) {
+  config.tls = {
+    rejectUnauthorized: true,
+  };
+}
+
+const connection = new IORedis(redisUrl, config);
 
 // Queue参照
 const queue = new Queue('rootlens-mint-queue', { connection });
