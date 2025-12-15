@@ -165,6 +165,8 @@ export async function searchArweaveTransactionsByHash(
       const uploaderAddress = txHeader.address; // Solana Address
       
       if (uploaderAddress !== ROOTLENS_WALLET) {
+        // デバッグ用: Issuer不一致をアラートで表示
+        alert(`Arweave Issuer Mismatch!\nExpected: ${ROOTLENS_WALLET}\nFound: ${uploaderAddress}\nTxId: ${candidate.id}`);
         console.warn(`   ❌ Invalid Issuer: ${candidate.id} (Owner: ${uploaderAddress})`);
         continue; // 偽物として除外
       }
