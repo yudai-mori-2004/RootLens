@@ -10,31 +10,12 @@ if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
-// Railway Public URLはTLS必須
-const useTLS = process.env.REDIS_URL.includes('rlwy.net');
-
-// URL文字列から認証情報を抽出
-const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
-
-// Redis接続オプション（BullMQのすべての接続で共有）
-const redisOptions = {
-  host: urlObj.hostname,
-  port: parseInt(urlObj.port || '6379'),
-  password: urlObj.password,
-  family: 0, // ★ RailwayのIPv6対応：デュアルスタックルックアップを有効化
-  maxRetriesPerRequest: null,
-  tls: useTLS ? { rejectUnauthorized: false } : undefined,
-  retryStrategy: (times: number) => {
-    if (times > 3) {
-      return null; // 3回失敗したら諦める
-    }
-    return Math.min(times * 50, 2000);
-  },
-};
+// ★★★ RailwayのIPv6対応: family=0 を含むURL文字列を作成 ★★★
+const redisUrlWithFamily = `${process.env.REDIS_URL}?family=0`;
 
 // Mintジョブ用のキュー
 export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection: redisOptions,
+  connection: redisUrlWithFamily,
   defaultJobOptions: {
     attempts: 3,                    // 最大3回リトライ
     backoff: {
