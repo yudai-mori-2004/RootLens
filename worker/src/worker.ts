@@ -19,8 +19,10 @@ if (!redisUrl) {
   process.exit(1);
 }
 
+// Railway Public URLはTLS必須
 const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
+  tls: redisUrl.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
 });
 
 console.log('🚀 RootLens Worker started...');

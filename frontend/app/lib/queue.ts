@@ -10,8 +10,10 @@ if (!process.env.REDIS_URL) {
   throw new Error('REDIS_URL environment variable is not set');
 }
 
+// Railway Public URLはTLS必須
 const connection = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
+  tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
     if (times > 3) {
       return null; // 3回失敗したら諦める
