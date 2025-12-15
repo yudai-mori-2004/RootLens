@@ -11,9 +11,18 @@ if (!process.env.REDIS_URL) {
 }
 
 // Railway Public URLはTLS必須
-const connection = new IORedis(process.env.REDIS_URL, {
+const useTLS = process.env.REDIS_URL.includes('rlwy.net');
+
+// URL文字列から認証情報を抽出
+const urlObj = new URL(process.env.REDIS_URL.replace('redis://', 'http://'));
+
+const connection = new IORedis({
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default',
+  password: urlObj.password,
   maxRetriesPerRequest: null,
-  tls: process.env.REDIS_URL.includes('rlwy.net') ? { rejectUnauthorized: false } : undefined,
+  tls: useTLS ? { rejectUnauthorized: false } : undefined,
   retryStrategy: (times: number) => {
     if (times > 3) {
       return null; // 3回失敗したら諦める

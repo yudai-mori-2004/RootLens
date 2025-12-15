@@ -33,7 +33,14 @@ if (!redisUrl) {
 const useTLS = redisUrl.includes('rlwy.net');
 console.log(`🔧 Connecting to Redis with TLS: ${useTLS ? 'ENABLED' : 'DISABLED'}`);
 
-const connection = new IORedis(redisUrl, {
+// URL文字列から認証情報を抽出
+const urlObj = new URL(redisUrl.replace('redis://', 'http://'));
+
+const connection = new IORedis({
+  host: urlObj.hostname,
+  port: parseInt(urlObj.port || '6379'),
+  username: urlObj.username || 'default',
+  password: urlObj.password,
   maxRetriesPerRequest: null,
   tls: useTLS ? { rejectUnauthorized: false } : undefined,
 });
