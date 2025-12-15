@@ -64,6 +64,10 @@ export default function Header({ isLandingPage = false }: HeaderProps) {
                   <Search className="w-4 h-4" />
                   Lens
                 </Link>
+                <Link href="/upload" className="hover:text-blue-600 transition-colors flex items-center gap-1">
+                  <Upload className="w-4 h-4" />
+                  Upload
+                </Link>
               </>
             ) : (
               <>
@@ -155,6 +159,10 @@ export default function Header({ isLandingPage = false }: HeaderProps) {
                         <Link href="/lens" className="flex items-center gap-2 text-slate-600 font-medium hover:text-blue-600">
                           <Search className="w-5 h-5" />
                           Lens
+                        </Link>
+                        <Link href="/upload" className="flex items-center gap-2 text-slate-600 font-medium hover:text-blue-600">
+                          <Upload className="w-5 h-5" />
+                          Upload
                         </Link>
                       </>
                     ) : (
