@@ -4,7 +4,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { mintQueue } from '@/app/lib/queue';
-import type { JobStatusResponse, JobState } from '@shared/types';
+import type { JobStatusResponse, JobStatus } from '@shared/types';
+// ...
+      state: state as JobStatus,
 
 export async function GET(
   request: NextRequest,
