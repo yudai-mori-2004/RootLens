@@ -147,6 +147,7 @@ export default function TechnicalSpecsModal({
                 </div>
             </section>
 
+
             {/* コンテンツエリア：読みやすさ重視で1カラム構成に変更 */}
             <div className="space-y-12">
                 {/* 1. C2PA署名の確認方法 */}
