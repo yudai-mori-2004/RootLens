@@ -262,7 +262,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     
-                    <CardHeader className="p-4 pb-2 space-y-1 relative">
+                    <CardHeader className="p-3 pb-2 space-y-1 relative">
                       <div className="flex justify-between items-start">
                         <CardTitle className="truncate text-sm font-bold text-slate-900 pr-6">
                           {content.title || '無題のアセット'}
@@ -275,41 +275,41 @@ export default function DashboardPage() {
                         </button>
                       </div>
                       {content.description && (
-                        <CardDescription className="text-xs text-slate-500 line-clamp-2 mb-2 h-8 leading-tight">
+                        <CardDescription className="text-xs text-slate-500 line-clamp-1 leading-tight">
                           {content.description}
                         </CardDescription>
                       )}
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-2 border-t border-slate-100">
-                        <div className="flex items-center gap-1">
-                          <Shield className="w-3 h-3" />
-                          {content.cnftMintAddress.slice(0, 6)}...{content.cnftMintAddress.slice(-6)}
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-2 border-t border-slate-100 gap-2">
+                        <div className="flex items-center gap-1 min-w-0 flex-1 truncate">
+                          <Shield className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{content.cnftMintAddress.slice(0, 4)}...{content.cnftMintAddress.slice(-4)}</span>
                         </div>
-                        <span className="font-bold text-indigo-600">
+                        <span className="font-bold text-indigo-600 flex-shrink-0 text-[10px]">
                           {content.priceLamports === 0 ? 'Free' : `${(content.priceLamports / 1e9).toFixed(2)} SOL`}
                         </span>
                       </div>
                     </CardHeader>
-                    
-                    <CardContent className="p-4 pt-2">
-                      <div className="grid grid-cols-2 gap-2 mt-1">
+
+                    <CardContent className="p-3 pt-0">
+                      <div className="grid grid-cols-2 gap-2">
                         <Button variant="outline" size="sm" asChild className="w-full text-xs h-8 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50">
                           <Link href={`/asset/${content.originalHash}`}>
                             詳細
                           </Link>
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className={`w-full text-xs h-8 border ${content.isPublic ? 'text-slate-500 hover:text-slate-700 bg-slate-50 border-slate-200' : 'text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 border-green-200'}`}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`w-full text-[11px] h-8 border px-1 ${content.isPublic ? 'text-slate-500 hover:text-slate-700 bg-slate-50 border-slate-200' : 'text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 border-green-200'}`}
                           onClick={() => handleTogglePublic(content.mediaProofId, content.isPublic)}
                         >
                           {content.isPublic ? (
                             <>
-                              <EyeOff className="w-3 h-3 mr-1" /> 非公開
+                              <EyeOff className="w-3 h-3 mr-0.5" /> <span className="hidden sm:inline">非公開</span>
                             </>
                           ) : (
                             <>
-                              <Eye className="w-3 h-3 mr-1" /> 公開
+                              <Eye className="w-3 h-3 mr-0.5" /> <span className="hidden sm:inline">公開</span>
                             </>
                           )}
                         </Button>
@@ -402,7 +402,7 @@ export default function DashboardPage() {
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
                     </div>
                     
-                    <CardHeader className="p-4 pb-2 space-y-1">
+                    <CardHeader className="p-3 pb-2 space-y-1">
                       <CardTitle className="truncate text-sm font-bold text-slate-900">
                         {content.title || '無題のアセット'}
                       </CardTitle>
@@ -411,9 +411,9 @@ export default function DashboardPage() {
                         購入日: {new Date(content.purchasedAt).toLocaleDateString('ja-JP')}
                       </CardDescription>
                     </CardHeader>
-                    
-                    <CardContent className="p-4 pt-2">
-                      <div className="flex flex-col gap-2 mt-1">
+
+                    <CardContent className="p-3 pt-0">
+                      <div className="flex flex-col gap-2">
                         <Button size="sm" className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all" onClick={() => window.open(`/api/download/${content.downloadToken}`, '_blank')}>
                           <Download className="w-3 h-3 mr-1.5" />
                           ダウンロード

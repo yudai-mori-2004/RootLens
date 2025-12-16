@@ -17,6 +17,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { searchArweaveTransactionsByHash } from '@/app/lib/irys-verification';
 import {
   getIrysGatewayUrl,
@@ -42,7 +48,8 @@ import {
   Wallet,
   Camera,
   Lock,
-  Check
+  Check,
+  Info
 } from 'lucide-react';
 
 import Header from '@/app/components/Header';
@@ -765,18 +772,30 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
 
                         {/* 3. Arweave (Interactive) */}
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-indigo-500/50 transition-colors group">
-                            <p className="text-xs text-slate-400 font-medium mb-3 flex items-center gap-2">
-                                永久保存データ (Data)
-                                <Database className="w-3 h-3 text-slate-500" />
-                            </p>
-                            
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-xs text-slate-400 font-medium flex items-center gap-2">
+                                    永久保存データ (Data)
+                                    <Database className="w-3 h-3 text-slate-500" />
+                                </p>
+                                {/* モバイル用情報アイコン */}
+                                <button
+                                    onClick={() => setShowArweaveDialog(true)}
+                                    className="md:hidden p-1 hover:bg-slate-700/50 rounded-full transition-colors"
+                                    aria-label="詳細を表示"
+                                >
+                                    <Info className="w-4 h-4 text-indigo-400" />
+                                </button>
+                            </div>
+
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                                                                <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
-                                                                                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
-                                                                                        <Image src="/arweave_logo.png" alt="Arweave Logo" fill style={{ objectFit: 'contain' }} sizes="32px" />
-                                                                                    </div>                                            <div className="flex-1 min-w-0">                                                <div className="flex items-center gap-2">
+                                        <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
+                                                <Image src="/arweave_logo.png" alt="Arweave Logo" fill style={{ objectFit: 'contain' }} sizes="32px" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
                                                     <p className="font-bold text-lg text-white group-hover:underline decoration-indigo-500 decoration-2 underline-offset-4">
                                                         Arweave
                                                     </p>
@@ -788,18 +807,18 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                             </div>
                                         </button>
                                     </TooltipTrigger>
-                                    <TooltipContent className="bg-slate-800 border-slate-700 text-white p-4 max-w-xs">
+                                    <TooltipContent className="bg-slate-800 border-slate-700 text-white p-4 max-w-xs hidden md:block">
                                         <div className="mb-2">
                                             <h4 className="font-bold text-sm mb-1 flex items-center gap-2">
                                                 <Database className="w-4 h-4" /> Permanent Data
                                             </h4>
                                             <p className="text-xs text-slate-300 leading-relaxed">
-                                                この画像のオリジナルデータとハッシュ値は、Arweaveブロックチェーン上に永久に保存されています。サーバーダウンや改ざんのリスクがありません。
+                                                このコンテンツのオリジナルデータとハッシュ値は、Arweaveブロックチェーン上に永久に保存されています。サーバーダウンや改ざんのリスクがありません。
                                             </p>
                                         </div>
-                                        <a 
-                                            href={`${arweaveExplorer}/${proof.arweaveTxId}`} 
-                                            target="_blank" 
+                                        <a
+                                            href={`${arweaveExplorer}/${proof.arweaveTxId}`}
+                                            target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 font-bold"
                                         >
@@ -812,18 +831,30 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
 
                         {/* 4. cNFT (Interactive) */}
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-indigo-500/50 transition-colors group">
-                            <p className="text-xs text-slate-400 font-medium mb-3 flex items-center gap-2">
-                                デジタル所有権 (Ownership)
-                                <Wallet className="w-3 h-3 text-slate-500" />
-                            </p>
-                            
-                             <TooltipProvider>
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-xs text-slate-400 font-medium flex items-center gap-2">
+                                    デジタル所有権 (Ownership)
+                                    <Wallet className="w-3 h-3 text-slate-500" />
+                                </p>
+                                {/* モバイル用情報アイコン */}
+                                <button
+                                    onClick={() => setShowCnftDialog(true)}
+                                    className="md:hidden p-1 hover:bg-slate-700/50 rounded-full transition-colors"
+                                    aria-label="詳細を表示"
+                                >
+                                    <Info className="w-4 h-4 text-purple-400" />
+                                </button>
+                            </div>
+
+                            <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                                                                <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
-                                                                                    <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
-                                                                                        <Image src="/solana_logo.png" alt="Solana Logo" fill style={{ objectFit: 'contain' }} sizes="32px" />
-                                                                                    </div>                                            <div className="flex-1 min-w-0">                                                <div className="flex items-center gap-2">
+                                        <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
+                                                <Image src="/solana_logo.png" alt="Solana Logo" fill style={{ objectFit: 'contain' }} sizes="32px" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
                                                     <p className="font-bold text-lg text-white group-hover:underline decoration-purple-500 decoration-2 underline-offset-4">
                                                         cNFT
                                                     </p>
@@ -835,7 +866,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                             </div>
                                         </button>
                                     </TooltipTrigger>
-                                    <TooltipContent className="bg-slate-800 border-slate-700 text-white p-4 max-w-xs">
+                                    <TooltipContent className="bg-slate-800 border-slate-700 text-white p-4 max-w-xs hidden md:block">
                                         <div className="mb-2">
                                             <h4 className="font-bold text-sm mb-1 flex items-center gap-2">
                                                 <Wallet className="w-4 h-4" /> Digital Ownership
@@ -844,9 +875,9 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                                 所有権はSolanaブロックチェーン上の圧縮NFT(cNFT)として管理されています。これにより、権利の明確化と即時の売買が可能になります。
                                             </p>
                                         </div>
-                                        <a 
-                                            href={`${solanaExplorer}/${proof.cnftMintAddress}?cluster=devnet`} 
-                                            target="_blank" 
+                                        <a
+                                            href={`${solanaExplorer}/${proof.cnftMintAddress}?cluster=devnet`}
+                                            target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 font-bold"
                                         >
@@ -997,6 +1028,88 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           title={proof.title}
         />
       )}
+
+      {/* モバイル用 Arweave ダイアログ */}
+      <Dialog open={showArweaveDialog} onOpenChange={setShowArweaveDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Database className="w-5 h-5 text-indigo-400" />
+              Permanent Data
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
+                <Image src="/arweave_logo.png" alt="Arweave Logo" fill style={{ objectFit: 'contain' }} sizes="48px" />
+              </div>
+              <div>
+                <p className="font-bold text-lg">Arweave</p>
+                <p className="text-xs text-slate-400 font-mono break-all">
+                  {proof?.arweaveTxId}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              このコンテンツのオリジナルデータとハッシュ値は、Arweaveブロックチェーン上に永久に保存されています。サーバーダウンや改ざんのリスクがありません。
+            </p>
+            <Button
+              asChild
+              className="w-full bg-indigo-600 hover:bg-indigo-700"
+            >
+              <a
+                href={`${arweaveExplorer}/${proof?.arweaveTxId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Explorerで確認
+              </a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* モバイル用 cNFT ダイアログ */}
+      <Dialog open={showCnftDialog} onOpenChange={setShowCnftDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Wallet className="w-5 h-5 text-purple-400" />
+              Digital Ownership
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden relative">
+                <Image src="/solana_logo.png" alt="Solana Logo" fill style={{ objectFit: 'contain' }} sizes="48px" />
+              </div>
+              <div>
+                <p className="font-bold text-lg">cNFT</p>
+                <p className="text-xs text-slate-400 font-mono break-all">
+                  {proof?.cnftMintAddress}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-300 leading-relaxed">
+              所有権はSolanaブロックチェーン上の圧縮NFT(cNFT)として管理されています。これにより、権利の明確化と即時の売買が可能になります。
+            </p>
+            <Button
+              asChild
+              className="w-full bg-purple-600 hover:bg-purple-700"
+            >
+              <a
+                href={`${solanaExplorer}/${proof?.cnftMintAddress}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Explorerで確認
+              </a>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
