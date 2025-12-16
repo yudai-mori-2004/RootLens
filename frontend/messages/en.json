@@ -21,7 +21,8 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",
-    "backToHome": "Back to Home"
+    "backToHome": "Back to Home",
+    "noPreview": "No Preview"
   },
   "home": {
     "hero": {

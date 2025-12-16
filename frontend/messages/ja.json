@@ -21,7 +21,8 @@
     "cancel": "キャンセル",
     "confirm": "確認",
     "close": "閉じる",
-    "backToHome": "ホームに戻る"
+    "backToHome": "ホームに戻る",
+    "noPreview": "プレビューなし"
   },
   "home": {
     "hero": {
