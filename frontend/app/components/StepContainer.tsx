@@ -1,5 +1,8 @@
+'use client';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 
 interface StepContainerProps {
   title: React.ReactNode;
@@ -19,11 +22,14 @@ export default function StepContainer({
   children,
   onNext,
   onBack,
-  nextLabel = '次へ',
+  nextLabel,
   nextDisabled = false,
   showBack = true,
   isLoading = false,
 }: StepContainerProps) {
+  const t = useTranslations('components.stepContainer');
+  const finalNextLabel = nextLabel || t('next');
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -37,7 +43,7 @@ export default function StepContainer({
         <CardFooter className="flex justify-between border-t pt-6">
           {showBack && onBack ? (
             <Button onClick={onBack} disabled={isLoading} variant="ghost">
-              ← 戻る
+              {t('back')}
             </Button>
           ) : (
             <div />
@@ -48,11 +54,11 @@ export default function StepContainer({
               {isLoading ? (
                 <>
                   <span className="animate-spin mr-2">⏳</span>
-                  <span>処理中...</span>
+                  <span>{t('processing')}</span>
                 </>
               ) : (
                 <>
-                  <span>{nextLabel}</span>
+                  <span>{finalNextLabel}</span>
                   <span className="ml-2">→</span>
                 </>
               )}

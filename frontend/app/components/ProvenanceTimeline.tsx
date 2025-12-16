@@ -5,6 +5,7 @@ import { Camera, Edit3, ShieldCheck, Sparkles, User, Image as ImageIcon } from '
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { useTranslations } from 'next-intl';
 
 interface ProvenanceTimelineProps {
   c2paSummary: C2PASummaryData;
@@ -16,13 +17,14 @@ interface ProvenanceTimelineProps {
  * 日本語ローカライズ版
  */
 export default function ProvenanceTimeline({ c2paSummary, rootSigner }: ProvenanceTimelineProps) {
+  const t = useTranslations('components.provenanceTimeline');
   const activeManifest = c2paSummary.activeManifest;
 
   if (!activeManifest) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-slate-400 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
         <ShieldCheck className="w-12 h-12 mb-3 opacity-20" />
-        <p className="text-sm font-medium">来歴情報が見つかりません</p>
+        <p className="text-sm font-medium">{t('notFound')}</p>
       </div>
     );
   }
@@ -47,16 +49,16 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
             <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-3">
               <div>
                 {/* 日本語に変更 */}
-                <h4 className="font-bold text-slate-900 text-base">オリジナルの作成・撮影</h4>
+                <h4 className="font-bold text-slate-900 text-base">{t('origin')}</h4>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {activeManifest.signatureInfo.time
-                    ? new Date(activeManifest.signatureInfo.time).toLocaleString('ja-JP', { dateStyle: 'long', timeStyle: 'short' })
-                    : '日時不明'}
+                    ? new Date(activeManifest.signatureInfo.time).toLocaleString()
+                    : t('unknownDate')}
                 </p>
               </div>
               {/* バッジも日本語に */}
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 shrink-0">
-                オリジナル
+                {t('originalBadge')}
               </Badge>
             </div>
 
@@ -64,20 +66,20 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
               <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck className="w-4 h-4 text-slate-400 shrink-0" />
                 {/* 専門用語はカタカナ併記などで分かりやすく */}
-                <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">発行元の署名 (Root Signer)</span>
+                <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">{t('rootSigner')}</span>
               </div>
               <p className="font-semibold text-slate-800 text-sm mb-3 flex flex-wrap items-center gap-2">
                  <span className="break-all">{finalRootSigner}</span>
                  {/* 信頼性の高さを日本語でアピール */}
                  <Badge variant="secondary" className="text-[10px] h-5 shrink-0 bg-slate-200 text-slate-700">
-                    認証済みデバイス
+                    {t('trustedDevice')}
                  </Badge>
               </p>
 
               {activeManifest.rootThumbnailUrl && (
                 <div className="relative rounded-lg overflow-hidden border border-slate-200 group/img">
                   <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm z-10">
-                    編集前のスナップショット
+                    {t('snapshot')}
                   </div>
                   <Image
                     src={activeManifest.rootThumbnailUrl}
@@ -113,13 +115,13 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
                     </p>
                     {isAI && (
                         <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-none text-[10px]">
-                            AI生成・編集
+                            {t('aiEdited')}
                         </Badge>
                     )}
                 </div>
                 {action.when && (
                     <p className="text-[10px] text-slate-400">
-                    {new Date(action.when).toLocaleString('ja-JP')}
+                    {new Date(action.when).toLocaleString()}
                     </p>
                 )}
               </div>
@@ -143,14 +145,14 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
             <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-3">
                <div>
                   {/* 日本語に変更 */}
-                  <h4 className="font-bold text-blue-900 text-base">現在のバージョン</h4>
+                  <h4 className="font-bold text-blue-900 text-base">{t('currentVersion')}</h4>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {activeManifest.signatureInfo.time
-                      ? new Date(activeManifest.signatureInfo.time).toLocaleString('ja-JP')
-                      : '日時不明'}
+                      ? new Date(activeManifest.signatureInfo.time).toLocaleString()
+                      : t('unknownDate')}
                   </p>
                </div>
-               <Badge className="bg-blue-600 hover:bg-blue-700 shrink-0">最新版</Badge>
+               <Badge className="bg-blue-600 hover:bg-blue-700 shrink-0">{t('latestBadge')}</Badge>
             </div>
 
             <div className="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
@@ -159,7 +161,7 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
                     <User className="w-4 h-4 text-blue-600" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">最終署名者 (Signed By)</p>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wide font-bold">{t('signedBy')}</p>
                   <p className="font-bold text-slate-900 text-sm truncate">
                     {activeManifest.signatureInfo.issuer || 'Unknown'}
                   </p>
@@ -169,7 +171,7 @@ export default function ProvenanceTimeline({ c2paSummary, rootSigner }: Provenan
               {c2paSummary.thumbnailUrl && (
                 <div className="relative rounded-lg overflow-hidden border border-slate-200">
                   <div className="absolute top-2 left-2 bg-blue-600/90 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm z-10">
-                    現在の画像
+                    {t('currentImage')}
                   </div>
                   <Image
                     src={c2paSummary.thumbnailUrl}

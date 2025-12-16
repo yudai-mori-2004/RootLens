@@ -527,7 +527,7 @@ export default function UploadPage() {
       if (!summaryData) {
         const result = await c2pa!.read(currentFile);
         const manifestStore = result.manifestStore;
-        summaryData = await createManifestSummary(manifestStore, previewThumbnailUrl);
+        summaryData = await createManifestSummary(manifestStore, previewThumbnailDataUri);
       } else {
         // 既存のsummaryDataのthumbnailUrlを更新
         summaryData = { ...summaryData, thumbnailUrl: publicThumbnailUrl };

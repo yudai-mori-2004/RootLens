@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { PenTool, Save, Loader2, Sparkles, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 
 interface EditAssetModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export default function EditAssetModal({
   currentPriceLamports,
   walletAddress,
 }: EditAssetModalProps) {
+  const t = useTranslations('components.editAssetModal');
   const [title, setTitle] = useState(currentTitle);
   const [description, setDescription] = useState(currentDescription);
   // 表示用はSOL単位、保存用はLamports
@@ -64,15 +66,15 @@ export default function EditAssetModal({
       });
 
       if (!response.ok) {
-        throw new Error('更新に失敗しました');
+        throw new Error(t('error'));
       }
 
-      toast.success('アセット情報を更新しました');
+      toast.success(t('success'));
       onSuccess();
       onClose();
     } catch (error) {
       console.error(error);
-      toast.error('エラーが発生しました');
+      toast.error(t('unknownError'));
     } finally {
       setIsSaving(false);
     }
@@ -90,10 +92,10 @@ export default function EditAssetModal({
             </div>
             <div>
               <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
-                アセット情報の編集
+                {t('title')}
               </DialogTitle>
               <DialogDescription className="text-slate-500 text-sm mt-0.5">
-                公開されるタイトルや価格を変更します
+                {t('desc')}
               </DialogDescription>
             </div>
           </div>
@@ -104,13 +106,13 @@ export default function EditAssetModal({
           <div className="space-y-2">
             <Label htmlFor="title" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-indigo-500" />
-              タイトル
+              {t('inputTitle')}
             </Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="アセットのタイトル"
+              placeholder={t('placeholderTitle')}
               className="focus-visible:ring-indigo-500 focus-visible:border-indigo-500"
             />
           </div>
@@ -118,13 +120,13 @@ export default function EditAssetModal({
           <div className="space-y-2">
             <Label htmlFor="description" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-indigo-500" />
-              説明
+              {t('inputDesc')}
             </Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="アセットの詳細な説明"
+              placeholder={t('placeholderDesc')}
               className="resize-none focus-visible:ring-indigo-500 focus-visible:border-indigo-500 min-h-[100px]"
             />
           </div>
@@ -132,7 +134,7 @@ export default function EditAssetModal({
           <div className="space-y-2">
             <Label htmlFor="price" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4 text-indigo-500" />
-              販売価格 (SOL)
+              {t('inputPrice')}
             </Label>
             <div className="relative">
               <Input
@@ -162,7 +164,7 @@ export default function EditAssetModal({
               </div>
             </div>
             <p className="text-[10px] text-slate-500">
-              ※ 0 SOLに設定すると無料ダウンロード可能になります
+              {t('priceNote')}
             </p>
           </div>
         </div>
@@ -175,7 +177,7 @@ export default function EditAssetModal({
             disabled={isSaving}
             className="text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
           >
-            キャンセル
+            {t('cancel')}
           </Button>
           <Button
             onClick={handleSave}
@@ -185,12 +187,12 @@ export default function EditAssetModal({
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                保存中
+                {t('saving')}
               </>
             ) : (
               <>
                 <Save className="w-4 h-4 mr-2" />
-                保存する
+                {t('save')}
               </>
             )}
           </Button>

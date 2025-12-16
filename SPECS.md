@@ -1,8 +1,10 @@
-RootLens 企画・仕様書（Ver.5）✅ MVP完成版
+RootLens 企画・仕様書（Ver.5）
 
 ## 📋 概要
 
 **RootLens**は、C2PAハードウェア署名とブロックチェーン技術を組み合わせ、AI時代における「現実」の価値を再定義し、保護するプラットフォームです。
+
+**稼働状況**: 本番環境 https://rootlens.io で稼働中
 
 ### 技術の役割分担
 
@@ -11,17 +13,17 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 | 技術 | 担当する役割 |
 | --- | --- |
 | **C2PA** | コンテンツの真正性証明、改ざん検出、来歴情報の保持 |
-| **Blockchain** | 所有権の帰属先の明確化、権利の流動化（売買・譲渡）、乗っ取り防止 |
+| **Blockchain** | 所有権の帰属先の明確化、権利の流動化(売買・譲渡)、乗っ取り防止 |
 
 > 重要: C2PAだけでもトラストレスな真正性検証は可能です。ブロックチェーンは「誰のものか」と「権利の流動性」を担います。
-> 
+>
 
 ### 解決する課題
 
 | 課題 | 解決技術 | RootLensの解決策 |
 | --- | --- | --- |
 | **AI生成コンテンツの氾濫** | C2PA | ハードウェア署名を検証し、実在性を暗号技術で担保 |
-| **コンテンツの改ざん** | C2PA | 改ざんがあれば検出される（元データがあれば誰でも検証可能） |
+| **コンテンツの改ざん** | C2PA | 改ざんがあれば検出される(元データがあれば誰でも検証可能) |
 | **所有権の不明確さ** | Blockchain | ウォレットに紐づけ、権利の帰属先を明確化 |
 | **権利の乗っ取り** | Blockchain | Arweave ⇄ cNFT の相互リンク設計により乗っ取りを防止 |
 | **権利の固定化** | Blockchain | NFTとして売買・譲渡が可能 |
@@ -29,10 +31,10 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 
 ### コアコンセプト
 
-**「Root（始祖）がハードウェア署名であれば、編集済みデータも受け入れる」**
+**「Root(始祖)がハードウェア署名であれば、編集済みデータも受け入れる」**
 
 - 無加工のみを対象とせず、色調整・トリミング等を行った報道写真やアート作品も対象
-- 重要なのは「どんなに加工されていても、その根っこ（Root）がハードウェア署名である」こと
+- 重要なのは「どんなに加工されていても、その根っこ(Root)がハードウェア署名である」こと
 
 ### ターゲットユーザー
 
@@ -63,29 +65,33 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
             │                   │                   │
             ▼                   ▼                   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Docker Compose 環境                           │
+│                  本番環境アーキテクチャ                           │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │                   Next.js (Frontend)                      │  │
-│  │  ・API Routes（ジョブ投入、ステータス確認）                │  │
-│  │  ・Presigned URL発行（Private R2）                        │  │
-│  │  ・Public Bucket直接アップロード（Manifest・サムネイル）    │  │
-│  │  ・購入処理（DB記録、DLリンク発行）                        │  │
+│  │            Next.js 15 (Vercel デプロイ)                   │  │
+│  │  ・API Routes (ジョブ投入、ステータス確認)                 │  │
+│  │  ・Presigned URL発行 (Private R2)                         │  │
+│  │  ・Public Bucket直接アップロード (Manifest・サムネイル)     │  │
+│  │  ・購入処理 (DB記録、DLリンク発行)                         │  │
+│  │  ・next-intl (英語・日本語 完全対応)                       │  │
 │  └──────────────────────┬───────────────────────────────────┘  │
 │                         │ Job追加                               │
 │                         ▼                                       │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │                      Redis                                │  │
-│  │              (BullMQ ジョブキュー)                         │  │
+│  │            Upstash Redis (TLS接続)                        │  │
+│  │           (BullMQ ジョブキュー)                            │  │
+│  │  ・rediss:// プロトコル                                    │  │
+│  │  ・Vercel & Railway 共有                                  │  │
 │  └──────────────────────┬───────────────────────────────────┘  │
-│                         │ Job取得（直列）                       │
+│                         │ Job取得 (直列)                        │
 │                         ▼                                       │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │                   Worker (Node.js)                        │  │
-│  │  ・次のcNFTアドレス予測（TreeConfig.numMinted参照）        │  │
-│  │  ・Arweaveアップロード（Umi + Irys）                      │  │
-│  │  ・cNFT mint（Arweave URI設定）                           │  │
+│  │         Worker (Node.js / Railway デプロイ)               │  │
+│  │  ・次のcNFTアドレス予測 (TreeConfig.numMinted参照)         │  │
+│  │  ・Arweaveアップロード (Umi + Irys)                       │  │
+│  │  ・cNFT mint (Arweave URI設定)                            │  │
 │  │  ・concurrency: 1 で完全直列処理                          │  │
+│  │  ・HTTP API (/health, /metrics, /api/upload)             │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │      ┌───────────────┬───────────────┬───────────────┐          │
@@ -98,11 +104,15 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 │  └────────┘  └─────────────┘  └─────────────┘  └────────────┘  │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Cloudflare Workers AI (Lens)                 │  │
-│  │  ・uform-gen2-qwen-500m（画像キャプション生成）            │  │
-│  │  ・bge-base-en-v1.5（テキスト埋め込み）                    │  │
+│  │        Cloudflare Workers AI (Lens / 独立デプロイ)        │  │
+│  │  ・uform-gen2-qwen-500m (画像キャプション生成)             │  │
+│  │  ・bge-base-en-v1.5 (テキスト埋め込み)                     │  │
 │  └──────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
+
+【開発環境】
+- docker-compose.yml: フロントエンドのみ (ローカル開発用)
+- Workerは常にRailwayから実行
 
 ```
 
@@ -110,7 +120,7 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 
 | レイヤー | 技術 | 選定理由 |
 | --- | --- | --- |
-| Frontend | Next.js 15 (App Router) | React Server Components、API Routes統合 |
+| Frontend | Next.js 16 (App Router) | React Server Components、API Routes統合 |
 | Blockchain | Solana (BubbleGum/Metaplex) | cNFTによる低コスト大量mint |
 | 永久保存 | Arweave (via Irys) | 永久保存、Umi統合、SOL払い |
 | Storage | Cloudflare R2 (2バケット) | Egress無料、Private+Public構成 |
@@ -119,9 +129,21 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 | Auth | Privy | ウォレット + SMS認証 |
 | 決済 | SolanaPay | 直接送金、手数料最小化 |
 | RPC | Helius | cNFT読み取り、DAS API |
-| ジョブキュー | BullMQ + Redis | 直列処理、リトライ、スケーラブル |
+| ジョブキュー | BullMQ + Upstash Redis | 直列処理、リトライ、クラウドネイティブ |
 | Lens検索 | Cloudflare Workers AI | uform-gen2-qwen-500m + bge-base-en-v1.5 |
-| コンテナ | Docker Compose | 開発・本番環境の統一 |
+| 国際化 | next-intl | 英語・日本語完全対応 |
+| デプロイ | Vercel + Railway | フロント・Worker分離デプロイ |
+
+### デプロイメント構成
+
+| コンポーネント | プラットフォーム | 環境変数管理 |
+| --- | --- | --- |
+| **Frontend** | Vercel | Vercel Dashboard |
+| **Worker** | Railway | Railway Dashboard |
+| **Redis** | Upstash | 両プラットフォームで共有 |
+| **Lens Worker** | Cloudflare Workers | wrangler.toml + Secrets |
+| **Database** | Supabase Cloud | 全プラットフォームで共有 |
+| **Storage** | Cloudflare R2 | 全プラットフォームで共有 |
 
 ### トラストモデル
 
@@ -130,24 +152,24 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 │                    信頼の構造                                    │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  【C2PAが担保するもの（元データがあれば誰でも検証可能）】          │
+│  【C2PAが担保するもの(元データがあれば誰でも検証可能)】          │
 │  ├─ コンテンツがハードウェアで撮影されたこと                     │
-│  ├─ 撮影後の編集履歴（来歴情報）                                │
-│  └─ 改ざんの有無（改ざんされていれば検出される）                 │
+│  ├─ 撮影後の編集履歴(来歴情報)                                │
+│  └─ 改ざんの有無(改ざんされていれば検出される)                 │
 │                                                                 │
 │  【ブロックチェーンが担保するもの】                               │
-│  ├─ 所有権の帰属先（ウォレットアドレス）                         │
-│  ├─ 権利の流通履歴（NFTの譲渡履歴）                             │
-│  └─ 乗っ取り防止（相互リンクによる真正性）                       │
+│  ├─ 所有権の帰属先(ウォレットアドレス)                         │
+│  ├─ 権利の流通履歴(NFTの譲渡履歴)                             │
+│  └─ 乗っ取り防止(相互リンクによる真正性)                       │
 │                                                                 │
 │  【信頼する必要があるもの】                                       │
-│  ├─ C2PA仕様（暗号技術）                                         │
-│  ├─ ハードウェアメーカーのRoot CA（Sony, Google等）               │
+│  ├─ C2PA仕様(暗号技術)                                         │
+│  ├─ ハードウェアメーカーのRoot CA(Google等)                     │
 │  ├─ Solanaブロックチェーン                                       │
 │  └─ Arweaveネットワーク                                          │
 │                                                                 │
 │  【RootLensサーバーの役割】                                       │
-│  ├─ 証明書ページでの表示（manifest.jsonの内容表示）              │
+│  ├─ 証明書ページでの表示(manifest.jsonの内容表示)              │
 │  │   → ただし元ファイル自体はC2PA署名により改ざん検出可能        │
 │  │                                                               │
 │  ├─ Arweaveアップロード時のウォレット署名                         │
@@ -179,22 +201,22 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 
 | データ種別 | 保存先 | 理由 |
 | --- | --- | --- |
-| 証明参照データ（ハッシュ、署名者等） | Arweave (via Irys) | 永久保存、所有権紐づけ用 |
+| 証明参照データ(ハッシュ、署名者等) | Arweave (via Irys) | 永久保存、所有権紐づけ用 |
 | サムネイル画像 | R2 Public Bucket | 公開URL、削除可能 |
-| C2PAメタデータ（manifest.json） | R2 Public Bucket | 公開URL、証明書ページで使用 |
+| C2PAメタデータ(manifest.json) | R2 Public Bucket | 公開URL、証明書ページで使用 |
 | 元メディアファイル | R2 Private Bucket | Presigned URLのみ、販売対象 |
-| 所有権（cNFT） | Solana | 譲渡可能、検証可能 |
+| 所有権(cNFT) | Solana | 譲渡可能、検証可能 |
 | ビジネスデータ | Supabase | 可変、サービス固有 |
 | 特徴量ベクトル | Supabase (pgvector) | Lens検索用 |
-| ジョブキュー | Redis | 直列処理、リトライ管理 |
+| ジョブキュー | Upstash Redis | 直列処理、リトライ管理、クラウド管理 |
 
 ---
 
 ## 📁 データモデル
 
-### Arweave構造（証明参照データの永久保存）
+### Arweave構造(証明参照データの永久保存)
 
-**Arweaveに保存するJSONメタデータ：**
+**Arweaveに保存するJSONメタデータ:**
 
 ```json
 {
@@ -205,7 +227,7 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
   "target_asset_id": "7xKp...3mNv",
   "attributes": [
     { "trait_type": "original_hash", "value": "abc123ef..." },
-    { "trait_type": "root_signer", "value": "Sony Corporation" },
+    { "trait_type": "root_signer", "value": "Google LLC" },
     { "trait_type": "root_cert_chain", "value": "Base64エンコードされた証明書チェーン" },
     { "trait_type": "created_at", "value": "2025-01-15T12:00:00Z" }
   ]
@@ -213,28 +235,28 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 
 ```
 
-**フィールド詳細：**
+**フィールド詳細:**
 
 | フィールド | 内容 | サイズ | 用途 |
 | --- | --- | --- | --- |
 | `name` | 証明書の名前 | 50 bytes | 識別用 |
-| `symbol` | シンボル（RLENS） | 10 bytes | 識別用 |
+| `symbol` | シンボル(RLENS) | 10 bytes | 識別用 |
 | `description` | 説明文 | 100 bytes | 説明 |
 | `image` | サムネイル公開URL | 100 bytes | R2 Public Bucketへのリンク |
 | `target_asset_id` | cNFTアドレス | 44 bytes | 相互リンク検証 |
 | `original_hash` | 元ファイルのSHA-256 | 64 bytes | ファイル識別 |
 | `root_signer` | Root CA名 | 50-100 bytes | 署名者表示・検索 |
-| `root_cert_chain` | 証明書チェーン（Base64） | 1-3 KB | 参照用（実際の検証は元ファイルで行う） |
+| `root_cert_chain` | 証明書チェーン(Base64) | 1-3 KB | 参照用(実際の検証は元ファイルで行う) |
 | `created_at` | タイムスタンプ | 30 bytes | 発行日時 |
 
-**特徴：**
+**特徴:**
 
-- サムネイルはR2 Public URLとして保存（削除可能）
-- 証明参照データは最小限（3-5KB）
+- サムネイルはR2 Public URLとして保存(削除可能)
+- 証明参照データは最小限(3-5KB)
 - Irys Explorerでウォレットアドレスを確認可能
-- 実際のC2PA検証は元ファイルで行う（Arweaveのデータは参照用）
+- 実際のC2PA検証は元ファイルで行う(Arweaveのデータは参照用)
 
-### cNFT構造（Solana / BubbleGum）
+### cNFT構造(Solana / BubbleGum)
 
 ```json
 {
@@ -254,7 +276,7 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 │              「正当な所有権証明」の定義                           │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  以下の条件をすべて満たすArweaveデータを「正当な所有権証明」とする：│
+│  以下の条件をすべて満たすArweaveデータを「正当な所有権証明」とする:│
 │                                                                 │
 │  1. Irys Explorerで、トランザクションの発行者が                 │
 │     RootLensの公開ウォレットアドレスと一致する                   │
@@ -263,17 +285,23 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 │     target_asset_idに記載されたcNFTが最も古い                   │
 │                                                                 │
 │  3. そのcNFTのURIがこのArweaveデータを指している                 │
-│     （相互リンクの成立）                                        │
+│     (相互リンクの成立)                                        │
 │                                                                 │
 │  ※ コンテンツの真正性自体はC2PAで保証される                      │
 │  ※ ブロックチェーンは「誰がこの証明付きコンテンツを所有するか」   │
 │     を担保する                                                   │
 │                                                                 │
+│  【重要: サーバーウォレット変更による再発行】                     │
+│  ├─ RootLensのサーバーウォレットを変更した場合、                │
+│  │   同一original_hashでも異なるIssuerとして扱われる            │
+│  ├─ これにより、異なる発行元からの同一コンテンツ証明が可能       │
+│  └─ 検証ロジックは「現在のサーバーウォレット」との一致を確認     │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 
 ```
 
-**攻撃シナリオと防御：**
+**攻撃シナリオと防御:**
 
 | 攻撃 | 防御 |
 | --- | --- |
@@ -286,7 +314,7 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  cNFT Burn（削除）の検出と表示                                    │
+│  cNFT Burn(削除)の検出と表示                                    │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Helius DAS API レスポンスで burnt フラグを確認                 │
@@ -298,7 +326,7 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 │  }                                                              │
 │                                                                 │
 │  【UI表示】                                                      │
-│  ├─ 所有者情報に「Burn済み（削除）」バッジ表示                   │
+│  ├─ 所有者情報に「Burn済み(削除)」バッジ表示                   │
 │  ├─ 最終所有者のウォレットアドレス表示                           │
 │  ├─ 購入ボタンを非表示                                          │
 │  └─ 警告メッセージ: 「このNFTは削除されています」                │
@@ -311,48 +339,48 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### R2ストレージ構造（2バケット構成）
+### R2ストレージ構造(2バケット構成)
 
-### Private Bucket（元データ専用）
+### Private Bucket(元データ専用)
 
 ```
 media/{original_hash}/
-└── original.{ext}          # 元メディアファイル（C2PA署名埋め込み済み）
+└── original.{ext}          # 元メディアファイル(C2PA署名埋め込み済み)
 
 ```
 
-- **アクセス**: Presigned URLのみ（購入者のみ、期限付き）
+- **アクセス**: Presigned URLのみ(購入者のみ、期限付き)
 - **用途**: 販売対象、購入後のC2PA検証用
-- **削除可能**: はい（GDPR対応、違法コンテンツ削除）
+- **削除可能**: はい(GDPR対応、違法コンテンツ削除)
 
-### Public Bucket（公開データ）
+### Public Bucket(公開データ)
 
 ```
 media/{original_hash}/
-├── thumbnail.jpg           # サムネイル画像（50-200KB）
-└── manifest.json           # C2PAメタデータ（50-500KB）
+├── thumbnail.jpg           # サムネイル画像(50-200KB)
+└── manifest.json           # C2PAメタデータ(50-500KB)
 
 ```
 
-- **アクセス**: 公開URL（誰でもアクセス可能）
+- **アクセス**: 公開URL(誰でもアクセス可能)
 - **用途**: 証明書ページでの表示
-- **削除可能**: はい（プライバシー保護）
+- **削除可能**: はい(プライバシー保護)
 
-**manifest.json の内容：**
+**manifest.json の内容:**
 
 ```json
 {
   "activeManifest": {
-    "claim_generator": "Sony ILCE-7M4 1.0",
+    "claim_generator": "Google Pixel 7 1.0",
     "signature_info": {
-      "issuer": "Sony Corporation",
+      "issuer": "Google LLC",
       "cert_chain": ["-----BEGIN CERTIFICATE-----...", ...],
       "time": "2024-12-01T15:30:00Z"
     },
     "assertions": [
       {
         "label": "stds.exif",
-        "data": { "exif:Make": "Sony", "exif:Model": "ILCE-7M4", ... }
+        "data": { "exif:Make": "Google", "exif:Model": "Pixel 7", ... }
       },
       {
         "label": "stds.iptc",
@@ -368,18 +396,18 @@ media/{original_hash}/
 
 ### Supabaseスキーマ
 
-### media_proofs テーブル（ビジネスデータ）
+### media_proofs テーブル(ビジネスデータ)
 
 ```sql
 CREATE TABLE media_proofs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     -- Arweave連携
-    arweave_tx_id TEXT NOT NULL UNIQUE,
+    arweave_tx_id TEXT UNIQUE,
 
     -- cNFT連携
-    cnft_mint_address TEXT NOT NULL UNIQUE,
-    owner_wallet TEXT NOT NULL,
+    cnft_mint_address TEXT UNIQUE,
+    owner_wallet TEXT,
 
     -- R2パス導出用
     original_hash TEXT NOT NULL UNIQUE,
@@ -391,8 +419,7 @@ CREATE TABLE media_proofs (
     description TEXT,
 
     -- 状態管理
-    is_deleted BOOLEAN DEFAULT FALSE,
-    is_public BOOLEAN DEFAULT TRUE,
+    is_public BOOLEAN DEFAULT FALSE,
 
     -- タイムスタンプ
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -401,7 +428,7 @@ CREATE TABLE media_proofs (
 
 ```
 
-**設計思想**: 証明参照データはArweaveに保存。Supabaseはビジネスロジック専用（価格、タイトル、状態管理のみ）
+**設計思想**: 証明参照データはArweaveに保存。Supabaseはビジネスロジック専用(価格、タイトル、状態管理のみ)
 
 ### purchases テーブル
 
@@ -421,7 +448,7 @@ CREATE TABLE purchases (
 
 ```
 
-### users テーブル（Privy連携）
+### users テーブル(Privy連携)
 
 ```sql
 CREATE TABLE users (
@@ -437,7 +464,7 @@ CREATE TABLE users (
 
 ```
 
-### feature_vectors テーブル（Lens機能用）
+### feature_vectors テーブル(Lens機能用)
 
 ```sql
 CREATE TABLE feature_vectors (
@@ -460,55 +487,63 @@ CREATE TABLE feature_vectors (
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 1: Privy認証                                              │
 │  ├─ ウォレット接続                                               │
-│  └─ SMS認証（オプション）                                        │
+│  └─ SMS認証(オプション)                                        │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 2: ファイル選択                                            │
-│  ユーザーがC2PA付きメディアをドラッグ＆ドロップ                    │
+│  ユーザーがC2PA付きメディアをドラッグ&ドロップ                    │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  Step 3: クライアントサイドC2PA検証（WASM）                       │
+│  Step 3: クライアントサイドC2PA検証(WASM)                       │
 │  ├─ c2pa.read(file) でManifest Storeを解析                      │
 │  ├─ Ingredientsを再帰的に遡り、Rootを特定                        │
-│  ├─ Root署名証明書が信頼済みリスト（ハードウェアCA）に含まれるか確認│
-│  ├─ root_signer（CA名）を抽出                                   │
-│  ├─ 証明書チェーン（cert_chain）をBase64エンコード               │
+│  ├─ Root署名証明書が信頼済みリスト(ハードウェアCA)に含まれるか確認│
+│  │   ★現在対応: Google Pixel のみ                              │
+│  │   ・signatureInfo.issuer が "Google LLC" に一致              │
+│  │   ・targetLabel: "c2pa.hash.data.part"                      │
+│  │   ・他デバイス(Sony, Leica等)は動作確認後に順次有効化        │
+│  ├─ root_signer(CA名)を抽出                                   │
+│  ├─ 証明書チェーン(cert_chain)をBase64エンコード               │
 │  ├─ サムネイルをData URIに変換                                  │
 │  └─ 検証失敗 → エラー表示、アップロード不可                       │
 │                                                                 │
-│  ※ この検証はC2PA技術によるもの（改ざんがあれば検出される）       │
+│  ※ この検証はC2PA技術によるもの(改ざんがあれば検出される)       │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 4: プライバシー警告表示                                    │
 │  ├─ C2PAメタデータに含まれる情報を一覧表示                        │
-│  │   （GPS、シリアル番号、撮影日時等）                           │
+│  │   (GPS、シリアル番号、撮影日時等)                           │
 │  ├─ 「これらの情報が公開されます」と警告                          │
 │  └─ ユーザーが続行を選択                                         │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 5: 価格・情報設定                                          │
-│  ├─ 価格を設定（0 = 無料ダウンロード）                           │
-│  ├─ タイトル（オプション）                                       │
-│  └─ 説明文（オプション）                                         │
+│  ├─ 価格を設定(0 = 無料ダウンロード)                           │
+│  ├─ タイトル(オプション)                                       │
+│  └─ 説明文(オプション)                                         │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 6: クライアントサイドでハッシュ計算                         │
-│  └─ 元メディアファイルのSHA-256ハッシュ（= original_hash）        │
+│  └─ 元メディアファイルのSHA-256ハッシュ(= original_hash)        │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  Step 7: 重複チェック（API経由）                                 │
-│  ├─ original_hashがすでにSupabaseに存在するか確認               │
-│  └─ 存在する場合 → エラー表示、アップロード不可                   │
+│  Step 7: 重複チェック(API経由・強化版)                           │
+│  ├─ フロント: Supabase DBでoriginal_hashチェック               │
+│  └─ Worker: オンチェーン検証(Arweave + Solana)                 │
+│     ├─ Arweave GraphQLでoriginal_hashタグ検索                  │
+│     ├─ 現在のサーバーウォレット発行のみを重複として判定           │
+│     ├─ 各Arweave TXのtarget_asset_idがSolana上に存在するか確認  │
+│     └─ 存在する場合 → 重複エラー                                │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  Step 8: R2アップロード（2段階）                                 │
+│  Step 8: R2アップロード(2段階)                                 │
 │                                                                 │
 │  【8-1】Private Bucketへ元ファイルアップロード                   │
 │  ├─ POST /api/upload/presigned でPresigned URL取得             │
@@ -532,25 +567,27 @@ CREATE TABLE feature_vectors (
 │  │   - mediaFilePath                                           │
 │  │   - thumbnailPublicUrl                                      │
 │  │   - price, title, description                               │
-│  ├─ BullMQのキューにジョブを追加                                 │
+│  ├─ Upstash Redis (BullMQ) のキューにジョブを追加               │
 │  └─ ユーザーに「処理中」と即座にレスポンス                        │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
         ┌─────────────────────────────────────────────────────────┐
-        │  【Worker側で直列処理】                                  │
+        │  【Worker側で直列処理 (Railway)】                        │
         │                                                         │
-        │  Step 10: 既存チェック（冪等性担保）                     │
-        │  └─ Supabaseでoriginal_hashを検索                       │
+        │  Step 10: オンチェーン重複チェック(冪等性担保)           │
+        │  ├─ Arweave GraphQLでoriginal_hash検索                  │
+        │  ├─ 現在のサーバーウォレット発行のTXをフィルタ            │
+        │  └─ 各TX のtarget_asset_id がSolana上に存在するか確認   │
         │                                                         │
         │  Step 11: 次のcNFTアドレス予測                          │
         │  ├─ TreeConfig.numMintedを取得                          │
         │  ├─ 次のleaf indexを決定                                │
         │  └─ PDAを計算してAsset IDを予測                          │
         │                                                         │
-        │  Step 12: Arweaveアップロード（Umi + Irys）              │
+        │  Step 12: Arweaveアップロード(Umi + Irys)              │
         │  ├─ 証明参照データJSONを作成:                            │
         │  │   - target_asset_id: 予測したcNFTアドレス            │
-        │  │   - image: サムネイル公開URL（R2）                   │
+        │  │   - image: サムネイル公開URL(R2)                   │
         │  │   - attributes: ハッシュ、署名者、証明書チェーン等    │
         │  └─ umi.uploader.uploadJson()                           │
         │                                                         │
@@ -573,15 +610,17 @@ CREATE TABLE feature_vectors (
 
 ```
 
-### アセットページ（証明・購入・ダウンロード）
+### アセットページ(証明・購入・ダウンロード)
 
-**URL形式**: `rootlens.io/asset/{original_hash}`
+**URL形式**: `rootlens.io/[locale]/asset/{original_hash}`
 
-### 検証フロー（完全版・5ステップ検証）
+- **locale**: `en` または `ja` (next-intl対応)
+
+### 検証フロー(完全版・5ステップ検証)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│        所有権の正当性検証プロセス（リアルタイム）                   │
+│        所有権の正当性検証プロセス(リアルタイム)                   │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  Step 1: 永久記録を探す                                         │
@@ -594,7 +633,7 @@ CREATE TABLE feature_vectors (
 │  ├─ Helius DAS API で cNFT の存在確認                          │
 │  │   (checkSolanaAssetExists)                                 │
 │  ├─ 所有者ウォレットアドレス取得                                │
-│  ├─ Burn判定（burnt === true の場合）                         │
+│  ├─ Burn判定(burnt === true の場合)                         │
 │  │   └─ 最終所有者を表示、現在は「削除済み」と表示              │
 │  └─ 失敗時は DB フォールバック                                  │
 │                                                                 │
@@ -602,17 +641,17 @@ CREATE TABLE feature_vectors (
 │  ├─ Irys Gateway から Arweave メタデータ取得                   │
 │  │   (fetchArweaveMetadata)                                   │
 │  ├─ attributes から root_signer 抽出                           │
-│  ├─ target_asset_id（相互リンク先）を取得                      │
+│  ├─ target_asset_id(相互リンク先)を取得                      │
 │  └─ C2PA manifest.json を R2 Public Bucket から取得           │
 │                                                                 │
-│  Step 4: 乗っ取り防止チェック（相互リンク検証）                   │
+│  Step 4: 乗っ取り防止チェック(相互リンク検証)                   │
 │  ├─ arweaveToCnft: Arweave の target_asset_id が                │
 │  │   実際の cNFT mint address と一致するか                     │
 │  ├─ cnftToArweave: cNFT の URI に Arweave txId が               │
-│  │   含まれているか（相互参照の成立）                            │
+│  │   含まれているか(相互参照の成立)                            │
 │  └─ 両者が互いに指し合っている = 正当な所有権証明                │
 │                                                                 │
-│  Step 5: コピー発行の確認（重複チェック）                        │
+│  Step 5: コピー発行の確認(重複チェック)                        │
 │  ├─ Supabase で original_hash を検索                           │
 │  ├─ 複数レコードがある場合、現在の cNFT が最古か確認            │
 │  │   └─ created_at でソートし、最初のものが「真の証明」         │
@@ -622,18 +661,18 @@ CREATE TABLE feature_vectors (
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  アセットページ表示                                              │
-│  ├─ 検証結果バッジ（✅ RootLens Verified / ❌ Invalid）         │
-│  ├─ サムネイル表示（C2PA thumbnail または R2 Public URL）       │
-│  ├─ 所有者情報（ウォレットアドレス + Burn状態）                  │
-│  ├─ C2PA 詳細情報（Provenance Timeline）                        │
-│  ├─ デジタル資産証明（4カラム: C2PA, AI判定, Arweave, cNFT）    │
-│  ├─ 技術仕様（Technical Details）                               │
-│  └─ 購入ボタン（価格表示 + SolanaPay統合）                      │
+│  ├─ 検証結果バッジ(✅ RootLens Verified / ❌ Invalid)         │
+│  ├─ サムネイル表示(C2PA thumbnail または R2 Public URL)       │
+│  ├─ 所有者情報(ウォレットアドレス + Burn状態)                  │
+│  ├─ C2PA 詳細情報(Provenance Timeline)                        │
+│  ├─ デジタル資産証明(4カラム: C2PA, AI判定, Arweave, cNFT)    │
+│  ├─ 技術仕様(Technical Details)                               │
+│  └─ 購入ボタン(価格表示 + SolanaPay統合)                      │
 └─────────────────────────────────────────────────────────────────┘
 
 ```
 
-### 購入フロー（SolanaPay）
+### 購入フロー(SolanaPay)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -659,23 +698,23 @@ CREATE TABLE feature_vectors (
 │  ├─ purchasesテーブルに記録                                      │
 │  │   - buyer_wallet                                             │
 │  │   - solana_tx_signature                                      │
-│  │   - download_token（UUID生成）                               │
-│  │   - download_expires_at（24時間後）                          │
+│  │   - download_token(UUID生成)                               │
+│  │   - download_expires_at(24時間後)                          │
 │  └─ ダウンロードトークンをレスポンス                             │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │  Step 5: 即時ダウンロード                                        │
 │  ├─ GET /download/{download_token}                              │
-│  ├─ トークン検証（有効期限、使用回数）                           │
-│  ├─ Presigned URL生成（Private Bucket）                         │
+│  ├─ トークン検証(有効期限、使用回数)                           │
+│  ├─ Presigned URL生成(Private Bucket)                         │
 │  │   - media/{hash}/original.{ext}                             │
 │  │   - 有効期限: 1時間                                          │
 │  └─ リダイレクトでダウンロード開始                               │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  Step 6: 購入後のC2PA検証（ユーザー側）                          │
+│  Step 6: 購入後のC2PA検証(ユーザー側)                          │
 │  ├─ c2pa.read(file) でC2PA検証                                  │
 │  ├─ Root署名者を確認                                             │
 │  ├─ 証明書チェーンを確認                                         │
@@ -692,11 +731,11 @@ CREATE TABLE feature_vectors (
 
 ユーザーが所有するアセットと購入済みコンテンツを一元管理するダッシュボード機能。
 
-**URL**: `/dashboard`
+**URL**: `/[locale]/dashboard`
 
 ### 実装機能
 
-#### 1. 所有権同期（Helius DAS API統合）✅
+#### 1. 所有権同期(Helius DAS API統合) ✅
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -721,7 +760,7 @@ CREATE TABLE feature_vectors (
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-#### 2. ページネーション✅
+#### 2. ページネーション ✅
 
 ```
 【実装詳細】
@@ -729,7 +768,7 @@ CREATE TABLE feature_vectors (
 ├─ ページ切り替え時に API 再フェッチ
 ├─ クエリパラメータ: page, limit
 ├─ レスポンス: items[], total, page, totalPages
-└─ UI: 前後ボタン + ページ番号表示（最大7つ）
+└─ UI: 前後ボタン + ページ番号表示(最大7つ)
 
 【状態管理】
 ├─ 所有アセットタブ: ownedPage, ownedTotal, ownedTotalPages
@@ -737,30 +776,30 @@ CREATE TABLE feature_vectors (
 └─ useEffect でページ変更時に自動再取得
 ```
 
-#### 3. アセット編集機能（EditAssetModal）✅
+#### 3. アセット編集機能(EditAssetModal) ✅
 
 ```
 POST /api/creator-content/update
 
 【編集可能項目】
-├─ タイトル（title）
-├─ 説明文（description）
-└─ 価格（price）
+├─ タイトル(title)
+├─ 説明文(description)
+└─ 価格(price)
    ├─ フロント入力: SOL単位
-   ├─ API送信: Lamports（× 10^9）
+   ├─ API送信: Lamports(× 10^9)
    └─ 0 = 無料ダウンロード
 
 【権限チェック】
 └─ walletAddress === owner_wallet のみ編集可能
 
 【UI】
-├─ 各アセットカードに編集ボタン（PenTool icon）
+├─ 各アセットカードに編集ボタン(PenTool icon)
 ├─ モーダル表示
 ├─ 保存成功時にリスト自動更新
 └─ エラーハンドリング
 ```
 
-#### 4. 公開/非公開切り替え✅
+#### 4. 公開/非公開切り替え ✅
 
 ```
 POST /api/creator-content/toggle-public
@@ -772,8 +811,8 @@ POST /api/creator-content/toggle-public
 └─ C2PA manifest.json も非公開時は所有者のみ表示
 
 【UI】
-├─ 公開中: 緑バッジ「公開中」（Eye icon）
-├─ 非公開: グレーバッジ「非公開」（EyeOff icon）
+├─ 公開中: 緑バッジ「公開中」(Eye icon)
+├─ 非公開: グレーバッジ「非公開」(EyeOff icon)
 └─ ボタンクリックで即座に切り替え
 ```
 
@@ -789,8 +828,8 @@ POST /api/creator-content/toggle-public
 
 ┌─────────────────────────────────────────────────────────────────┐
 │  タブ切り替え                                                     │
-│  ├─ 所有アセット（creatorContents.length件）                     │
-│  └─ 購入済み（purchasedContents.length件）                      │
+│  ├─ 所有アセット(creatorContents.length件)                     │
+│  └─ 購入済み(purchasedContents.length件)                      │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
@@ -798,12 +837,12 @@ POST /api/creator-content/toggle-public
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  【グリッド表示】                                                 │
-│  ├─ 2列（MD） / 3列（LG） / 4列（XL） / 5列（2XL）               │
+│  ├─ 2列(MD) / 3列(LG) / 4列(XL) / 5列(2XL)               │
 │  └─ 各カード:                                                     │
-│     ├─ サムネイル画像（aspect-square）                           │
-│     ├─ 公開/非公開バッジ（右上）                                 │
+│     ├─ サムネイル画像(aspect-square)                           │
+│     ├─ 公開/非公開バッジ(右上)                                 │
 │     ├─ タイトル                                                  │
-│     ├─ cNFT address（短縮表示）                                 │
+│     ├─ cNFT address(短縮表示)                                 │
 │     ├─ 価格表示                                                  │
 │     ├─ 編集ボタン                                                │
 │     ├─ 詳細ボタン → /asset/[hash]                               │
@@ -836,14 +875,14 @@ POST /api/creator-content/toggle-public
 ┌─────────────────────────────────────────────────────────────────┐
 │  ページネーション                                                 │
 │  ├─ 前へ / 次へボタン                                            │
-│  ├─ ページ番号（最大7つ表示）                                    │
+│  ├─ ページ番号(最大7つ表示)                                    │
 │  └─ 現在ページ / 総ページ数表示                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🔍 Lens機能（画像検索）✅ 完全実装済み
+## 🔍 Lens機能(画像検索) ✅ 完全実装済み
 
 ### 概要
 
@@ -855,12 +894,12 @@ Cloudflare Workers AIを使用して、アップロードされた画像の特�
 
 | 項目 | 技術 | 用途 |
 | --- | --- | --- |
-| 画像→テキスト | uform-gen2-qwen-500m | 画像からキャプション（説明文）を生成 |
+| 画像→テキスト | uform-gen2-qwen-500m | 画像からキャプション(説明文)を生成 |
 | テキスト→ベクトル | bge-base-en-v1.5 | キャプションを768次元ベクトルに変換 |
 | ベクトルDB | Supabase pgvector | コサイン類似度検索 |
 | 実行環境 | Cloudflare Workers AI | エッジでの高速推論 |
 
-### 検索インターフェース（/lens ページ）
+### 検索インターフェース(/[locale]/lens ページ)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -868,17 +907,17 @@ Cloudflare Workers AIを使用して、アップロードされた画像の特�
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  1️⃣ テキスト検索                                                 │
-│  ├─ 検索クエリ入力（例: "sunset over mountain"）                │
+│  ├─ 検索クエリ入力(例: "sunset over mountain")                │
 │  ├─ Workers AI で埋め込みベクトル生成                           │
 │  └─ pgvector でコサイン類似度検索                                │
 │                                                                 │
-│  2️⃣ 画像検索（ドラッグ＆ドロップ対応）                            │
+│  2️⃣ 画像検索(ドラッグ&ドロップ対応)                            │
 │  ├─ 画像ファイルをアップロード                                   │
-│  ├─ 自動リサイズ（MAX_SIZE: 800px、JPEG品質: 0.85）             │
+│  ├─ 自動リサイズ(MAX_SIZE: 800px、JPEG品質: 0.85)             │
 │  ├─ Workers AI でキャプション生成 → 埋め込み                    │
 │  └─ 類似画像検索                                                 │
 │                                                                 │
-│  3️⃣ カメラ検索（Google Lens風）                                  │
+│  3️⃣ カメラ検索(Google Lens風)                                  │
 │  ├─ getUserMedia で外カメラ起動                                 │
 │  ├─ Canvas で撮影                                               │
 │  └─ 撮影画像で自動的に画像検索実行                               │
@@ -890,17 +929,17 @@ Cloudflare Workers AIを使用して、アップロードされた画像の特�
 
 ```
 【検索結果表示】
-├─ レスポンシブグリッド（2列MD / 3列LG / 4列XL）
+├─ レスポンシブグリッド(2列MD / 3列LG / 4列XL)
 ├─ 各結果カードに:
-│  ├─ サムネイル画像（R2 Public Bucket）
-│  ├─ 類似度スコア（0-100%）
+│  ├─ サムネイル画像(R2 Public Bucket)
+│  ├─ 類似度スコア(0-100%)
 │  ├─ タイトル
-│  ├─ 価格（Free / X.XX SOL）
+│  ├─ 価格(Free / X.XX SOL)
 │  ├─ 作成日時
 │  └─ クリックで /asset/[hash] へ遷移
 ├─ ローディング状態表示
 ├─ エラーハンドリング
-└─ 全画面ドラッグオーバーレイ（画像検索用）
+└─ 全画面ドラッグオーバーレイ(画像検索用)
 ```
 
 ### アーキテクチャ
@@ -922,7 +961,7 @@ Cloudflare Workers AIを使用して、アップロードされた画像の特�
 ┌─────────────────────────────────────────────────────────────────┐
 │  テキスト検索時                                                  │
 │                                                                 │
-│  検索クエリ（テキスト）                                          │
+│  検索クエリ(テキスト)                                          │
 │       ↓                                                         │
 │  Cloudflare Workers AI                                          │
 │  └─ bge-base-en-v1.5 → クエリベクトル                           │
@@ -935,7 +974,7 @@ Cloudflare Workers AIを使用して、アップロードされた画像の特�
 ┌─────────────────────────────────────────────────────────────────┐
 │  画像検索時                                                      │
 │                                                                 │
-│  検索クエリ（画像）                                              │
+│  検索クエリ(画像)                                              │
 │       ↓                                                         │
 │  Cloudflare Workers AI                                          │
 │  ├─ uform-gen2-qwen-500m → キャプション生成                     │
@@ -950,7 +989,7 @@ Cloudflare Workers AIを使用して、アップロードされた画像の特�
 
 ### 処理フロー
 
-### 特徴量抽出（アップロード時）
+### 特徴量抽出(アップロード時)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -974,7 +1013,7 @@ Cloudflare Workers AIを使用して、アップロードされた画像の特�
 │  Step 4: Supabaseに保存                                          │
 │  └─ feature_vectors テーブルに挿入                               │
 │     - media_proof_id: 対象のProof ID                            │
-│     - embedding: 特徴量ベクトル（pgvector型）                    │
+│     - embedding: 特徴量ベクトル(pgvector型)                    │
 │     - model_name: "bge-base-en-v1.5"                            │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -991,17 +1030,17 @@ LIMIT 20;
 
 ```
 
-### 副次的効果：信頼性検索
+### 副次的効果: 信頼性検索
 
-Lens機能には、単なる画像検索以上の価値があります：
+Lens機能には、単なる画像検索以上の価値があります:
 
-> 「この画像は、証明付きの"本物"として登録されているか？」
-> 
+> 「この画像は、証明付きの"本物"として登録されているか?」
+>
 
 を検索できる**信頼性の検証ツール**として機能します。
 
 - ユーザーが増え、登録画像が増えるほど、検証ツールとしての価値が高まる
-- 「ヒットしない＝偽物」とは限らないが、「ヒットする＝証明付き」は確実
+- 「ヒットしない=偽物」とは限らないが、「ヒットする=証明付き」は確実
 
 ---
 
@@ -1009,7 +1048,7 @@ Lens機能には、単なる画像検索以上の価値があります：
 
 ### 技術的背景
 
-cNFTのAsset IDは、Merkle TreeのアドレスとLeaf Indexから導出されるPDA（Program Derived Address）です。
+cNFTのAsset IDは、Merkle TreeのアドレスとLeaf Indexから導出されるPDA(Program Derived Address)です。
 
 ```tsx
 // PDA導出の仕組み
@@ -1033,7 +1072,7 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
   // 1. TreeConfigからnum_mintedを取得
   const treeConfig = await fetchTreeConfigFromSeeds(umi, { merkleTree });
 
-  // 2. 次のleaf indexはnum_minted（0-indexed）
+  // 2. 次のleaf indexはnum_minted(0-indexed)
   const nextLeafIndex = treeConfig.numMinted;
 
   // 3. Asset IDを事前計算
@@ -1052,16 +1091,16 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
 
 ### 直列処理による競合防止
 
-**なぜ直列処理が必要か：**
+**なぜ直列処理が必要か:**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  並列処理の場合（危険）                                          │
+│  並列処理の場合(危険)                                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  User A ─┬─ numMinted=100を読む ─┬─ ID予測=Asset#100           │
 │          │                       │                              │
-│  User B ─┴─ numMinted=100を読む ─┴─ ID予測=Asset#100 ← 重複！  │
+│  User B ─┴─ numMinted=100を読む ─┴─ ID予測=Asset#100 ← 重複!  │
 │                                                                 │
 │  → 両方がAsset#100を予測してArweaveにアップロード               │
 │  → 一方のmintが失敗、または相互リンクが壊れる                   │
@@ -1069,7 +1108,7 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  直列処理の場合（安全）                                          │
+│  直列処理の場合(安全)                                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  User A ─── numMinted=100 ─── ID予測=Asset#100 ─── mint完了    │
@@ -1091,12 +1130,12 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
 
 | リソース | アクセス |
 | --- | --- |
-| 証明書ページ | パブリック（誰でも閲覧可） |
-| Arweaveデータ | パブリック（誰でも読める） |
-| cNFTデータ | パブリック（ブロックチェーン） |
-| R2 Public Bucket（manifest、サムネイル） | パブリック（公開URL） |
-| R2 Private Bucket（元ファイル） | プライベート（Presigned URLのみ） |
-| Redisキュー | プライベート（Docker内部ネットワーク） |
+| 証明書ページ | パブリック(誰でも閲覧可) |
+| Arweaveデータ | パブリック(誰でも読める) |
+| cNFTデータ | パブリック(ブロックチェーン) |
+| R2 Public Bucket(manifest、サムネイル) | パブリック(公開URL) |
+| R2 Private Bucket(元ファイル) | プライベート(Presigned URLのみ) |
+| Upstash Redis キュー | プライベート(Vercel & Railway のみ) |
 
 ### サーバー公開鍵の管理
 
@@ -1107,11 +1146,12 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
 │                                                                 │
 │  【公開鍵】                                                      │
 │  ├─ Irys Explorerでトランザクション発行者として記録される        │
+│  ├─ NEXT_PUBLIC_ROOTLENS_SERVER_PUBLIC_KEY で公開               │
 │  └─ 公開情報として誰でも検証可能                                │
 │                                                                 │
 │  【秘密鍵】                                                      │
-│  ├─ Workerコンテナのみが保持                                    │
-│  ├─ 環境変数経由で注入（JSON配列形式）                          │
+│  ├─ Railway Worker環境変数のみが保持                            │
+│  ├─ JSON配列形式で注入: [1,2,3,...]                            │
 │  ├─ 本番環境ではHSM等での保護を推奨                             │
 │  └─ 鍵のローテーション計画を策定                                │
 │                                                                 │
@@ -1119,6 +1159,11 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
 │  ├─ 新しい鍵ペアを生成                                          │
 │  ├─ 旧公開鍵を「失効」リストに追加                              │
 │  └─ 検証ロジックで失効リストを参照                              │
+│                                                                 │
+│  【サーバーウォレット変更時の挙動】                               │
+│  ├─ 異なるIssuerとして認識される                                │
+│  ├─ 同一original_hashでも重複と判定されない                    │
+│  └─ 意図的に複数発行元からの証明を許可可能                       │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -1139,15 +1184,15 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│  Step 2: DBのis_deletedフラグを立てる                            │
-│  └─ 証明書ページで「削除済み」と表示                              │
+│  Step 2: DBのis_publicフラグをfalseに                            │
+│  └─ 証明書ページで「非公開」と表示                                │
 └─────────────────────────────────────────────────────────────────┘
 
 【Arweave/cNFTについて】
-- 削除できない（技術的制約）
-- ただし、Arweaveには違法コンテンツ自体は含まれない（メタデータのみ）
-- cNFTも同様（URIのみ）
-- むしろ、アップロードした人物の特定に使用可能（証拠として残る）
+- 削除できない(技術的制約)
+- ただし、Arweaveには違法コンテンツ自体は含まれない(メタデータのみ)
+- cNFTも同様(URIのみ)
+- むしろ、アップロードした人物の特定に使用可能(証拠として残る)
 
 ```
 
@@ -1156,10 +1201,15 @@ async function predictNextAssetId(umi: Umi, merkleTree: PublicKey) {
 ## ⚙️ 環境変数
 
 ```bash
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# RootLens Ver5 - Environment Variables
+# Vercel (Frontend) + Railway (Worker) + Upstash Redis
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 # ===== Privy (認証) =====
 NEXT_PUBLIC_PRIVY_APP_ID=
 
-# ===== Supabase (データベース) =====
+# ===== Supabase (データベース + ベクトル検索) =====
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -1168,22 +1218,21 @@ SUPABASE_SERVICE_ROLE_KEY=
 R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
-R2_BUCKET_NAME=rootlens-media              # Private bucket
-R2_PUBLIC_BUCKET_NAME=rootlens-public      # Public bucket
+R2_BUCKET_NAME=rootlens-media
+R2_PUBLIC_BUCKET_NAME=rootlens-public
 R2_PUBLIC_BUCKET_URL=https://pub-xxxxx.r2.dev
 NEXT_PUBLIC_R2_PUBLIC_BUCKET_URL=https://pub-xxxxx.r2.dev
 
-# ===== Cloudflare Workers AI (Lens) =====
-CLOUDFLARE_ACCOUNT_ID=
-CLOUDFLARE_API_TOKEN=
-
-# ===== Redis (Docker内部) =====
-REDIS_HOST=redis
-REDIS_PORT=6379
+# ===== Upstash Redis (BullMQジョブキュー) =====
+# ★ Ver5の主要変更点: ローカルRedis → Upstash Redis
+# Upstash Console (https://console.upstash.com/) でRedisを作成
+# VercelとRailwayで同じURLを使用
+REDIS_URL=rediss://default:YOUR_PASSWORD@YOUR_ENDPOINT.upstash.io:6379
 
 # ===== Solana =====
 SOLANA_RPC_URL=https://api.devnet.solana.com
-SOLANA_PRIVATE_KEY=                        # JSON配列形式: [1,2,3,...]
+# JSON配列形式で秘密鍵を設定: [1,2,3,...]
+SOLANA_PRIVATE_KEY=
 
 # ===== Metaplex (Merkle Tree) =====
 MERKLE_TREE_ADDRESS=
@@ -1192,16 +1241,24 @@ MERKLE_TREE_ADDRESS=
 HELIUS_API_KEY=
 
 # ===== Arweave Gateway (Irys) =====
-ARWEAVE_GATEWAY=https://devnet.irys.xyz       # devnet
-# ARWEAVE_GATEWAY=https://node1.irys.xyz      # mainnet
-
-# ===== ビューワー =====
+# devnet: https://devnet.irys.xyz
+# mainnet: https://gateway.irys.xyz (node1.irys.xyz for uploads)
+ARWEAVE_GATEWAY=https://devnet.irys.xyz
 NEXT_PUBLIC_ARWEAVE_GATEWAY=https://devnet.irys.xyz
 NEXT_PUBLIC_ARWEAVE_EXPLORER_URL=https://devnet.irys.xyz/tx
 NEXT_PUBLIC_SOLANA_EXPLORER_URL=https://orb.helius.dev/address
 
+# ===== RootLens Server Keys =====
+# Workerの秘密鍵(JSON配列形式)
+ROOTLENS_SERVER_PRIVATE_KEY=
+# Workerの公開鍵(Base58形式)
+NEXT_PUBLIC_ROOTLENS_SERVER_PUBLIC_KEY=
+
 # ===== App URL =====
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=https://rootlens.io
+
+# ===== Lens Worker (Cloudflare Workers) =====
+NEXT_PUBLIC_LENS_WORKER_URL=https://rootlens-lens-worker.your-subdomain.workers.dev
 
 ```
 
@@ -1211,7 +1268,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 | 用途 | ライブラリ |
 | --- | --- |
-| フロントエンド | Next.js 15 (App Router) |
+| フロントエンド | Next.js 16 (App Router) |
 | 認証 | @privy-io/react-auth |
 | C2PA | c2pa-rs (WASM) |
 | Solana | @solana/web3.js |
@@ -1222,7 +1279,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 | DB | @supabase/supabase-js |
 | ジョブキュー | bullmq, ioredis |
 | Lens | Cloudflare Workers AI |
-| UI | Radix UI, Tailwind CSS |
+| UI | Radix UI, Tailwind CSS 4 |
+| 国際化 | next-intl |
 
 ---
 
@@ -1230,12 +1288,19 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ```
 root/
-├── docker-compose.yml        # 全体の起動管理
+├── docker-compose.yml        # フロントエンドのみ(開発用)
 ├── .env.example              # 環境変数テンプレート
-├── supabase-schema.sql       # Supabaseスキーマ
+├── supabase-schema-v4.sql    # Supabaseスキーマ
 ├── SPECS.md                  # 本仕様書
-├── frontend/                 # Next.js (Producer: ジョブを追加する側)
+├── frontend/                 # Next.js (Vercel デプロイ)
 │   ├── app/
+│   │   ├── [locale]/         # 国際化ルーティング(en/ja)
+│   │   │   ├── asset/[originalHash]/page.tsx  # アセット詳細
+│   │   │   ├── upload/page.tsx                # アップロード
+│   │   │   ├── lens/page.tsx                  # Lens検索
+│   │   │   ├── dashboard/page.tsx             # ダッシュボード
+│   │   │   ├── page.tsx                       # ランディング
+│   │   │   └── layout.tsx                     # ロケールレイアウト
 │   │   ├── api/
 │   │   │   ├── upload/
 │   │   │   │   ├── route.ts              # ジョブ投入API
@@ -1253,55 +1318,59 @@ root/
 │   │   │   │   └── check/route.ts        # 購入状態確認
 │   │   │   ├── lens/search/route.ts      # Lens検索API
 │   │   │   └── sync-owner/route.ts       # 所有権同期
-│   │   ├── asset/[originalHash]/page.tsx # アセット詳細ページ（検証・購入）
-│   │   ├── upload/page.tsx               # アップロードページ
-│   │   ├── lens/page.tsx                 # Lens検索ページ
-│   │   ├── dashboard/page.tsx            # ダッシュボード
-│   │   ├── download/[token]/page.tsx     # ダウンロードページ
 │   │   ├── lib/
-│   │   │   ├── r2.ts                     # R2操作（2バケット対応）
-│   │   │   ├── queue.ts                  # BullMQ Queue設定
+│   │   │   ├── r2.ts                     # R2操作(2バケット対応)
+│   │   │   ├── queue.ts                  # BullMQ Queue設定 (Upstash)
 │   │   │   ├── supabase.ts               # Supabaseクライアント
 │   │   │   ├── c2pa-parser.ts            # C2PA解析ヘルパー
+│   │   │   ├── hash-specs.ts             # デバイス別ハッシュ仕様
 │   │   │   ├── irys-verification.ts      # Arweave検証
 │   │   │   └── verification-helpers.ts   # 検証ヘルパー関数
-│   │   └── components/
-│   │       ├── Header.tsx                # ナビゲーション
-│   │       ├── LoadingState.tsx          # ローディング表示
-│   │       ├── ProgressBar.tsx           # 進捗バー
-│   │       ├── StepContainer.tsx         # ステップUI
-│   │       ├── PrivacyWarning.tsx        # プライバシー警告
-│   │       ├── ProvenanceModal.tsx       # 来歴詳細モーダル
-│   │       ├── ProvenanceTimeline.tsx    # タイムライン表示
-│   │       ├── TechnicalSpecsModal.tsx   # 技術仕様モーダル
-│   │       ├── TechnicalDetailsSection.tsx  # 技術詳細セクション
-│   │       ├── PurchaseModal.tsx         # 購入モーダル
-│   │       ├── EditAssetModal.tsx        # アセット編集モーダル
-│   │       └── AssetThumbnail.tsx        # サムネイル表示
-│   ├── package.json
-│   └── Dockerfile
-├── worker/                   # Node.js (Consumer: ジョブを処理する側)
+│   │   ├── components/
+│   │   │   ├── Header.tsx                # ナビゲーション (i18n対応)
+│   │   │   ├── LoadingState.tsx          # ローディング表示
+│   │   │   ├── ProgressBar.tsx           # 進捗バー
+│   │   │   ├── StepContainer.tsx         # ステップUI
+│   │   │   ├── PrivacyWarning.tsx        # プライバシー警告
+│   │   │   ├── ProvenanceModal.tsx       # 来歴詳細モーダル
+│   │   │   ├── ProvenanceTimeline.tsx    # タイムライン表示
+│   │   │   ├── TechnicalSpecsModal.tsx   # 技術仕様モーダル
+│   │   │   ├── TechnicalDetailsSection.tsx  # 技術詳細セクション
+│   │   │   ├── PurchaseModal.tsx         # 購入モーダル
+│   │   │   ├── EditAssetModal.tsx        # アセット編集モーダル
+│   │   │   └── AssetThumbnail.tsx        # サムネイル表示
+│   │   ├── messages/
+│   │   │   ├── en.json                   # 英語翻訳 (443行)
+│   │   │   └── ja.json                   # 日本語翻訳 (443行)
+│   │   ├── i18n.ts                       # next-intl設定
+│   │   ├── lib/navigation.ts             # i18n対応ナビゲーション
+│   │   ├── next.config.ts                # Next.js設定 (next-intl統合)
+│   │   └── package.json
+├── worker/                   # Node.js (Railway デプロイ)
+│   ├── railway.json          # Railway設定ファイル
 │   ├── src/
-│   │   ├── worker.ts         # BullMQ Worker設定
-│   │   ├── processor.ts      # Mint処理ロジック
+│   │   ├── worker.ts         # BullMQ Worker設定 (Upstash接続)
+│   │   ├── processor.ts      # Mint処理ロジック (5ステップ)
+│   │   ├── server.ts         # HTTP API (/health, /metrics, etc.)
 │   │   └── lib/
 │   │       ├── solana.ts     # Solana/cNFT関連
 │   │       ├── cnft.ts       # cNFT mint処理
 │   │       ├── arweave.ts    # Arweave/Irys関連
-│   │       └── database.ts   # Supabase保存処理
+│   │       ├── database.ts   # Supabase保存処理
+│   │       └── verification.ts  # 重複検証ロジック
 │   ├── package.json
-│   └── Dockerfile
-├── lens-worker/              # Cloudflare Worker (Lens機能)
+│   └── Dockerfile            # Railway用 (オプション)
+├── lens-worker/              # Cloudflare Worker (独立デプロイ)
 │   ├── src/
 │   │   └── index.ts          # Workers AI呼び出し
 │   ├── wrangler.toml
 │   └── package.json
-├── shared/                   # 共有コード（型定義等）
+├── shared/                   # 共有コード(型定義等)
 │   └── types/
 │       ├── index.ts
 │       ├── job.ts            # MintJobData, MintJobResult
 │       └── proof.ts          # ArweaveProofMetadata, MediaProof
-└── redis-data/               # Redisの永続化データ（.gitignore）
+└── redis-data/               # (未使用 - Upstash Redisを利用)
 
 ```
 
@@ -1309,59 +1378,66 @@ root/
 
 ## 🚀 開発ロードマップ
 
-### ✅ MVP完成（Ver.5）- 2025年1月
+### ✅ MVP完成(Ver.5) - 2025年1月
 
 **すべてのコア機能が実装済み・動作確認済み**
 
 | カテゴリ | 機能 | 状態 |
 | --- | --- | --- |
-| **基盤** | Docker環境構築 | ✅ 完了 |
-| | Redis + BullMQ（直列処理） | ✅ 完了 |
-| | Privy認証（ウォレット接続） | ✅ 完了 |
-| | R2二重バケット構成 | ✅ 完了 |
+| **基盤** | Vercel + Railway デプロイ | ✅ 完了 |
+|  | Upstash Redis + BullMQ(直列処理) | ✅ 完了 |
+|  | Privy認証(ウォレット接続) | ✅ 完了 |
+|  | R2二重バケット構成 | ✅ 完了 |
+|  | next-intl (英語・日本語) | ✅ 完了 |
 | **Blockchain** | cNFTアドレス予測 | ✅ 完了 |
-| | Arweaveアップロード（Irys） | ✅ 完了 |
-| | cNFT mint（BubbleGum） | ✅ 完了 |
-| | 相互リンク検証（完全版・5ステップ） | ✅ 完了 |
-| | Burn検出機能 | ✅ 完了 |
-| | 所有権同期（Helius DAS API） | ✅ 完了 |
-| **アップロード** | C2PA検証（WASM） | ✅ 完了 |
-| | プライバシー警告表示 | ✅ 完了 |
-| | アップロードフロー（5ステップ） | ✅ 完了 |
-| | Worker側Mint処理 | ✅ 完了 |
-| **アセット管理** | アセット詳細ページ（/asset/[hash]） | ✅ 完了 |
-| | ダッシュボード（/dashboard） | ✅ 完了 |
-| | ページネーション（20件/ページ） | ✅ 完了 |
-| | アセット編集機能 | ✅ 完了 |
-| | 公開/非公開切り替え | ✅ 完了 |
+|  | Arweaveアップロード(Irys) | ✅ 完了 |
+|  | cNFT mint(BubbleGum) | ✅ 完了 |
+|  | 相互リンク検証(完全版・5ステップ) | ✅ 完了 |
+|  | Burn検出機能 | ✅ 完了 |
+|  | 所有権同期(Helius DAS API) | ✅ 完了 |
+| **アップロード** | C2PA検証(WASM) | ✅ 完了 |
+|  | Google Pixel対応 | ✅ 完了 |
+|  | プライバシー警告表示 | ✅ 完了 |
+|  | アップロードフロー(5ステップ) | ✅ 完了 |
+|  | Worker側Mint処理 | ✅ 完了 |
+|  | オンチェーン重複チェック | ✅ 完了 |
+| **アセット管理** | アセット詳細ページ(/asset/[hash]) | ✅ 完了 |
+|  | ダッシュボード(/dashboard) | ✅ 完了 |
+|  | ページネーション(20件/ページ) | ✅ 完了 |
+|  | アセット編集機能 | ✅ 完了 |
+|  | 公開/非公開切り替え | ✅ 完了 |
 | **購入・決済** | SolanaPay購入フロー | ✅ 完了 |
-| | トランザクション検証 | ✅ 完了 |
-| | ダウンロード機能（トークン制） | ✅ 完了 |
-| | 無料コンテンツ対応 | ✅ 完了 |
-| **検索** | Lens機能（画像検索） | ✅ 完了 |
-| | テキスト検索 | ✅ 完了 |
-| | カメラ検索 | ✅ 完了 |
-| | pgvectorベクトル検索 | ✅ 完了 |
+|  | トランザクション検証 | ✅ 完了 |
+|  | ダウンロード機能(トークン制) | ✅ 完了 |
+|  | 無料コンテンツ対応 | ✅ 完了 |
+| **検索** | Lens機能(画像検索) | ✅ 完了 |
+|  | テキスト検索 | ✅ 完了 |
+|  | カメラ検索 | ✅ 完了 |
+|  | pgvectorベクトル検索 | ✅ 完了 |
 | **UI/UX** | レスポンシブデザイン | ✅ 完了 |
-| | ローディング状態表示 | ✅ 完了 |
-| | エラーハンドリング | ✅ 完了 |
+|  | ローディング状態表示 | ✅ 完了 |
+|  | エラーハンドリング | ✅ 完了 |
+| **インフラ** | Railway Worker HTTP API | ✅ 完了 |
+|  | ヘルスチェック(/health) | ✅ 完了 |
+|  | メトリクス(/metrics) | ✅ 完了 |
 
 ### 次フェーズ: 本番運用・改善
 
 | カテゴリ | タスク | 優先度 |
 | --- | --- | --- |
+| **デバイス対応** | Sony, Leica, Nikon, Canon検証・有効化 | 🔴 高 |
 | **信頼性** | モニタリング・ログ基盤 | 🔴 高 |
-| | エラー通知システム | 🔴 高 |
-| | バックアップ戦略 | 🟡 中 |
+|  | エラー通知システム | 🔴 高 |
+|  | バックアップ戦略 | 🟡 中 |
 | **パフォーマンス** | 画像最適化・CDN | 🟡 中 |
-| | キャッシュ戦略 | 🟡 中 |
-| | インデックス最適化 | 🟢 低 |
+|  | キャッシュ戦略 | 🟡 中 |
+|  | インデックス最適化 | 🟢 低 |
 | **スケール** | マルチツリー対応 | 🟢 低 |
-| | Worker並列化 | 🟢 低 |
-| | 負荷分散 | 🟢 低 |
+|  | Worker並列化 | 🟢 低 |
+|  | 負荷分散 | 🟢 低 |
 | **機能追加** | NFT譲渡履歴表示 | 🟡 中 |
-| | コレクション機能 | 🟢 低 |
-| | コメント機能 | 🟢 低 |
+|  | コレクション機能 | 🟢 低 |
+|  | コメント機能 | 🟢 低 |
 
 ---
 
@@ -1379,3 +1455,115 @@ root/
 - [Irys Documentation](https://docs.irys.xyz/)
 - [BullMQ Documentation](https://docs.bullmq.io/)
 - [Supabase pgvector](https://supabase.com/docs/guides/ai/vector-columns)
+- [next-intl Documentation](https://next-intl-docs.vercel.app/)
+- [Upstash Redis](https://upstash.com/docs/redis)
+- [Railway Documentation](https://docs.railway.app/)
+
+---
+
+## 🏢 デプロイメント詳細
+
+### Vercel(Frontend)
+
+- **プラットフォーム**: Vercel
+- **ビルドコマンド**: `cd frontend && npm install && npm run build`
+- **起動コマンド**: `npm start`
+- **環境変数**: Vercel Dashboardで設定
+
+### Railway(Worker)
+
+- **プラットフォーム**: Railway
+- **設定ファイル**: `worker/railway.json`
+- **ビルドコマンド**: `cd worker && npm install && npm run build`
+- **起動コマンド**: `cd worker && npm start`
+- **ヘルスチェック**: `/health`
+- **再起動ポリシー**: ON_FAILURE, 最大10回リトライ
+- **環境変数**: Railway Dashboardで設定
+
+### Upstash Redis
+
+- **プロバイダー**: Upstash
+- **接続プロトコル**: TLS(`rediss://`)
+- **共有**: Vercel & Railway 両方で同一インスタンス使用
+- **設定**: Upstash Console (https://console.upstash.com/)
+
+### Cloudflare Workers(Lens)
+
+- **プラットフォーム**: Cloudflare Workers
+- **デプロイコマンド**: `wrangler deploy`
+- **AI Binding**: Workers AI
+- **R2 Binding**: Private Bucket
+- **環境変数**: `wrangler secret put`
+
+---
+
+## 📝 Ver.5 の主要変更点
+
+### インフラ変更
+
+1. **Docker Compose → クラウドネイティブ**
+    - フロントエンド: Vercel
+    - Worker: Railway
+    - Redis: Upstash (TLS対応)
+    - docker-compose.ymlは開発用のみ
+2. **Redis設定変更**
+    - `REDIS_URL` 環境変数で接続
+    - `rediss://` プロトコル(TLS)
+    - Vercel & Railway で共有
+
+### 機能追加
+
+1. **国際化(i18n)**
+    - next-intl 導入
+    - 英語・日本語完全対応
+    - 443行の翻訳ファイル
+    - `/[locale]/` ルーティング
+2. **Worker HTTP API**
+    - `/health` - ヘルスチェック
+    - `/metrics` - キュー統計
+    - `/api/upload` - ジョブ投入(代替)
+    - `/api/job-status/:jobId` - ステータス確認
+3. **検証ロジック強化**
+    - サーバーウォレット照合
+    - オンチェーン二重チェック(Arweave + Solana)
+    - サーバーウォレット変更時の再発行対応
+
+### デバイス対応
+
+- **現在有効**: Google Pixel のみ
+- **保留中**: Sony, Leica, Nikon, Canon, Adobe
+- **理由**: 動作確認後に順次有効化
+
+### 本番稼働
+
+- **ドメイン**: https://rootlens.io
+- **環境**: Production
+- **モニタリング**: Railway ダッシュボード
+
+---
+
+## 🔍 デバイス対応ロードマップ
+
+### 現在対応デバイス
+
+| デバイス | 状態 | Issuer | Target Label |
+| --- | --- | --- | --- |
+| **Google Pixel** | ✅ 有効 | Google LLC | c2pa.hash.data.part |
+
+### 検証待ちデバイス
+
+| デバイス | 状態 | 推定Issuer | 推定Label | 優先度 |
+| --- | --- | --- | --- | --- |
+| Sony カメラ | 🟡 保留 | Sony Corporation | c2pa.hash.data | 高 |
+| Leica カメラ | 🟡 保留 | Leica | c2pa.hash.data | 中 |
+| Nikon カメラ | 🟡 保留 | Nikon | c2pa.hash.data | 中 |
+| Canon カメラ | 🟡 保留 | Canon | c2pa.hash.data | 中 |
+| Adobe ソフト | 🟡 保留 | Adobe | c2pa.hash.data | 低 |
+
+**有効化手順**:
+
+1. 実機でC2PA付き画像を撮影
+2. `signatureInfo.issuer` を確認
+3. `hash-specs.ts` でコメント解除
+4. アップロード検証テスト
+5. 本番環境デプロイ
