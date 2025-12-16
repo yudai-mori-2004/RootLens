@@ -1,8 +1,9 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from '@/lib/navigation';
 import Image from 'next/image';
 import { usePrivy } from '@privy-io/react-auth';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ interface HeaderProps {
 
 export default function Header({ isLandingPage = false }: HeaderProps) {
   const { login, authenticated, logout, user } = usePrivy();
+  const t = useTranslations('header');
 
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -55,29 +57,29 @@ export default function Header({ isLandingPage = false }: HeaderProps) {
           <nav className="hidden md:flex gap-6 text-sm font-medium text-slate-600 items-center mr-2">
             {isLandingPage ? (
               <>
-                <Link href="#why" className="hover:text-blue-600 transition-colors">背景</Link>
-                <Link href="#technology" className="hover:text-blue-600 transition-colors">技術</Link>
-                <Link href="#values" className="hover:text-blue-600 transition-colors">特徴</Link>
-                <Link href="#faq" className="hover:text-blue-600 transition-colors">FAQ</Link>
+                <Link href="#why" className="hover:text-blue-600 transition-colors">{t('background')}</Link>
+                <Link href="#technology" className="hover:text-blue-600 transition-colors">{t('technology')}</Link>
+                <Link href="#values" className="hover:text-blue-600 transition-colors">{t('features')}</Link>
+                <Link href="#faq" className="hover:text-blue-600 transition-colors">{t('faq')}</Link>
                 <div className="h-4 w-px bg-slate-200 mx-2" />
                 <Link href="/lens" className="hover:text-blue-600 transition-colors flex items-center gap-1">
                   <Search className="w-4 h-4" />
-                  Lens
+                  {t('lens')}
                 </Link>
                 <Link href="/upload" className="hover:text-blue-600 transition-colors flex items-center gap-1">
                   <Upload className="w-4 h-4" />
-                  Upload
+                  {t('upload')}
                 </Link>
               </>
             ) : (
               <>
                 <Link href="/lens" className="hover:text-blue-600 transition-colors flex items-center gap-1">
                   <Search className="w-4 h-4" />
-                  Lens
+                  {t('lens')}
                 </Link>
                 <Link href="/upload" className="hover:text-blue-600 transition-colors flex items-center gap-1">
                   <Upload className="w-4 h-4" />
-                  Upload
+                  {t('upload')}
                 </Link>
               </>
             )}
@@ -98,28 +100,28 @@ export default function Header({ isLandingPage = false }: HeaderProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t('myAccount')}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard" className="cursor-pointer">
-                      Dashboard
+                      {t('dashboard')}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={logout} className="text-red-600 cursor-pointer focus:text-red-700 focus:bg-red-50">
                     <LogOut className="w-4 h-4 mr-2" />
-                    Disconnect Wallet
+                    {t('disconnectWallet')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button 
-                onClick={login} 
-                size="sm" 
+              <Button
+                onClick={login}
+                size="sm"
                 className="rounded-full bg-slate-900 hover:bg-slate-800 text-white gap-2"
               >
                 <Wallet className="w-4 h-4" />
-                <span>Connect Wallet</span>
+                <span>{t('connectWallet')}</span>
               </Button>
             )}
           </div>
@@ -151,29 +153,29 @@ export default function Header({ isLandingPage = false }: HeaderProps) {
                   <div className="flex flex-col gap-4">
                     {isLandingPage ? (
                       <>
-                        <Link href="#why" className="text-slate-600 font-medium hover:text-blue-600">背景</Link>
-                        <Link href="#technology" className="text-slate-600 font-medium hover:text-blue-600">技術</Link>
-                        <Link href="#values" className="text-slate-600 font-medium hover:text-blue-600">特徴</Link>
-                        <Link href="#faq" className="text-slate-600 font-medium hover:text-blue-600">FAQ</Link>
+                        <Link href="#why" className="text-slate-600 font-medium hover:text-blue-600">{t('background')}</Link>
+                        <Link href="#technology" className="text-slate-600 font-medium hover:text-blue-600">{t('technology')}</Link>
+                        <Link href="#values" className="text-slate-600 font-medium hover:text-blue-600">{t('features')}</Link>
+                        <Link href="#faq" className="text-slate-600 font-medium hover:text-blue-600">{t('faq')}</Link>
                         <div className="h-px w-full bg-slate-100 my-2" />
                         <Link href="/lens" className="flex items-center gap-2 text-slate-600 font-medium hover:text-blue-600">
                           <Search className="w-5 h-5" />
-                          Lens
+                          {t('lens')}
                         </Link>
                         <Link href="/upload" className="flex items-center gap-2 text-slate-600 font-medium hover:text-blue-600">
                           <Upload className="w-5 h-5" />
-                          Upload
+                          {t('upload')}
                         </Link>
                       </>
                     ) : (
                       <>
                         <Link href="/lens" className="flex items-center gap-2 text-slate-600 font-medium hover:text-blue-600">
                           <Search className="w-5 h-5" />
-                          Lens (Search)
+                          {t('lensSearch')}
                         </Link>
                         <Link href="/upload" className="flex items-center gap-2 text-slate-600 font-medium hover:text-blue-600">
                           <Upload className="w-5 h-5" />
-                          Upload
+                          {t('upload')}
                         </Link>
                       </>
                     )}
@@ -188,35 +190,35 @@ export default function Header({ isLandingPage = false }: HeaderProps) {
                             <User className="w-5 h-5 text-indigo-600" />
                           </div>
                           <div>
-                            <p className="text-xs text-indigo-600 font-bold uppercase">Connected</p>
+                            <p className="text-xs text-indigo-600 font-bold uppercase">{t('connected')}</p>
                             <p className="font-mono text-sm text-indigo-900 truncate max-w-[160px]">
                               {truncateAddress(user.wallet.address)}
                             </p>
                           </div>
                         </div>
-                        
+
                         <Button asChild variant="outline" className="w-full justify-start">
                           <Link href="/dashboard">
-                            Dashboard
+                            {t('dashboard')}
                           </Link>
                         </Button>
-                        
-                        <Button 
-                          onClick={logout} 
-                          variant="ghost" 
+
+                        <Button
+                          onClick={logout}
+                          variant="ghost"
                           className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <LogOut className="w-4 h-4 mr-2" />
-                          Disconnect
+                          {t('disconnect')}
                         </Button>
                       </div>
                     ) : (
-                      <Button 
-                        onClick={login} 
+                      <Button
+                        onClick={login}
                         className="w-full bg-slate-900 hover:bg-slate-800 text-white gap-2"
                       >
                         <Wallet className="w-4 h-4" />
-                        Connect Wallet
+                        {t('connectWallet')}
                       </Button>
                     )}
                   </div>

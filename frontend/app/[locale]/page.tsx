@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Link } from '@/lib/navigation';
 import Image from 'next/image';
 import Header from '@/app/components/Header';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,11 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Check, X, Shield, Coins, Search, Camera, Lock, ArrowRight, ExternalLink, X as XIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 export default function Home() {
+  const t = useTranslations('home');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 text-slate-900 font-sans">
       <Header isLandingPage={true} />
@@ -24,30 +27,26 @@ export default function Home() {
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-100/50 via-transparent to-transparent opacity-70"></div>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <Badge variant="secondary" className="mb-6 px-4 py-1.5 text-sm font-medium bg-blue-50 text-blue-700 border-blue-100">
-              Proof of Reality, Ownership on Chain.
+              {t('hero.badge')}
             </Badge>
             <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 mb-8 max-w-5xl mx-auto leading-tight">
-              <span className="inline-block">「本物」を、</span>
-              <span className="inline-block">あなたの<span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">『デジタル資産』</span>に。</span>
+              <span className="inline-block">{t('hero.title.prefix')}</span>
+              <span className="inline-block"><span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">{t('hero.title.suffix')}</span></span>
             </h1>
             <p className="text-xl text-slate-600 mb-10 max-w-3xl mx-auto leading-relaxed">
-              <span className="inline-block">AI生成コンテンツが氾濫する時代。</span>
-              <span className="inline-block">C2PAハードウェア署名で「現実」を証明し、</span>
-              <span className="inline-block">ブロックチェーンで唯一無二の</span>
-              <span className="inline-block">「デジタル所有権」と「流動性」を確立する、</span>
-              <span className="inline-block">次世代のマーケットプレイス。</span>
+              {t('hero.description')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Button asChild size="lg" className="h-14 px-8 text-lg rounded-full shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 transition-all">
                 <Link href="/upload">
                   <Camera className="w-5 h-5 mr-2" />
-                  証明付きでアップロード
+                  {t('hero.buttons.upload')}
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-2 hover:bg-slate-50">
                 <Link href="/lens">
                   <Search className="w-5 h-5 mr-2" />
-                  コンテンツを検索
+                  {t('hero.buttons.search')}
                 </Link>
               </Button>
             </div>
@@ -59,21 +58,18 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid md:grid-cols-2 gap-16 items-center">
               <div>
-                <h2 className="text-3xl font-bold mb-6 text-slate-900">
-                  AI時代の「信頼の危機」と<br />
-                  失われつつある「現実の価値」
+                <h2 className="text-3xl font-bold mb-6 text-slate-900 whitespace-pre-line">
+                  {t('why.title')}
                 </h2>
                 <div className="space-y-6 text-lg text-slate-600">
                   <p>
-                    2024年、生成AIの爆発的な普及により、誰もが数秒で「本物そっくり」の画像を作れるようになりました。
-                    しかし、それは同時に「目の前の画像が現実なのか、AIなのか区別できない」という深刻な問題を引き起こしています。
+                    {t('why.p1')}
                   </p>
                   <p className="font-medium text-slate-800 border-l-4 border-blue-500 pl-4">
-                    皮肉なことに、今最も価値が高まっているのは「本当にカメラで撮影された、加工されていない現実」です。
+                    {t('why.p2')}
                   </p>
                   <p>
-                    RootLensは、C2PA対応カメラのハードウェア署名とブロックチェーンを組み合わせ、
-                    この「現実の価値」を正当に評価し、収益化する仕組みを提供します。
+                    {t('why.p3')}
                   </p>
                 </div>
               </div>
@@ -86,8 +82,8 @@ export default function Home() {
                         <X className="w-6 h-6" />
                       </div>
                       <div>
-                        <div className="font-bold text-slate-900">AI生成画像</div>
-                        <div className="text-sm text-slate-500">誰でも作成可能・無限に複製</div>
+                        <div className="font-bold text-slate-900">{t('why.aiImage.title')}</div>
+                        <div className="text-sm text-slate-500">{t('why.aiImage.desc')}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-blue-100 ring-2 ring-blue-500/20">
@@ -95,9 +91,11 @@ export default function Home() {
                         <Check className="w-6 h-6" />
                       </div>
                       <div>
-                        <div className="font-bold text-slate-900">ハードウェア撮影画像 (RootLens)</div>
+                        <div className="font-bold text-slate-900">{t('why.rootLensImage.title')}</div>
                         <div className="text-sm text-slate-500">
-                          <span className="font-medium text-blue-600">証明可能</span>な唯一無二の現実
+                          {t.rich('why.rootLensImage.desc', {
+                            strong: (chunks) => <span className="font-medium text-blue-600">{chunks}</span>
+                          })}
                         </div>
                       </div>
                     </div>
@@ -112,11 +110,10 @@ export default function Home() {
         <section id="technology" className="py-24 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
-              <Badge variant="outline" className="mb-4">Technology</Badge>
-              <h2 className="text-3xl font-bold text-slate-900">2つの技術の融合</h2>
+              <Badge variant="outline" className="mb-4">{t('technology.badge')}</Badge>
+              <h2 className="text-3xl font-bold text-slate-900">{t('technology.title')}</h2>
               <p className="mt-4 text-lg text-slate-600 max-w-2xl mx-auto">
-                真正性の証明は「C2PA」で、権利の管理と流動性は「ブロックチェーン」で。<br />
-                それぞれの得意分野を組み合わせることで、完全な信頼基盤を構築します。
+                {t('technology.description')}
               </p>
             </div>
 
@@ -125,22 +122,22 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-blue-700">
                     <Shield className="w-6 h-6" />
-                    C2PA (Content Provenance)
+                    {t('technology.c2pa.title')}
                   </CardTitle>
-                  <CardDescription>ハードウェアによる「真正性」の証明</CardDescription>
+                  <CardDescription>{t('technology.c2pa.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex items-start gap-2">
                     <Check className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <span className="text-slate-700">カメラ内でのデジタル署名埋め込み</span>
+                    <span className="text-slate-700">{t('technology.c2pa.point1')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <span className="text-slate-700">改ざんの検知と履歴の追跡</span>
+                    <span className="text-slate-700">{t('technology.c2pa.point2')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                    <span className="text-slate-700">数学的な「撮影証明」</span>
+                    <span className="text-slate-700">{t('technology.c2pa.point3')}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -149,22 +146,22 @@ export default function Home() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-purple-700">
                     <Coins className="w-6 h-6" />
-                    Blockchain (Solana + Arweave)
+                    {t('technology.blockchain.title')}
                   </CardTitle>
-                  <CardDescription>権利の「所有」と「流動化」</CardDescription>
+                  <CardDescription>{t('technology.blockchain.desc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <div className="flex items-start gap-2">
                     <Check className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                    <span className="text-slate-700">所有権の明確化（ウォレット紐付け）</span>
+                    <span className="text-slate-700">{t('technology.blockchain.point1')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                    <span className="text-slate-700">NFTとしての自由な売買・譲渡</span>
+                    <span className="text-slate-700">{t('technology.blockchain.point2')}</span>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
-                    <span className="text-slate-700">相互リンクによる乗っ取り防止</span>
+                    <span className="text-slate-700">{t('technology.blockchain.point3')}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -173,42 +170,42 @@ export default function Home() {
             {/* Web2 vs Web3 Comparison */}
             <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
               <div className="p-8 border-b bg-slate-50/50">
-                <h3 className="text-xl font-bold text-center">なぜWeb3なのか？ - Web2的アプローチとの比較</h3>
+                <h3 className="text-xl font-bold text-center">{t('technology.comparison.title')}</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 text-slate-500 text-sm">
-                      <th className="p-4 font-medium border-b">機能・課題</th>
-                      <th className="p-4 font-medium border-b">Web2 (従来型)</th>
-                      <th className="p-4 font-medium border-b bg-blue-50/50 text-blue-700">RootLens (Web3)</th>
+                      <th className="p-4 font-medium border-b">{t('technology.comparison.headers.feature')}</th>
+                      <th className="p-4 font-medium border-b">{t('technology.comparison.headers.web2')}</th>
+                      <th className="p-4 font-medium border-b bg-blue-50/50 text-blue-700">{t('technology.comparison.headers.web3')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     <tr>
-                      <td className="p-4 font-medium text-slate-900">真正性証明・改ざん検出</td>
-                      <td className="p-4 text-slate-600">C2PAで可能 ✓</td>
-                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">C2PAで可能 ✓</td>
+                      <td className="p-4 font-medium text-slate-900">{t('technology.comparison.rows.authenticity.label')}</td>
+                      <td className="p-4 text-slate-600">{t('technology.comparison.rows.authenticity.web2')}</td>
+                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">{t('technology.comparison.rows.authenticity.web3')}</td>
                     </tr>
                     <tr>
-                      <td className="p-4 font-medium text-slate-900">所有権の記録</td>
-                      <td className="p-4 text-slate-600">DBに記録 (プラットフォーム依存)</td>
-                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">ウォレットに紐付け (自律分散的)</td>
+                      <td className="p-4 font-medium text-slate-900">{t('technology.comparison.rows.ownership.label')}</td>
+                      <td className="p-4 text-slate-600">{t('technology.comparison.rows.ownership.web2')}</td>
+                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">{t('technology.comparison.rows.ownership.web3')}</td>
                     </tr>
                     <tr>
-                      <td className="p-4 font-medium text-slate-900">証明付き画像の流出時</td>
-                      <td className="p-4 text-slate-600 text-red-500">権利者の特定が困難</td>
-                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">ウォレットで権利者を特定可能</td>
+                      <td className="p-4 font-medium text-slate-900">{t('technology.comparison.rows.leak.label')}</td>
+                      <td className="p-4 text-slate-600 text-red-500">{t('technology.comparison.rows.leak.web2')}</td>
+                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">{t('technology.comparison.rows.leak.web3')}</td>
                     </tr>
                     <tr>
-                      <td className="p-4 font-medium text-slate-900">権利の売買・流動性</td>
-                      <td className="p-4 text-slate-600 text-red-500">困難 (プラットフォーム内限定)</td>
-                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">NFTとして自由に流通</td>
+                      <td className="p-4 font-medium text-slate-900">{t('technology.comparison.rows.liquidity.label')}</td>
+                      <td className="p-4 text-slate-600 text-red-500">{t('technology.comparison.rows.liquidity.web2')}</td>
+                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">{t('technology.comparison.rows.liquidity.web3')}</td>
                     </tr>
                     <tr>
-                      <td className="p-4 font-medium text-slate-900">乗っ取り防止</td>
-                      <td className="p-4 text-slate-600">困難</td>
-                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">相互リンクで完全防止</td>
+                      <td className="p-4 font-medium text-slate-900">{t('technology.comparison.rows.takeover.label')}</td>
+                      <td className="p-4 text-slate-600">{t('technology.comparison.rows.takeover.web2')}</td>
+                      <td className="p-4 text-slate-900 bg-blue-50/30 font-medium">{t('technology.comparison.rows.takeover.web3')}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -220,36 +217,33 @@ export default function Home() {
         {/* 3 Core Values */}
         <section id="values" className="py-24 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center mb-16 text-slate-900">RootLensが提供する3つの価値</h2>
+            <h2 className="text-3xl font-bold text-center mb-16 text-slate-900">{t('values.title')}</h2>
             <div className="grid md:grid-cols-3 gap-10">
               <div className="space-y-4">
                 <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-4">
                   <Camera className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">1. ハードウェア証明の<br />マーケットプレイス</h3>
+                <h3 className="text-xl font-bold text-slate-900 whitespace-pre-line">{t('values.value1.title')}</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  「本当にそこにいた人が撮った」こと自体に価値を見出し、対価を支払える初めての場所です。
-                  報道、AI学習データ、法務証拠など、信頼性が不可欠な領域に。
+                  {t('values.value1.desc')}
                 </p>
               </div>
               <div className="space-y-4">
                 <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 mb-4">
                   <Lock className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">2. 所有権の可視化と<br />流動化</h3>
+                <h3 className="text-xl font-bold text-slate-900 whitespace-pre-line">{t('values.value2.title')}</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  デジタルデータの所有権をウォレットに紐付けることで、権利の所在を明確化。
-                  さらにNFT化することで、証明付きコンテンツを資産として売買可能にします。
+                  {t('values.value2.desc')}
                 </p>
               </div>
               <div className="space-y-4">
                 <div className="w-14 h-14 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 mb-4">
                   <Search className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900">3. 信頼の検索エンジン<br />(Lens機能)</h3>
+                <h3 className="text-xl font-bold text-slate-900 whitespace-pre-line">{t('values.value3.title')}</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  「この画像は証明付きの本物か？」を即座に検証。
-                  単なる画像検索ではなく、信頼性を確認するためのツールとして機能します。
+                  {t('values.value3.desc')}
                 </p>
               </div>
             </div>
@@ -262,29 +256,29 @@ export default function Home() {
             <div className="grid md:grid-cols-2 gap-16">
               <div>
                 <h3 className="text-2xl font-bold mb-8 flex items-center gap-3">
-                  <span className="text-blue-400">For Creator</span>
-                  <span>(供給側)</span>
+                  <span className="text-blue-400">{t('target.creator.title')}</span>
+                  <span>{t('target.creator.subtitle')}</span>
                 </h3>
                 <ul className="space-y-6">
                   <li className="flex gap-4">
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shrink-0">1</div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">フォトジャーナリスト</h4>
-                      <p className="text-slate-400 text-sm">証明付きコンテンツをマーケットプレイスで適正価格で販売。フェイクとの差別化。</p>
+                      <h4 className="font-bold text-lg mb-1">{t('target.creator.item1.title')}</h4>
+                      <p className="text-slate-400 text-sm">{t('target.creator.item1.desc')}</p>
                     </div>
                   </li>
                   <li className="flex gap-4">
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shrink-0">2</div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">プロフォトグラファー</h4>
-                      <p className="text-slate-400 text-sm">ストックフォトの高い手数料を回避。Solana Payによる直接取引で収益最大化。</p>
+                      <h4 className="font-bold text-lg mb-1">{t('target.creator.item2.title')}</h4>
+                      <p className="text-slate-400 text-sm">{t('target.creator.item2.desc')}</p>
                     </div>
                   </li>
                   <li className="flex gap-4">
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shrink-0">3</div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">市民ジャーナリスト</h4>
-                      <p className="text-slate-400 text-sm">匿名性を保ちながら、ウォレットベースで権利を保持・主張可能。</p>
+                      <h4 className="font-bold text-lg mb-1">{t('target.creator.item3.title')}</h4>
+                      <p className="text-slate-400 text-sm">{t('target.creator.item3.desc')}</p>
                     </div>
                   </li>
                 </ul>
@@ -292,29 +286,29 @@ export default function Home() {
 
               <div>
                 <h3 className="text-2xl font-bold mb-8 flex items-center gap-3">
-                  <span className="text-purple-400">For Consumer</span>
-                  <span>(需要側)</span>
+                  <span className="text-purple-400">{t('target.consumer.title')}</span>
+                  <span>{t('target.consumer.subtitle')}</span>
                 </h3>
                 <ul className="space-y-6">
                   <li className="flex gap-4">
                     <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold shrink-0">1</div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">報道機関・メディア</h4>
-                      <p className="text-slate-400 text-sm">フェイクニュース対策として、ハードウェア署名付きの信頼できる素材を調達。</p>
+                      <h4 className="font-bold text-lg mb-1">{t('target.consumer.item1.title')}</h4>
+                      <p className="text-slate-400 text-sm">{t('target.consumer.item1.desc')}</p>
                     </div>
                   </li>
                   <li className="flex gap-4">
                     <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold shrink-0">2</div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">AI企業</h4>
-                      <p className="text-slate-400 text-sm">著作権と出自が明確な「クリーンな学習データ」として購入。</p>
+                      <h4 className="font-bold text-lg mb-1">{t('target.consumer.item2.title')}</h4>
+                      <p className="text-slate-400 text-sm">{t('target.consumer.item2.desc')}</p>
                     </div>
                   </li>
                   <li className="flex gap-4">
                     <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold shrink-0">3</div>
                     <div>
-                      <h4 className="font-bold text-lg mb-1">法務・保険業界</h4>
-                      <p className="text-slate-400 text-sm">改ざんされていないことが数学的に証明された、確実な証拠画像として。</p>
+                      <h4 className="font-bold text-lg mb-1">{t('target.consumer.item3.title')}</h4>
+                      <p className="text-slate-400 text-sm">{t('target.consumer.item3.desc')}</p>
                     </div>
                   </li>
                 </ul>
@@ -326,38 +320,30 @@ export default function Home() {
         {/* FAQ */}
         <section id="faq" className="py-24 bg-white">
           <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-bold text-center mb-12 text-slate-900">よくある質問</h2>
+            <h2 className="text-3xl font-bold text-center mb-12 text-slate-900">{t('faq.title')}</h2>
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="item-1">
-                <AccordionTrigger>C2PA対応カメラを持っていない人は使えないのですか？</AccordionTrigger>
+                <AccordionTrigger>{t('faq.q1.q')}</AccordionTrigger>
                 <AccordionContent>
-                  現在、Sony α7シリーズ、Google Pixel（特定モデル）、Nikon Z9、Leicaなどが対応しており、対応機種は急速に増加中です。
-                  また、スマートフォンへの搭載も進んでおり、将来的にはより多くのデバイスで利用可能になる見込みです。
-                  現時点では、これらの対応デバイスで撮影された画像のみが「ハードウェア証明」の対象となります。
+                  {t('faq.q1.a')}
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-2">
-                <AccordionTrigger>従来のストックフォトサイトとの違いは何ですか？</AccordionTrigger>
+                <AccordionTrigger>{t('faq.q2.q')}</AccordionTrigger>
                 <AccordionContent>
-                  最大の違いは「所有権の扱い」です。Web2的なサービスではデータベース上の記録に過ぎませんが、
-                  RootLensではブロックチェーン（NFT）を用いて所有権をユーザーのウォレットに紐付けます。
-                  これにより、権利の自由な売買、譲渡が可能になり、万が一の流出時にも真の所有者を特定できます。
+                  {t('faq.q2.a')}
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-3">
-                <AccordionTrigger>「改ざん不可能」なのはブロックチェーンのおかげですか？</AccordionTrigger>
+                <AccordionTrigger>{t('faq.q3.q')}</AccordionTrigger>
                 <AccordionContent>
-                  いいえ。画像の改ざん検知や真正性の証明自体は「C2PA」技術によって実現されています。
-                  ブロックチェーンの役割は、その証明されたコンテンツが「誰のものか」を記録し、権利を流動化させることです。
-                  この2つを組み合わせることで、真正性と所有権の両方を担保しています。
+                  {t('faq.q3.a')}
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="item-4">
-                <AccordionTrigger>なぜSolanaとArweaveを選んだのですか？</AccordionTrigger>
+                <AccordionTrigger>{t('faq.q4.q')}</AccordionTrigger>
                 <AccordionContent>
-                  画像データ（大容量）の永久保存にはArweaveが最適であり、
-                  大量の証明書（NFT）を低コストで発行するにはSolanaのcNFT（圧縮NFT）技術が必須でした。
-                  1枚の画像につき1つの証明を発行するモデルにおいて、ガス代の安さと処理速度は非常に重要です。
+                  {t('faq.q4.a')}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -369,14 +355,14 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-slate-900 mb-6">
-                現実の証明を、あなたの資産に。
+                {t('cta.title')}
               </h2>
               <p className="text-lg text-slate-600 mb-8">
-                手数料0%で、今すぐ始められます。
+                {t('cta.subtitle')}
               </p>
               <Button asChild size="lg" className="h-14 px-10 text-lg rounded-full shadow-xl shadow-blue-600/20">
                 <Link href="/upload">
-                  アップロードを始める
+                  {t('cta.button')}
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>
               </Button>
@@ -407,7 +393,7 @@ export default function Home() {
               </div>
             </div>
             <div className="text-center mt-8 text-xs text-slate-400">
-              © 2025 RootLens. Built with C2PA, Arweave, and Solana.
+              {t('cta.builtWith')}
             </div>
           </div>
         </footer>

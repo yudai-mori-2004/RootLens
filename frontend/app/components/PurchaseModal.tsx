@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Loader2, Wallet, Check, AlertCircle, ShoppingBag, Download, ArrowRight, ExternalLink } from 'lucide-react';
 import bs58 from 'bs58';
 import LoadingState from '@/app/components/LoadingState';
+import { useTranslations } from 'next-intl';
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -30,6 +31,8 @@ export default function PurchaseModal({
   sellerWallet,
   title,
 }: PurchaseModalProps) {
+  const t = useTranslations('components.purchaseModal');
+  const tCommon = useTranslations('common');
   const { user, authenticated, login } = usePrivy();
   const { wallets } = useWallets();
   const { signAndSendTransaction } = useSignAndSendTransaction();
@@ -51,7 +54,7 @@ export default function PurchaseModal({
       }
 
       if (!buyerWallet) {
-        toast.error('ウォレットが接続されていません');
+        toast.error(t('connectWallet'));
         return;
       }
     }
@@ -68,7 +71,7 @@ export default function PurchaseModal({
       } else {
         setStep('payment');
         if (!solanaWallet) {
-          throw new Error('Solanaウォレットが見つかりません');
+          throw new Error(t('connectWallet'));
         }
 
         const connection = new Connection(
@@ -118,7 +121,7 @@ export default function PurchaseModal({
         }
 
         if (!extractedSignature || typeof extractedSignature !== 'string') {
-          throw new Error(`トランザクションシグネチャが無効です: ${JSON.stringify(txResult)}`);
+          throw new Error(`Transaction Signature Invalid: ${JSON.stringify(txResult)}`);
         }
 
         await connection.confirmTransaction({
@@ -143,18 +146,18 @@ export default function PurchaseModal({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `購入記録に失敗しました (${response.status})`);
+        throw new Error(errorData.error || `${tCommon('error')} (${response.status})`);
       }
 
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || '購入記録に失敗しました');
+        throw new Error(result.error || tCommon('error'));
       }
 
       setDownloadToken(result.downloadToken);
       setStep('success');
-      toast.success('処理が完了しました！');
+      toast.success(t('complete'));
 
       if (isFree) {
         const downloadUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/download/${result.downloadToken}`;
@@ -202,11 +205,11 @@ export default function PurchaseModal({
             </div>
             <div>
               <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
-                {step === 'success' ? '完了しました' : isFree ? 'ダウンロード' : 'コンテンツの購入'}
+                {step === 'success' ? t('complete') : isFree ? t('download') : t('title')}
               </DialogTitle>
               {step === 'confirm' && (
                 <p className="text-sm text-slate-500 mt-0.5">
-                    {title || (isFree ? 'コンテンツをダウンロードします' : 'デジタル資産を購入します')}
+                    {title || (isFree ? t('freeDesc') : t('desc'))}
                 </p>
               )}
             </div>
@@ -220,7 +223,7 @@ export default function PurchaseModal({
                 {/* Price Display */}
                 <div className="relative rounded-2xl p-6 text-center border overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                     <p className="text-xs font-bold uppercase tracking-wider opacity-60 mb-2">
-                        {isFree ? 'Download Price' : 'Purchase Price'}
+                        {isFree ? t('downloadPrice') : t('purchasePrice')}
                     </p>
                     <div className="flex items-baseline justify-center gap-1">
                          {isFree ? (
@@ -241,7 +244,7 @@ export default function PurchaseModal({
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex gap-3 items-start">
                     <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
                     <p className="text-sm text-yellow-800 font-medium">
-                        購入にはSolanaウォレットの接続が必要です
+                        {t('connectWallet')}
                     </p>
                 </div>
                 )}
@@ -255,22 +258,22 @@ export default function PurchaseModal({
                     {loading ? (
                         <>
                             <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            処理中...
+                            {t('processing')}
                         </>
                     ) : isFree ? (
                         <>
                             <Download className="w-5 h-5 mr-2" />
-                            今すぐダウンロード
+                            {t('downloadNow')}
                         </>
                     ) : authenticated ? (
                         <>
-                            購入してダウンロード
+                            {t('buyAndDownload')}
                             <ArrowRight className="w-5 h-5 ml-2" />
                         </>
                     ) : (
                         <>
                             <Wallet className="w-5 h-5 mr-2" />
-                            ウォレットを接続
+                            {t('connect')}
                         </>
                     )}
                 </Button>
@@ -278,7 +281,7 @@ export default function PurchaseModal({
                 <p className="text-center text-xs text-slate-400">
                     {isFree 
                         ? 'ダウンロードファイルにはC2PA署名が含まれています' 
-                        : '安全なブロックチェーン決済により即時処理されます'
+                        : t('secure')
                     }
                 </p>
             </div>
@@ -288,8 +291,8 @@ export default function PurchaseModal({
                 <div className="py-8">
                     <LoadingState 
                         fullScreen={false} 
-                        message={isFree ? "ダウンロード準備中..." : "トランザクション送信中..."}
-                        subMessage={isFree ? "サーバーからファイルを取得しています" : "ブロックチェーンで決済を処理しています"}
+                        message={isFree ? t('preparing') : t('transmitting')}
+                        subMessage={isFree ? t('serverMsg') : t('txMsg')}
                         className="bg-transparent p-0"
                     />
                 </div>
@@ -302,10 +305,10 @@ export default function PurchaseModal({
                              <Check className="w-8 h-8 text-white" />
                          </div>
                          <h3 className="text-lg font-bold mb-1 text-white">
-                             {isFree ? '準備ができました' : '購入完了！'}
+                             {isFree ? t('ready') : t('complete')}
                          </h3>
                          <p className="text-sm text-blue-100">
-                             ダウンロードが自動的に開始されない場合は<br/>下のボタンをクリックしてください
+                             {t.rich('autoMsg', { br: () => <br/> })}
                          </p>
                     </div>
 
@@ -330,7 +333,7 @@ export default function PurchaseModal({
                         >
                             <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
                                 <Download className="w-5 h-5 mr-2" />
-                                ファイルを保存
+                                {t('saveFile')}
                             </a>
                         </Button>
                     )}
@@ -340,7 +343,7 @@ export default function PurchaseModal({
                         variant="ghost"
                         className="w-full text-slate-500 hover:text-slate-700"
                     >
-                        閉じる
+                        {tCommon('close')}
                     </Button>
                 </div>
             )}

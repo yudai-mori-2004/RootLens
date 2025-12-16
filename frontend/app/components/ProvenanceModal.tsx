@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { History, Clock } from 'lucide-react'; // アイコンのバリエーション
+import { useTranslations } from 'next-intl';
 
 interface ProvenanceModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export default function ProvenanceModal({
   c2paSummary,
   rootSigner,
 }: ProvenanceModalProps) {
+  const t = useTranslations('components.provenanceModal');
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] p-0 bg-white shadow-2xl rounded-xl sm:rounded-2xl flex flex-col overflow-hidden border border-slate-100 gap-0">
@@ -37,11 +40,11 @@ export default function ProvenanceModal({
                     <History className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                 </div>
                 <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                    コンテンツ来歴タイムライン
+                    {t('title')}
                 </DialogTitle>
             </div>
             <DialogDescription className="text-slate-500 text-sm mt-2 sm:ml-14 leading-relaxed">
-                撮影から現在までのすべての編集・加工プロセス。改ざん不可能なデジタル署名の連鎖を表示しています。
+                {t('description')}
             </DialogDescription>
             </DialogHeader>
         </div>

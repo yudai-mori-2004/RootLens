@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, Loader2, Image as ImageIcon, Camera, X, ArrowRight } from 'lucide-react';
-import Link from 'next/link';
+import { Search, Loader2, Image as ImageIconLucide, Camera, X, ArrowRight, Shield } from 'lucide-react';
+import { Link } from '@/lib/navigation'; // Changed from 'next/link'
 import NextImage from 'next/image';
 import Header from '@/app/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import AssetThumbnail from '@/app/components/AssetThumbnail';
+import { useTranslations } from 'next-intl';
 
 interface SearchResult {
   media_proof_id: string;
@@ -27,6 +29,7 @@ interface SearchResult {
 }
 
 export default function LensPage() {
+  const t = useTranslations('lens');
   const [queryText, setQueryText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export default function LensPage() {
       setIsCameraOpen(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
-      toast.error("カメラへのアクセスが許可されていません");
+      toast.error(t('cameraError'));
     }
   };
 
@@ -93,7 +96,7 @@ export default function LensPage() {
   // 画像選択処理
   const handleImageSelect = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      toast.error("画像ファイルを選択してください");
+      toast.error(t('fileError'));
       return;
     }
 
@@ -114,7 +117,7 @@ export default function LensPage() {
     if (file) {
       handleImageSelect(file);
     }
-  }, []);
+  }, [t]);
 
   const clearImage = () => {
     setSelectedImage(null);
@@ -175,7 +178,7 @@ export default function LensPage() {
 
   const handleSearch = async () => {
     if (!selectedImage && !queryText.trim()) {
-      toast.error("検索ワードまたは画像を入力してください");
+      toast.error(t('inputError'));
       return;
     }
 
@@ -224,7 +227,7 @@ export default function LensPage() {
 
     } catch (error: unknown) {
       console.error('Search error:', error);
-      toast.error(error instanceof Error ? error.message : "検索中にエラーが発生しました");
+      toast.error(error instanceof Error ? error.message : t('error'));
     } finally {
       setIsSearching(false);
     }
@@ -245,8 +248,8 @@ export default function LensPage() {
       {isDragging && (
         <div className="fixed inset-0 z-50 bg-blue-500/20 backdrop-blur-sm border-4 border-blue-500 border-dashed m-4 rounded-3xl flex items-center justify-center pointer-events-none">
           <div className="bg-white p-6 rounded-xl shadow-xl flex flex-col items-center animate-bounce">
-            <ImageIcon className="w-12 h-12 text-blue-600 mb-2" />
-            <p className="text-xl font-bold text-blue-700">画像をドロップして検索</p>
+            <ImageIconLucide className="w-12 h-12 text-blue-600 mb-2" />
+            <p className="text-xl font-bold text-blue-700">{t('dragDrop')}</p>
           </div>
         </div>
       )}
@@ -277,7 +280,7 @@ export default function LensPage() {
                 <div className="w-full h-1 bg-blue-500/80 shadow-[0_0_10px_rgba(59,130,246,0.8)] absolute top-1/2 -translate-y-1/2 animate-scan"></div>
               </div>
               <p className="absolute bottom-20 text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
-                対象を枠に合わせてください
+                {t('scanOverlay')}
               </p>
             </div>
             <canvas ref={canvasRef} className="hidden" />
@@ -301,11 +304,10 @@ export default function LensPage() {
         <div className="text-center mb-12">
           <Badge variant="outline" className="mb-4 bg-white">Verify Reality</Badge>
           <h1 className="text-4xl md:text-5xl font-bold mb-4 text-slate-900">
-            RootLens <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">Search</span>
+            {t('title')} <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">Search</span>
           </h1>
-          <p className="text-slate-600 text-lg max-w-2xl mx-auto">
-            テキスト、画像、またはカメラから。<br className="md:hidden" />
-            世界中の証明済みコンテンツを検索。
+          <p className="text-slate-600 text-lg max-w-2xl mx-auto whitespace-pre-line">
+            {t('subtitle')}
           </p>
         </div>
 
@@ -319,16 +321,18 @@ export default function LensPage() {
               {selectedImage ? (
                 // 画像プレビューモード
                 <div className="relative h-48 md:h-64 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center group">
-                  <NextImage 
-                    src={imagePreview || ''} // srcはstringが必須なので空文字をフォールバック
-                    alt="Search Target" 
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    style={{ objectFit: 'contain' }}
-                  />
+                  {imagePreview && (
+                    <NextImage
+                      src={imagePreview}
+                      alt="Search Target"
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      style={{ objectFit: 'contain' }}
+                    />
+                  )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                      <Button variant="secondary" onClick={clearImage} className="rounded-full">
-                       <X className="w-4 h-4 mr-2" /> 解除
+                       <X className="w-4 h-4 mr-2" /> {t('clear')}
                      </Button>
                   </div>
                 </div>
@@ -337,7 +341,7 @@ export default function LensPage() {
                 <div className="flex items-center px-4 py-2">
                   <Search className="w-5 h-5 text-slate-400 mr-3 shrink-0" />
                   <Input 
-                    placeholder="何を検索しますか？ (例: 「夕焼けの海」)" 
+                    placeholder={t('placeholder')}
                     className="border-none shadow-none focus-visible:ring-0 text-base sm:text-lg px-0 placeholder:text-slate-400 h-12"
                     value={queryText}
                     onChange={(e) => setQueryText(e.target.value)}
@@ -349,7 +353,7 @@ export default function LensPage() {
                       size="icon" 
                       className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full"
                       onClick={startCamera}
-                      title="カメラで検索"
+                      title={t('lensSearch')}
                     >
                       <Camera className="w-5 h-5" />
                     </Button>
@@ -359,9 +363,9 @@ export default function LensPage() {
                         size="icon" 
                         className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full"
                         onClick={() => fileInputRef.current?.click()}
-                        title="画像をアップロード"
+                        title={t('upload')}
                       >
-                        <ImageIcon className="w-5 h-5" />
+                        <ImageIconLucide className="w-5 h-5" />
                       </Button>
                       <input
                         ref={fileInputRef}
@@ -379,8 +383,8 @@ export default function LensPage() {
             {/* 検索アクションバー */}
             <div className="bg-slate-50 px-4 py-3 border-t border-slate-100 flex justify-between items-center">
               <div className="text-xs text-slate-400 flex items-center gap-2">
-                {!selectedImage && <span className="hidden sm:inline">画像をここにドロップ</span>}
-                {selectedImage && <span className="text-blue-600 font-medium">画像検索モード</span>}
+                {!selectedImage && <span className="hidden sm:inline">{t('dropImage')}</span>}
+                {selectedImage && <span className="text-blue-600 font-medium">{t('imageMode')}</span>}
               </div>
               <Button 
                 onClick={handleSearch} 
@@ -392,11 +396,11 @@ export default function LensPage() {
               >
                 {isSearching ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> 検索中...
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t('searching')}
                   </>
                 ) : (
                   <>
-                    検索 <ArrowRight className="w-4 h-4 ml-2" />
+                    {t('search')} <ArrowRight className="w-4 h-4 ml-2" />
                   </>
                 )}
               </Button>
@@ -407,7 +411,7 @@ export default function LensPage() {
         {/* 検索結果セクション */}
         <div id="results-section">
           {searchResults.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6 animate-in fade-in duration-500">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {searchResults.map((result, i) => (
                 <Link
                   key={result.media_proof_id}
@@ -415,40 +419,42 @@ export default function LensPage() {
                   className="group block"
                   style={{ animationDelay: `${i * 50}ms` }}
                 >
-                  <Card className="overflow-hidden border-slate-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 h-full">
-                    <div className="relative aspect-square overflow-hidden bg-slate-100">
-                      <NextImage
+                  <Card className="overflow-hidden hover:shadow-md transition-all duration-300 border-slate-200 group bg-white rounded-xl p-0 gap-0">
+                    <div className="relative aspect-video bg-slate-100 overflow-hidden border-b border-slate-100">
+                      <AssetThumbnail
                         src={getThumbnailUrl(result.original_hash)}
-                        alt={result.title || 'Untitled'}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        style={{ objectFit: 'cover' }}
-                        loading="lazy"
+                        alt={result.title || t('untitled')}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       <div className="absolute top-2 right-2">
-                        <Badge variant="secondary" className="bg-black/60 text-white hover:bg-black/70 backdrop-blur-sm border-none text-[10px] px-1.5 py-0.5 md:text-xs md:px-2.5 md:py-0.5">
+                        <Badge
+                          variant="default"
+                          className="backdrop-blur-md shadow-sm border-0 bg-indigo-500/90 hover:bg-indigo-600 text-white"
+                        >
                           {Math.round(result.similarity * 100)}%
                         </Badge>
                       </div>
                     </div>
-                    <CardContent className="p-3 md:p-4">
-                      <h3 className="font-semibold text-slate-900 truncate mb-1 group-hover:text-blue-600 transition-colors text-sm md:text-base">
-                        {result.title || 'Untitled'}
-                      </h3>
-                      <p className="text-xs text-slate-500 line-clamp-2 mb-2 md:mb-3 h-8 md:h-10">
-                        {result.description || 'No description'}
-                      </p>
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                        <span className="text-[10px] md:text-xs text-slate-400">
-                          {new Date(result.created_at).toLocaleDateString()}
-                        </span>
-                        <span className="font-bold text-blue-600 text-xs md:text-sm">
-                          {result.price_lamports === 0
-                            ? 'Free'
-                            : `${(result.price_lamports / 1e9).toFixed(2)} SOL`}
+
+                    <CardHeader className="p-3 pb-2 space-y-1">
+                      <CardTitle className="truncate text-sm font-bold text-slate-900">
+                        {result.title || t('untitled')}
+                      </CardTitle>
+                      {result.description && (
+                        <CardDescription className="text-xs text-slate-500 line-clamp-1 leading-tight">
+                          {result.description}
+                        </CardDescription>
+                      )}
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-2 border-t border-slate-100 gap-2">
+                        <div className="flex items-center gap-1 min-w-0 flex-1 truncate">
+                          <Shield className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{result.cnft_mint_address.slice(0, 4)}...{result.cnft_mint_address.slice(-4)}</span>
+                        </div>
+                        <span className="font-bold text-indigo-600 flex-shrink-0 text-[10px]">
+                          {result.price_lamports === 0 ? t('free') : `${(result.price_lamports / 1e9).toFixed(2)} SOL`}
                         </span>
                       </div>
-                    </CardContent>
+                    </CardHeader>
                   </Card>
                 </Link>
               ))}
@@ -459,7 +465,7 @@ export default function LensPage() {
           {!isSearching && searchResults.length === 0 && (selectedImage || queryText) && (
             <div className="text-center py-20 text-slate-400">
               <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>条件に一致するコンテンツは見つかりませんでした</p>
+              <p>{t('noResults')}</p>
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@
 import React from 'react';
 import { Loader2, CheckCircle2, Circle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTranslations } from 'next-intl';
 
 export interface LoadingStep {
   label: string;
@@ -18,12 +19,15 @@ interface LoadingStateProps {
 }
 
 export default function LoadingState({
-  message = '読み込み中...',
+  message,
   subMessage,
   steps = [],
   fullScreen = true,
   className,
 }: LoadingStateProps) {
+  const t = useTranslations('common');
+  const displayMessage = message || t('loading');
+
   return (
     <div
       className={cn(
@@ -44,7 +48,7 @@ export default function LoadingState({
         {/* Text Content */}
         <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <h3 className="text-xl font-bold text-slate-900 tracking-tight">
-            {message}
+            {displayMessage}
           </h3>
           {subMessage && (
             <p className="text-slate-500 text-sm font-medium">

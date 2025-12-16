@@ -53,10 +53,11 @@ import {
 } from 'lucide-react';
 
 import Header from '@/app/components/Header';
-import Link from 'next/link';
+import { Link } from '@/lib/navigation';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import LoadingState from '@/app/components/LoadingState';
+import { useTranslations } from 'next-intl';
 
 // クライアントサイドでのSupabase接続
 const supabase = createClient(
@@ -102,6 +103,8 @@ interface VerificationStep {
 
 export default function AssetPage({ params }: { params: Promise<{ originalHash: string }> }) {
   const { originalHash } = use(params);
+  const t = useTranslations('asset');
+  
   const [proof, setProof] = useState<ProofData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,33 +113,33 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
   const [verificationSteps, setVerificationSteps] = useState<VerificationStep[]>([
     {
       id: 'db',
-      label: 'Step 1: 永久記録を探す',
+      label: t('verificationSteps.db.label'),
       status: 'pending',
-      explanation: 'Arweave（永久保存ブロックチェーン）から、RootLens公式が発行した証明記録を検索します。'
+      explanation: t('verificationSteps.db.explanation')
     },
     {
       id: 'cnft',
-      label: 'Step 2: デジタル所有権を確認',
+      label: t('verificationSteps.cnft.label'),
       status: 'pending',
-      explanation: 'Solanaブロックチェーン上のcNFT（デジタル所有権証明書）が存在するか確認します。'
+      explanation: t('verificationSteps.cnft.explanation')
     },
     {
       id: 'arweave',
-      label: 'Step 3: 来歴データを取得',
+      label: t('verificationSteps.arweave.label'),
       status: 'pending',
-      explanation: 'コンテンツの「指紋」（ハッシュ値）を永久記録から取得します。'
+      explanation: t('verificationSteps.arweave.explanation')
     },
     {
       id: 'crosslink',
-      label: 'Step 4: 乗っ取り防止チェック',
+      label: t('verificationSteps.crosslink.label'),
       status: 'pending',
-      explanation: 'ArweaveとSolanaが互いにリンクしているか確認し、所有権の偽装を防ぎます。'
+      explanation: t('verificationSteps.crosslink.explanation')
     },
     {
       id: 'duplicate',
-      label: 'Step 5: コピー発行の確認',
+      label: t('verificationSteps.duplicate.label'),
       status: 'pending',
-      explanation: '過去に同じコンテンツの所有権証明が発行されていないか、今見ているものが最古の記録であるかを確認します。'
+      explanation: t('verificationSteps.duplicate.explanation')
     },
   ]);
 
@@ -246,11 +249,11 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         let isBurned = false;
         let lastOwnerBeforeBurn = '';
 
-        updateStep('db', 'loading', 'Arweave GraphQL検索中...');
+        updateStep('db', 'loading', t('verificationSteps.db.loading'));
         const matchingTxs = await searchArweaveTransactionsByHash(originalHash);
 
         if (matchingTxs.length > 0) {
-          updateStep('db', 'loading', `${matchingTxs.length}件の候補を検証中...`);
+          updateStep('db', 'loading', t('verificationSteps.db.loadingCount', { count: matchingTxs.length }));
           let foundValidProof = false;
 
           for (const tx of matchingTxs) {
@@ -288,33 +291,33 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           }
 
           if (foundValidProof) {
-            updateStep('db', 'success', '有効な最古の証明を発見');
-            updateStep('arweave', 'success', '永久記録を取得しました');
-            updateStep('cnft', 'success', 'cNFT存在確認完了');
+            updateStep('db', 'success', t('verificationSteps.db.success'));
+            updateStep('arweave', 'success', t('verificationSteps.arweave.success'));
+            updateStep('cnft', 'success', t('verificationSteps.cnft.success'));
             verificationSource = 'onchain';
           } else {
             console.warn('Fallback to DB.');
             const fallback = await fallbackToDatabase(originalHash);
-            if (!fallback) throw new Error('証明データが見つかりません');
+            if (!fallback) throw new Error(t('status.notFound'));
 
-            updateStep('db', 'success', 'DBから記録を取得');
+            updateStep('db', 'success', t('verificationSteps.db.successDB'));
             arweaveTxId = fallback.arweaveTxId;
             arweaveData = fallback.arweaveData;
             targetAssetId = fallback.targetAssetId;
             verificationSource = 'db';
-            if (arweaveData) updateStep('arweave', 'success', '永久記録を取得しました');
+            if (arweaveData) updateStep('arweave', 'success', t('verificationSteps.arweave.success'));
           }
         } else {
           console.warn('Fallback to DB.');
           const fallback = await fallbackToDatabase(originalHash);
-          if (!fallback) throw new Error('証明データが見つかりません');
+          if (!fallback) throw new Error(t('status.notFound'));
 
-          updateStep('db', 'success', 'DBから記録を取得');
+          updateStep('db', 'success', t('verificationSteps.db.successDB'));
           arweaveTxId = fallback.arweaveTxId;
           arweaveData = fallback.arweaveData;
           targetAssetId = fallback.targetAssetId;
           verificationSource = 'db';
-          if (arweaveData) updateStep('arweave', 'success', '永久記録を取得しました');
+          if (arweaveData) updateStep('arweave', 'success', t('verificationSteps.arweave.success'));
         }
 
         if (verificationSource === 'db' && targetAssetId && !cnftData) {
@@ -335,12 +338,12 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
               }
               if (result.content?.json_uri) cnftUri = result.content.json_uri;
               cnftExists = true;
-              updateStep('cnft', 'success', `cNFT存在確認完了`);
+              updateStep('cnft', 'success', t('verificationSteps.cnft.success'));
             } else {
-              updateStep('cnft', 'pending', 'cNFTがまだ見つかりません');
+              updateStep('cnft', 'pending', t('verificationSteps.cnft.pending'));
             }
           } catch (e) {
-            updateStep('cnft', 'error', 'cNFT取得失敗');
+            updateStep('cnft', 'error', t('verificationSteps.cnft.error'));
           }
         }
 
@@ -352,12 +355,12 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         const crossLinkValid = arweaveToCnft && cnftToArweave;
 
         if (crossLinkValid) {
-          updateStep('crosslink', 'success', '双方向リンクを確認');
+          updateStep('crosslink', 'success', t('verificationSteps.crosslink.success'));
         } else {
           if (verificationSource === 'db') {
-            updateStep('crosslink', 'pending', 'オンチェーン反映待ち');
+            updateStep('crosslink', 'pending', t('verificationSteps.crosslink.pending'));
           } else {
-            updateStep('crosslink', 'error', '相互リンク検証失敗');
+            updateStep('crosslink', 'error', t('verificationSteps.crosslink.error'));
           }
         }
 
@@ -371,16 +374,16 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         const noDuplicates = !dupError && duplicates && duplicates.length === 1;
 
         if (noDuplicates) {
-          updateStep('duplicate', 'success', '重複なし');
+          updateStep('duplicate', 'success', t('verificationSteps.duplicate.success'));
         } else if (duplicates && duplicates.length > 1) {
           const isOldest = duplicates[0].cnft_mint_address === targetAssetId;
           if (isOldest) {
-            updateStep('duplicate', 'success', '最古の証明');
+            updateStep('duplicate', 'success', t('verificationSteps.duplicate.successOldest'));
           } else {
-            updateStep('duplicate', 'error', '重複あり');
+            updateStep('duplicate', 'error', t('verificationSteps.duplicate.error'));
           }
         } else {
-          updateStep('duplicate', 'error', '重複チェック失敗');
+          updateStep('duplicate', 'error', t('verificationSteps.duplicate.errorCheck'));
         }
 
         let c2paData: C2PASummaryData | null = null;
@@ -458,7 +461,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         });
 
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'エラーが発生しました');
+        setError(err instanceof Error ? err.message : t('status.error'));
       } finally {
         setLoading(false);
       }
@@ -474,8 +477,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
       <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
         <Header />
         <LoadingState 
-          message="所有権を検証中..." 
-          subMessage="ブロックチェーン上の記録と電子署名を照合しています"
+          message={t('status.loading')}
+          subMessage={t('status.subLoading')}
           steps={verificationSteps.map(s => ({ label: s.label, status: s.status }))}
         />
       </div>
@@ -490,15 +493,15 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
             <Lock className="w-8 h-8 text-red-500" />
           </div>
           <h2 className="text-xl font-bold text-slate-900 mb-2">
-            {accessAllowed === false ? 'アクセスが拒否されました' : 'エラーが発生しました'}
+            {accessAllowed === false ? t('status.accessDenied') : t('status.error')}
           </h2>
           <p className="text-slate-600 mb-6">
             {accessAllowed === false ?
-             'このコンテンツは非公開、またはアクセス権限がありません。' :
-             (error || 'データが見つかりません')}
+             t('status.privateOrNoAccess') :
+             (error || t('status.notFound'))}
           </p>
           <Button asChild className="bg-blue-600 hover:bg-blue-700">
-             <Link href="/">ホームに戻る</Link>
+             <Link href="/">{t('common.backToHome')}</Link>
           </Button>
         </div>
       </div>
@@ -534,14 +537,14 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
               ) : (
                 <div className="text-slate-500 text-center p-8">
                   <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">プレビューなし</p>
+                  <p className="text-sm">{t('details.preview')}</p>
                 </div>
               )}
               {proof.isValid && (
                 <div className="absolute top-4 right-4 z-10">
                   <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 border border-green-200">
                     <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-xs font-bold text-green-700">RootLens Verified</span>
+                    <span className="text-xs font-bold text-green-700">{t('details.verified')}</span>
                   </div>
                 </div>
               )}
@@ -556,7 +559,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                         非公開（自分しか見えない）時のみ表示する */}
                    {!proof.isPublic && isOwner && (
                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                           <Lock className="w-3 h-3 mr-1" /> 非公開
+                           <Lock className="w-3 h-3 mr-1" /> {t('details.private')}
                        </Badge>
                    )}
                    {/* 何も表示しない場合のスペーサー */}
@@ -569,7 +572,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                 </div>
 
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 leading-tight">
-                  {proof.title || '無題のコンテンツ'}
+                  {proof.title || t('details.untitled')}
                 </h1>
                 
                 {proof.description && (
@@ -584,15 +587,15 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                         <User className="w-5 h-5 text-purple-600" />
                     </div>
                     <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Current Owner</p>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{t('details.currentOwner')}</p>
                         {proof.isBurned ? (
-                            <p className="text-sm font-bold text-orange-600 truncate">Burn済み (削除)</p>
+                            <p className="text-sm font-bold text-orange-600 truncate">{t('details.burned')}</p>
                         ) : (
                             <div className="flex items-center gap-2">
                                 <p className="text-sm font-mono text-slate-700 truncate max-w-[180px]">
                                     {proof.ownerWallet}
                                 </p>
-                                {isOwner && <Badge className="text-[10px] h-5 px-1.5 bg-blue-100 text-blue-700 hover:bg-blue-100 border-none">You</Badge>}
+                                {isOwner && <Badge className="text-[10px] h-5 px-1.5 bg-blue-100 text-blue-700 hover:bg-blue-100 border-none">{t('details.you')}</Badge>}
                             </div>
                         )}
                     </div>
@@ -606,7 +609,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                       className="h-9 flex-1"
                    >
                      <Eye className="w-4 h-4 mr-2" />
-                     タイムライン
+                     {t('details.timeline')}
                    </Button>
                    <Button 
                       variant="outline" 
@@ -615,7 +618,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                       className="h-9 flex-1"
                    >
                      <ClipboardList className="w-4 h-4 mr-2" />
-                     検証レポート
+                     {t('details.report')}
                    </Button>
                 </div>
 
@@ -633,11 +636,11 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                             <div className="flex items-center justify-between mb-4">
                                 <div>
                                     <p className="text-xs font-medium opacity-80 mb-0.5">
-                                        {isPurchased ? '購入済み' : '来歴情報付きコンテンツ価格'}
+                                        {isPurchased ? t('details.purchaseTitle') : t('details.priceTitle')}
                                     </p>
                                     <div className="flex items-baseline gap-2">
                                         {proof.priceLamports === 0 ? (
-                                            <span className="text-2xl font-bold">Free</span>
+                                            <span className="text-2xl font-bold">{t('details.free')}</span>
                                         ) : (
                                             <>
                                                 <span className="text-2xl font-bold">
@@ -677,18 +680,18 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                 {isPurchased ? (
                                     <>
                                         <RefreshCw className="w-4 h-4 mr-2" />
-                                        再ダウンロード
+                                        {t('details.redownload')}
                                     </>
                                 ) : (
                                     <>
-                                        {checkingPurchase ? '確認中...' : (proof.priceLamports > 0 ? '購入してダウンロード' : 'ダウンロード')}
+                                        {checkingPurchase ? t('details.checking') : (proof.priceLamports > 0 ? t('details.purchase') : t('details.download'))}
                                     </>
                                 )}
                             </Button>
 
                             {!isPurchased && proof.priceLamports > 0 && (
                                 <p className="text-[10px] text-center opacity-70 mt-3 flex items-center justify-center gap-1">
-                                    <Lock className="w-3 h-3" /> Solana Payによる安全な取引
+                                    <Lock className="w-3 h-3" /> {t('details.solanaPay')}
                                 </p>
                             )}
                         </div>
@@ -711,8 +714,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                             <Shield className="w-6 h-6 text-blue-400" />
                         </div>
                         <div>
-                            <h2 className="text-xl md:text-2xl font-bold">デジタル資産証明</h2>
-                            <p className="text-slate-400 text-sm">Blockchain & C2PA Verification</p>
+                            <h2 className="text-xl md:text-2xl font-bold">{t('proof.title')}</h2>
+                            <p className="text-slate-400 text-sm">{t('proof.subtitle')}</p>
                         </div>
                     </div>
 
@@ -720,7 +723,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                         
                         {/* 1. C2PA Status */}
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-blue-500/50 transition-colors">
-                            <p className="text-xs text-slate-400 font-medium mb-3">来歴証明 (Provenance)</p>
+                            <p className="text-xs text-slate-400 font-medium mb-3">{t('proof.provenance')}</p>
                             <div className="flex items-center gap-3">
                                 <div className="relative w-8 h-8 shrink-0">
                                     <Image src="/c2pa_logo.jpg" alt="C2PA Logo" fill style={{ objectFit: 'contain' }} sizes="32px" className="rounded-full" />
@@ -732,10 +735,10 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                 </div>
                                 <div>
                                     <p className="font-bold text-lg text-white">
-                                        {proof.c2paData?.validationStatus.isValid ? 'Valid' : 'Invalid'}
+                                        {proof.c2paData?.validationStatus.isValid ? t('proof.valid') : t('proof.invalid')}
                                     </p>
                                     <p className="text-xs text-slate-400">
-                                        {proof.c2paData?.validationStatus.isValid ? '来歴検証に成功' : '署名無効'}
+                                        {proof.c2paData?.validationStatus.isValid ? t('proof.validDesc') : t('proof.invalidDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -743,14 +746,14 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
 
                         {/* 2. AI Status */}
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-purple-500/50 transition-colors">
-                            <p className="text-xs text-slate-400 font-medium mb-3">AI生成判定</p>
+                            <p className="text-xs text-slate-400 font-medium mb-3">{t('proof.ai')}</p>
                             <div className="flex items-center gap-3">
                                 {proof.c2paData?.activeManifest?.isAIGenerated ? (
                                     <>
                                         <Sparkles className="w-8 h-8 text-purple-400" />
                                         <div>
-                                            <p className="font-bold text-lg text-purple-400">Detected</p>
-                                            <p className="text-xs text-slate-400">AI生成の可能性</p>
+                                            <p className="font-bold text-lg text-purple-400">{t('proof.aiDetected')}</p>
+                                            <p className="text-xs text-slate-400">{t('proof.aiDesc')}</p>
                                         </div>
                                     </>
                                 ) : (
@@ -762,8 +765,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                             </div>
                                         </div>
                                         <div>
-                                            <p className="font-bold text-lg text-blue-400">Captured</p>
-                                            <p className="text-xs text-slate-400">カメラ撮影データ</p>
+                                            <p className="font-bold text-lg text-blue-400">{t('proof.captured')}</p>
+                                            <p className="text-xs text-slate-400">{t('proof.capturedDesc')}</p>
                                         </div>
                                     </>
                                 )}
@@ -774,7 +777,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-indigo-500/50 transition-colors group">
                             <div className="flex items-center justify-between mb-3">
                                 <p className="text-xs text-slate-400 font-medium flex items-center gap-2">
-                                    永久保存データ (Data)
+                                    {t('proof.data')}
                                     <Database className="w-3 h-3 text-slate-500" />
                                 </p>
                                 {/* モバイル用情報アイコン */}
@@ -813,7 +816,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                                 <Database className="w-4 h-4" /> Permanent Data
                                             </h4>
                                             <p className="text-xs text-slate-300 leading-relaxed">
-                                                このコンテンツのオリジナルデータとハッシュ値は、Arweaveブロックチェーン上に永久に保存されています。サーバーダウンや改ざんのリスクがありません。
+                                                {t('proof.dataDesc')}
                                             </p>
                                         </div>
                                         <a
@@ -822,7 +825,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                             rel="noopener noreferrer"
                                             className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 font-bold"
                                         >
-                                            Explorerで確認 <ArrowRightIcon className="w-3 h-3" />
+                                            {t('proof.explorer')} <ArrowRightIcon className="w-3 h-3" />
                                         </a>
                                     </TooltipContent>
                                 </Tooltip>
@@ -833,7 +836,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-indigo-500/50 transition-colors group">
                             <div className="flex items-center justify-between mb-3">
                                 <p className="text-xs text-slate-400 font-medium flex items-center gap-2">
-                                    デジタル所有権 (Ownership)
+                                    {t('proof.ownership')}
                                     <Wallet className="w-3 h-3 text-slate-500" />
                                 </p>
                                 {/* モバイル用情報アイコン */}
@@ -872,7 +875,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                                 <Wallet className="w-4 h-4" /> Digital Ownership
                                             </h4>
                                             <p className="text-xs text-slate-300 leading-relaxed">
-                                                所有権はSolanaブロックチェーン上の圧縮NFT(cNFT)として管理されています。これにより、権利の明確化と即時の売買が可能になります。
+                                                {t('proof.ownershipDesc')}
                                             </p>
                                         </div>
                                         <a
@@ -881,7 +884,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                             rel="noopener noreferrer"
                                             className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 font-bold"
                                         >
-                                            Explorerで確認 <ArrowRightIcon className="w-3 h-3" />
+                                            {t('proof.explorer')} <ArrowRightIcon className="w-3 h-3" />
                                         </a>
                                     </TooltipContent>
                                 </Tooltip>
@@ -899,10 +902,10 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                 <CardHeader>
                     <CardTitle className="text-xl flex items-center gap-2">
                          <Shield className="w-5 h-5 text-blue-600" />
-                         所有権の正当性検証プロセス
+                         {t('card.title')}
                     </CardTitle>
                     <CardDescription>
-                        5つのステップでリアルタイムにブロックチェーンと署名を照合します
+                        {t('card.desc')}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -965,12 +968,12 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                 )}
                                 <div>
                                     <h4 className={`font-bold ${proof.isValid ? 'text-green-900' : 'text-red-900'}`}>
-                                        {proof.isValid ? '✓ 正当な所有権が確認されました' : '⚠ 検証に問題があります'}
+                                        {proof.isValid ? t('card.validTitle') : t('card.invalidTitle')}
                                     </h4>
                                     <p className={`text-xs ${proof.isValid ? 'text-green-700' : 'text-red-700'}`}>
                                         {proof.isValid 
-                                        ? 'この所有権証明は、Arweave永久記録とSolana cNFTの双方向相互リンクにより、偽造や乗っ取りから保護されています。' 
-                                        : '一部の検証項目が失敗しています。この所有権証明に問題がある可能性があります。'}
+                                        ? t('card.validDesc')
+                                        : t('card.invalidDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -1020,7 +1023,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
             setShowPurchaseModal(false);
             // 購入チェックを再実行
             setPurchaseCheckTrigger(prev => prev + 1);
-            toast.success("購入が完了しました！");
+            toast.success(t('common.success'));
           }}
           mediaProofId={proof.mediaProofId}
           priceLamports={proof.priceLamports}
@@ -1051,7 +1054,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
               </div>
             </div>
             <p className="text-sm text-slate-300 leading-relaxed">
-              このコンテンツのオリジナルデータとハッシュ値は、Arweaveブロックチェーン上に永久に保存されています。サーバーダウンや改ざんのリスクがありません。
+              {t('proof.dataDesc')}
             </p>
             <Button
               asChild
@@ -1063,7 +1066,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                 rel="noopener noreferrer"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
-                Explorerで確認
+                {t('proof.explorer')}
               </a>
             </Button>
           </div>
@@ -1092,7 +1095,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
               </div>
             </div>
             <p className="text-sm text-slate-300 leading-relaxed">
-              所有権はSolanaブロックチェーン上の圧縮NFT(cNFT)として管理されています。これにより、権利の明確化と即時の売買が可能になります。
+              {t('proof.ownershipDesc')}
             </p>
             <Button
               asChild
@@ -1104,7 +1107,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                 rel="noopener noreferrer"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
-                Explorerで確認
+                {t('proof.explorer')}
               </a>
             </Button>
           </div>

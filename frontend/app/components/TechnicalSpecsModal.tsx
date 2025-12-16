@@ -16,6 +16,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
+import { useTranslations } from 'next-intl';
 
 interface VerificationDetails {
   arweaveToCnft: boolean;
@@ -55,6 +56,7 @@ export default function TechnicalSpecsModal({
   isBurned,
   lastOwnerBeforeBurn,
 }: TechnicalSpecsModalProps) {
+  const t = useTranslations('components.technicalSpecsModal');
   const manifest = c2paSummary.activeManifest;
 
   return (
@@ -69,7 +71,7 @@ export default function TechnicalSpecsModal({
                         <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
                     </div>
                     <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                        検証レポート
+                        {t('title')}
                     </DialogTitle>
                 </div>
             </DialogHeader>
@@ -87,8 +89,8 @@ export default function TechnicalSpecsModal({
                         </div>
                         <div>
                             {/* 修正: 検証結果ではなく、情報の提示とする */}
-                            <h3 className="text-lg font-bold text-slate-900">埋め込みメタデータと資産情報</h3>
-                            <p className="text-sm text-slate-500">ファイルに含まれるC2PA情報およびオンチェーン記録の概要</p>
+                            <h3 className="text-lg font-bold text-slate-900">{t('summaryTitle')}</h3>
+                            <p className="text-sm text-slate-500">{t('summaryDesc')}</p>
                         </div>
                     </div>
 
@@ -106,11 +108,11 @@ export default function TechnicalSpecsModal({
                                     c2paSummary.validationStatus.isValid ? 'text-green-700' : 'text-slate-500'
                                 }`} />
                             </div>
-                            <p className="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">ハードウェア署名</p>
+                            <p className="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('hardware')}</p>
                             <p className={`text-lg font-bold ${
                                 c2paSummary.validationStatus.isValid ? 'text-green-700' : 'text-slate-600'
                             }`}>
-                                {c2paSummary.validationStatus.isValid ? 'あり' : '未検出'}
+                                {c2paSummary.validationStatus.isValid ? t('exists') : t('notDetected')}
                             </p>
                         </div>
 
@@ -127,11 +129,11 @@ export default function TechnicalSpecsModal({
                                     manifest?.isAIGenerated ? 'text-purple-700' : 'text-blue-700'
                                 }`} />
                             </div>
-                            <p className="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">AI生成</p>
+                            <p className="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('ai')}</p>
                             <p className={`text-lg font-bold ${
                                 manifest?.isAIGenerated ? 'text-purple-700' : 'text-blue-700'
                             }`}>
-                                {manifest?.isAIGenerated ? 'あり' : 'なし'}
+                                {manifest?.isAIGenerated ? t('exists') : t('none')}
                             </p>
                         </div>
 
@@ -140,8 +142,8 @@ export default function TechnicalSpecsModal({
                             <div className="mb-3 p-3 rounded-full bg-indigo-100">
                                 <Database className="w-6 h-6 text-indigo-700" />
                             </div>
-                            <p className="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">ブロックチェーン</p>
-                            <p className="text-lg font-bold text-indigo-700">登録済み</p>
+                            <p className="text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('blockchain')}</p>
+                            <p className="text-lg font-bold text-indigo-700">{t('registered')}</p>
                         </div>
                     </div>
                 </div>
@@ -153,32 +155,33 @@ export default function TechnicalSpecsModal({
                 {/* 1. C2PA署名の確認方法 */}
                 <section className="space-y-4">
                     <h4 className="flex items-center gap-3 font-bold text-slate-900 text-lg border-l-4 border-indigo-500 pl-4 py-1">
-                        1. ハードウェア署名の確認
+                        {t('section1')}
                     </h4>
                     <div className="bg-white p-6 sm:p-8 rounded-2xl text-base space-y-6 border border-slate-200 shadow-sm">
                         <p className="leading-loose text-slate-700">
-                        <strong className="text-slate-900 font-semibold border-b border-indigo-200 pb-0.5">C2PA（Coalition for Content Provenance and Authenticity）</strong>は、
-                        Adobe、Microsoft、Sony、Canonなどが参加する業界標準規格です。
+                            {t.rich('c2paDesc', {
+                                strong: (chunks) => <strong className="text-slate-900 font-semibold border-b border-indigo-200 pb-0.5">{chunks}</strong>
+                            })}
                         </p>
 
                         <div className="bg-slate-50/80 p-6 rounded-xl border border-slate-200">
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">確認ポイント</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">{t('checkPoint')}</p>
                             <ul className="space-y-4 text-slate-700">
                                 <li className="flex items-start gap-3">
                                     <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
                                     <div>
-                                        <div className="font-bold text-slate-900 mb-1">署名の有効性</div>
+                                        <div className="font-bold text-slate-900 mb-1">{t('validity')}</div>
                                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium ${
                                             c2paSummary.validationStatus.isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                                         }`}>
-                                            このコンテンツの署名は{c2paSummary.validationStatus.isValid ? '有効' : '無効'}です
+                                            {t('validMsg', { status: c2paSummary.validationStatus.isValid ? 'Valid' : 'Invalid' })}
                                         </span>
                                     </div>
                                 </li>
                                 <li className="flex items-start gap-3">
                                     <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
                                     <div className="w-full">
-                                        <div className="font-bold text-slate-900 mb-1">署名者</div>
+                                        <div className="font-bold text-slate-900 mb-1">{t('signer')}</div>
                                         <div className="bg-white p-2 rounded border border-slate-200 text-sm font-mono text-slate-600 break-all">
                                             {manifest?.signatureInfo.issuer || 'Unknown'}
                                         </div>
@@ -187,11 +190,11 @@ export default function TechnicalSpecsModal({
                                 <li className="flex items-start gap-3">
                                     <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
                                     <div>
-                                        <div className="font-bold text-slate-900 mb-1">署名日時</div>
+                                        <div className="font-bold text-slate-900 mb-1">{t('date')}</div>
                                         <div className="text-slate-700">
                                             {manifest?.signatureInfo.time
-                                                ? new Date(manifest.signatureInfo.time).toLocaleString('ja-JP')
-                                                : '不明'
+                                                ? new Date(manifest.signatureInfo.time).toLocaleString()
+                                                : t('unknown')
                                             }
                                         </div>
                                     </div>
@@ -202,18 +205,20 @@ export default function TechnicalSpecsModal({
                         <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 flex gap-4 items-start">
                             <Eye className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
                             <div>
-                                <p className="text-sm font-bold text-blue-900 mb-2">どうやって自分で確認できる？</p>
+                                <p className="text-sm font-bold text-blue-900 mb-2">{t('verifySelf')}</p>
                                 <p className="text-sm text-blue-900 leading-relaxed">
-                                    この画像の真正性は、Adobe Content Credentials
-                                    （<a 
-                                        href="https://verify.contentauthenticity.org" 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="font-mono text-blue-600 underline decoration-blue-300 hover:text-blue-800 mx-1"
-                                    >
-                                        verify.contentauthenticity.org
-                                    </a>）
-                                    等の外部ツールでも検証可能です。
+                                    {t.rich('verifySelfDesc', {
+                                        a: (chunks) => (
+                                            <a 
+                                                href="https://verify.contentauthenticity.org" 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="font-mono text-blue-600 underline decoration-blue-300 hover:text-blue-800 mx-1"
+                                            >
+                                                verify.contentauthenticity.org
+                                            </a>
+                                        )
+                                    })}
                                 </p>
                             </div>
                         </div>
@@ -223,7 +228,7 @@ export default function TechnicalSpecsModal({
                 {/* 2. AI生成の確認方法 */}
                 <section className="space-y-4">
                     <h4 className="flex items-center gap-3 font-bold text-slate-900 text-lg border-l-4 border-purple-500 pl-4 py-1">
-                        2. AI技術の使用確認
+                        {t('section2')}
                     </h4>
                     <div className={`p-6 sm:p-8 rounded-2xl text-base space-y-6 border-2 bg-white shadow-sm ${
                         manifest?.isAIGenerated
@@ -235,10 +240,10 @@ export default function TechnicalSpecsModal({
                                 <Sparkles className={`w-6 h-6 ${manifest?.isAIGenerated ? 'text-purple-600' : 'text-blue-600'}`} />
                             </div>
                             <div>
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">判定結果</p>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{t('result')}</p>
                                 <p className="font-bold text-slate-900 text-lg">
                                     {/* 修正点: 生成だけでなく編集の可能性も含める / AIなしの場合は「記録なし」とする */}
-                                    {manifest?.isAIGenerated ? 'AI技術の使用あり（生成・編集）' : 'AI生成・編集の記録なし'}
+                                    {manifest?.isAIGenerated ? t('aiUsed') : t('aiNone')}
                                 </p>
                             </div>
                         </div>
@@ -246,8 +251,7 @@ export default function TechnicalSpecsModal({
                         {manifest?.isAIGenerated ? (
                         <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
                             <p className="text-sm text-purple-900 leading-relaxed mb-4">
-                            このコンテンツの来歴情報には、生成AIまたはAIモデルを使用した処理の記録が含まれています。
-                            検出されたアクションは以下の通りです：
+                            {t('aiDetail')}
                             </p>
                             <ul className="space-y-3 text-sm text-purple-800">
                             {manifest.assertions.actions
@@ -268,7 +272,7 @@ export default function TechnicalSpecsModal({
                                     
                                     {/* digitalSourceTypeがわかる場合は補足表示（任意） */}
                                     {action.digitalSourceType?.includes('composite') && (
-                                        <span className="block text-xs text-purple-500 mt-1">※既存画像へのAI合成・編集</span>
+                                        <span className="block text-xs text-purple-500 mt-1">{t('composite')}</span>
                                     )}
                                     </div>
                                 </li>
@@ -279,8 +283,7 @@ export default function TechnicalSpecsModal({
                         <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
                             <p className="text-sm text-blue-900 leading-relaxed">
                             {/* 修正点: カメラ撮影と断定せず、あくまでメタデータ上の事実を述べる */}
-                            C2PAメタデータ内に、AIによる生成や編集を示す明確な記録は見つかりませんでした。
-                            （※通常の編集ツールによる加工や、手動による作成、またはカメラ撮影の可能性があります）
+                            {t('aiNoneDetail')}
                             </p>
                         </div>
                         )}
@@ -289,8 +292,7 @@ export default function TechnicalSpecsModal({
                             <AlertCircle className="w-5 h-5 mt-0.5 shrink-0 text-slate-400" />
                             <p className="leading-relaxed text-xs sm:text-sm">
                                 {/* 修正点: 信頼性の定義をより正確に */}
-                                AI判定は、作成・編集時に使用されたソフトウェアがC2PAメタデータに記録した情報に基づきます。
-                                「記録なし」の場合でも、C2PA非対応のAIツールが使用された可能性は否定できません。
+                                {t('disclaimer')}
                             </p>
                         </div>
                     </div>
@@ -300,14 +302,14 @@ export default function TechnicalSpecsModal({
                 <section className="space-y-4">
                     {/* タイトルを「改ざん検知」から「所有権と紐付け」に変更 */}
                     <h4 className="flex items-center gap-3 font-bold text-slate-900 text-lg border-l-4 border-slate-500 pl-4 py-1">
-                        3. 所有権の証明とデータ紐付け
+                        {t('section3')}
                     </h4>
                     
                     <div className="bg-white p-6 sm:p-8 rounded-2xl text-base space-y-8 border border-slate-200 shadow-sm">
                         <p className="leading-loose text-slate-700">
-                            C2PAによって内容の真正性が保証されたファイルと、ブロックチェーン上の所有権を
-                            <strong className="text-slate-900 bg-slate-100 px-1 py-0.5 rounded mx-1">ハッシュ値</strong>
-                            によって強固に紐付けています。
+                            {t.rich('hashDesc', {
+                                strong: (chunks) => <strong className="text-slate-900 bg-slate-100 px-1 py-0.5 rounded mx-1">{chunks}</strong>
+                            })}
                         </p>
 
                         <div className="grid grid-cols-1 gap-6">
@@ -315,14 +317,14 @@ export default function TechnicalSpecsModal({
                             <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">1</div>
                                 <div className="space-y-2 min-w-0 flex-1">
-                                    <p className="font-bold text-slate-900">紐付け用ハッシュ (Binding Hash)</p>
+                                    <p className="font-bold text-slate-900">{t('bindingHash')}</p>
                                     <div className="bg-slate-800 rounded-lg p-3 relative group">
                                         <code className="text-slate-300 text-xs sm:text-sm font-mono break-all leading-relaxed block">
                                             {originalHash}
                                         </code>
                                     </div>
                                     <p className="text-sm text-slate-600 leading-relaxed">
-                                        ダウンロードしたファイル固有のIDです。このIDがブロックチェーン上に記録されていることで、「このファイルこそが、NFTに紐づく正当なデータである」と特定できます。
+                                        {t('bindingHashDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -332,7 +334,7 @@ export default function TechnicalSpecsModal({
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">2</div>
                                 <div className="space-y-2 min-w-0 flex-1">
                                     <div className="flex items-center justify-between">
-                                        <p className="font-bold text-slate-900">Arweaveによる永続記録</p>
+                                        <p className="font-bold text-slate-900">{t('arweave')}</p>
                                         <a 
                                             href={`https://devnet.irys.xyz/tx/${arweaveTxId}`}
                                             target="_blank"
@@ -348,7 +350,7 @@ export default function TechnicalSpecsModal({
                                         </code>
                                     </div>
                                     <p className="text-sm text-slate-600 leading-relaxed">
-                                        「上記のハッシュ値を持つファイルが存在する」という事実が、Arweave上に永久に記録されています。
+                                        {t('arweaveDesc')}
                                     </p>
                                 </div>
                             </div>
@@ -358,10 +360,10 @@ export default function TechnicalSpecsModal({
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">3</div>
                                 <div className="space-y-2 min-w-0 flex-1">
                                     <div className="flex items-center justify-between gap-2">
-                                        <p className="font-bold text-slate-900">Solana cNFTによる所有権</p>
+                                        <p className="font-bold text-slate-900">{t('solana')}</p>
                                         {isBurned ? (
                                             <span className="bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">
-                                                Burned (破棄済み)
+                                                {t('burned')}
                                             </span>
                                         ) : (
                                             <a 
@@ -381,8 +383,8 @@ export default function TechnicalSpecsModal({
                                     </div>
                                     <p className="text-sm text-slate-600 leading-relaxed">
                                         {isBurned 
-                                            ? 'このコンテンツの所有権トークン（cNFT）は破棄されています。'
-                                            : 'このcNFTを持つウォレットが、上記ハッシュ値を持つファイルの正当な保有者（Owner）であることをSolanaチェーンが証明しています。'
+                                            ? t('burnedDesc')
+                                            : t('solanaDesc')
                                         }
                                     </p>
                                 </div>
@@ -392,21 +394,23 @@ export default function TechnicalSpecsModal({
                         {/* 検証フローの説明も修正 */}
                         <div className="bg-green-50 p-5 rounded-xl border border-green-100">
                             <p className="text-sm font-bold text-green-900 mb-3 flex items-center gap-2">
-                                <CheckCircle className="w-5 h-5 text-green-600" /> RootLensでの真正性担保の構造
+                                <CheckCircle className="w-5 h-5 text-green-600" /> {t('rootLensStructure')}
                             </p>
                             <ul className="space-y-3 ml-1">
                                 <li className="flex items-start gap-3 text-sm text-green-800">
-                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5">CONTENT</span>
+                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5">{t('content')}</span>
                                     <span>
-                                        <strong>ファイルの中身（改ざん検知）:</strong><br/>
-                                        C2PAの電子署名によって、画像のピクセルやメタデータが変更されていないことを保証します。（外部ツールで検証可能）
+                                        {t.rich('contentDesc', {
+                                            strong: (chunks) => <strong>{chunks}</strong>
+                                        })}
                                     </span>
                                 </li>
                                 <li className="flex items-start gap-3 text-sm text-green-800">
-                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5">OWNERSHIP</span>
+                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5">{t('ownership')}</span>
                                     <span>
-                                        <strong>ファイルの所有権（資産証明）:</strong><br/>
-                                        ファイルのハッシュ値をキーとして、Solanaブロックチェーン上のNFTと紐付けます。「誰がこのファイルのオーナーか」を保証します。
+                                        {t.rich('ownershipDesc', {
+                                            strong: (chunks) => <strong>{chunks}</strong>
+                                        })}
                                     </span>
                                 </li>
                             </ul>
@@ -417,16 +421,17 @@ export default function TechnicalSpecsModal({
                 {/* 4. 相互リンク検証 */}
                 <section className="space-y-4">
                     <h4 className="flex items-center gap-3 font-bold text-slate-900 text-lg border-l-4 border-slate-800 pl-4 py-1">
-                        4. 堅牢な所有権証明（相互リンク）
+                        {t('section4')}
                     </h4>
                     <div className="bg-white p-6 sm:p-8 rounded-2xl text-base space-y-6 border border-slate-200 shadow-sm">
                         <p className="leading-loose text-slate-700">
-                        RootLensでは、<strong className="text-slate-900">Arweave</strong>と<strong className="text-slate-900">Solana</strong>が
-                        相互にリンクすることで、「乗っ取り攻撃」を防ぎます。
+                            {t.rich('linkDesc', {
+                                strong: (chunks) => <strong className="text-slate-900">{chunks}</strong>
+                            })}
                         </p>
 
                         <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">仕組み</p>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">{t('mechanism')}</p>
                             <div className="flex flex-col md:flex-row items-center gap-4">
                                 <div className="bg-white p-5 rounded-xl border border-slate-200 w-full md:w-auto flex-1 shadow-sm relative overflow-hidden">
                                     <div className="absolute top-0 right-0 p-2 opacity-10">
@@ -438,9 +443,10 @@ export default function TechnicalSpecsModal({
                                             <span className="text-xs text-slate-500 font-bold">Data Layer</span>
                                         </div>
                                         <p className="text-sm text-slate-700 break-all leading-relaxed">
-                                            cNFTのアドレス<br/>
-                                            <span className="font-mono bg-slate-100 px-1 rounded text-slate-900">{cnftMintAddress.slice(0, 8)}...</span>
-                                            <br/>を記録済み
+                                            {t.rich('arweaveRecorded', {
+                                                br: () => <br/>,
+                                                code: () => <span className="font-mono bg-slate-100 px-1 rounded text-slate-900">{cnftMintAddress.slice(0, 8)}...</span>
+                                            })}
                                         </p>
                                     </div>
                                 </div>
@@ -458,9 +464,10 @@ export default function TechnicalSpecsModal({
                                             <span className="text-xs text-slate-500 font-bold">Ownership Layer</span>
                                         </div>
                                         <p className="text-sm text-slate-700 break-all leading-relaxed">
-                                            ArweaveのTX ID<br/>
-                                            <span className="font-mono bg-slate-100 px-1 rounded text-slate-900">{arweaveTxId.slice(0, 8)}...</span>
-                                            <br/>を記録済み
+                                            {t.rich('solanaRecorded', {
+                                                br: () => <br/>,
+                                                code: () => <span className="font-mono bg-slate-100 px-1 rounded text-slate-900">{arweaveTxId.slice(0, 8)}...</span>
+                                            })}
                                         </p>
                                     </div>
                                 </div>
@@ -478,12 +485,12 @@ export default function TechnicalSpecsModal({
                             {verificationDetails.arweaveToCnft && verificationDetails.cnftToArweave ? (
                                 <>
                                 <CheckCircle className="w-6 h-6 text-green-600" />
-                                <span className="text-green-800">相互リンク検証: 成功</span>
+                                <span className="text-green-800">{t('success')}</span>
                                 </>
                             ) : (
                                 <>
                                 <XCircle className="w-6 h-6 text-red-600" />
-                                <span className="text-red-800">相互リンク検証: 失敗</span>
+                                <span className="text-red-800">{t('failed')}</span>
                                 </>
                             )}
                             </p>
@@ -496,7 +503,7 @@ export default function TechnicalSpecsModal({
                                 <XCircle className="w-5 h-5 text-red-600 shrink-0" />
                                 )}
                                 <span className={`text-sm font-medium ${verificationDetails.arweaveToCnft ? 'text-green-800' : 'text-red-800'}`}>
-                                Arweave → cNFT: {verificationDetails.arweaveToCnft ? '一致' : '不一致'}
+                                Arweave → cNFT: {verificationDetails.arweaveToCnft ? 'Match' : 'Mismatch'}
                                 </span>
                             </div>
 
@@ -507,7 +514,7 @@ export default function TechnicalSpecsModal({
                                 <XCircle className="w-5 h-5 text-red-600 shrink-0" />
                                 )}
                                 <span className={`text-sm font-medium ${verificationDetails.cnftToArweave ? 'text-green-800' : 'text-red-800'}`}>
-                                cNFT → Arweave: {verificationDetails.cnftToArweave ? '一致' : '不一致'}
+                                cNFT → Arweave: {verificationDetails.cnftToArweave ? 'Match' : 'Mismatch'}
                                 </span>
                             </div>
                             </div>
@@ -524,7 +531,7 @@ export default function TechnicalSpecsModal({
                     <AccordionTrigger className="hover:no-underline py-4 px-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
                         <div className="flex items-center gap-3 text-slate-600 font-bold">
                             <BookOpen className="w-5 h-5" />
-                            <span>検証に役立つ用語集</span>
+                            <span>{t('glossary')}</span>
                         </div>
                     </AccordionTrigger>
                     <AccordionContent>
@@ -534,35 +541,31 @@ export default function TechnicalSpecsModal({
                                     <span className="w-2 h-2 bg-slate-400 rounded-full" /> C2PA (Coalition for Content Provenance and Authenticity)
                                 </dt>
                                 <dd className="text-sm text-slate-600 leading-loose pl-4 border-l-2 border-slate-100 ml-1">
-                                    Adobe、Microsoft、Sony、Canonなどが参加する、コンテンツの来歴と真正性を証明するための業界標準規格。
-                                    デジタルカメラやAdobeソフトから直接C2PA署名を埋め込むことができます。
+                                    {t('c2paDesc')}
                                 </dd>
                             </div>
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                                 <dt className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full" /> ハッシュ値（SHA-256）
+                                    <span className="w-2 h-2 bg-slate-400 rounded-full" /> {t('bindingHash')} (SHA-256)
                                 </dt>
                                 <dd className="text-sm text-slate-600 leading-loose pl-4 border-l-2 border-slate-100 ml-1">
-                                    デジタルデータの「指紋」。1ビットでも変更されると全く異なる値になるため、改ざん検知に使われます。
-                                    同じハッシュ値を持つ異なるファイルを作ることは、現在の技術では事実上不可能です。
+                                    {t('bindingHashDesc')}
                                 </dd>
                             </div>
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                                 <dt className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full" /> Arweave（アーウィーブ）
+                                    <span className="w-2 h-2 bg-slate-400 rounded-full" /> Arweave
                                 </dt>
                                 <dd className="text-sm text-slate-600 leading-loose pl-4 border-l-2 border-slate-100 ml-1">
-                                    一度書き込むと永久に削除・変更ができないブロックチェーンストレージ。
-                                    「デジタルの石板」として、証拠の永久保存に使われます。
+                                    {t('arweaveDesc')}
                                 </dd>
                             </div>
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                                 <dt className="font-bold text-slate-800 mb-2 flex items-center gap-2">
-                                    <span className="w-2 h-2 bg-slate-400 rounded-full" /> cNFT（圧縮NFT）
+                                    <span className="w-2 h-2 bg-slate-400 rounded-full" /> cNFT (Compressed NFT)
                                 </dt>
                                 <dd className="text-sm text-slate-600 leading-loose pl-4 border-l-2 border-slate-100 ml-1">
-                                    Solanaブロックチェーン上の低コストなNFT。このコンテンツの「デジタル所有権証明書」として機能します。
-                                    誰が所有者かをブロックチェーン上で透明に確認できます。
+                                    {t('solanaDesc')}
                                 </dd>
                             </div>
                         </div>

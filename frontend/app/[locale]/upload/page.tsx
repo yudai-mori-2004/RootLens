@@ -16,11 +16,13 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Wallet, CheckCircle, XCircle, UploadCloud, Loader2, Info, Sparkles, Clipboard, Camera, AlertTriangle, Lock, PenTool, Cloud, Link, ExternalLink, FileText } from 'lucide-react';
+import { Wallet, CheckCircle, XCircle, UploadCloud, Loader2, Info, Sparkles, Clipboard, Camera, AlertTriangle, Lock, PenTool, Cloud, Link as LinkIcon, ExternalLink, FileText } from 'lucide-react';
 
 import Header from '@/app/components/Header';
 import LoadingState, { LoadingStep } from '@/app/components/LoadingState';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/lib/navigation';
 
 interface C2PAValidationResult {
   isValid: boolean;
@@ -33,16 +35,8 @@ interface FileHashes {
   originalHash: string;
 }
 
-// ステップ定義
-const STEPS = [
-  { label: 'ウォレット接続' },
-  { label: 'ファイル選択' },
-  { label: '検証とプライバシー' },
-  { label: '価格・情報設定' },
-  { label: 'アップロード' },
-];
-
 export default function UploadPage() {
+  const t = useTranslations('upload');
   const [currentStep, setCurrentStep] = useState(1);
   const [c2pa, setC2pa] = useState<C2pa | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -82,6 +76,15 @@ export default function UploadPage() {
   const { login, authenticated, logout } = usePrivy();
   const { wallets } = useWallets();
   const solanaWallet = wallets[0];
+
+  // ステップ定義
+  const STEPS = [
+    { label: t('steps.wallet') },
+    { label: t('steps.file') },
+    { label: t('steps.verify') },
+    { label: t('steps.settings') },
+    { label: t('steps.upload') },
+  ];
 
   // C2PA WASM初期化
   useEffect(() => {
@@ -417,12 +420,12 @@ export default function UploadPage() {
     setShowUploadProgressModal(true);
     setIsProcessing(true);
     setUploadProgressStep(0);
-    setUploadStatusMessage('アップロード準備中...');
+    setUploadStatusMessage(t('progress.message'));
 
     try {
       // 1. Presigned URL取得（元ファイル）とR2アップロード
       setUploadProgressStep(1);
-      setUploadStatusMessage('1/4: 元データを一時保存しています...');
+      setUploadStatusMessage(t('progress.steps.0'));
       const presignedOriginalResponse = await fetch('/api/upload/presigned', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -451,7 +454,7 @@ export default function UploadPage() {
 
       // 2. Lens Workerで処理 (ベクトル化 + DB初期登録)
       setUploadProgressStep(2);
-      setUploadStatusMessage('2/4: 真正性を検証し、データを解析しています...');
+      setUploadStatusMessage(t('progress.steps.1'));
       const lensWorkerUrl = process.env.NEXT_PUBLIC_LENS_WORKER_URL;
       if (!lensWorkerUrl) {
         throw new Error('System Error: LENS_WORKER_URL is not configured');
@@ -483,7 +486,7 @@ export default function UploadPage() {
 
       // 3. サムネイルとManifestをPublic Bucketにアップロード
       setUploadProgressStep(3);
-      setUploadStatusMessage('3/4: 証明データを保存しています...');
+      setUploadStatusMessage(t('progress.steps.2'));
       
       // 3-1. サムネイル生成 & 直接アップロード (Presigned URL)
       const thumbnailBlob = await resizeImage(currentFile);
@@ -524,7 +527,7 @@ export default function UploadPage() {
       if (!summaryData) {
         const result = await c2pa!.read(currentFile);
         const manifestStore = result.manifestStore;
-        summaryData = await createManifestSummary(manifestStore, publicThumbnailUrl);
+        summaryData = await createManifestSummary(manifestStore, previewThumbnailUrl);
       } else {
         // 既存のsummaryDataのthumbnailUrlを更新
         summaryData = { ...summaryData, thumbnailUrl: publicThumbnailUrl };
@@ -553,7 +556,7 @@ export default function UploadPage() {
 
       // 5. アップロードAPI呼び出し (ジョブ投入)
       setUploadProgressStep(4);
-      setUploadStatusMessage('4/4: デジタル資産を発行しています...');
+      setUploadStatusMessage(t('progress.steps.3'));
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -599,7 +602,7 @@ export default function UploadPage() {
           // BullMQはジョブ結果を "returnvalue" に格納する
           if (statusResult.returnvalue?.success) {
             setUploadProgressStep(5);
-            setUploadStatusMessage('完了しました！');
+            setUploadStatusMessage(t('complete.successDesc'));
             await new Promise(resolve => setTimeout(resolve, 1000));
             setShowUploadProgressModal(false);
             setUploadResult({ hash: hashes.originalHash });
@@ -671,8 +674,8 @@ export default function UploadPage() {
         {/* Step 1: ウォレット接続 */}
         {currentStep === 1 && (
           <StepContainer
-            title="ウォレット接続"
-            description="撮影したコンテンツの所有権を証明するために、Solanaウォレットを接続してください"
+            title={t('wallet.title')}
+            description={t('wallet.desc')}
             onNext={authenticated ? () => setCurrentStep(2) : undefined}
             nextLabel="次へ"
             nextDisabled={!authenticated}
@@ -683,10 +686,9 @@ export default function UploadPage() {
                 <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mb-6">
                   <Wallet className="w-10 h-10 text-indigo-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">ウォレットを接続して開始</h3>
-                <p className="text-gray-500 text-center max-w-md mb-8">
-                  RootLensでは、コンテンツの権利をあなたのウォレットに直接紐付けます。<br />
-                  これにより、真正性の証明と権利の販売が可能になります。
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t('wallet.notConnected.title')}</h3>
+                <p className="text-gray-500 text-center max-w-md mb-8 whitespace-pre-line">
+                  {t('wallet.notConnected.desc')}
                 </p>
                 <Button
                   onClick={handleLogin}
@@ -694,7 +696,7 @@ export default function UploadPage() {
                   size="lg"
                   className="text-lg px-10 py-6 rounded-full shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
                 >
-                  {isProcessing ? '接続中...' : 'ウォレットを選択して接続'}
+                  {isProcessing ? t('wallet.notConnected.connecting') : t('wallet.notConnected.button')}
                 </Button>
               </div>
             ) : (
@@ -705,14 +707,14 @@ export default function UploadPage() {
                       <Wallet className="w-6 h-6 text-slate-600" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Connected Wallet</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{t('wallet.connected.label')}</p>
                       <p className="text-lg font-mono font-bold text-slate-900 truncate">
                         {solanaWallet?.address || '読み込み中...'}
                       </p>
                       <div className="flex items-center gap-2 mt-1.5">
                         <div className="flex items-center gap-1.5 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
                             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                            <span className="text-xs text-green-700 font-bold">Active</span>
+                            <span className="text-xs text-green-700 font-bold">{t('wallet.connected.active')}</span>
                         </div>
                       </div>
                     </div>
@@ -723,7 +725,7 @@ export default function UploadPage() {
                     variant="outline"
                     className="flex-shrink-0 border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
                   >
-                    切断する
+                    {t('wallet.connected.disconnect')}
                   </Button>
                 </div>
               </div>
@@ -734,8 +736,8 @@ export default function UploadPage() {
         {/* Step 2: ファイル選択 */}
         {currentStep === 2 && (
           <StepContainer
-            title="ファイル選択"
-            description="C2PA対応カメラで撮影されたファイルを選択してください"
+            title={t('file.title')}
+            description={t('file.desc')}
             onBack={() => setCurrentStep(1)}
             isLoading={isProcessing}
           >
@@ -769,15 +771,15 @@ export default function UploadPage() {
                     </div>
                     
                     <h3 className="text-lg font-bold text-slate-900 mb-2">
-                      C2PA対応ファイルをアップロード
+                      {t('file.dropzone.title')}
                     </h3>
-                    <p className="text-slate-500 mb-8 max-w-xs mx-auto text-sm leading-relaxed">
-                      ここにファイルをドラッグ＆ドロップするか、<br/>クリックして選択してください
+                    <p className="text-slate-500 mb-8 max-w-xs mx-auto text-sm leading-relaxed whitespace-pre-line">
+                      {t('file.dropzone.desc')}
                     </p>
 
                     <div className="bg-slate-900 text-white px-6 py-2.5 rounded-full font-bold shadow-md hover:bg-slate-800 transition-all hover:shadow-lg text-sm flex items-center gap-2 transform active:scale-95">
                       <Cloud className="w-4 h-4" />
-                      ファイルを選択
+                      {t('file.dropzone.button')}
                     </div>
                     
                     <div className="mt-8 flex gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
@@ -791,12 +793,12 @@ export default function UploadPage() {
             ) : (
               <LoadingState
                 fullScreen={false}
-                message="解析を実行中..."
-                subMessage="コンテンツに含まれるC2PA署名を検証しています"
+                message={t('file.loading.title')}
+                subMessage={t('file.loading.desc')}
                 steps={[
-                  { label: 'C2PAマニフェストを読み込み中...', status: 'loading' },
-                  { label: 'ハードウェア署名を検証', status: 'pending' },
-                  { label: 'ハッシュ値を計算', status: 'pending' },
+                  { label: t('file.loading.step1'), status: 'loading' },
+                  { label: t('file.loading.step2'), status: 'pending' },
+                  { label: t('file.loading.step3'), status: 'pending' },
                 ]}
                 className="py-12"
               />
@@ -836,11 +838,11 @@ export default function UploadPage() {
                   {/* タイトル */}
                   <div className="text-center space-y-1 z-10">
                     <span className="text-2xl font-bold text-slate-900 tracking-tight block">
-                      ハードウェア署名を確認
+                      {t('verify.success.title')}
                     </span>
                     <div className="flex items-center justify-center gap-2">
                       <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
-                        C2PA Validated
+                        {t('verify.success.badge')}
                       </span>
                     </div>
                   </div>
@@ -850,7 +852,7 @@ export default function UploadPage() {
                   <div className="rounded-full bg-red-50 p-4 mb-3 border border-red-100">
                     <XCircle className="w-12 h-12" />
                   </div>
-                  <span className="text-2xl font-bold">検証失敗</span>
+                  <span className="text-2xl font-bold">{t('verify.error.title')}</span>
                 </div>
               )
             }
@@ -862,13 +864,12 @@ export default function UploadPage() {
                       <Camera className="w-4 h-4 text-slate-600" />
                     </div>
                     <div className="text-left">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Root Issuer</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t('verify.success.rootIssuer')}</p>
                       <p className="text-sm text-slate-900 font-bold">{validationResult.rootSigner}</p>
                     </div>
                   </div>
-                  <p className="text-slate-500 text-sm text-center max-w-md leading-relaxed">
-                    撮影デバイス由来のデジタル署名を確認しました。<br/>
-                    このコンテンツは「AI生成」や「改ざん」ではないことが証明されています。
+                  <p className="text-slate-500 text-sm text-center max-w-md leading-relaxed whitespace-pre-line">
+                    {t('verify.success.desc')}
                   </p>
                 </div>
               ) : (
@@ -891,11 +892,12 @@ export default function UploadPage() {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center">
                   <h4 className="text-lg font-bold text-slate-900 mb-2 flex items-center justify-center gap-2">
                     <Sparkles className="w-5 h-5 text-indigo-500" />
-                    コンテンツの資産化と公開
+                    {t('verify.success.nextTitle')}
                   </h4>
-                  <p className="text-slate-600 text-sm max-w-lg mx-auto leading-relaxed">
-                    C2PA来歴を可視化したページを作成し、<br />
-                    このコンテンツを<strong className="text-indigo-600 font-bold">信頼できるデジタル資産</strong>として世界に公開します。
+                  <p className="text-slate-600 text-sm max-w-lg mx-auto leading-relaxed whitespace-pre-line">
+                    {t.rich('verify.success.nextDesc', {
+                         strong: (chunks) => <strong className="text-indigo-600 font-bold">{chunks}</strong>
+                    })}
                   </p>
                 </div>
 
@@ -914,11 +916,11 @@ export default function UploadPage() {
         {/* Step 4: 価格・情報設定 */}
         {currentStep === 4 && (
           <StepContainer
-            title="価格・情報設定"
-            description="公開ページに表示する情報と、資産としての販売価格を設定します"
+            title={t('settings.title')}
+            description={t('settings.desc')}
             onBack={() => setCurrentStep(3)}
             onNext={() => handleUpload()}
-            nextLabel="アップロード開始"
+            nextLabel={t('settings.next')}
             isLoading={isProcessing}
           >
             <div className="space-y-6 py-4">
@@ -927,9 +929,9 @@ export default function UploadPage() {
                 <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
                   <h5 className="font-bold text-slate-900 text-base flex items-center gap-2">
                     <PenTool className="w-5 h-5 text-slate-500" />
-                    コンテンツ情報
+                    {t('settings.cardTitle')}
                   </h5>
-                  <p className="text-xs text-slate-500 mt-1">公開ページに表示されるコンテンツ情報を入力してください</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('settings.cardDesc')}</p>
                 </div>
 
                 <div className="p-6 space-y-6">
@@ -937,14 +939,14 @@ export default function UploadPage() {
                   <div className="space-y-2">
                     <Label htmlFor="title" className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                       <FileText className="w-4 h-4 text-indigo-500" />
-                      タイトル（任意）
+                      {t('settings.inputTitle')}
                     </Label>
                     <Input
                       id="title"
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      placeholder="例: 夕焼けの富士山"
+                      placeholder={t('settings.placeholderTitle')}
                       className="focus-visible:ring-indigo-500 focus-visible:border-indigo-500 border-gray-300 rounded-lg transition-all"
                     />
                   </div>
@@ -953,13 +955,13 @@ export default function UploadPage() {
                   <div className="space-y-2">
                     <Label htmlFor="description" className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                       <FileText className="w-4 h-4 text-indigo-500" />
-                      説明（任意）
+                      {t('settings.inputDesc')}
                     </Label>
                     <Textarea
                       id="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="例: 2025年1月、山梨県から撮影。C2PA検証済み。"
+                      placeholder={t('settings.placeholderDesc')}
                       rows={4}
                       className="focus-visible:ring-indigo-500 focus-visible:border-indigo-500 border-gray-300 resize-none rounded-lg transition-all"
                     />
@@ -969,7 +971,7 @@ export default function UploadPage() {
                   <div className="space-y-2">
                     <Label htmlFor="price" className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                       <Sparkles className="w-4 h-4 text-indigo-500" />
-                      販売価格
+                      {t('settings.inputPrice')}
                     </Label>
                     <div className="relative">
                       <Input
@@ -1003,7 +1005,7 @@ export default function UploadPage() {
                     <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mt-2">
                       <p className="text-xs text-indigo-800 flex items-start gap-2">
                         <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                        <span><strong>0 SOL</strong> に設定すると、フリー素材として無償で提供されます（資産としての記録は残ります）</span>
+                        <span dangerouslySetInnerHTML={{ __html: t('settings.priceInfo') }} />
                       </p>
                     </div>
                   </div>
@@ -1016,8 +1018,8 @@ export default function UploadPage() {
         {/* Step 5: 完了 */}
         {currentStep === 5 && uploadResult && (
           <StepContainer
-            title="デジタル資産化が完了しました"
-            description="cNFTの発行が完了しました"
+            title={t('complete.title')}
+            description={t('complete.desc')}
             showBack={false}
           >
             <div className="flex flex-col items-center py-8 px-4">
@@ -1038,17 +1040,19 @@ export default function UploadPage() {
 
                     {/* タイトル */}
                     <h3 className="text-2xl font-bold text-slate-900 mb-2">
-                      公開完了
+                      {t('complete.successTitle')}
                     </h3>
-                    <p className="text-slate-600 text-sm mb-8 leading-relaxed">
-                      あなたのコンテンツは<strong className="text-green-600 font-bold">信頼できる資産</strong>として<br />ブロックチェーン上に記録されました
+                    <p className="text-slate-600 text-sm mb-8 leading-relaxed whitespace-pre-line">
+                      {t.rich('complete.successDesc', {
+                         strong: (chunks) => <strong className="text-green-600 font-bold">{chunks}</strong>
+                      })}
                     </p>
 
                     {/* URL表示 */}
                     <div className="bg-slate-50 rounded-xl p-3 sm:p-4 text-left border border-slate-200">
                       <div className="flex items-center gap-2 mb-2">
-                        <Link className="w-3.5 h-3.5 text-slate-500" />
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Public URL</p>
+                        <LinkIcon className="w-3.5 h-3.5 text-slate-500" />
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{t('complete.publicUrl')}</p>
                       </div>
                       <div className="flex items-center justify-between gap-2 bg-white rounded-lg p-2 sm:p-3 border border-slate-200 shadow-sm">
                         <code className="text-xs text-indigo-600 font-mono truncate flex-1 font-semibold break-all">
@@ -1062,7 +1066,7 @@ export default function UploadPage() {
                             navigator.clipboard.writeText(
                               `${window.location.origin}/asset/${uploadResult.hash}`
                             );
-                            alert('URLをコピーしました');
+                            alert(t('complete.copyAlert'));
                           }}
                         >
                           <Clipboard className="w-4 h-4" />
@@ -1079,10 +1083,10 @@ export default function UploadPage() {
                     size="lg"
                     className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all rounded-xl"
                   >
-                    <a href={`/asset/${uploadResult.hash}`} className="flex items-center justify-center gap-2">
+                    <Link href={`/asset/${uploadResult.hash}`} className="flex items-center justify-center gap-2">
                       <ExternalLink className="w-5 h-5" />
-                      <span>公開ページを見る</span>
-                    </a>
+                      <span>{t('complete.viewPage')}</span>
+                    </Link>
                   </Button>
                   <Button
                     onClick={() => window.location.reload()}
@@ -1090,7 +1094,7 @@ export default function UploadPage() {
                     size="lg"
                     className="flex-1 border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl"
                   >
-                    続けてアップロード
+                    {t('complete.uploadMore')}
                   </Button>
                 </div>
               </div>
@@ -1103,19 +1107,19 @@ export default function UploadPage() {
           <DialogContent className="w-[95vw] sm:w-[90vw] max-w-md p-0 overflow-hidden bg-transparent border-none shadow-none" showCloseButton={false}>
             <DialogHeader>
               <VisuallyHidden.Root>
-                <DialogTitle>アップロード進捗</DialogTitle>
+                <DialogTitle>{t('progress.title')}</DialogTitle>
               </VisuallyHidden.Root>
             </DialogHeader>
             <div className="bg-white rounded-lg shadow-xl overflow-hidden">
              <LoadingState
                 fullScreen={false}
-                message="コンテンツをデジタル資産化しています"
-                subMessage="この処理には数秒から数十秒かかります"
+                message={t('progress.message')}
+                subMessage={t('progress.subMessage')}
                 steps={[
-                  '元データのアップロード',
-                  '真正性の検証と解析',
-                  '証明データの保存',
-                  'デジタル資産の発行',
+                  t('progress.steps.0'),
+                  t('progress.steps.1'),
+                  t('progress.steps.2'),
+                  t('progress.steps.3'),
                 ].map((step, index) => ({
                     label: step,
                     status: uploadProgressStep > index + 1 ? 'success' : uploadProgressStep === index + 1 ? 'loading' : 'pending'

@@ -1,0 +1,444 @@
+{
+  "header": {
+    "background": "背景",
+    "technology": "技術",
+    "features": "特徴",
+    "faq": "FAQ",
+    "lens": "Lens",
+    "upload": "Upload",
+    "lensSearch": "Lens (検索)",
+    "connectWallet": "ウォレット接続",
+    "myAccount": "マイアカウント",
+    "dashboard": "ダッシュボード",
+    "disconnectWallet": "ウォレット切断",
+    "disconnect": "切断",
+    "connected": "接続済み"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "close": "閉じる",
+    "backToHome": "ホームに戻る"
+  },
+  "home": {
+    "hero": {
+      "badge": "Proof of Reality, Ownership on Chain.",
+      "title": {
+        "prefix": "「本物」を、",
+        "suffix": "あなたの『デジタル資産』に。"
+      },
+      "description": "AI生成コンテンツが氾濫する時代。C2PAハードウェア署名で「現実」を証明し、ブロックチェーンで唯一無二の「デジタル所有権」と「流動性」を確立する、次世代のマーケットプレイス。",
+      "buttons": {
+        "upload": "証明付きでアップロード",
+        "search": "コンテンツを検索"
+      }
+    },
+    "why": {
+      "title": "AI時代の「信頼の危機」と\n失われつつある「現実の価値」",
+      "p1": "2024年、生成AIの爆発的な普及により、誰もが数秒で「本物そっくり」の画像を作れるようになりました。しかし、それは同時に「目の前の画像が現実なのか、AIなのか区別できない」という深刻な問題を引き起こしています。",
+      "p2": "皮肉なことに、今最も価値が高まっているのは「本当にカメラで撮影された、加工されていない現実」です。",
+      "p3": "RootLensは、C2PA対応カメラのハードウェア署名とブロックチェーンを組み合わせ、この「現実の価値」を正当に評価し、収益化する仕組みを提供します。",
+      "aiImage": {
+        "title": "AI生成画像",
+        "desc": "誰でも作成可能・無限に複製"
+      },
+      "rootLensImage": {
+        "title": "ハードウェア撮影画像 (RootLens)",
+        "desc": "証明可能な唯一無二の現実"
+      }
+    },
+    "technology": {
+      "badge": "Technology",
+      "title": "2つの技術の融合",
+      "description": "真正性の証明は「C2PA」で、権利の管理と流動性は「ブロックチェーン」で。それぞれの得意分野を組み合わせることで、完全な信頼基盤を構築します。",
+      "c2pa": {
+        "title": "C2PA (Content Provenance)",
+        "desc": "ハードウェアによる「真正性」の証明",
+        "point1": "カメラ内でのデジタル署名埋め込み",
+        "point2": "改ざんの検知と履歴の追跡",
+        "point3": "数学的な「撮影証明」"
+      },
+      "blockchain": {
+        "title": "Blockchain (Solana + Arweave)",
+        "desc": "権利の「所有」と「流動化」",
+        "point1": "所有権の明確化（ウォレット紐付け）",
+        "point2": "NFTとしての自由な売買・譲渡",
+        "point3": "相互リンクによる乗っ取り防止" 
+      },
+      "comparison": {
+        "title": "なぜWeb3なのか？ - Web2的アプローチとの比較",
+        "headers": {
+            "feature": "機能・課題",
+            "web2": "Web2 (従来型)",
+            "web3": "RootLens (Web3)"
+        },
+        "rows": {
+            "authenticity": {
+                "label": "真正性証明・改ざん検出",
+                "web2": "C2PAで可能 ✓",
+                "web3": "C2PAで可能 ✓"
+            },
+            "ownership": {
+                "label": "所有権の記録",
+                "web2": "DBに記録 (プラットフォーム依存)",
+                "web3": "ウォレットに紐付け (自律分散的)"
+            },
+            "leak": {
+                "label": "証明付き画像の流出時",
+                "web2": "権利者の特定が困難",
+                "web3": "ウォレットで権利者を特定可能"
+            },
+            "liquidity": {
+                "label": "権利の売買・流動性",
+                "web2": "困難 (プラットフォーム内限定)",
+                "web3": "NFTとして自由に流通"
+            },
+            "takeover": {
+                "label": "乗っ取り防止",
+                "web2": "困難",
+                "web3": "相互リンクで完全防止"
+            }
+        }
+      }
+    },
+    "values": {
+        "title": "RootLensが提供する3つの価値",
+        "value1": {
+            "title": "ハードウェア証明の\nマーケットプレイス",
+            "desc": "「本当にそこにいた人が撮った」こと自体に価値を見出し、対価を支払える初めての場所です。報道、AI学習データ、法務証拠など、信頼性が不可欠な領域に。"
+        },
+        "value2": {
+            "title": "所有権の可視化と\n流動化",
+            "desc": "デジタルデータの所有権をウォレットに紐付けることで、権利の所在を明確化。さらにNFT化することで、証明付きコンテンツを資産として売買可能にします。"
+        },
+        "value3": {
+            "title": "信頼の検索エンジン\n(Lens機能)",
+            "desc": "「この画像は証明付きの本物か？」を即座に検証。単なる画像検索ではなく、信頼性を確認するためのツールとして機能します。"
+        }
+    },
+    "target": {
+        "creator": {
+            "title": "For Creator",
+            "subtitle": "(供給側)",
+            "item1": {
+                "title": "フォトジャーナリスト",
+                "desc": "証明付きコンテンツをマーケットプレイスで適正価格で販売。フェイクとの差別化。"
+            },
+            "item2": {
+                "title": "プロフォトグラファー",
+                "desc": "ストックフォトの高い手数料を回避。Solana Payによる直接取引で収益最大化。"
+            },
+            "item3": {
+                "title": "市民ジャーナリスト",
+                "desc": "匿名性を保ちながら、ウォレットベースで権利を保持・主張可能。"
+            }
+        },
+        "consumer": {
+            "title": "For Consumer",
+            "subtitle": "(需要側)",
+            "item1": {
+                "title": "報道機関・メディア",
+                "desc": "フェイクニュース対策として、ハードウェア署名付きの信頼できる素材を調達。"
+            },
+            "item2": {
+                "title": "AI企業",
+                "desc": "著作権と出自が明確な「クリーンな学習データ」として購入。"
+            },
+            "item3": {
+                "title": "法務・保険業界",
+                "desc": "改ざんされていないことが数学的に証明された、確実な証拠画像として。"
+            }
+        }
+    },
+    "faq": {
+        "title": "よくある質問",
+        "q1": {
+            "q": "C2PA対応カメラを持っていない人は使えないのですか？",
+            "a": "現在、Sony α7シリーズ、Google Pixel（特定モデル）、Nikon Z9、Leicaなどが対応しており、対応機種は急速に増加中です。また、スマートフォンへの搭載も進んでおり、将来的にはより多くのデバイスで利用可能になる見込みです。現時点では、これらの対応デバイスで撮影された画像のみが「ハードウェア証明」の対象となります。"
+        },
+        "q2": {
+            "q": "従来のストックフォトサイトとの違いは何ですか？",
+            "a": "最大の違いは「所有権の扱い」です。Web2的なサービスではデータベース上の記録に過ぎませんが、RootLensではブロックチェーン（NFT）を用いて所有権をユーザーのウォレットに紐付けます。これにより、権利の自由な売買、譲渡が可能になり、万が一の流出時にも真の所有者を特定できます。"
+        },
+        "q3": {
+            "q": "「改ざん不可能」なのはブロックチェーンのおかげですか？",
+            "a": "いいえ。画像の改ざん検知や真正性の証明自体は「C2PA」技術によって実現されています。ブロックチェーンの役割は、その証明されたコンテンツが「誰のものか」を記録し、権利を流動化させることです。この2つを組み合わせることで、真正性と所有権の両方を担保しています。"
+        },
+        "q4": {
+            "q": "なぜSolanaとArweaveを選んだのですか？",
+            "a": "画像データ（大容量）の永久保存にはArweaveが最適であり、大量の証明書（NFT）を低コストで発行するにはSolanaのcNFT（圧縮NFT）技術が必須でした。1枚の画像につき1つの証明を発行するモデルにおいて、ガス代の安さと処理速度は非常に重要です。"
+        }
+    },
+    "cta": {
+        "title": "現実の証明を、あなたの資産に。",
+        "subtitle": "手数料0%で、今すぐ始められます。",
+        "button": "アップロードを始める",
+        "builtWith": "© 2025 RootLens. Built with C2PA, Arweave, and Solana."
+    }
+  },
+  "upload": {
+    "steps": {
+        "wallet": "ウォレット接続",
+        "file": "ファイル選択",
+        "verify": "検証とプライバシー",
+        "settings": "価格・情報設定",
+        "upload": "アップロード"
+    },
+    "wallet": {
+        "title": "ウォレット接続",
+        "desc": "撮影したコンテンツの所有権を証明するために、Solanaウォレットを接続してください",
+        "notConnected": {
+            "title": "ウォレットを接続して開始",
+            "desc": "RootLensでは、コンテンツの権利をあなたのウォレットに直接紐付けます。\nこれにより、真正性の証明と権利の販売が可能になります。",
+            "button": "ウォレットを選択して接続",
+            "connecting": "接続中..."
+        },
+        "connected": {
+            "label": "Connected Wallet",
+            "active": "Active",
+            "disconnect": "切断する"
+        }
+    },
+    "file": {
+        "title": "ファイル選択",
+        "desc": "C2PA対応カメラで撮影されたファイルを選択してください",
+        "dropzone": {
+            "title": "C2PA対応ファイルをアップロード",
+            "desc": "ここにファイルをドラッグ＆ドロップするか、\nクリックして選択してください",
+            "button": "ファイルを選択",
+            "formats": ["JPEG", "PNG", "HEIC"]
+        },
+        "loading": {
+            "title": "解析を実行中...",
+            "desc": "コンテンツに含まれるC2PA署名を検証しています",
+            "step1": "C2PAマニフェストを読み込み中...",
+            "step2": "ハードウェア署名を検証",
+            "step3": "ハッシュ値を計算"
+        }
+    },
+    "verify": {
+        "success": {
+            "title": "ハードウェア署名を確認",
+            "badge": "C2PA Validated",
+            "desc": "撮影デバイス由来のデジタル署名を確認しました。\nこのコンテンツは「AI生成」や「改ざん」ではないことが証明されています。",
+            "rootIssuer": "Root Issuer",
+            "nextTitle": "コンテンツの資産化と公開",
+            "nextDesc": "C2PA来歴を可視化したページを作成し、\nこのコンテンツを信頼できるデジタル資産として世界に公開します。"
+        },
+        "error": {
+            "title": "検証失敗"
+        }
+    },
+    "settings": {
+        "title": "価格・情報設定",
+        "desc": "公開ページに表示する情報と、資産としての販売価格を設定します",
+        "cardTitle": "コンテンツ情報",
+        "cardDesc": "公開ページに表示されるコンテンツ情報を入力してください",
+        "inputTitle": "タイトル（任意）",
+        "placeholderTitle": "例: 夕焼けの富士山",
+        "inputDesc": "説明（任意）",
+        "placeholderDesc": "例: 2025年1月、山梨県から撮影。C2PA検証済み。",
+        "inputPrice": "販売価格",
+        "priceInfo": "0 SOL に設定すると、フリー素材として無償で提供されます（資産としての記録は残ります）",
+        "next": "アップロード開始"
+    },
+    "complete": {
+        "title": "デジタル資産化が完了しました",
+        "desc": "cNFTの発行が完了しました",
+        "successTitle": "公開完了",
+        "successDesc": "あなたのコンテンツは信頼できる資産として\nブロックチェーン上に記録されました",
+        "publicUrl": "Public URL",
+        "copyAlert": "URLをコピーしました",
+        "viewPage": "公開ページを見る",
+        "uploadMore": "続けてアップロード"
+    },
+    "progress": {
+        "title": "アップロード進捗",
+        "message": "コンテンツをデジタル資産化しています",
+        "subMessage": "この処理には数秒から数十秒かかります",
+        "steps": [
+            "元データのアップロード",
+            "真正性の検証と解析",
+            "証明データの保存",
+            "デジタル資産の発行"
+        ]
+    }
+  },
+  "asset": {
+    "verificationSteps": {
+        "db": {
+            "label": "Step 1: 永久記録を探す",
+            "explanation": "Arweave（永久保存ブロックチェーン）から、RootLens公式が発行した証明記録を検索します。",
+            "loading": "Arweave GraphQL検索中...",
+            "loadingCount": "{count}件の候補を検証中...",
+            "success": "有効な最古の証明を発見",
+            "successDB": "DBから記録を取得"
+        },
+        "cnft": {
+            "label": "Step 2: デジタル所有権を確認",
+            "explanation": "Solanaブロックチェーン上のcNFT（デジタル所有権証明書）が存在するか確認します。",
+            "success": "cNFT存在確認完了",
+            "pending": "cNFTがまだ見つかりません",
+            "error": "cNFT取得失敗"
+        },
+        "arweave": {
+            "label": "Step 3: 来歴データを取得",
+            "explanation": "コンテンツの「指紋」（ハッシュ値）を永久記録から取得します。",
+            "success": "永久記録を取得しました"
+        },
+        "crosslink": {
+            "label": "Step 4: 乗っ取り防止チェック",
+            "explanation": "ArweaveとSolanaが互いにリンクしているか確認し、所有権の偽装を防ぎます。",
+            "success": "双方向リンクを確認",
+            "pending": "オンチェーン反映待ち",
+            "error": "相互リンク検証失敗"
+        },
+        "duplicate": {
+            "label": "Step 5: コピー発行の確認",
+            "explanation": "過去に同じコンテンツの所有権証明が発行されていないか、今見ているものが最古の記録であるかを確認します。",
+            "success": "重複なし",
+            "successOldest": "最古の証明",
+            "error": "重複あり",
+            "errorCheck": "重複チェック失敗"
+        }
+    },
+    "status": {
+        "loading": "所有権を検証中...",
+        "subLoading": "ブロックチェーン上の記録と電子署名を照合しています",
+        "accessDenied": "アクセスが拒否されました",
+        "error": "エラーが発生しました",
+        "privateOrNoAccess": "このコンテンツは非公開、またはアクセス権限がありません。",
+        "notFound": "データが見つかりません"
+    },
+    "details": {
+        "preview": "プレビューなし",
+        "verified": "RootLens Verified",
+        "private": "非公開",
+        "untitled": "無題のコンテンツ",
+        "currentOwner": "Current Owner",
+        "you": "You",
+        "burned": "Burn済み (削除)",
+        "timeline": "タイムライン",
+        "report": "検証レポート",
+        "purchaseTitle": "購入済み",
+        "priceTitle": "来歴情報付きコンテンツ価格",
+        "free": "Free",
+        "redownload": "再ダウンロード",
+        "purchase": "購入してダウンロード",
+        "download": "ダウンロード",
+        "checking": "確認中...",
+        "solanaPay": "Solana Payによる安全な取引"
+    },
+    "proof": {
+        "title": "デジタル資産証明",
+        "subtitle": "Blockchain & C2PA Verification",
+        "provenance": "来歴証明 (Provenance)",
+        "valid": "Valid",
+        "invalid": "Invalid",
+        "validDesc": "来歴検証に成功",
+        "invalidDesc": "署名無効",
+        "ai": "AI生成判定",
+        "aiDetected": "Detected",
+        "aiDesc": "AI生成の可能性",
+        "captured": "Captured",
+        "capturedDesc": "カメラ撮影データ",
+        "data": "永久保存データ (Data)",
+        "dataDesc": "このコンテンツのハッシュ値と、所有権を表すcNFTのアドレスがArweaveブロックチェーン上に永久保存されています。サーバーダウンや改ざんのリスクがありません。",
+        "ownership": "デジタル所有権 (Ownership)",
+        "ownershipDesc": "所有権はSolanaブロックチェーン上の圧縮NFT(cNFT)として管理されています。これにより、権利の明確化と即時の売買が可能になります。",
+        "explorer": "Explorerで確認"
+    },
+    "card": {
+        "title": "所有権の正当性検証プロセス",
+        "desc": "5つのステップでリアルタイムにブロックチェーンと署名を照合します",
+        "validTitle": "✓ 正当な所有権が確認されました",
+        "validDesc": "この所有権証明は、Arweave永久記録とSolana cNFTの双方向相互リンクにより、偽造や乗っ取りから保護されています。",
+        "invalidTitle": "⚠ 検証に問題があります",
+        "invalidDesc": "一部の検証項目が失敗しています。この所有権証明に問題がある可能性があります。"
+    }
+  },
+  "components": {
+      "provenanceModal": {
+          "title": "コンテンツ来歴タイムライン",
+          "description": "撮影から現在までのすべての編集・加工プロセス。改ざん不可能なデジタル署名の連鎖を表示しています。"
+      },
+      "technicalSpecsModal": {
+          "title": "検証レポート",
+          "summaryTitle": "埋め込みメタデータと資産情報",
+          "summaryDesc": "ファイルに含まれるC2PA情報およびオンチェーン記録の概要",
+          "hardware": "ハードウェア署名",
+          "ai": "AI生成",
+          "blockchain": "ブロックチェーン",
+          "registered": "登録済み",
+          "exists": "あり",
+          "notDetected": "未検出",
+          "none": "なし",
+          "section1": "1. ハードウェア署名の確認",
+          "c2paDesc": "C2PA（Coalition for Content Provenance and Authenticity）は、Adobe、Microsoft、Sony、Canonなどが参加する業界標準規格です。",
+          "checkPoint": "確認ポイント",
+          "validity": "署名の有効性",
+          "validMsg": "このコンテンツの署名は{status}です",
+          "signer": "署名者",
+          "date": "署名日時",
+          "unknown": "不明",
+          "verifySelf": "どうやって自分で確認できる？",
+          "verifySelfDesc": "この画像の真正性は、Adobe Content Credentials 等の外部ツールでも検証可能です。",
+          "section2": "2. AI技術の使用確認",
+          "result": "判定結果",
+          "aiUsed": "AI技術の使用あり（生成・編集）",
+          "aiNone": "AI生成・編集の記録なし",
+          "aiDetail": "このコンテンツの来歴情報には、生成AIまたはAIモデルを使用した処理の記録が含まれています。検出されたアクションは以下の通りです：",
+          "composite": "※既存画像へのAI合成・編集",
+          "aiNoneDetail": "C2PAメタデータ内に、AIによる生成や編集を示す明確な記録は見つかりませんでした。（※通常の編集ツールによる加工や、手動による作成、またはカメラ撮影の可能性があります）",
+          "disclaimer": "AI判定は、作成・編集時に使用されたソフトウェアがC2PAメタデータに記録した情報に基づきます。「記録なし」の場合でも、C2PA非対応のAIツールが使用された可能性は否定できません。",
+          "section3": "3. 所有権の証明とデータ紐付け",
+          "hashDesc": "C2PAによって内容の真正性が保証されたファイルと、ブロックチェーン上の所有権をハッシュ値によって強固に紐付けています。",
+          "bindingHash": "紐付け用ハッシュ (Binding Hash)",
+          "bindingHashDesc": "ダウンロードしたファイル固有のIDです。このIDがブロックチェーン上に記録されていることで、「このファイルこそが、NFTに紐づく正当なデータである」と特定できます。",
+          "arweave": "Arweaveによる永続記録",
+          "arweaveDesc": "「上記のハッシュ値を持つファイルが存在する」という事実が、Arweave上に永久に記録されています。",
+          "solana": "Solana cNFTによる所有権",
+          "burned": "Burned (破棄済み)",
+          "solanaDesc": "このcNFTを持つウォレットが、上記ハッシュ値を持つファイルの正当な保有者（Owner）であることをSolanaチェーンが証明しています。",
+          "burnedDesc": "このコンテンツの所有権トークン（cNFT）は破棄されています。",
+          "rootLensStructure": "RootLensでの真正性担保の構造",
+          "content": "CONTENT",
+          "contentDesc": "ファイルの中身（改ざん検知）:\nC2PAの電子署名によって、画像のピクセルやメタデータが変更されていないことを保証します。（外部ツールで検証可能）",
+          "ownership": "OWNERSHIP",
+          "ownershipDesc": "ファイルの所有権（資産証明）:\nファイルのハッシュ値をキーとして、Solanaブロックチェーン上のNFTと紐付けます。「誰がこのファイルのオーナーか」を保証します。",
+          "section4": "4. 堅牢な所有権証明（相互リンク）",
+          "linkDesc": "RootLensでは、ArweaveとSolanaが相互にリンクすることで、「乗っ取り攻撃」を防ぎます。",
+          "mechanism": "仕組み",
+          "arweaveRecorded": "cNFTのアドレスを記録済み",
+          "solanaRecorded": "ArweaveのTX IDを記録済み",
+          "success": "相互リンク検証: 成功",
+          "failed": "相互リンク検証: 失敗",
+          "glossary": "検証に役立つ用語集"
+      },
+      "purchaseModal": {
+          "title": "コンテンツの購入",
+          "download": "ダウンロード",
+          "complete": "完了しました",
+          "ready": "準備ができました",
+          "desc": "デジタル資産を購入します",
+          "freeDesc": "コンテンツをダウンロードします",
+          "downloadPrice": "Download Price",
+          "purchasePrice": "Purchase Price",
+          "connectWallet": "購入にはSolanaウォレットの接続が必要です",
+          "processing": "処理中...",
+          "downloadNow": "今すぐダウンロード",
+          "buyAndDownload": "購入してダウンロード",
+          "connect": "ウォレットを接続",
+          "secure": "安全なブロックチェーン決済により即時処理されます",
+          "preparing": "ダウンロード準備中...",
+          "serverMsg": "サーバーからファイルを取得しています",
+          "txMsg": "ブロックチェーンで決済を処理しています",
+          "transmitting": "トランザクション送信中...",
+          "autoMsg": "ダウンロードが自動的に開始されない場合は下のボタンをクリックしてください",
+          "saveFile": "ファイルを保存"
+      }
+  }
+}

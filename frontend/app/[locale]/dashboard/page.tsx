@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, Package, EyeOff, Eye, XCircle, ShoppingBag, Download, ArrowRight, Plus, PenTool, ChevronLeft, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/lib/navigation'; // Changed from 'next/link'
 import Header from '@/app/components/Header';
 import { Badge } from '@/components/ui/badge';
 import LoadingState from '@/app/components/LoadingState';
 import EditAssetModal from '@/app/components/EditAssetModal';
 import AssetThumbnail from '@/app/components/AssetThumbnail';
+import { useTranslations } from 'next-intl';
 
 interface CreatorContent {
   mediaProofId: string;
@@ -42,6 +43,9 @@ export default function DashboardPage() {
   const solanaWallet = wallets[0];
   const userWalletAddress = solanaWallet?.address;
 
+  const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +68,7 @@ export default function DashboardPage() {
   const fetchContents = useCallback(async () => {
     if (!authenticated || !userWalletAddress) {
         if (authenticated && !userWalletAddress) {
-            setError('ウォレットが接続されていません。');
+            setError(t('walletError'));
         }
         return;
     }
@@ -79,8 +83,8 @@ export default function DashboardPage() {
           fetch(`/api/purchased-content?walletAddress=${userWalletAddress}&page=${purchasedPage}&limit=${itemsPerPage}`)
       ]);
 
-      if (!creatorRes.ok) throw new Error('所有コンテンツの取得に失敗しました。');
-      if (!purchasedRes.ok) throw new Error('購入コンテンツの取得に失敗しました。');
+      if (!creatorRes.ok) throw new Error(t('error'));
+      if (!purchasedRes.ok) throw new Error(t('error'));
 
       const creatorData = await creatorRes.json();
       const purchasedData = await purchasedRes.json();
@@ -95,11 +99,11 @@ export default function DashboardPage() {
 
     } catch (err) {
       console.error('コンテンツ取得エラー:', err);
-      setError(err instanceof Error ? err.message : 'コンテンツの読み込み中にエラーが発生しました。');
+      setError(err instanceof Error ? err.message : t('error'));
     } finally {
       setLoading(false);
     }
-  }, [authenticated, userWalletAddress, ownedPage, purchasedPage, itemsPerPage]);
+  }, [authenticated, userWalletAddress, ownedPage, purchasedPage, itemsPerPage, t]);
 
   useEffect(() => {
     if (authenticated && userWalletAddress) {
@@ -107,11 +111,11 @@ export default function DashboardPage() {
     } else {
         setLoading(false);
     }
-  }, [authenticated, userWalletAddress, ownedPage, purchasedPage]);
+  }, [authenticated, userWalletAddress, ownedPage, purchasedPage, fetchContents]);
 
   const handleTogglePublic = async (mediaProofId: string, currentIsPublic: boolean) => {
     if (!userWalletAddress) {
-      setError('ウォレットが接続されていません。');
+      setError(t('walletError'));
       return;
     }
     try {
@@ -158,12 +162,12 @@ export default function DashboardPage() {
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Shield className="w-8 h-8 text-indigo-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">ウォレットを接続</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('connectTitle')}</h2>
             <p className="text-gray-600 mb-8">
-              ダッシュボードを表示するには、ウォレットを接続してください。
+              {t('connectDesc')}
             </p>
             <Button onClick={login} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              接続する
+              {t('connectButton')}
             </Button>
           </Card>
         </div>
@@ -176,8 +180,8 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <Header />
         <LoadingState 
-          message="アセット情報を読み込んでいます..." 
-          subMessage="ブロックチェーンとデータベースから最新情報を取得中"
+          message={t('loading')}
+          subMessage={t('loadingDesc')}
         />
       </div>
     );
@@ -190,13 +194,13 @@ export default function DashboardPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">ダッシュボード</h1>
-            <p className="text-gray-500 mt-1">あなたのデジタル資産と購入履歴を管理します</p>
+            <h1 className="text-3xl font-bold text-gray-900">{t('title')}</h1>
+            <p className="text-gray-500 mt-1">{t('subtitle')}</p>
           </div>
           <Button asChild className="bg-indigo-600 hover:bg-indigo-700 shadow-sm">
             <Link href="/upload" className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
-              新規アセット作成
+              {t('create')}
             </Link>
           </Button>
         </div>
@@ -214,13 +218,13 @@ export default function DashboardPage() {
               value="owned"
               className="flex-1 rounded-lg text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-700"
             >
-              所有アセット ({ownedTotal})
+              {t('ownedTab')} ({ownedTotal})
             </TabsTrigger>
             <TabsTrigger
               value="purchased"
               className="flex-1 rounded-lg text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm transition-all text-slate-500 hover:text-slate-700"
             >
-              購入済み ({purchasedTotal})
+              {t('purchasedTab')} ({purchasedTotal})
             </TabsTrigger>
           </TabsList>
 
@@ -231,14 +235,13 @@ export default function DashboardPage() {
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                   <Package className="w-8 h-8 text-slate-400" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">まだアセットがありません</h3>
-                <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
-                  C2PA検証済みのコンテンツをアップロードして、<br />
-                  世界で唯一のデジタル資産を作成しましょう。
+                <h3 className="text-lg font-bold text-slate-900 mb-2">{t('noAssetsTitle')}</h3>
+                <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm leading-relaxed whitespace-pre-line">
+                  {t('noAssetsDesc')}
                 </p>
                 <Button asChild variant="default" className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-8">
                   <Link href="/upload">
-                    作成を始める
+                    {t('startCreate')}
                   </Link>
                 </Button>
               </div>
@@ -249,7 +252,7 @@ export default function DashboardPage() {
                     <div className="relative aspect-video bg-slate-100 overflow-hidden border-b border-slate-100">
                       <AssetThumbnail
                         src={content.thumbnailUrl}
-                        alt={content.title}
+                        alt={content.title || t('untitled')}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       <div className="absolute top-2 right-2">
@@ -257,7 +260,7 @@ export default function DashboardPage() {
                           variant={content.isPublic ? "default" : "secondary"}
                           className={`backdrop-blur-md shadow-sm border-0 ${content.isPublic ? 'bg-green-500/90 hover:bg-green-600' : 'bg-slate-500/90 hover:bg-slate-600 text-white'}`}
                         >
-                          {content.isPublic ? '公開中' : '非公開'}
+                          {content.isPublic ? t('public') : t('private')}
                         </Badge>
                       </div>
                     </div>
@@ -265,7 +268,7 @@ export default function DashboardPage() {
                     <CardHeader className="p-3 pb-2 space-y-1 relative">
                       <div className="flex justify-between items-start">
                         <CardTitle className="truncate text-sm font-bold text-slate-900 pr-6">
-                          {content.title || '無題のアセット'}
+                          {content.title || t('untitled')}
                         </CardTitle>
                         <button 
                           onClick={() => setEditingContent(content)}
@@ -285,7 +288,7 @@ export default function DashboardPage() {
                           <span className="truncate">{content.cnftMintAddress.slice(0, 4)}...{content.cnftMintAddress.slice(-4)}</span>
                         </div>
                         <span className="font-bold text-indigo-600 flex-shrink-0 text-[10px]">
-                          {content.priceLamports === 0 ? 'Free' : `${(content.priceLamports / 1e9).toFixed(2)} SOL`}
+                          {content.priceLamports === 0 ? t('lens.free') : `${(content.priceLamports / 1e9).toFixed(2)} SOL`}
                         </span>
                       </div>
                     </CardHeader>
@@ -294,7 +297,7 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-2 gap-2">
                         <Button variant="outline" size="sm" asChild className="w-full text-xs h-8 border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50">
                           <Link href={`/asset/${content.originalHash}`}>
-                            詳細
+                            {t('details')}
                           </Link>
                         </Button>
                         <Button
@@ -305,11 +308,11 @@ export default function DashboardPage() {
                         >
                           {content.isPublic ? (
                             <>
-                              <EyeOff className="w-3 h-3 mr-0.5" /> <span className="hidden sm:inline">非公開</span>
+                              <EyeOff className="w-3 h-3 mr-0.5" /> <span className="hidden sm:inline">{t('private')}</span>
                             </>
                           ) : (
                             <>
-                              <Eye className="w-3 h-3 mr-0.5" /> <span className="hidden sm:inline">公開</span>
+                              <Eye className="w-3 h-3 mr-0.5" /> <span className="hidden sm:inline">{t('public')}</span>
                             </>
                           )}
                         </Button>
@@ -379,13 +382,13 @@ export default function DashboardPage() {
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                   <ShoppingBag className="w-8 h-8 text-slate-400" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">購入履歴がありません</h3>
-                <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm leading-relaxed">
-                  Lens機能を使って、信頼できる真正なコンテンツを探してみましょう。
+                <h3 className="text-lg font-bold text-slate-900 mb-2">{t('noPurchasesTitle')}</h3>
+                <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm leading-relaxed whitespace-pre-line">
+                  {t('noPurchasesDesc')}
                 </p>
                 <Button asChild variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-full px-8">
                   <Link href="/lens">
-                    コンテンツを探す
+                    {t('findContent')}
                   </Link>
                 </Button>
               </div>
@@ -396,7 +399,7 @@ export default function DashboardPage() {
                     <div className="relative aspect-video bg-slate-100 overflow-hidden border-b border-slate-100">
                       <AssetThumbnail
                         src={content.thumbnailUrl}
-                        alt={content.title}
+                        alt={content.title || t('untitled')}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
@@ -404,11 +407,11 @@ export default function DashboardPage() {
                     
                     <CardHeader className="p-3 pb-2 space-y-1">
                       <CardTitle className="truncate text-sm font-bold text-slate-900">
-                        {content.title || '無題のアセット'}
+                        {content.title || t('untitled')}
                       </CardTitle>
                       {/* 購入済みアイテムには説明と価格は表示しない */}
                       <CardDescription className="text-xs text-slate-500 mt-1">
-                        購入日: {new Date(content.purchasedAt).toLocaleDateString('ja-JP')}
+                        {t('purchaseDate', { date: new Date(content.purchasedAt).toLocaleDateString() })}
                       </CardDescription>
                     </CardHeader>
 
@@ -416,11 +419,11 @@ export default function DashboardPage() {
                       <div className="flex flex-col gap-2">
                         <Button size="sm" className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all" onClick={() => window.open(`/api/download/${content.downloadToken}`, '_blank')}>
                           <Download className="w-3 h-3 mr-1.5" />
-                          ダウンロード
+                          {t('download')}
                         </Button>
                         <Button variant="ghost" size="sm" asChild className="w-full h-8 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-50">
                           <Link href={`/asset/${content.originalHash}`} className="flex items-center justify-center">
-                            資産ページを確認 <ArrowRight className="w-3 h-3 ml-1" />
+                            {t('viewPage')} <ArrowRight className="w-3 h-3 ml-1" />
                           </Link>
                         </Button>
                       </div>

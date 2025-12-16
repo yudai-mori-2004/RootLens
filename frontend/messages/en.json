@@ -1,0 +1,444 @@
+{
+  "header": {
+    "background": "Background",
+    "technology": "Technology",
+    "features": "Features",
+    "faq": "FAQ",
+    "lens": "Lens",
+    "upload": "Upload",
+    "lensSearch": "Lens (Search)",
+    "connectWallet": "Connect Wallet",
+    "myAccount": "My Account",
+    "dashboard": "Dashboard",
+    "disconnectWallet": "Disconnect Wallet",
+    "disconnect": "Disconnect",
+    "connected": "Connected"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "backToHome": "Back to Home"
+  },
+  "home": {
+    "hero": {
+      "badge": "Proof of Reality, Ownership on Chain.",
+      "title": {
+        "prefix": "Turn 'Real' into",
+        "suffix": "Your Digital Asset"
+      },
+      "description": "In an era flooded with AI-generated content. A next-generation marketplace that proves 'reality' with C2PA hardware signatures and establishes unique 'digital ownership' and 'liquidity' on the blockchain.",
+      "buttons": {
+        "upload": "Upload with Proof",
+        "search": "Search Content"
+      }
+    },
+    "why": {
+      "title": "The 'Crisis of Trust' in the AI Era and\nthe Fading 'Value of Reality'",
+      "p1": "In 2024, the explosive spread of generative AI has made it possible for anyone to create 'lifelike' images in seconds. However, this has caused a serious problem: 'indistinguishability between reality and AI'.",
+      "p2": "Ironically, what is now becoming most valuable is 'unprocessed reality truly captured by a camera'.",
+      "p3": "RootLens combines hardware signatures from C2PA-compliant cameras with blockchain to properly evaluate and monetize this 'value of reality'.",
+      "aiImage": {
+        "title": "AI Generated Image",
+        "desc": "Create by anyone, infinite replication"
+      },
+      "rootLensImage": {
+        "title": "Hardware Captured (RootLens)",
+        "desc": "Provable unique reality"
+      }
+    },
+    "technology": {
+      "badge": "Technology",
+      "title": "Fusion of Two Technologies",
+      "description": "Proof of authenticity with 'C2PA', management of rights and liquidity with 'Blockchain'. By combining their strengths, we build a complete foundation of trust.",
+      "c2pa": {
+        "title": "C2PA (Content Provenance)",
+        "desc": "Proof of 'Authenticity' by Hardware",
+        "point1": "Digital signature embedding in camera",
+        "point2": "Tamper detection and history tracking",
+        "point3": "Mathematical 'Proof of Capture'"
+      },
+      "blockchain": {
+        "title": "Blockchain (Solana + Arweave)",
+        "desc": "'Ownership' and 'Liquidity' of Rights",
+        "point1": "Clarification of ownership (Wallet binding)",
+        "point2": "Free trading and transfer as NFT",
+        "point3": "Hijacking prevention by mutual linking"
+      },
+      "comparison": {
+        "title": "Why Web3? - Comparison with Web2 Approach",
+        "headers": {
+            "feature": "Feature / Issue",
+            "web2": "Web2 (Traditional)",
+            "web3": "RootLens (Web3)"
+        },
+        "rows": {
+            "authenticity": {
+                "label": "Authenticity Proof / Tamper Detection",
+                "web2": "Possible with C2PA ✓",
+                "web3": "Possible with C2PA ✓"
+            },
+            "ownership": {
+                "label": "Record of Ownership",
+                "web2": "Record in DB (Platform dependent)",
+                "web3": "Linked to Wallet (Autonomous Decentralized)"
+            },
+            "leak": {
+                "label": "In case of content leak",
+                "web2": "Difficult to identify rights holder",
+                "web3": "Identify rights holder via Wallet"
+            },
+            "liquidity": {
+                "label": "Trading / Liquidity of Rights",
+                "web2": "Difficult (Platform specific)",
+                "web3": "Free circulation as NFT"
+            },
+            "takeover": {
+                "label": "Hijack Prevention",
+                "web2": "Difficult",
+                "web3": "Complete prevention by mutual link"
+            }
+        }
+      }
+    },
+    "values": {
+        "title": "3 Values Provided by RootLens",
+        "value1": {
+            "title": "Marketplace for\nHardware Proof",
+            "desc": "The first place where value is found in 'being taken by a person who was really there' and compensation can be paid. For journalism, AI training data, legal evidence, etc."
+        },
+        "value2": {
+            "title": "Visualization and\nLiquidity of Ownership",
+            "desc": "By linking digital data ownership to a wallet, the location of rights is clarified. Furthermore, by turning it into an NFT, proven content can be traded as an asset."
+        },
+        "value3": {
+            "title": "Search Engine of Trust\n(Lens Function)",
+            "desc": "Instantly verify 'Is this image a proven real one?'. Functions not just as an image search, but as a tool to confirm reliability."
+        }
+    },
+    "target": {
+        "creator": {
+            "title": "For Creator",
+            "subtitle": "(Supply Side)",
+            "item1": {
+                "title": "Photojournalist",
+                "desc": "Sell proven content at a fair price on the marketplace. Differentiation from fakes."
+            },
+            "item2": {
+                "title": "Pro Photographer",
+                "desc": "Avoid high fees of stock photos. Maximize revenue with direct transactions via Solana Pay."
+            },
+            "item3": {
+                "title": "Citizen Journalist",
+                "desc": "Maintain anonymity while holding and asserting rights based on wallet."
+            }
+        },
+        "consumer": {
+            "title": "For Consumer",
+            "subtitle": "(Demand Side)",
+            "item1": {
+                "title": "Media / Press",
+                "desc": "Procure reliable materials with hardware signatures as a countermeasure against fake news."
+            },
+            "item2": {
+                "title": "AI Companies",
+                "desc": "Purchase as 'clean training data' with clear copyright and origin."
+            },
+            "item3": {
+                "title": "Legal / Insurance",
+                "desc": "As sure evidence images mathematically proven not to be tampered with."
+            }
+        }
+    },
+    "faq": {
+        "title": "FAQ",
+        "q1": {
+            "q": "Can't I use it if I don't have a C2PA compatible camera?",
+            "a": "Currently, Sony Alpha 7 series, Google Pixel (specific models), Nikon Z9, Leica, etc. are supported, and compatible models are increasing rapidly. It is also being installed on smartphones, and it is expected to be available on more devices in the future. At this time, only images taken with these compatible devices are subject to 'Hardware Proof'."
+        },
+        "q2": {
+            "q": "What is the difference from traditional stock photo sites?",
+            "a": "The biggest difference is the 'handling of ownership'. In Web2 services, it is just a record in a database, but in RootLens, ownership is linked to the user's wallet using blockchain (NFT). This enables free buying and selling and transfer of rights, and the true owner can be identified even in the unlikely event of a leak."
+        },
+        "q3": {
+            "q": "Is it 'tamper-proof' thanks to the blockchain?",
+            "a": "No. Tamper detection and proof of authenticity of images are realized by 'C2PA' technology itself. The role of the blockchain is to record 'whose' proved content it is and to mobilize rights. By combining these two, both authenticity and ownership are secured."
+        },
+        "q4": {
+            "q": "Why did you choose Solana and Arweave?",
+            "a": "Arweave is optimal for permanent storage of image data (large capacity), and Solana's cNFT (compressed NFT) technology was essential for issuing a large number of certificates (NFTs) at low cost. In a model where one certificate is issued per image, low gas fees and processing speed are very important."
+        }
+    },
+    "cta": {
+        "title": "Proof of Reality, as Your Asset.",
+        "subtitle": "Start now with 0% fees.",
+        "button": "Start Upload",
+        "builtWith": "© 2025 RootLens. Built with C2PA, Arweave, and Solana."
+    }
+  },
+  "upload": {
+    "steps": {
+        "wallet": "Connect Wallet",
+        "file": "Select File",
+        "verify": "Verify & Privacy",
+        "settings": "Pricing & Info",
+        "upload": "Upload"
+    },
+    "wallet": {
+        "title": "Connect Wallet",
+        "desc": "Connect your Solana wallet to prove ownership of your captured content",
+        "notConnected": {
+            "title": "Connect Wallet to Start",
+            "desc": "RootLens links content rights directly to your wallet.\nThis enables proof of authenticity and sales of rights.",
+            "button": "Select Wallet to Connect",
+            "connecting": "Connecting..."
+        },
+        "connected": {
+            "label": "Connected Wallet",
+            "active": "Active",
+            "disconnect": "Disconnect"
+        }
+    },
+    "file": {
+        "title": "Select File",
+        "desc": "Select a file taken with a C2PA compatible camera",
+        "dropzone": {
+            "title": "Upload C2PA Compatible File",
+            "desc": "Drag & drop file here, or\nclick to select",
+            "button": "Select File",
+            "formats": ["JPEG", "PNG", "HEIC"]
+        },
+        "loading": {
+            "title": "Analyzing...",
+            "desc": "Verifying C2PA signature included in the content",
+            "step1": "Loading C2PA Manifest...",
+            "step2": "Verifying Hardware Signature",
+            "step3": "Calculating Hash"
+        }
+    },
+    "verify": {
+        "success": {
+            "title": "Hardware Signature Verified",
+            "badge": "C2PA Validated",
+            "desc": "Digital signature from capture device confirmed.\nThis content is proven not to be 'AI Generated' or 'Tampered'.",
+            "rootIssuer": "Root Issuer",
+            "nextTitle": "Assetize and Publish Content",
+            "nextDesc": "Create a page visualizing C2PA provenance and\npublish this content to the world as a trusted digital asset."
+        },
+        "error": {
+            "title": "Verification Failed"
+        }
+    },
+    "settings": {
+        "title": "Pricing & Info",
+        "desc": "Set information to verify on the public page and sales price as an asset",
+        "cardTitle": "Content Information",
+        "cardDesc": "Enter content information to be displayed on the public page",
+        "inputTitle": "Title (Optional)",
+        "placeholderTitle": "Ex: Mt. Fuji at Sunset",
+        "inputDesc": "Description (Optional)",
+        "placeholderDesc": "Ex: Taken in Yamanashi, Jan 2025. C2PA Verified.",
+        "inputPrice": "Sales Price",
+        "priceInfo": "If set to 0 SOL, it will be provided as free material (record as asset remains)",
+        "next": "Start Upload"
+    },
+    "complete": {
+        "title": "Digital Asset Creation Complete",
+        "desc": "cNFT issuance completed",
+        "successTitle": "Publish Complete",
+        "successDesc": "Your content has been recorded on the blockchain\nas a trusted asset",
+        "publicUrl": "Public URL",
+        "copyAlert": "URL copied",
+        "viewPage": "View Public Page",
+        "uploadMore": "Upload More"
+    },
+    "progress": {
+        "title": "Upload Progress",
+        "message": "Turning content into digital asset",
+        "subMessage": "This process takes a few seconds to tens of seconds",
+        "steps": [
+            "Uploading Original Data",
+            "Verifying Authenticity & Analyzing",
+            "Saving Proof Data",
+            "Issuing Digital Asset"
+        ]
+    }
+  },
+  "asset": {
+    "verificationSteps": {
+        "db": {
+            "label": "Step 1: Search Permanent Record",
+            "explanation": "Search for proof records issued by RootLens official from Arweave (Permanent Storage Blockchain).",
+            "loading": "Searching Arweave GraphQL...",
+            "loadingCount": "Verifying {count} candidates...",
+            "success": "Found oldest valid proof",
+            "successDB": "Retrieved record from DB"
+        },
+        "cnft": {
+            "label": "Step 2: Confirm Digital Ownership",
+            "explanation": "Check if cNFT (Digital Ownership Certificate) exists on Solana Blockchain.",
+            "success": "cNFT existence confirmed",
+            "pending": "cNFT not found yet",
+            "error": "Failed to get cNFT"
+        },
+        "arweave": {
+            "label": "Step 3: Get Provenance Data",
+            "explanation": "Retrieve the 'fingerprint' (hash value) of the content from the permanent record.",
+            "success": "Retrieved permanent record"
+        },
+        "crosslink": {
+            "label": "Step 4: Hijack Prevention Check",
+            "explanation": "Check if Arweave and Solana are linked to each other to prevent spoofing of ownership.",
+            "success": "Bidirectional link confirmed",
+            "pending": "Waiting for on-chain reflection",
+            "error": "Mutual link verification failed"
+        },
+        "duplicate": {
+            "label": "Step 5: Copy Issuance Check",
+            "explanation": "Check if ownership proof for the same content has been issued in the past and if what you are seeing is the oldest record.",
+            "success": "No duplicates",
+            "successOldest": "Oldest proof",
+            "error": "Duplicate found",
+            "errorCheck": "Duplicate check failed"
+        }
+    },
+    "status": {
+        "loading": "Verifying Ownership...",
+        "subLoading": "Matching blockchain records with digital signatures",
+        "accessDenied": "Access Denied",
+        "error": "An error occurred",
+        "privateOrNoAccess": "This content is private or you do not have access permission.",
+        "notFound": "Data not found"
+    },
+    "details": {
+        "preview": "No Preview",
+        "verified": "RootLens Verified",
+        "private": "Private",
+        "untitled": "Untitled Content",
+        "currentOwner": "Current Owner",
+        "you": "You",
+        "burned": "Burned (Deleted)",
+        "timeline": "Timeline",
+        "report": "Verification Report",
+        "purchaseTitle": "Purchased",
+        "priceTitle": "Content Price with Provenance",
+        "free": "Free",
+        "redownload": "Redownload",
+        "purchase": "Purchase & Download",
+        "download": "Download",
+        "checking": "Checking...",
+        "solanaPay": "Secure transaction via Solana Pay"
+    },
+    "proof": {
+        "title": "Digital Asset Proof",
+        "subtitle": "Blockchain & C2PA Verification",
+        "provenance": "Provenance",
+        "valid": "Valid",
+        "invalid": "Invalid",
+        "validDesc": "Provenance Verified",
+        "invalidDesc": "Invalid Signature",
+        "ai": "AI Detection",
+        "aiDetected": "Detected",
+        "aiDesc": "Possible AI Generation",
+        "captured": "Captured",
+        "capturedDesc": "Camera Captured Data",
+        "data": "Permanent Data",
+        "dataDesc": "The hash value of this content and the address of the cNFT representing ownership are permanently stored on the Arweave blockchain. No risk of server downtime or tampering.",
+        "ownership": "Digital Ownership",
+        "ownershipDesc": "Ownership is managed as a compressed NFT (cNFT) on the Solana blockchain. This clarifies rights and enables immediate trading.",
+        "explorer": "View on Explorer"
+    },
+    "card": {
+        "title": "Ownership Legitimacy Verification Process",
+        "desc": "Match blockchain and signatures in real time in 5 steps",
+        "validTitle": "✓ Legitimate Ownership Confirmed",
+        "validDesc": "This ownership proof is protected from forgery and hijacking by a bidirectional mutual link between Arweave permanent records and Solana cNFT.",
+        "invalidTitle": "⚠ Verification Issue",
+        "invalidDesc": "Some verification items failed. There may be a problem with this ownership proof."
+    }
+  },
+  "components": {
+      "provenanceModal": {
+          "title": "Content Provenance Timeline",
+          "description": "All editing and processing processes from capture to present. Displays a chain of tamper-proof digital signatures."
+      },
+      "technicalSpecsModal": {
+          "title": "Verification Report",
+          "summaryTitle": "Embedded Metadata & Asset Info",
+          "summaryDesc": "Overview of C2PA information and on-chain records included in the file",
+          "hardware": "Hardware Signature",
+          "ai": "AI Generation",
+          "blockchain": "Blockchain",
+          "registered": "Registered",
+          "exists": "Yes",
+          "notDetected": "Not Detected",
+          "none": "None",
+          "section1": "1. Confirm Hardware Signature",
+          "c2paDesc": "C2PA (Coalition for Content Provenance and Authenticity) is an industry standard in which Adobe, Microsoft, Sony, Canon, etc. participate.",
+          "checkPoint": "Check Points",
+          "validity": "Signature Validity",
+          "validMsg": "The signature of this content is {status}",
+          "signer": "Signer",
+          "date": "Signature Date",
+          "unknown": "Unknown",
+          "verifySelf": "How can I verify it myself?",
+          "verifySelfDesc": "The authenticity of this image can also be verified with external tools like Adobe Content Credentials.",
+          "section2": "2. Confirm AI Technology Use",
+          "result": "Result",
+          "aiUsed": "AI Technology Used (Generation/Editing)",
+          "aiNone": "No Record of AI Generation/Editing",
+          "aiDetail": "The provenance information of this content includes records of processing using Generative AI or AI models. Detected actions are as follows:",
+          "composite": "* AI composition/editing to existing image",
+          "aiNoneDetail": "No clear record indicating generation or editing by AI was found in C2PA metadata. (* Possibility of processing by normal editing tools, manual creation, or camera shooting)",
+          "disclaimer": "AI detection is based on information recorded in C2PA metadata by the software used during creation/editing. Even if 'No Record', the possibility of using non-C2PA compatible AI tools cannot be denied.",
+          "section3": "3. Proof of Ownership & Data Binding",
+          "hashDesc": "Files whose authenticity is guaranteed by C2PA and ownership on the blockchain are strongly linked by hash value.",
+          "bindingHash": "Binding Hash",
+          "bindingHashDesc": "Unique ID of the downloaded file. By recording this ID on the blockchain, it can be identified that 'this file is the legitimate data linked to the NFT'.",
+          "arweave": "Permanent Record by Arweave",
+          "arweaveDesc": "The fact that 'a file with the above hash value exists' is permanently recorded on Arweave.",
+          "solana": "Ownership by Solana cNFT",
+          "burned": "Burned",
+          "solanaDesc": "Solana chain proves that the wallet holding this cNFT is the legitimate owner of the file with the above hash value.",
+          "burnedDesc": "The ownership token (cNFT) of this content has been destroyed.",
+          "rootLensStructure": "Structure of Authenticity Assurance in RootLens",
+          "content": "CONTENT",
+          "contentDesc": "File Content (Tamper Detection):\nGuarantees that image pixels and metadata have not been changed by C2PA digital signature. (Verifiable by external tools)",
+          "ownership": "OWNERSHIP",
+          "ownershipDesc": "File Ownership (Asset Proof):\nLinks to NFT on Solana blockchain using file hash value as key. Guarantees 'who is the owner of this file'.",
+          "section4": "4. Robust Ownership Proof (Mutual Link)",
+          "linkDesc": "RootLens prevents 'hijacking attacks' by mutually linking Arweave and Solana.",
+          "mechanism": "Mechanism",
+          "arweaveRecorded": "Recorded cNFT address",
+          "solanaRecorded": "Recorded Arweave TX ID",
+          "success": "Mutual Link Verification: Success",
+          "failed": "Mutual Link Verification: Failed",
+          "glossary": "Useful Glossary for Verification"
+      },
+      "purchaseModal": {
+          "title": "Purchase Content",
+          "download": "Download",
+          "complete": "Completed",
+          "ready": "Ready",
+          "desc": "Purchase digital asset",
+          "freeDesc": "Download content",
+          "downloadPrice": "Download Price",
+          "purchasePrice": "Purchase Price",
+          "connectWallet": "Solana wallet connection required for purchase",
+          "processing": "Processing...",
+          "downloadNow": "Download Now",
+          "buyAndDownload": "Purchase & Download",
+          "connect": "Connect Wallet",
+          "secure": "Processed instantly by secure blockchain settlement",
+          "preparing": "Preparing download...",
+          "serverMsg": "Retrieving file from server",
+          "txMsg": "Processing settlement on blockchain",
+          "transmitting": "Sending transaction...",
+          "autoMsg": "If download does not start automatically, please click the button below",
+          "saveFile": "Save File"
+      }
+  }
+}
