@@ -112,10 +112,10 @@ async function searchIrysByTag(
 export async function searchArweaveTransactionsByHash(
   originalHash: string
 ): Promise<VerifiedArweaveTransaction[]> {
-  const ROOTLENS_WALLET = process.env.NEXT_PUBLIC_ROOTLENS_WALLET;
+  const ROOTLENS_WALLET = process.env.NEXT_PUBLIC_ROOTLENS_SERVER_PUBLIC_KEY;
 
   if (!ROOTLENS_WALLET) {
-    throw new Error('環境変数 NEXT_PUBLIC_ROOTLENS_WALLET が設定されていません');
+    throw new Error('環境変数 NEXT_PUBLIC_ROOTLENS_SERVER_PUBLIC_KEY が設定されていません');
   }
 
   console.log('🔍 完全オンチェーン検証を開始...');

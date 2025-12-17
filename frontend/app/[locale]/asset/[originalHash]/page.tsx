@@ -526,10 +526,10 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         {/* メインコンテンツカード */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-10">
-          <div className="grid md:grid-cols-5 gap-0">
+          <div className="flex flex-col md:grid md:grid-cols-5 gap-0">
             
             {/* 左: 画像 (3/5) */}
-            <div className="md:col-span-3 bg-slate-900 relative min-h-[250px] sm:min-h-[280px] md:min-h-[300px] flex items-center justify-center p-2 sm:p-3 md:p-4">
+            <div className="md:col-span-3 bg-slate-900 relative min-h-[250px] sm:min-h-[280px] md:min-h-[300px] flex items-center justify-center p-0 sm:p-3 md:p-4">
               {proof.c2paData?.thumbnailUrl ? (
                 <div className="relative w-full h-full max-w-full max-h-[280px] sm:max-h-[320px] md:max-h-[380px]">
                   <Image
@@ -538,7 +538,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                     fill
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     style={{ objectFit: 'contain' }}
-                    className="rounded-md shadow-2xl"
+                    className="sm:rounded-md shadow-2xl"
                   />
                 </div>
               ) : (
@@ -550,7 +550,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
               {proof.isValid && (() => {
                   const { isHardware } = getSourceTypeLabel(proof.sourceType);
                   return (
-                      <div className="absolute top-4 right-4 z-10">
+                      <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
                           {isHardware ? (
                               <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 border border-blue-200">
                                 <Cpu className="w-4 h-4 text-blue-600" />
@@ -568,7 +568,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
             </div>
 
             {/* 右: 詳細情報 (2/5) */}
-            <div className="md:col-span-2 p-6 md:p-8 flex flex-col h-full border-l border-slate-100">
+            <div className="md:col-span-2 p-6 md:p-8 flex flex-col h-full border-t md:border-t-0 md:border-l border-slate-100">
               <div className="flex-1">
                 {/* ヘッダー情報 */}
                 <div className="flex items-center justify-between gap-4 mb-4">

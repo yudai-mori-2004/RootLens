@@ -92,6 +92,9 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 │  │  ・cNFT mint (Arweave URI設定)                            │  │
 │  │  ・concurrency: 1 で完全直列処理                          │  │
 │  │  ・HTTP API (/health, /metrics, /api/upload)             │  │
+│  │                                                           │  │
+│  │  ⚠️ MVP制限: Worker側でのC2PA再検証なし                  │  │
+│  │  → Phase2で実装予定 (document/phase2参照)                │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                 │
 │      ┌───────────────┬───────────────┬───────────────┐          │
@@ -479,6 +482,45 @@ CREATE TABLE feature_vectors (
 
 ---
 
+## ⚠️ MVP段階の制限事項
+
+### 1. Worker側でのC2PA再検証なし
+
+**現状**:
+- フロントエンドから送信される `rootSigner`/`rootCertChain` をそのまま信頼
+- 攻撃者が `/api/upload` を直接叩くことで偽装が可能
+- RootLens上の表示は騙される（ダウンロード後のc2pa.read()では偽造が発覚）
+
+**対策計画**: Phase2で実装
+- Worker側でR2から元ファイルをダウンロード
+- Node.js版C2PAライブラリでの再検証
+- フロントエンドからの値を破棄し、検証済みの値を使用
+
+詳細: `document/phase2/backend-c2pa-verification.md`
+
+### 2. 単一Merkle Tree構成
+
+**現状**:
+- `concurrency: 1` による完全直列処理
+- 10人同時アップロード時、最大5分待ち
+
+**拡張計画**: Phase2以降で検討
+- 100個のMerkle Treeをランダム振り分け
+- 並列度100倍、自然な重複解決メカニズム
+- UNIQUE制約による冪等性保証
+
+詳細: `document/phase2/multi-tree-scalability.md`
+
+### 3. 対応デバイス
+
+**現在有効**: Google Pixel のみ
+**保留中**: Sony, Leica, Nikon, Canon, Adobe
+**理由**: 動作確認後に順次有効化
+
+---
+
+---
+
 ## 🔄 ユーザーフロー
 
 ### アップロードフロー
@@ -509,7 +551,8 @@ CREATE TABLE feature_vectors (
 │  ├─ サムネイルをData URIに変換                                  │
 │  └─ 検証失敗 → エラー表示、アップロード不可                       │
 │                                                                 │
-│  ※ この検証はC2PA技術によるもの(改ざんがあれば検出される)       │
+│  ⚠️ この検証はフロントエンドのみ (Worker側では未再検証)        │
+│  ※ Phase2でWorker側再検証を実装予定                            │
 └─────────────────────────────────────────────────────────────────┘
                                 ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -562,8 +605,8 @@ CREATE TABLE feature_vectors (
 │  ├─ POST /api/upload で以下のデータを送信:                      │
 │  │   - userWallet                                              │
 │  │   - originalHash                                            │
-│  │   - rootSigner                                              │
-│  │   - rootCertChain (Base64)                                  │
+│  │   - rootSigner  ⚠️ Worker側で未再検証                       │
+│  │   - rootCertChain  ⚠️ Worker側で未再検証                    │
 │  │   - mediaFilePath                                           │
 │  │   - thumbnailPublicUrl                                      │
 │  │   - price, title, description                               │
@@ -589,6 +632,7 @@ CREATE TABLE feature_vectors (
         │  │   - target_asset_id: 予測したcNFTアドレス            │
         │  │   - image: サムネイル公開URL(R2)                   │
         │  │   - attributes: ハッシュ、署名者、証明書チェーン等    │
+        │  │      ⚠️ フロントエンドからの値をそのまま使用         │
         │  └─ umi.uploader.uploadJson()                           │
         │                                                         │
         │  Step 13: cNFT mint                                     │
@@ -1421,23 +1465,23 @@ root/
 |  | ヘルスチェック(/health) | ✅ 完了 |
 |  | メトリクス(/metrics) | ✅ 完了 |
 
-### 次フェーズ: 本番運用・改善
 
-| カテゴリ | タスク | 優先度 |
-| --- | --- | --- |
-| **デバイス対応** | Sony, Leica, Nikon, Canon検証・有効化 | 🔴 高 |
-| **信頼性** | モニタリング・ログ基盤 | 🔴 高 |
-|  | エラー通知システム | 🔴 高 |
-|  | バックアップ戦略 | 🟡 中 |
-| **パフォーマンス** | 画像最適化・CDN | 🟡 中 |
-|  | キャッシュ戦略 | 🟡 中 |
-|  | インデックス最適化 | 🟢 低 |
-| **スケール** | マルチツリー対応 | 🟢 低 |
-|  | Worker並列化 | 🟢 低 |
-|  | 負荷分散 | 🟢 低 |
-| **機能追加** | NFT譲渡履歴表示 | 🟡 中 |
-|  | コレクション機能 | 🟢 低 |
-|  | コメント機能 | 🟢 低 |
+### Phase2: セキュリティ・スケーラビリティ強化
+
+| カテゴリ | タスク | 優先度 | 参照 |
+| --- | --- | --- | --- |
+| **セキュリティ** | Worker側C2PA再検証 | 🔴 最高 | document/phase2/backend-c2pa-verification.md |
+| **スケール** | 複数Merkle Tree対応 | 🟡 中 | document/phase2/multi-tree-scalability.md |
+| **デバイス対応** | Sony, Leica, Nikon, Canon検証・有効化 | 🔴 高 | - |
+| **信頼性** | モニタリング・ログ基盤 | 🔴 高 | - |
+|  | エラー通知システム | 🔴 高 | - |
+|  | バックアップ戦略 | 🟡 中 | - |
+| **パフォーマンス** | 画像最適化・CDN | 🟡 中 | - |
+|  | キャッシュ戦略 | 🟡 中 | - |
+|  | インデックス最適化 | 🟢 低 | - |
+| **機能追加** | NFT譲渡履歴表示 | 🟡 中 | - |
+|  | コレクション機能 | 🟢 低 | - |
+|  | コメント機能 | 🟢 低 | - |
 
 ---
 
