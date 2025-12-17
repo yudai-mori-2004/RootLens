@@ -16,7 +16,8 @@ import type { ArweaveProofMetadata } from '../../../shared/types';
 export async function uploadToArweave(data: {
   originalHash: string;
   rootSigner: string;
-  rootCertChain: string;
+  claimGenerator: string;
+  sourceType: string;
   predictedAssetId: string;
   thumbnailPublicUrl?: string;
 }): Promise<string> {
@@ -38,7 +39,8 @@ export async function uploadToArweave(data: {
     attributes: [
       { trait_type: 'original_hash', value: data.originalHash },
       { trait_type: 'root_signer', value: data.rootSigner },
-      { trait_type: 'root_cert_chain', value: data.rootCertChain },
+      { trait_type: 'claim_generator', value: data.claimGenerator },
+      { trait_type: 'source_type', value: data.sourceType },
       { trait_type: 'created_at', value: new Date().toISOString() },
     ],
   };
@@ -57,6 +59,7 @@ export async function uploadToArweave(data: {
     contentType: 'application/json',
     tags: [
       { name: 'original_hash', value: data.originalHash },
+      { name: 'source_type', value: data.sourceType },
       { name: 'App-Name', value: 'RootLens' },
     ]
   });
@@ -64,7 +67,7 @@ export async function uploadToArweave(data: {
   // uploadメソッド自体のoptionsにはtagsを渡しても無視される
   const [metadataUri] = await umi.uploader.upload([file]);
 
-  console.log(`   ✓ Uploaded with tags: original_hash=${data.originalHash}`);
+  console.log(`   ✓ Uploaded with tags: original_hash=${data.originalHash}, source_type=${data.sourceType}`);
 
   return metadataUri;
 }

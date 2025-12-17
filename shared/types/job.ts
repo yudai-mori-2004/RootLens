@@ -9,7 +9,8 @@ export interface MintJobData {
   userWallet: string;
   originalHash: string;
   rootSigner: string;
-  rootCertChain: string;
+  claimGenerator: string;
+  sourceType: string;
   mediaFilePath: string;
   thumbnailPublicUrl?: string;
   price: number;

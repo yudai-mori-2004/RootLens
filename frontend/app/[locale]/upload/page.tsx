@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createC2pa, C2pa, ManifestStore, Manifest } from 'c2pa';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
-import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
+import { createManifestSummary, C2PASummaryData, getSourceType } from '@/app/lib/c2pa-parser';
 import { searchArweaveTransactionsByHash } from '@/app/lib/irys-verification';
 import { checkSolanaAssetExists } from '@/app/lib/verification-helpers';
 import ProgressBar from '@/app/components/ProgressBar';
@@ -551,8 +551,20 @@ export default function UploadPage() {
       const publicUploadResult = await publicUploadResponse.json();
       console.log('✅ Public Bucketアップロード完了:', publicUploadResult);
 
-      // 4. Root証明書チェーンを抽出
-      const rootCertChain = extractRootCertChain(manifestData);
+      // 4. claimGenerator と sourceType を抽出
+      const claimGenerator = summaryData?.activeManifest?.claimGenerator || 'Unknown';
+
+      // getSourceType関数を使ってsourceTypeを抽出
+      let sourceTypeShort = 'unknown';
+      if (manifestData?.activeManifest) {
+        const extractedSourceType = getSourceType(manifestData.activeManifest);
+        if (extractedSourceType) {
+          sourceTypeShort = extractedSourceType;
+        }
+      }
+
+      console.log('📋 claimGenerator:', claimGenerator);
+      console.log('📋 sourceType:', sourceTypeShort);
 
       // 5. アップロードAPI呼び出し (ジョブ投入)
       setUploadProgressStep(4);
@@ -564,7 +576,8 @@ export default function UploadPage() {
           userWallet: solanaWallet.address,
           originalHash: hashes.originalHash,
           rootSigner: summaryData?.activeManifest?.signatureInfo?.issuer || 'Unknown',
-          rootCertChain: rootCertChain,
+          claimGenerator: claimGenerator,
+          sourceType: sourceTypeShort,
           mediaFilePath: `media/${hashes.originalHash}/original.${getExtension(currentFile.type)}`,
           thumbnailPublicUrl: publicUploadResult.thumbnail_url,
           price: Math.floor(parseFloat(priceStr || '0') * 1e9),
@@ -630,23 +643,6 @@ export default function UploadPage() {
     }
   };
 
-  function extractRootCertChain(manifestStore: ManifestStore | null): string {
-    try {
-      let currentManifest: Manifest | undefined | null = manifestStore?.activeManifest;
-      while (currentManifest?.ingredients && currentManifest.ingredients.length > 0) {
-        const parentIngredient: any = currentManifest.ingredients[0];
-        if (!parentIngredient.c2pa_manifest) break;
-        currentManifest = parentIngredient.c2pa_manifest;
-      }
-      const certChain = (currentManifest?.signatureInfo as any)?.cert_chain || [];
-      const certChainJson = JSON.stringify(certChain);
-      const certChainBase64 = btoa(certChainJson);
-      return certChainBase64;
-    } catch (err) {
-      console.error('証明書チェーン抽出エラー:', err);
-      return btoa(JSON.stringify([]));
-    }
-  }
 
   function getExtension(contentType: string): string {
     const mapping: Record<string, string> = {

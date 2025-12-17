@@ -80,7 +80,8 @@ export async function processMint(
     const arweaveUri = await uploadToArweave({
       originalHash: data.originalHash,
       rootSigner: data.rootSigner,
-      rootCertChain: data.rootCertChain,
+      claimGenerator: data.claimGenerator,
+      sourceType: data.sourceType,
       predictedAssetId,
       thumbnailPublicUrl: data.thumbnailPublicUrl,
     });

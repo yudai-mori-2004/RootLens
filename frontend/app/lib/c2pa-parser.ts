@@ -93,6 +93,56 @@ function bytesToHex(bytes: number[] | Uint8Array): string {
   return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// C2PAで定義されている定数（ハードウェア撮影の証明）
+const DIGITAL_CAPTURE_URI = "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture";
+const TRAINED_ALGORITHMIC_MEDIA_URI = "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia";
+
+/**
+ * マニフェストから source_type (digitalSourceType) を抽出する関数
+ * @returns "digitalCapture" | "trainedAlgorithmicMedia" | null
+ */
+export function getSourceType(manifest: Manifest): string | null {
+  // 1. assertions から actions を探す
+  // c2pa.actions (v1) と c2pa.actions.v2 (v2) の両対応
+  if (!manifest.assertions || !('data' in manifest.assertions) || !Array.isArray(manifest.assertions.data)) {
+    return null;
+  }
+
+  const actionAssertion = manifest.assertions.data.find((a: Assertion) =>
+    a.label === 'c2pa.actions' || a.label === 'c2pa.actions.v2'
+  );
+
+  if (!actionAssertion) return null;
+
+  // 2. dataの中身を取り出す
+  const data = actionAssertion.data as any;
+  const actionsList = data.actions;
+
+  if (!Array.isArray(actionsList)) return null;
+
+  // 3. アクションリストを走査して digitalSourceType を探す
+  // 通常 "c2pa.created" アクションに付随しています
+  for (const action of actionsList) {
+    if (action.digitalSourceType) {
+      const typeUri = action.digitalSourceType as string;
+
+      // URI全体が含まれているかチェック
+      if (typeUri === DIGITAL_CAPTURE_URI) {
+        return "digitalCapture"; // ★これがハードウェアの証
+      }
+
+      if (typeUri === TRAINED_ALGORITHMIC_MEDIA_URI || typeUri.includes("trainedAlgorithmicMedia")) {
+        return "trainedAlgorithmicMedia"; // AI生成
+      }
+
+      // その他のタイプの場合、URIの末尾などを返す
+      return typeUri;
+    }
+  }
+
+  return null; // 見つからなかった場合
+}
+
 /**
  * ManifestStoreを解析して、シリアライズ可能なサマリーデータを生成する
  */
