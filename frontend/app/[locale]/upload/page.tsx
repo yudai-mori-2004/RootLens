@@ -158,6 +158,8 @@ export default function UploadPage() {
           activeManifest: null,
           validationStatus: { isValid: false, errors: ['No C2PA signature found'] },
           thumbnailUrl: null,
+          sourceType: null,
+          claimGenerator: null,
         });
         setIsProcessing(false);
         setCurrentStep(3); // エラー表示のためStep 3へ
