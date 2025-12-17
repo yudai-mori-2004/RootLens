@@ -529,16 +529,17 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           <div className="flex flex-col md:grid md:grid-cols-5 gap-0">
             
             {/* 左: 画像 (3/5) */}
-            <div className="md:col-span-3 bg-slate-900 relative min-h-[250px] sm:min-h-[280px] md:min-h-[300px] flex items-center justify-center p-0 sm:p-3 md:p-4">
+            <div className="md:col-span-3 bg-slate-900 relative w-full aspect-video md:aspect-auto md:h-auto md:min-h-[400px] flex items-center justify-center p-0 md:p-4">
               {proof.c2paData?.thumbnailUrl ? (
-                <div className="relative w-full h-full max-w-full max-h-[280px] sm:max-h-[320px] md:max-h-[380px]">
+                <div className="relative w-full h-full">
                   <Image
                     src={proof.c2paData.thumbnailUrl}
                     alt="Content preview"
                     fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 60vw, 50vw"
                     style={{ objectFit: 'contain' }}
-                    className="sm:rounded-md shadow-2xl"
+                    className="md:rounded-md shadow-2xl"
+                    priority
                   />
                 </div>
               ) : (
@@ -568,27 +569,27 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
             </div>
 
             {/* 右: 詳細情報 (2/5) */}
-            <div className="md:col-span-2 p-6 md:p-8 flex flex-col h-full border-t md:border-t-0 md:border-l border-slate-100">
-              <div className="flex-1">
+            <div className="md:col-span-2 p-6 md:p-8 flex flex-col h-full border-t md:border-t-0 md:border-l border-slate-100 min-w-0">
+              <div className="flex-1 min-w-0">
                 {/* ヘッダー情報 */}
                 <div className="flex items-center justify-between gap-4 mb-4">
                     {/* 所有者以外には「公開」バッジは見せない（ノイズになるため）
                         非公開（自分しか見えない）時のみ表示する */}
                    {!proof.isPublic && isOwner && (
-                       <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                       <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 shrink-0">
                            <Lock className="w-3 h-3 mr-1" /> {t('details.private')}
                        </Badge>
                    )}
                    {/* 何も表示しない場合のスペーサー */}
                    {proof.isPublic && <div />}
                    
-                  <div className="flex items-center text-xs text-slate-400 font-mono gap-1">
+                  <div className="flex items-center text-xs text-slate-400 font-mono gap-1 shrink-0">
                     <Clock className="w-3 h-3" />
                     {new Date(proof.createdAt).toLocaleDateString()}
                   </div>
                 </div>
 
-                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 leading-tight">
+                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 leading-tight break-words">
                   {proof.title || t('details.untitled')}
                 </h1>
                 
