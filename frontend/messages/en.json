@@ -522,6 +522,8 @@
     "title": "RootLens Search",
     "subtitle": "From text, image, or camera.\nSearch for proven content worldwide.",
     "placeholder": "What are you looking for? (e.g., 'Sunset Ocean')",
+    "lensSearch": "Search with Camera",
+    "upload": "Upload Image",
     "dropImage": "Drop image here",
     "imageMode": "Image Search Mode",
     "searching": "Searching...",

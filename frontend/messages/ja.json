@@ -522,6 +522,8 @@
     "title": "RootLens Search",
     "subtitle": "テキスト、画像、またはカメラから。\n世界中の証明済みコンテンツを検索。",
     "placeholder": "何を検索しますか？ (例: 「夕焼けの海」)",
+    "lensSearch": "カメラで検索",
+    "upload": "画像をアップロード",
     "dropImage": "画像をここにドロップ",
     "imageMode": "画像検索モード",
     "searching": "検索中...",
