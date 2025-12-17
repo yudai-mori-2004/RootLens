@@ -248,6 +248,54 @@ export default function UploadPage() {
 
       setHashes({ originalHash });
 
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // 🔍 デバッグ: Arweaveに送信するデータの確認
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+      // claimGeneratorとsourceTypeを取得
+      const claimGenerator = summary?.activeManifest?.claimGenerator || 'Unknown';
+
+      let sourceTypeShort = 'unknown';
+      if (manifestStore?.activeManifest) {
+        const extractedSourceType = getSourceType(manifestStore.activeManifest);
+        if (extractedSourceType) {
+          sourceTypeShort = extractedSourceType;
+        }
+      }
+
+      // Arweaveに送信されるデータをalertで表示
+      const debugData = {
+        'originalHash': originalHash,
+        'rootSigner': issuer,
+        'claimGenerator': claimGenerator,
+        'sourceType': sourceTypeShort,
+      };
+
+      const debugMessage = `
+🔍 C2PA Data Extraction Debug
+━━━━━━━━━━━━━━━━━━━━━━
+
+✅ originalHash:
+${debugData.originalHash}
+
+✅ rootSigner (issuer):
+${debugData.rootSigner}
+
+✅ claimGenerator:
+${debugData.claimGenerator}
+
+✅ sourceType:
+${debugData.sourceType}
+
+━━━━━━━━━━━━━━━━━━━━━━
+これらのデータがArweaveに保存されます
+      `.trim();
+
+      alert(debugMessage);
+      console.log('🔍 Debug - Extracted C2PA Data:', debugData);
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
       // プレビュー画像の生成
       try {
         // resizeImageを使ってブラウザ表示用の軽量なDataURIを生成

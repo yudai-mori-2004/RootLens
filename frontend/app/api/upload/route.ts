@@ -15,7 +15,8 @@ interface UploadRequest {
 
   // C2PA情報（最小限）
   rootSigner: string;
-  rootCertChain: string;
+  claimGenerator: string;
+  sourceType: string;
 
   // R2パス（アップロード済み）
   mediaFilePath: string;
@@ -45,7 +46,8 @@ export async function POST(request: NextRequest) {
       userWallet: body.userWallet,
       originalHash: body.originalHash,
       rootSigner: body.rootSigner,
-      rootCertChain: body.rootCertChain,
+      claimGenerator: body.claimGenerator,
+      sourceType: body.sourceType,
       mediaFilePath: body.mediaFilePath,
       thumbnailPublicUrl: body.thumbnailPublicUrl,
       price: body.price,

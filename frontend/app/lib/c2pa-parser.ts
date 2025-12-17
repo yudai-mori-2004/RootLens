@@ -214,6 +214,13 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
     icon: null,
   };
 
+  // claimGenerator文字列を構築（User Agent形式）
+  // manifest.claimGeneratorが存在すればそれを使用、なければclaimGeneratorInfoから構築
+  const claimGeneratorString = manifest.claimGenerator ||
+    (generatorInfo?.name
+      ? `${generatorInfo.name}${generatorInfo.version ? ' ' + generatorInfo.version : ''}`
+      : 'Unknown');
+
   // Credentials の抽出
   const credentials: CredentialSummary[] = manifest.credentials?.map((cred: any) => ({
     url: cred.url || null,
@@ -381,7 +388,7 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
     title: manifest.title,
     format: manifest.format,
     vendor: manifest.vendor,
-    claimGenerator: manifest.claimGenerator,
+    claimGenerator: claimGeneratorString,
     claimGeneratorInfo,
     claimGeneratorHints: manifest.claimGeneratorHints,
     instanceId: manifest.instanceId,
