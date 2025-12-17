@@ -167,6 +167,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showArweaveDialog, setShowArweaveDialog] = useState(false);
   const [showCnftDialog, setShowCnftDialog] = useState(false);
+  const [showAiInfoDialog, setShowAiInfoDialog] = useState(false);
 
   // ヘルパー: 検証ステップを更新
   const updateStep = (stepId: string, status: VerificationStep['status'], message?: string) => {
@@ -772,8 +773,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                         className="md:hidden ml-auto p-1 hover:bg-slate-700/50 rounded-full transition-colors"
                                         aria-label="詳細を表示"
                                         onClick={(e) => {
-                                            // ここでダイアログを開く処理を入れるか、Tooltipを強制表示する工夫が必要
-                                            // 今回はシンプルにPCと同じTooltip構造にするが、モバイル対応は別途検討
+                                            e.preventDefault();
+                                            setShowAiInfoDialog(true);
                                         }}
                                     >
                                         <Info className="w-3 h-3 text-blue-400" />
@@ -1196,6 +1197,43 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                 {t('proof.explorer')}
               </a>
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* モバイル用 AI/Device Info ダイアログ */}
+      <Dialog open={showAiInfoDialog} onOpenChange={setShowAiInfoDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Cpu className="w-5 h-5 text-blue-400" />
+              {t('proof.deviceAuthenticated')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+             <p className="text-sm text-slate-300 leading-relaxed">
+                {t('proof.deviceDesc')}
+             </p>
+             
+             {proof?.claimGenerator && (
+                <div className="bg-slate-800 rounded p-3 border border-slate-700 space-y-3">
+                    <div>
+                        <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">{t('proof.deviceSdk')}</p>
+                        <p className="text-sm text-white font-mono break-words">
+                            {(() => {
+                                const rawGenerator = proof.claimGenerator || '';
+                                return rawGenerator.split(' 8')[0].trim();
+                            })()}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase text-slate-500 font-bold mb-1">{t('proof.signer')}</p>
+                        <p className="text-sm text-white flex items-center gap-1.5">
+                            <Shield className="w-4 h-4 text-green-500" />
+                            {proof.rootSigner}
+                        </p>
+                    </div>
+                </div>
+             )}
           </div>
         </DialogContent>
       </Dialog>
