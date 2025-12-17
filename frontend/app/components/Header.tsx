@@ -138,7 +138,7 @@ export default function Header({ isLandingPage = false }: HeaderProps) {
                 <SheetHeader className="mb-6">
                   <SheetTitle className="text-left flex items-center gap-2">
                     <Image
-                      src="/icon.png"
+                      src="/icon_white.png"
                       alt="RootLens Logo"
                       width={24}
                       height={24}

@@ -6,7 +6,7 @@
     "faq": "FAQ",
     "lens": "Lens",
     "upload": "Upload",
-    "lensSearch": "Lens (検索)",
+    "lensSearch": "Lens",
     "connectWallet": "ウォレット接続",
     "myAccount": "マイアカウント",
     "dashboard": "ダッシュボード",
@@ -250,7 +250,7 @@
         "title": "デジタル資産化が完了しました",
         "desc": "cNFTの発行が完了しました",
         "successTitle": "公開完了",
-        "successDesc": "あなたのコンテンツは信頼できる資産として\nブロックチェーン上に記録されました",
+        "successDesc": "あなたのコンテンツは信頼できる資産としてブロックチェーン上に記録されました。",
         "publicUrl": "Public URL",
         "copyAlert": "URLをコピーしました",
         "viewPage": "公開ページを見る",
@@ -559,10 +559,11 @@
     "private": "非公開",
     "details": "詳細",
     "download": "ダウンロード",
-    "viewPage": "資産ページを確認",
+    "viewPage": "アセットを確認",
     "purchaseDate": "購入日: {date}",
     "error": "コンテンツの読み込み中にエラーが発生しました。",
-    "walletError": "ウォレットが接続されていません。"
+    "walletError": "ウォレットが接続されていません。",
+    "free": "Free"
   },
   "legal": {
     "privacy": {

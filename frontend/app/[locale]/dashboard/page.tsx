@@ -278,7 +278,7 @@ export default function DashboardPage() {
                         </button>
                       </div>
                       {content.description && (
-                        <CardDescription className="text-xs text-slate-500 line-clamp-1 leading-tight">
+                        <CardDescription className="text-xs text-slate-500 line-clamp-3 leading-tight break-all">
                           {content.description}
                         </CardDescription>
                       )}
@@ -288,7 +288,7 @@ export default function DashboardPage() {
                           <span className="truncate">{content.cnftMintAddress.slice(0, 4)}...{content.cnftMintAddress.slice(-4)}</span>
                         </div>
                         <span className="font-bold text-indigo-600 flex-shrink-0 text-[10px]">
-                          {content.priceLamports === 0 ? t('lens.free') : `${(content.priceLamports / 1e9).toFixed(2)} SOL`}
+                          {content.priceLamports === 0 ? t('free') : `${(content.priceLamports / 1e9).toFixed(2)} SOL`}
                         </span>
                       </div>
                     </CardHeader>

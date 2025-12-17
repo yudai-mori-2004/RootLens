@@ -562,7 +562,8 @@
     "viewPage": "View Asset Page",
     "purchaseDate": "Purchased: {date}",
     "error": "An error occurred while loading content.",
-    "walletError": "Wallet not connected."
+    "walletError": "Wallet not connected.",
+    "free": "Free"
   },
   "legal": {
     "privacy": {
