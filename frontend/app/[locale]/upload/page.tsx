@@ -456,7 +456,12 @@ ${debugData.sourceType}
 
   const handleUpload = async () => {
     if (!currentFile || !hashes || !validationResult || !solanaWallet) {
-      alert('必要な情報が不足しています。');
+      const missing = [];
+      if (!currentFile) missing.push('File');
+      if (!hashes) missing.push('Hashes');
+      if (!validationResult) missing.push('Validation Result');
+      if (!solanaWallet) missing.push('Wallet');
+      alert(`必要な情報が不足しています: ${missing.join(', ')}`);
       return;
     }
 
