@@ -23,6 +23,7 @@ import LoadingState, { LoadingStep } from '@/app/components/LoadingState';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/lib/navigation';
+import exifr from 'exifr';
 
 interface C2PAValidationResult {
   isValid: boolean;
@@ -51,6 +52,7 @@ export default function UploadPage() {
   const [validationResult, setValidationResult] = useState<C2PAValidationResult | null>(null);
   const [hashes, setHashes] = useState<FileHashes | null>(null);
   const [previewThumbnailDataUri, setPreviewThumbnailDataUri] = useState<string | null>(null); // 追加
+  const [exifData, setExifData] = useState<Record<string, any> | null>(null); // 追加: Exifデータ
 
   // プライバシー同意
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
@@ -146,6 +148,24 @@ export default function UploadPage() {
       // 1. C2PA解析
       const readResult = await c2pa!.read(file);
 
+      // 1.5. Exif解析（元ファイルから直接読み取り）
+      try {
+        const exif = await exifr.parse(file, {
+          // すべてのタグを取得
+          tiff: true,
+          exif: true,
+          gps: true,
+          iptc: true,
+          icc: true,
+          jfif: true,
+        });
+        console.log('📸 Extracted Exif data:', exif);
+        setExifData(exif || null);
+      } catch (exifError) {
+        console.warn('⚠️ Failed to extract Exif data:', exifError);
+        setExifData(null);
+      }
+
       // c2pa.read()が失敗した場合やmanifestStoreがnullの場合
       if (!readResult || !readResult.manifestStore) {
         setValidationResult({
@@ -203,8 +223,9 @@ export default function UploadPage() {
         return;
       }
 
-      const issuer = activeManifest.signatureInfo.issuer || 'Unknown';
-      const isTrusted = activeManifest.isTrustedIssuer; // c2pa-parser.tsから判定結果を取得
+      // Root（最古）マニフェストの情報を使用
+      const issuer = summary.originalIssuer || 'Unknown';
+      const isTrusted = summary.isTrustedRootIssuer; // Root Issuerが信頼できるか
       const isAI = activeManifest.isAIGenerated;
 
       if (isAI) {
@@ -254,8 +275,8 @@ export default function UploadPage() {
       // 🔍 デバッグ: Arweaveに送信するデータの確認
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      // claimGeneratorとsourceTypeをsummaryから直接取得
-      const claimGenerator = summary.claimGenerator || 'Unknown';
+      // Root（最古）マニフェストの情報を使用
+      const claimGenerator = summary.originalClaimGenerator || 'Unknown';
       const sourceTypeShort = summary.sourceType || 'unknown';
 
       // Arweaveに送信されるデータをalertで表示
@@ -286,7 +307,7 @@ ${debugData.sourceType}
 これらのデータがArweaveに保存されます
       `.trim();
 
-      // alert(debugMessage);
+      alert(debugMessage);
       console.log('🔍 Debug - Extracted C2PA Data:', debugData);
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -599,11 +620,11 @@ ${debugData.sourceType}
       const publicUploadResult = await publicUploadResponse.json();
       console.log('✅ Public Bucketアップロード完了:', publicUploadResult);
 
-      // 4. claimGenerator と sourceType を抽出（統合済みパーサーから取得）
-      const claimGenerator = summaryData?.claimGenerator || 'Unknown';
+      // 4. Root（最古）マニフェストの情報を抽出
+      const claimGenerator = summaryData?.originalClaimGenerator || 'Unknown';
       const sourceTypeShort = summaryData?.sourceType || 'unknown';
 
-      console.log('📋 claimGenerator:', claimGenerator);
+      console.log('📋 claimGenerator (Root):', claimGenerator);
       console.log('📋 sourceType:', sourceTypeShort);
 
       // 5. アップロードAPI呼び出し (ジョブ投入)
@@ -615,8 +636,8 @@ ${debugData.sourceType}
         body: JSON.stringify({
           userWallet: solanaWallet.address,
           originalHash: hashes.originalHash,
-          rootSigner: summaryData?.activeManifest?.signatureInfo?.issuer || 'Unknown',
-          claimGenerator: claimGenerator,
+          rootSigner: summaryData?.originalIssuer || 'Unknown',
+          claimGenerator: summaryData?.originalClaimGenerator || 'Unknown',
           sourceType: sourceTypeShort,
           mediaFilePath: `media/${hashes.originalHash}/original.${getExtension(currentFile.type)}`,
           thumbnailPublicUrl: publicUploadResult.thumbnail_url,
@@ -943,6 +964,7 @@ ${debugData.sourceType}
                   onAcknowledge={setPrivacyAcknowledged}
                   acknowledged={privacyAcknowledged}
                   rootSigner={validationResult.rootSigner || undefined}
+                  exifData={exifData}
                 />
               </div>
             )}

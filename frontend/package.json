@@ -43,6 +43,7 @@
     "c2pa": "^0.30.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "exifr": "^7.1.3",
     "ioredis": "^5.4.2",
     "lucide-react": "^0.556.0",
     "next": "16.0.10",

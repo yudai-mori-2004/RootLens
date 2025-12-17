@@ -353,7 +353,7 @@
         "explorer": "Explorerで確認",
         "hardwareSealed": "Hardware Sealed",
         "hardwareBadge": "Hardware",
-        "aiNotDetected": "AI未検出",
+        "aiNotDetected": "AI検出なし",
         "deviceAuthenticated": "Device Authenticated",
         "deviceDesc": "このコンテンツは、認証されたハードウェアデバイスまたはセキュアな環境を使用して撮影されました。",
         "deviceSdk": "Device / SDK",
@@ -526,7 +526,7 @@
       }
   },
   "lens": {
-    "title": "RootLens Search",
+    "title": "RootLens",
     "subtitle": "テキスト、画像、またはカメラから。\n世界中の証明済みコンテンツを検索。",
     "placeholder": "何を検索しますか？ (例: 「夕焼けの海」)",
     "lensSearch": "カメラで検索",
@@ -601,5 +601,50 @@
     },
     "warningTitle": "リスト外デバイスの取り扱い",
     "warningDesc": "上記のリストに含まれないデバイスやソフトウェア（信頼された `claimGenerator` と一致しないもの）については、RootLensはハッシュの抽出を行いません（エラーとなります）。\nこれはセキュリティ上の措置であり、検証されていない実装による誤ったハッシュ利用や偽装を防ぐためです。\n\nお使いのデバイスがC2PA対応であるにも関わらずエラーとなる場合は、RootLensチームまでご連絡ください。検証の上、速やかにリストに追加いたします。"
+  },
+  "metadata": {
+    "c2pa": {
+      "title": "C2PA真正性情報",
+      "subtitle": "ファイル全体の真正性を証明するデジタル署名",
+      "basicInfo": "基本情報",
+      "contentTitle": "コンテンツタイトル",
+      "signer": "署名者",
+      "signTime": "署名日時",
+      "claimGenerator": "クレームジェネレーター",
+      "aiTraining": "AI学習・マイニング制約",
+      "aiTrainingDesc": "このコンテンツはAI学習・推論モデルへの利用が制限されるよう記録されています。",
+      "aiTrainingNote": "ただし、これは強制力のある技術的な制御ではありません。利用者の倫理的判断を促すための情報です。",
+      "watermark": "デジタル透かし",
+      "watermarkCount": "{count}個のデジタル透かしが埋め込まれています"
+    },
+    "exif": {
+      "title": "Exif情報",
+      "subtitle": "元画像に埋め込まれたカメラ設定・撮影情報",
+      "equipment": "撮影機材",
+      "camera": "カメラ",
+      "lens": "レンズ",
+      "settings": "撮影設定",
+      "iso": "ISO感度",
+      "focalLength": "焦点距離",
+      "aperture": "絞り値",
+      "shutterSpeed": "シャッター速度",
+      "dateTime": "撮影日時",
+      "privacy": "プライバシー関連",
+      "gps": "位置情報 (GPS座標)",
+      "contains": "含む",
+      "notContains": "含まない",
+      "noExif": "Exif情報が検出されませんでした",
+      "noExifNote": "編集ソフトで削除された可能性があります"
+    },
+    "buttons": {
+      "provenance": "来歴タイムライン",
+      "details": "メタデータ詳細",
+      "mechanism": "RootLensの仕組み"
+    },
+    "consent": {
+      "title": "公開とデータ取り扱いに同意する",
+      "description": "上記のマニフェスト情報（撮影データ・編集履歴）およびコンテンツが、<strong>一般公開</strong>されることを理解し、同意します。",
+      "public": "一般公開"
+    }
   }
 }

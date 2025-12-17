@@ -12,12 +12,14 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import TechnicalDetailsSection from './TechnicalDetailsSection';
+import { useTranslations } from 'next-intl';
 
 interface PrivacyWarningProps {
   c2paSummary: C2PASummaryData;
   onAcknowledge: (acknowledged: boolean) => void;
   acknowledged: boolean;
   rootSigner?: string;
+  exifData?: Record<string, any> | null;
 }
 
 export default function PrivacyWarning({
@@ -25,7 +27,9 @@ export default function PrivacyWarning({
   onAcknowledge,
   acknowledged,
   rootSigner,
+  exifData,
 }: PrivacyWarningProps) {
+  const t = useTranslations('metadata');
   const [showProvenanceModal, setShowProvenanceModal] = useState(false);
   const [showTechnicalModal, setShowTechnicalModal] = useState(false);
   const [showAllMetadataModal, setShowAllMetadataModal] = useState(false);
@@ -292,24 +296,70 @@ export default function PrivacyWarning({
 
   // アクション（編集履歴）と親ファイル情報は来歴モーダルで表示されるため除外
 
-  // 重要情報の抽出
-  const importantInfo = {
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // C2PA情報の抽出（ファイル全体の真正性）
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const c2paInfo = {
     title: activeManifest.title,
     signer: activeManifest.signatureInfo.issuer,
     signTime: activeManifest.signatureInfo.time ? new Date(activeManifest.signatureInfo.time).toLocaleString('ja-JP') : null,
     generator: activeManifest.claimGeneratorInfo?.name,
     aiTrainingConstraints: activeManifest.assertions.allAssertions['c2pa.training-mining'] || activeManifest.assertions.allAssertions['cawg.training-mining'],
     watermarks: Object.keys(activeManifest.assertions.allAssertions).filter(k => k.startsWith('c2pa.soft-binding')).length,
-    hasExif: !!activeManifest.assertions.allAssertions['exif'],
-    hasLocation: !!activeManifest.assertions.allAssertions['c2pa.location'],
+  };
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Exif情報の解析（位置情報・カメラ設定など）
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const hasGPSData = exifData && (
+    exifData.latitude !== undefined ||
+    exifData.longitude !== undefined ||
+    exifData.GPSLatitude !== undefined ||
+    exifData.GPSLongitude !== undefined
+  );
+
+  // 日時データを文字列に変換
+  const formatExifDateTime = (dateValue: any): string | null => {
+    if (!dateValue) return null;
+    if (dateValue instanceof Date) {
+      return dateValue.toLocaleString('ja-JP');
+    }
+    if (typeof dateValue === 'string') {
+      return dateValue;
+    }
+    return String(dateValue);
+  };
+
+  // 安全に値を取得するヘルパー
+  const safeGetValue = (value: any): string | number | null => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'string' || typeof value === 'number') return value;
+    if (value instanceof Date) return value.toLocaleString('ja-JP');
+    return String(value);
+  };
+
+  const exifInfo = {
+    hasExif: !!exifData,
+    hasGPS: hasGPSData,
+    camera: exifData?.Make || exifData?.Model ? `${exifData.Make || ''} ${exifData.Model || ''}`.trim() : null,
+    lens: safeGetValue(exifData?.LensModel),
+    dateTime: formatExifDateTime(exifData?.DateTimeOriginal || exifData?.DateTime),
+    iso: safeGetValue(exifData?.ISO),
+    focalLength: safeGetValue(exifData?.FocalLength),
+    aperture: safeGetValue(exifData?.FNumber),
+    shutterSpeed: safeGetValue(exifData?.ExposureTime),
   };
 
   return (
     <div className="space-y-6">
-      {/* 簡易表示（重要情報のみ） */}
+      {/* C2PA情報カード */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
-          <h5 className="font-bold text-gray-900 text-lg">抽出されたC2PAメタデータ</h5>
+          <h5 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+            <Shield className="w-5 h-5 text-indigo-500" />
+            {t('c2pa.title')}
+          </h5>
+          <p className="text-xs text-gray-500 mt-1">{t('c2pa.subtitle')}</p>
         </div>
 
         <div className="p-6 space-y-6">
@@ -317,92 +367,70 @@ export default function PrivacyWarning({
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
               <FileText className="w-4 h-4 text-indigo-500" />
-              <span>基本情報</span>
+              <span>{t('c2pa.basicInfo')}</span>
             </div>
             <div className="pl-6 space-y-2 text-sm">
-              {importantInfo.title && (
+              {c2paInfo.title && (
                 <div className="flex justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-gray-500">コンテンツタイトル</span>
-                  <span className="font-medium text-gray-900">{importantInfo.title}</span>
+                  <span className="text-gray-500">{t('c2pa.contentTitle')}</span>
+                  <span className="font-medium text-gray-900">{c2paInfo.title}</span>
                 </div>
               )}
-              {importantInfo.signer && (
+              {c2paInfo.signer && (
                 <div className="flex justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-gray-500">署名者</span>
-                  <span className="font-medium text-gray-900">{importantInfo.signer}</span>
+                  <span className="text-gray-500">{t('c2pa.signer')}</span>
+                  <span className="font-medium text-gray-900">{c2paInfo.signer}</span>
                 </div>
               )}
-              {importantInfo.signTime && (
+              {c2paInfo.signTime && (
                 <div className="flex justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-gray-500">署名日時</span>
-                  <span className="font-medium text-gray-900">{importantInfo.signTime}</span>
+                  <span className="text-gray-500">{t('c2pa.signTime')}</span>
+                  <span className="font-medium text-gray-900">{c2paInfo.signTime}</span>
                 </div>
               )}
-              {importantInfo.generator && (
+              {c2paInfo.generator && (
                 <div className="flex justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-gray-500">クレームジェネレーター</span>
-                  <span className="font-medium text-gray-900">{importantInfo.generator}</span>
+                  <span className="text-gray-500">{t('c2pa.claimGenerator')}</span>
+                  <span className="font-medium text-gray-900">{c2paInfo.generator}</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* AI学習制約 */}
-          {!!importantInfo.aiTrainingConstraints && (
+          {!!c2paInfo.aiTrainingConstraints && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                 <Shield className="w-4 h-4 text-indigo-500" />
-                <span>AI学習・マイニング制約</span>
+                <span>{t('c2pa.aiTraining')}</span>
               </div>
               <div className="pl-6 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
                 <p className="text-sm text-indigo-900 font-medium mb-1">
-                  このコンテンツはAI学習・推論モデルへの利用が制限されるよう記録されています。
+                  {t('c2pa.aiTrainingDesc')}
                 </p>
                 <p className="text-xs text-indigo-800/80">
-                  ただし、これは強制力のある技術的な制御ではありません。利用者の倫理的判断を促すための情報です。
+                  {t('c2pa.aiTrainingNote')}
                 </p>
               </div>
             </div>
           )}
 
           {/* 透かし情報 */}
-          {importantInfo.watermarks > 0 && (
+          {c2paInfo.watermarks > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
                 <Lock className="w-4 h-4 text-indigo-500" />
-                <span>デジタル透かし</span>
+                <span>{t('c2pa.watermark')}</span>
               </div>
               <div className="pl-6 bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <p className="text-sm text-gray-700">
-                  {importantInfo.watermarks}個のデジタル透かしが埋め込まれています
+                  {t('c2pa.watermarkCount', { count: c2paInfo.watermarks })}
                 </p>
               </div>
             </div>
           )}
 
-          {/* 位置情報・カメラ情報 */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-              <MapPin className="w-4 h-4 text-indigo-500" />
-              <span>プライバシー関連情報</span>
-            </div>
-            <div className="pl-6 space-y-2">
-              <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600">位置情報 (GPSなど)</span>
-                <span className={`text-sm font-medium px-3 py-1 rounded-full ${importantInfo.hasLocation ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                  {importantInfo.hasLocation ? '含む' : '含まない'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm text-gray-600">Exif情報 (カメラ設定、撮影機材など)</span>
-                <span className={`text-sm font-medium px-3 py-1 rounded-full ${importantInfo.hasExif ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
-                  {importantInfo.hasExif ? '含む' : '含まない'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* 詳細情報ボタン（横並び） */}
+          {/* C2PA詳細情報ボタン（横並び） */}
           <div className="pt-4 border-t border-gray-200">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* 来歴情報 */}
@@ -412,7 +440,7 @@ export default function PrivacyWarning({
                 className="border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300"
               >
                 <GitBranch className="w-4 h-4 mr-2" />
-                来歴タイムライン
+                {t('buttons.provenance')}
               </Button>
               {/* すべてのメタデータ詳細 */}
               <Button
@@ -421,7 +449,7 @@ export default function PrivacyWarning({
                 className="border-gray-200 hover:bg-gray-50"
               >
                 <Code className="w-4 h-4 mr-2" />
-                メタデータ詳細
+                {t('buttons.details')}
               </Button>
               {/* 仕組みとデータ取り扱い */}
               <Button
@@ -430,10 +458,124 @@ export default function PrivacyWarning({
                 className="border-gray-200 hover:bg-gray-50"
               >
                 <BookOpen className="w-4 h-4 mr-2" />
-                RootLensの仕組み
+                {t('buttons.mechanism')}
               </Button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Exif情報カード */}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
+          <h5 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+            <Camera className="w-5 h-5 text-indigo-500" />
+            {t('exif.title')}
+          </h5>
+          <p className="text-xs text-gray-500 mt-1">{t('exif.subtitle')}</p>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {exifInfo.hasExif ? (
+            <>
+              {/* カメラ情報 */}
+              {(exifInfo.camera || exifInfo.lens) && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <Camera className="w-4 h-4 text-indigo-500" />
+                    <span>{t('exif.equipment')}</span>
+                  </div>
+                  <div className="pl-6 space-y-2 text-sm">
+                    {exifInfo.camera && (
+                      <div className="flex justify-between py-1.5 border-b border-gray-100">
+                        <span className="text-gray-500">{t('exif.camera')}</span>
+                        <span className="font-medium text-gray-900">{exifInfo.camera}</span>
+                      </div>
+                    )}
+                    {exifInfo.lens && (
+                      <div className="flex justify-between py-1.5 border-b border-gray-100">
+                        <span className="text-gray-500">{t('exif.lens')}</span>
+                        <span className="font-medium text-gray-900">{exifInfo.lens}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 撮影設定 */}
+              {(exifInfo.iso || exifInfo.focalLength || exifInfo.aperture || exifInfo.shutterSpeed) && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <PenTool className="w-4 h-4 text-indigo-500" />
+                    <span>{t('exif.settings')}</span>
+                  </div>
+                  <div className="pl-6 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    {exifInfo.iso && (
+                      <div className="flex flex-col py-1">
+                        <span className="text-gray-500 text-xs">{t('exif.iso')}</span>
+                        <span className="font-medium text-gray-900">{exifInfo.iso}</span>
+                      </div>
+                    )}
+                    {exifInfo.focalLength && (
+                      <div className="flex flex-col py-1">
+                        <span className="text-gray-500 text-xs">{t('exif.focalLength')}</span>
+                        <span className="font-medium text-gray-900">{exifInfo.focalLength}mm</span>
+                      </div>
+                    )}
+                    {exifInfo.aperture && (
+                      <div className="flex flex-col py-1">
+                        <span className="text-gray-500 text-xs">{t('exif.aperture')}</span>
+                        <span className="font-medium text-gray-900">F/{exifInfo.aperture}</span>
+                      </div>
+                    )}
+                    {exifInfo.shutterSpeed && (
+                      <div className="flex flex-col py-1">
+                        <span className="text-gray-500 text-xs">{t('exif.shutterSpeed')}</span>
+                        <span className="font-medium text-gray-900">{exifInfo.shutterSpeed}s</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 撮影日時 */}
+              {exifInfo.dateTime && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                    <Calendar className="w-4 h-4 text-indigo-500" />
+                    <span>{t('exif.dateTime')}</span>
+                  </div>
+                  <div className="pl-6 text-sm">
+                    <span className="font-medium text-gray-900">{exifInfo.dateTime}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 位置情報 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <MapPin className="w-4 h-4 text-indigo-500" />
+                  <span>{t('exif.privacy')}</span>
+                </div>
+                <div className="pl-6">
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-sm text-gray-600">{t('exif.gps')}</span>
+                    <span className={`text-sm font-medium px-3 py-1 rounded-full ${exifInfo.hasGPS ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+                      {exifInfo.hasGPS ? t('exif.contains') : t('exif.notContains')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
+                <Camera className="w-6 h-6 text-gray-400" />
+              </div>
+              <p className="text-sm text-gray-500">{t('exif.noExif')}</p>
+              <p className="text-xs text-gray-400 mt-1">{t('exif.noExifNote')}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -451,12 +593,12 @@ export default function PrivacyWarning({
           </div>
           <div className="flex-1">
             <span className="block text-base font-bold text-slate-900 mb-1 group-hover:text-indigo-700 transition-colors">
-              公開とデータ取り扱いに同意する
+              {t('consent.title')}
             </span>
             <p className="text-sm text-slate-600 leading-relaxed">
-              上記のマニフェスト情報（撮影データ・編集履歴）およびコンテンツが、
-              <strong className="text-slate-900 font-semibold mx-1 border-b-2 border-indigo-100">一般公開</strong>
-              されることを理解し、同意します。
+              {t.rich('consent.description', {
+                strong: (chunks) => <strong className="text-slate-900 font-semibold mx-1 border-b-2 border-indigo-100">{chunks}</strong>
+              })}
             </p>
           </div>
         </label>

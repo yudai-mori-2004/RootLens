@@ -46,20 +46,61 @@ export default function LensPage() {
 
   // カメラ起動
   const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' } // 外カメラ優先
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-      setIsCameraOpen(true);
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      toast.error(t('cameraError'));
-    }
+    setIsCameraOpen(true);
   };
+
+  // カメラモーダルが開いたらstreamを取得してvideoに設定
+  useEffect(() => {
+    let mounted = true;
+
+    const initCamera = async () => {
+      if (!isCameraOpen || !videoRef.current) return;
+
+      try {
+        // カメラストリームを取得
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+
+        if (!mounted) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          try {
+            await videoRef.current.play();
+          } catch (playError) {
+            console.error("Video play error:", playError);
+          }
+        }
+      } catch (err) {
+        console.error("Error accessing camera:", err);
+        if (mounted) {
+          toast.error(t('cameraError'));
+          setIsCameraOpen(false);
+        }
+      }
+    };
+
+    initCamera();
+
+    return () => {
+      mounted = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [isCameraOpen, t]);
 
   // カメラ停止
   const stopCamera = () => {
@@ -254,44 +295,39 @@ export default function LensPage() {
         </div>
       )}
 
-      {/* カメラモーダル (Google Lens風) */}
+      {/* カメラモーダル (シンプル版) */}
       {isCameraOpen && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-          <div className="absolute top-4 right-4 z-10">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 rounded-full w-12 h-12" onClick={stopCamera}>
+        <div className="fixed inset-0 z-[100] bg-black">
+          {/* 閉じるボタン */}
+          <div className="absolute top-4 right-4 z-20">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 rounded-full w-12 h-12"
+              onClick={stopCamera}
+            >
               <X className="w-8 h-8" />
             </Button>
           </div>
-          
-          <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            {/* スキャン演出用のオーバーレイ */}
-            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-              <div className="w-64 h-64 border-2 border-white/50 rounded-lg relative">
-                <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-white -mt-1 -ml-1"></div>
-                <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-white -mt-1 -mr-1"></div>
-                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-white -mb-1 -ml-1"></div>
-                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-white -mb-1 -mr-1"></div>
-                <div className="w-full h-1 bg-blue-500/80 shadow-[0_0_10px_rgba(59,130,246,0.8)] absolute top-1/2 -translate-y-1/2 animate-scan"></div>
-              </div>
-              <p className="absolute bottom-20 text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm">
-                {t('scanOverlay')}
-              </p>
-            </div>
-            <canvas ref={canvasRef} className="hidden" />
-          </div>
 
-          <div className="h-32 bg-black flex items-center justify-center pb-8 pt-4">
-            <button 
+          {/* カメラ映像（全画面） */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* シャッターボタン（下部固定） */}
+          <div className="absolute bottom-0 left-0 right-0 z-20 p-8 flex items-center justify-center bg-gradient-to-t from-black/60 to-transparent">
+            <button
               onClick={capturePhoto}
-              className="w-20 h-20 rounded-full border-4 border-white p-1 hover:scale-95 transition-transform"
+              className="w-20 h-20 rounded-full border-4 border-white bg-transparent hover:bg-white/10 active:scale-95 transition-all"
+              aria-label="撮影"
             >
-              <div className="w-full h-full bg-white rounded-full"></div>
+              <div className="w-full h-full rounded-full border-2 border-white"></div>
             </button>
           </div>
         </div>

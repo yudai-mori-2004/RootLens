@@ -526,7 +526,7 @@
       }
   },
   "lens": {
-    "title": "RootLens Search",
+    "title": "RootLens",
     "subtitle": "From text, image, or camera.\nSearch for proven content worldwide.",
     "placeholder": "What are you looking for? (e.g., 'Sunset Ocean')",
     "lensSearch": "Search with Camera",
@@ -601,5 +601,50 @@
     },
     "warningTitle": "Handling of Unsupported Devices",
     "warningDesc": "For devices or software not included in the list above (those not matching trusted `claimGenerator`), RootLens will not extract a hash (it will result in an error).\nThis is a security measure to prevent incorrect hash usage or spoofing by unverified implementations.\n\nIf you encounter an error despite using a C2PA-compatible device, please contact the RootLens team. We will verify and add it to the list promptly."
+  },
+  "metadata": {
+    "c2pa": {
+      "title": "C2PA Authenticity",
+      "subtitle": "Digital signature proving the integrity of the entire file",
+      "basicInfo": "Basic Information",
+      "contentTitle": "Content Title",
+      "signer": "Signer",
+      "signTime": "Signature Time",
+      "claimGenerator": "Claim Generator",
+      "aiTraining": "AI Training & Mining Constraints",
+      "aiTrainingDesc": "This content is recorded with restrictions on use for AI training and inference models.",
+      "aiTrainingNote": "However, this is not a technical control with enforcement power. It is information to encourage ethical judgment by users.",
+      "watermark": "Digital Watermark",
+      "watermarkCount": "{count} digital watermark(s) embedded"
+    },
+    "exif": {
+      "title": "Exif Information",
+      "subtitle": "Camera settings and shooting info embedded in the original image",
+      "equipment": "Equipment",
+      "camera": "Camera",
+      "lens": "Lens",
+      "settings": "Shooting Settings",
+      "iso": "ISO",
+      "focalLength": "Focal Length",
+      "aperture": "Aperture",
+      "shutterSpeed": "Shutter Speed",
+      "dateTime": "Date/Time",
+      "privacy": "Privacy Related",
+      "gps": "Location Info (GPS)",
+      "contains": "Contains",
+      "notContains": "Not Contains",
+      "noExif": "No Exif data detected",
+      "noExifNote": "May have been removed by editing software"
+    },
+    "buttons": {
+      "provenance": "Provenance Timeline",
+      "details": "Metadata Details",
+      "mechanism": "How RootLens Works"
+    },
+    "consent": {
+      "title": "I agree to publication and data handling",
+      "description": "I understand and agree that the above manifest information (shooting data and edit history) and content will be <strong>publicly available</strong>.",
+      "public": "publicly available"
+    }
   }
 }

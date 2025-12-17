@@ -19,7 +19,12 @@ export interface C2PASummaryData {
 
   // 統合: Arweaveに送信するデータ
   sourceType: string | null;        // "digitalCapture" | "trainedAlgorithmicMedia" | null
-  claimGenerator: string | null;    // e.g., "Google Pixel 7 1.0"
+  claimGenerator: string | null;    // e.g., "Google Pixel 7 1.0" (最新)
+
+  // ★追加: Root（最古）マニフェストの情報
+  originalClaimGenerator: string | null; // e.g., "Sony ILCE-7M4" (最古)
+  originalIssuer: string | null;         // e.g., "C2PA Test Signing Cert" (最古)
+  isTrustedRootIssuer: boolean;          // Root Issuerが信頼できるか
 }
 
 export interface ManifestSummary {
@@ -116,6 +121,9 @@ export async function createManifestSummary(
       thumbnailUrl,
       sourceType: null,
       claimGenerator: null,
+      originalClaimGenerator: null,
+      originalIssuer: null,
+      isTrustedRootIssuer: false,
     };
   }
 
@@ -128,6 +136,9 @@ export async function createManifestSummary(
       thumbnailUrl,
       sourceType: null,
       claimGenerator: null,
+      originalClaimGenerator: null,
+      originalIssuer: null,
+      isTrustedRootIssuer: false,
     };
   }
 
@@ -196,12 +207,34 @@ export async function createManifestSummary(
   // claimGenerator抽出
   const claimGenerator = manifestSummary.claimGenerator;
 
+  // ★追加: Rootマニフェストの特定と情報抽出
+  const rootManifest = findRootManifest(activeManifest);
+
+  // RootのClaimGenerator
+  const rootGenInfo = rootManifest.claimGeneratorInfo?.[0];
+  const originalClaimGenerator = rootManifest.claimGenerator ||
+    (rootGenInfo?.name
+      ? `${rootGenInfo.name}${rootGenInfo.version ? ' ' + rootGenInfo.version : ''}`
+      : 'Unknown');
+
+  // RootのIssuer
+  const originalIssuer = rootManifest.signatureInfo?.issuer || 'Unknown';
+
+  // ★追加: Root Issuerが信頼できるかどうかの判定
+  const trustedIssuerNames = getTrustedIssuerNames();
+  const isTrustedRootIssuer = trustedIssuerNames.some(trusted => originalIssuer.includes(trusted));
+
+  console.log(`🔍 Root Manifest Info: Generator="${originalClaimGenerator}", Issuer="${originalIssuer}", Trusted=${isTrustedRootIssuer}`);
+
   return {
     activeManifest: manifestSummary,
     validationStatus: { isValid, errors },
     thumbnailUrl: finalThumbnailUrl,
     sourceType,
     claimGenerator,
+    originalClaimGenerator, // ★追加
+    originalIssuer,         // ★追加
+    isTrustedRootIssuer,    // ★追加
   };
 }
 
@@ -417,6 +450,27 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
   };
 }
 
+// Rootマニフェストを再帰的に探すヘルパー
+function findRootManifest(manifest: Manifest, depth = 0): Manifest {
+  if (depth > 10) return manifest; // 深さ制限
+
+  // Ingredientsがない = Root
+  if (!manifest.ingredients || manifest.ingredients.length === 0) {
+    return manifest;
+  }
+
+  // 親を探す (ingredients[0] を優先)
+  const parentIngredient = manifest.ingredients[0];
+
+  // 親マニフェストがある場合、さらに潜る
+  if (parentIngredient?.manifest) {
+    return findRootManifest(parentIngredient.manifest, depth + 1);
+  }
+
+  // 親がなければ現在のマニフェストがRoot
+  return manifest;
+}
+
 // Rootサムネイルを再帰的に探すヘルパー
 async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string | null> {
   if (depth > 10) return null; // 深さ制限
@@ -432,7 +486,7 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
 
   // 親を探す (ingredients[0] を優先)
   const parentIngredient = manifest.ingredients[0];
-  
+
   // 親マニフェストがある場合、さらに潜る
   if (parentIngredient?.manifest) {
     const parentThumbnail = await findRootThumbnail(parentIngredient.manifest, depth + 1);

@@ -50,7 +50,8 @@ import {
   Lock,
   Check,
   Info,
-  Cpu
+  Cpu,
+  Package
 } from 'lucide-react';
 
 import Header from '@/app/components/Header';
@@ -593,7 +594,29 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                 <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4 leading-tight break-words">
                   {proof.title || t('details.untitled')}
                 </h1>
-                
+
+                {/* デバイス情報と署名者情報のチップ */}
+                {proof.claimGenerator && proof.rootSigner && (
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    {/* Device/SDK チップ */}
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full shadow-md border border-slate-200">
+                      <Package className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-900 truncate max-w-[200px]">
+                        {(() => {
+                          const rawGenerator = proof.claimGenerator || '';
+                          return rawGenerator.split(' 8')[0].trim();
+                        })()}
+                      </span>
+                    </div>
+
+                    {/* 署名者チップ */}
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full shadow-md border border-slate-200">
+                      <Shield className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-900">{proof.rootSigner}</span>
+                    </div>
+                  </div>
+                )}
+
                 {proof.description && (
                   <p className="text-slate-600 text-sm leading-relaxed mb-6">
                     {proof.description}
