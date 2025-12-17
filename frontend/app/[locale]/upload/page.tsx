@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createC2pa, C2pa, ManifestStore, Manifest } from 'c2pa';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
-import { createManifestSummary, C2PASummaryData, getSourceType } from '@/app/lib/c2pa-parser';
+import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
 import { searchArweaveTransactionsByHash } from '@/app/lib/irys-verification';
 import { checkSolanaAssetExists } from '@/app/lib/verification-helpers';
 import ProgressBar from '@/app/components/ProgressBar';
@@ -252,16 +252,9 @@ export default function UploadPage() {
       // 🔍 デバッグ: Arweaveに送信するデータの確認
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-      // claimGeneratorとsourceTypeを取得
-      const claimGenerator = summary?.activeManifest?.claimGenerator || 'Unknown';
-
-      let sourceTypeShort = 'unknown';
-      if (manifestStore?.activeManifest) {
-        const extractedSourceType = getSourceType(manifestStore.activeManifest);
-        if (extractedSourceType) {
-          sourceTypeShort = extractedSourceType;
-        }
-      }
+      // claimGeneratorとsourceTypeをsummaryから直接取得
+      const claimGenerator = summary.claimGenerator || 'Unknown';
+      const sourceTypeShort = summary.sourceType || 'unknown';
 
       // Arweaveに送信されるデータをalertで表示
       const debugData = {
@@ -291,7 +284,7 @@ ${debugData.sourceType}
 これらのデータがArweaveに保存されます
       `.trim();
 
-      alert(debugMessage);
+      // alert(debugMessage);
       console.log('🔍 Debug - Extracted C2PA Data:', debugData);
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -599,17 +592,9 @@ ${debugData.sourceType}
       const publicUploadResult = await publicUploadResponse.json();
       console.log('✅ Public Bucketアップロード完了:', publicUploadResult);
 
-      // 4. claimGenerator と sourceType を抽出
-      const claimGenerator = summaryData?.activeManifest?.claimGenerator || 'Unknown';
-
-      // getSourceType関数を使ってsourceTypeを抽出
-      let sourceTypeShort = 'unknown';
-      if (manifestData?.activeManifest) {
-        const extractedSourceType = getSourceType(manifestData.activeManifest);
-        if (extractedSourceType) {
-          sourceTypeShort = extractedSourceType;
-        }
-      }
+      // 4. claimGenerator と sourceType を抽出（統合済みパーサーから取得）
+      const claimGenerator = summaryData?.claimGenerator || 'Unknown';
+      const sourceTypeShort = summaryData?.sourceType || 'unknown';
 
       console.log('📋 claimGenerator:', claimGenerator);
       console.log('📋 sourceType:', sourceTypeShort);
