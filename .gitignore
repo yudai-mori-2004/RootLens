@@ -1,5 +1,6 @@
 # Environment files
 .env.local
+convert.js
 
 # OS files
 .DS_Store
