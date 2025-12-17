@@ -69,6 +69,8 @@ interface ProofData {
   mediaProofId: string;
   originalHash: string;
   rootSigner: string;
+  claimGenerator?: string;
+  sourceType?: string;
   createdAt: string;
   arweaveTxId: string;
   cnftMintAddress: string;
@@ -411,6 +413,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         }
 
         const rootSignerAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'root_signer');
+        const claimGeneratorAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'claim_generator');
+        const sourceTypeAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'source_type');
         const createdAtAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'created_at');
         const isValid = (verificationSource === 'db') ? true : (crossLinkValid && noDuplicates);
 
@@ -438,6 +442,8 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           mediaProofId: dbInfo.id || arweaveTxId,
           originalHash: originalHash,
           rootSigner: rootSignerAttr?.value || 'Unknown',
+          claimGenerator: claimGeneratorAttr?.value,
+          sourceType: sourceTypeAttr?.value,
           createdAt: createdAtAttr?.value || new Date().toISOString(),
           arweaveTxId: arweaveTxId,
           cnftMintAddress: targetAssetId || '',
@@ -744,7 +750,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                             </div>
                         </div>
 
-                        {/* 2. AI Status */}
+                        {/* 2. AI Status & Device Info */}
                         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-purple-500/50 transition-colors">
                             <p className="text-xs text-slate-400 font-medium mb-3">{t('proof.ai')}</p>
                             <div className="flex items-center gap-3">
@@ -758,15 +764,28 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                     </>
                                 ) : (
                                     <>
-                                        <div className="relative">
+                                        <div className="relative shrink-0">
                                             <Camera className="w-8 h-8 text-blue-400" />
                                             <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full border border-slate-900">
                                                 <CheckCircle className="w-4 h-4 text-blue-400" />
                                             </div>
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-lg text-blue-400">{t('proof.captured')}</p>
-                                            <p className="text-xs text-slate-400">{t('proof.capturedDesc')}</p>
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-lg text-blue-400 leading-tight">{t('proof.captured')}</p>
+                                            
+                                            {/* デバイス情報の表示 (New!) */}
+                                            {proof.claimGenerator ? (
+                                              <div className="mt-1">
+                                                <p className="text-[10px] text-slate-300 font-medium truncate" title={proof.claimGenerator}>
+                                                  {proof.claimGenerator.replace(/C2PA SDK.*$/, '').trim() || proof.claimGenerator}
+                                                </p>
+                                                <p className="text-[10px] text-slate-500 truncate" title={proof.rootSigner}>
+                                                  By {proof.rootSigner}
+                                                </p>
+                                              </div>
+                                            ) : (
+                                              <p className="text-xs text-slate-400">{t('proof.capturedDesc')}</p>
+                                            )}
                                         </div>
                                     </>
                                 )}
