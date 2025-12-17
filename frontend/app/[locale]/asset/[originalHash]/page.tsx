@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallets } from '@privy-io/react-auth/solana';
-import { createManifestSummary, C2PASummaryData } from '@/app/lib/c2pa-parser';
+import { createManifestSummary, C2PASummaryData, getSourceTypeLabel } from '@/app/lib/c2pa-parser';
 import ProvenanceModal from '@/app/components/ProvenanceModal';
 import TechnicalSpecsModal from '@/app/components/TechnicalSpecsModal';
 import PurchaseModal from '@/app/components/PurchaseModal';
@@ -49,7 +49,8 @@ import {
   Camera,
   Lock,
   Check,
-  Info
+  Info,
+  Cpu
 } from 'lucide-react';
 
 import Header from '@/app/components/Header';
@@ -546,14 +547,24 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                   <p className="text-sm">{t('details.preview')}</p>
                 </div>
               )}
-              {proof.isValid && (
-                <div className="absolute top-4 right-4 z-10">
-                  <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 border border-green-200">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-xs font-bold text-green-700">{t('details.verified')}</span>
-                  </div>
-                </div>
-              )}
+              {proof.isValid && (() => {
+                  const { isHardware } = getSourceTypeLabel(proof.sourceType);
+                  return (
+                      <div className="absolute top-4 right-4 z-10">
+                          {isHardware ? (
+                              <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 border border-blue-200">
+                                <Cpu className="w-4 h-4 text-blue-600" />
+                                <span className="text-xs font-bold text-blue-700">{t('proof.hardwareBadge')}</span>
+                              </div>
+                          ) : (
+                              <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 border border-green-200">
+                                <CheckCircle className="w-4 h-4 text-green-600" />
+                                <span className="text-xs font-bold text-green-700">{t('details.verified')}</span>
+                              </div>
+                          )}
+                      </div>
+                  );
+              })()}
             </div>
 
             {/* 右: 詳細情報 (2/5) */}
@@ -750,46 +761,101 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                             </div>
                         </div>
 
-                        {/* 2. AI Status & Device Info */}
-                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-purple-500/50 transition-colors">
-                            <p className="text-xs text-slate-400 font-medium mb-3">{t('proof.ai')}</p>
-                            <div className="flex items-center gap-3">
-                                {proof.c2paData?.activeManifest?.isAIGenerated ? (
-                                    <>
-                                        <Sparkles className="w-8 h-8 text-purple-400" />
-                                        <div>
-                                            <p className="font-bold text-lg text-purple-400">{t('proof.aiDetected')}</p>
-                                            <p className="text-xs text-slate-400">{t('proof.aiDesc')}</p>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="relative shrink-0">
-                                            <Camera className="w-8 h-8 text-blue-400" />
-                                            <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full border border-slate-900">
-                                                <CheckCircle className="w-4 h-4 text-blue-400" />
-                                            </div>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="font-bold text-lg text-blue-400 leading-tight">{t('proof.captured')}</p>
-                                            
-                                            {/* デバイス情報の表示 (New!) */}
-                                            {proof.claimGenerator ? (
-                                              <div className="mt-1">
-                                                <p className="text-[10px] text-slate-300 font-medium truncate" title={proof.claimGenerator}>
-                                                  {proof.claimGenerator.replace(/C2PA SDK.*$/, '').trim() || proof.claimGenerator}
-                                                </p>
-                                                <p className="text-[10px] text-slate-500 truncate" title={proof.rootSigner}>
-                                                  By {proof.rootSigner}
-                                                </p>
-                                              </div>
-                                            ) : (
-                                              <p className="text-xs text-slate-400">{t('proof.capturedDesc')}</p>
-                                            )}
-                                        </div>
-                                    </>
+                        {/* 2. AI Status & Device Info (Interactive) */}
+                        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 hover:border-purple-500/50 transition-colors group">
+                            <p className="text-xs text-slate-400 font-medium mb-3 flex items-center gap-2">
+                                {t('proof.ai')}
+                                {/* モバイル用情報アイコン (Hardwareの場合のみ) */}
+                                {!proof.c2paData?.activeManifest?.isAIGenerated && (
+                                    <button
+                                        className="md:hidden ml-auto p-1 hover:bg-slate-700/50 rounded-full transition-colors"
+                                        aria-label="詳細を表示"
+                                        onClick={(e) => {
+                                            // ここでダイアログを開く処理を入れるか、Tooltipを強制表示する工夫が必要
+                                            // 今回はシンプルにPCと同じTooltip構造にするが、モバイル対応は別途検討
+                                        }}
+                                    >
+                                        <Info className="w-3 h-3 text-blue-400" />
+                                    </button>
                                 )}
-                            </div>
+                            </p>
+                            
+                            {proof.c2paData?.activeManifest?.isAIGenerated ? (
+                                <div className="flex items-center gap-3">
+                                    <Sparkles className="w-8 h-8 text-purple-400" />
+                                    <div>
+                                        <p className="font-bold text-lg text-purple-400">{t('proof.aiDetected')}</p>
+                                        <p className="text-xs text-slate-400">{t('proof.aiDesc')}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                (() => {
+                                    const { label, isHardware } = getSourceTypeLabel(proof.sourceType);
+                                    const rawGenerator = proof.claimGenerator || '';
+                                    const cleanGenerator = rawGenerator.split(' 8')[0].trim();
+                                    
+                                    // Hardware Signed の場合の表示
+                                    return (
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                                                                        <button className="flex items-center gap-3 w-full text-left group-hover:bg-slate-700/50 p-2 -ml-2 rounded-lg transition-all">
+                                                                                                            <div className="relative shrink-0">
+                                                                                                                {isHardware ? (
+                                                                                                                    <Cpu className="w-8 h-8 text-blue-400" />
+                                                                                                                ) : (
+                                                                                                                    <Camera className="w-8 h-8 text-blue-400" />
+                                                                                                                )}
+                                                                                                                <div className="absolute -bottom-1 -right-1 bg-slate-900 rounded-full border border-slate-900">
+                                                                                                                    <CheckCircle className="w-4 h-4 text-blue-400" />
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                            <div className="min-w-0 flex-1">
+                                                                                                                <div className="flex items-center gap-2">
+                                                                                                                    <p className="font-bold text-lg text-blue-400 group-hover:underline decoration-blue-500 decoration-2 underline-offset-4">
+                                                                                                                        {isHardware ? t('proof.hardwareSealed') : t('proof.captured')}
+                                                                                                                    </p>
+                                                                                                                </div>
+                                                                                                                <div className="flex items-center gap-1.5 mt-0.5">
+                                                                                                                    <p className="text-xs text-slate-400 truncate">
+                                                                                                                        {isHardware ? t('proof.aiNotDetected') : label}
+                                                                                                                    </p>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        </button>
+                                                                                                    </TooltipTrigger>
+                                                                                                    <TooltipContent className="bg-slate-900 border-slate-700 text-white p-4 max-w-xs">
+                                                                                                        <div className="space-y-3">
+                                                                                                            <div>
+                                                                                                                <h4 className="font-bold text-sm mb-1 text-blue-400 flex items-center gap-2">
+                                                                                                                    <Cpu className="w-4 h-4" /> {t('proof.deviceAuthenticated')}
+                                                                                                                </h4>
+                                                                                                                <p className="text-xs text-slate-300 leading-relaxed">
+                                                                                                                    {t('proof.deviceDesc')}
+                                                                                                                </p>
+                                                                                                            </div>
+                                                                                                            
+                                                                                                            {proof.claimGenerator && (
+                                                                                                                <div className="bg-slate-800 rounded p-2 border border-slate-700">
+                                                                                                                    <div className="mb-2">
+                                                                                                                        <p className="text-[10px] uppercase text-slate-500 font-bold">{t('proof.deviceSdk')}</p>
+                                                                                                                        <p className="text-xs text-white font-mono break-words">{cleanGenerator}</p>
+                                                                                                                    </div>
+                                                                                                                    <div>
+                                                                                                                        <p className="text-[10px] uppercase text-slate-500 font-bold">{t('proof.signer')}</p>
+                                                                                                                        <p className="text-xs text-white flex items-center gap-1">
+                                                                                                                            <Shield className="w-3 h-3 text-green-500" />
+                                                                                                                            {proof.rootSigner}
+                                                                                                                        </p>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    </TooltipContent>                                            </Tooltip>
+                                        </TooltipProvider>
+                                    );
+                                })()
+                            )}
                         </div>
 
                         {/* 3. Arweave (Interactive) */}

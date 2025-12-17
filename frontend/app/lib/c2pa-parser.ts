@@ -457,6 +457,8 @@ async function findRootThumbnail(manifest: Manifest, depth = 0): Promise<string 
   }
 }
 
+// ... (existing code)
+
 // Helper: Blob URL to Data URI
 async function getBlobUrlAsDataUri(blobUrl: string | Blob): Promise<string | null> {
   let url: string = '';
@@ -491,5 +493,38 @@ async function getBlobUrlAsDataUri(blobUrl: string | Blob): Promise<string | nul
     if (url.startsWith('blob:')) {
       URL.revokeObjectURL(url); // オブジェクトURLを解放
     }
+  }
+}
+
+/**
+ * Source Type URIから表示用ラベルとハードウェア撮影判定を取得する
+ */
+export function getSourceTypeLabel(uri: string | null | undefined): { label: string; isHardware: boolean } {
+  if (!uri) return { label: 'Unknown', isHardware: false };
+
+  // URIから末尾のキーを取得
+  const key = uri.split('/').pop() || uri;
+
+  switch (key) {
+    case 'digitalCapture':
+      return { label: 'Digital Capture', isHardware: true };
+    case 'computationalCapture':
+      return { label: 'Computational Capture', isHardware: true };
+    case 'multipleExposures':
+      return { label: 'Multiple Exposures', isHardware: true };
+    case 'trainedAlgorithmicMedia':
+      return { label: 'AI Generated', isHardware: false };
+    case 'compositeSynthetic':
+      return { label: 'Composite / Synthetic', isHardware: false };
+    case 'algorithmicMedia':
+      return { label: 'Algorithmic Media', isHardware: false };
+    case 'softwareImage':
+      return { label: 'Software Image', isHardware: false };
+    case 'virtualRecording':
+      return { label: 'Virtual Recording', isHardware: false };
+    case 'scannedImage':
+      return { label: 'Scanned Image', isHardware: false };
+    default:
+      return { label: key, isHardware: false };
   }
 }

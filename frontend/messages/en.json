@@ -350,7 +350,14 @@
         "dataDesc": "The hash value of this content and the address of the cNFT representing ownership are permanently stored on the Arweave blockchain. No risk of server downtime or tampering.",
         "ownership": "Digital Ownership",
         "ownershipDesc": "Ownership is managed as a compressed NFT (cNFT) on the Solana blockchain. This clarifies rights and enables immediate trading.",
-        "explorer": "View on Explorer"
+        "explorer": "View on Explorer",
+        "hardwareSealed": "Hardware Sealed",
+        "hardwareBadge": "Hardware",
+        "aiNotDetected": "AI Not Detected",
+        "deviceAuthenticated": "Device Authenticated",
+        "deviceDesc": "This content was captured using a verified hardware device or secure environment.",
+        "deviceSdk": "Device / SDK",
+        "signer": "Signer"
     },
     "card": {
         "title": "Ownership Legitimacy Verification Process",
