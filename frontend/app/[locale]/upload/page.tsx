@@ -180,6 +180,9 @@ export default function UploadPage() {
           thumbnailUrl: null,
           sourceType: null,
           claimGenerator: null,
+          originalClaimGenerator: null,
+          originalIssuer: null,
+          isTrustedRootIssuer: false,
         });
         setIsProcessing(false);
         setCurrentStep(3); // エラー表示のためStep 3へ
