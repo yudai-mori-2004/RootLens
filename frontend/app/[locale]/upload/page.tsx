@@ -263,13 +263,22 @@ export default function UploadPage() {
       // C2PAのData Hash (c2pa.hash.data) を優先的に使用する。
       // これにより、ファイル末尾のパディングやExifの軽微な変更によるファイル全体ハッシュの変化を無視できる。
       let originalHash: string;
-      
+
       if (summary.activeManifest?.dataHash) {
         originalHash = summary.activeManifest.dataHash;
         console.log('✅ Used C2PA Data Hash:', originalHash);
       } else {
-        // フォールバック削除: エラーにする
-        throw new Error('C2PA Data Hash (Hard Binding) が見つかりません。このファイルはRootLensで検証できません。');
+        // Data Hash（Hard Binding）が見つからない場合はエラー
+        console.error('❌ C2PA Data Hash (Hard Binding) not found');
+        setValidationResult({
+          isValid: false,
+          rootSigner: null,
+          provenanceChain: [],
+          error: 'C2PA Data Hash (Hard Binding) が見つかりません。このファイルはRootLensで検証できません。',
+        });
+        setIsProcessing(false);
+        setCurrentStep(3); // エラー表示のためStep 3へ
+        return;
       }
 
       setHashes({ originalHash });
@@ -310,7 +319,7 @@ ${debugData.sourceType}
 これらのデータがArweaveに保存されます
       `.trim();
 
-      alert(debugMessage);
+      // alert(debugMessage);
       console.log('🔍 Debug - Extracted C2PA Data:', debugData);
 
       // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

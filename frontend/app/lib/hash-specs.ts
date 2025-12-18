@@ -13,7 +13,7 @@ export interface DeviceHashSpec {
   id: string;
   vendor: string;
   matcher: string | RegExp; // signatureInfo.issuer に含まれる文字列または正規表現
-  targetLabel: string;      // 採用するアサーションのラベル (完全一致)
+  targetLabels: string[];      // 採用するアサーションのラベル (完全一致)
   description: string;
   isTrustedIssuer: boolean; // このIssuerがRootLensにとって信頼できるかどうか
 }
@@ -23,10 +23,15 @@ export const DEVICE_HASH_SPECS: DeviceHashSpec[] = [
   {
     id: 'google-pixel',
     vendor: 'Google',
-    matcher: 'Google LLC', // 完全一致または部分一致
-    targetLabel: 'c2pa.hash.data.part',
-    description: 'Googleデバイス(Pixel等)の署名は、部分ハッシュ(c2pa.hash.data.part)を主要な識別子として使用します。',
-    isTrustedIssuer: true, // Google LLCは信頼できる発行者
+    matcher: 'Google LLC',
+    // ★変更: 配列にして、両方のパターンを登録します
+    // 優先順位をつけたい場合、配列の先頭を優先するロジックにすることも可能です
+    targetLabels: [
+      'c2pa.hash.data.part', // 通常の写真
+      'c2pa.hash.data'       // 動画スナップショット
+    ],
+    description: 'Googleデバイス(Pixel等)の署名。通常写真は.part、スナップショットは標準ハッシュを使用します。',
+    isTrustedIssuer: true,
   },
   
   // 以下は動作確認が取れ次第、順次有効化します。

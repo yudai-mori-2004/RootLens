@@ -221,8 +221,8 @@ export async function createManifestSummary(
   const originalIssuer = rootManifest.signatureInfo?.issuer || 'Unknown';
 
   // ★追加: Root Issuerが信頼できるかどうかの判定
-  const trustedIssuerNames = getTrustedIssuerNames();
-  const isTrustedRootIssuer = trustedIssuerNames.some(trusted => originalIssuer.includes(trusted));
+  const trustedIssuers = getTrustedIssuerNames();
+  const isTrustedRootIssuer = trustedIssuers.some(trusted => originalIssuer.includes(trusted));
 
   console.log(`🔍 Root Manifest Info: Generator="${originalClaimGenerator}", Issuer="${originalIssuer}", Trusted=${isTrustedRootIssuer}`);
 
@@ -244,6 +244,10 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
     issuer: manifest.signatureInfo?.issuer || 'Unknown',
     time: manifest.signatureInfo?.time || null,
   };
+
+  const trustedIssuers = getTrustedIssuerNames();
+  const issuer = signatureInfo.issuer || '';
+  const isTrustedIssuer = trustedIssuers.some(trusted => issuer.includes(trusted));
 
   const generatorInfo = manifest.claimGeneratorInfo?.[0];
   const claimGeneratorInfo = {
@@ -364,7 +368,12 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
 // 決定論的（Deterministic）に originalHash を抽出します。
 // これにより、アサーションの順序や曖昧さに依存せず、常に一意のIDが保証されます。
 //
-// ※ 定義されていないデバイス（信頼リスト外）の場合、ハッシュは抽出されずエラーとなります。
+// 抽出プロセス:
+//   1. Issuerに基づいてデバイス仕様をマッチング
+//   2. 仕様で指定されたC2PA assertionから Data Hash（Hard Binding）を抽出
+//   3. Hard Bindingが不在の場合、信頼できるIssuerに限り Instance ID で代用
+//
+// ※ 定義されていないデバイス（信頼リスト外）の場合、ハッシュは抽出されません。
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   let dataHash: string | null = null;
   
@@ -380,46 +389,80 @@ async function parseManifest(manifest: Manifest): Promise<ManifestSummary> {
     });
 
     if (appliedSpec) {
-        console.log(`🔍 Applied Hash Spec: [${appliedSpec.vendor}] ${appliedSpec.description} (Target: ${appliedSpec.targetLabel})`);
+      console.log(`🔍 Applied Hash Spec: [${appliedSpec.vendor}] ${appliedSpec.description} (Target: ${appliedSpec.targetLabels})`);
 
-        // 2. 指定されたラベルのアサーションを検索
-        // find() は配列の先頭から検索するため、同名ラベルが複数ある場合は最初のアサーションが選ばれる。
-        const hashAssertion = manifest.assertions.data.find((a: any) => a.label === appliedSpec!.targetLabel);
+      // 2. 指定されたラベルのアサーションを検索
+      // find() は配列の先頭から検索するため、同名ラベルが複数ある場合は最初のアサーションが選ばれる。
+      const hashAssertion = manifest.assertions.data.find((a: any) =>
+        appliedSpec!.targetLabels.includes(a.label)
+      );
 
-        if (hashAssertion) {
-          const rawData = hashAssertion.data as any;
-          
-          // ハッシュバイト列の抽出
-          // パターンA: { hash: [...] } - 標準的
-          if (rawData?.hash && (Array.isArray(rawData.hash) || rawData.hash instanceof Uint8Array)) {
-             dataHash = bytesToHex(rawData.hash);
-          } 
-          // パターンB: { val: [...] } - 一部の実装
-          else if (rawData?.val && (Array.isArray(rawData.val) || rawData.val instanceof Uint8Array)) {
-             dataHash = bytesToHex(rawData.val);
-          }
+      if (hashAssertion) {
+        const rawData = hashAssertion.data as any;
+
+        // 3. ハッシュバイト列の抽出（複数パターン対応）
+        // C2PAの実装によって、ハッシュデータの構造が異なるため、
+        // 複数のパターンを試行して柔軟に対応します。
+
+        if (rawData?.hash && (Array.isArray(rawData.hash) || rawData.hash instanceof Uint8Array)) {
+          // パターンA: { hash: [...] } - 標準的な構造
+          dataHash = bytesToHex(rawData.hash);
+        } else if (rawData?.val && (Array.isArray(rawData.val) || rawData.val instanceof Uint8Array)) {
+          // パターンB: { val: [...] } - 一部の実装で使用
+          dataHash = bytesToHex(rawData.val);
+        } else if (Array.isArray(rawData) || rawData instanceof Uint8Array) {
           // パターンC: データ自体が配列 - シンプルな構造
-          else if (Array.isArray(rawData) || rawData instanceof Uint8Array) {
-             dataHash = bytesToHex(rawData);
-          }
-
-          if (dataHash) {
-              console.log(`✅ Extracted Data Hash using spec [${appliedSpec.id}]:`, dataHash);
-          } else {
-              console.warn(`⚠️ Target assertion found (${appliedSpec.targetLabel}) but failed to extract bytes. Structure:`, rawData);
-          }
-        } else {
-            console.warn(`⚠️ Target assertion (${appliedSpec.targetLabel}) NOT found for spec [${appliedSpec.id}]. Issuer: ${issuerName}`);
+          dataHash = bytesToHex(rawData);
         }
+
+        if (dataHash) {
+          console.log(`✅ Extracted Data Hash using spec [${appliedSpec.id}]:`, dataHash);
+        } else {
+          console.warn(`⚠️ Target assertion found (${hashAssertion.label}) but failed to extract bytes. Structure:`, rawData);
+        }
+      } else {
+        console.warn(`⚠️ No matching target assertion found for spec [${appliedSpec.id}]. Searched for: ${appliedSpec.targetLabels.join(', ')}`);
+      }
+
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // Fallback: Instance IDによる代用 (Hard Binding不在時の特例措置)
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      //
+      // 一部のケースでは、明示的なData Hash assertionが存在しない場合があります：
+      // 例: Google Pixelの動画スナップショット（構造的結合/Implicit Binding）
+      //
+      // このような場合でも、Issuerが信頼できる機関（Google LLC等）であれば、
+      // C2PAマニフェストの Instance ID を一意識別子として代用します。
+      //
+      // Instance IDはマニフェストごとに一意であり、改ざんがあれば署名検証で
+      // 検出されるため、信頼できるIssuerの場合のみ安全に使用可能です。
+      // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      if (!dataHash) {
+        // Issuerが信頼できるかチェック (スペック定義またはグローバル信頼リスト)
+        const isTrusted = appliedSpec?.isTrustedIssuer || isTrustedIssuer;
+
+        if (isTrusted) {
+          console.warn('⚠️ No explicit Data Hash assertion found, but Issuer is Trusted.');
+          console.log('💡 Using Instance ID as a fallback identifier for this file.');
+
+          // Instance IDから 'urn:uuid:' プレフィックスを除去してUUIDを抽出
+          const uuid = manifest.instanceId.replace('urn:uuid:', '');
+
+          // 'iid_' プレフィックスでInstance ID由来であることを明示
+          dataHash = `iid_${uuid}`;
+
+          console.log(`✅ Using Instance ID as dataHash: ${dataHash}`);
+        }
+      }
+
+      // 最終検証: ハッシュが抽出できず、かつIssuerも信頼できない場合
+      if (!dataHash) {
+        console.warn(`⛔ Validation Failed: No Data Hash and Issuer not trusted.`);
+      }
     } else {
-        console.warn(`⛔ No matching hash spec found for Issuer: "${issuerName}". This issuer is NOT trusted for hash extraction by RootLens.`);
+      console.warn(`⛔ No matching hash spec found for Issuer: "${issuerName}". This issuer is NOT trusted for hash extraction by RootLens.`);
     }
   }
-
-  // Issuerが信頼できるかどうかの判定 (hash-specs.tsから取得)
-  const trustedIssuerNames = getTrustedIssuerNames();
-  const issuer = signatureInfo.issuer || '';
-  const isTrustedIssuer = trustedIssuerNames.some(trusted => issuer.includes(trusted));
 
   return {
     label: manifest.label,
