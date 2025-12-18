@@ -207,6 +207,16 @@ Arweave (Proof Data) ←→ cNFT (Ownership)
 → Hijacking is impossible
 ```
 
+**Real Example on Devnet:**
+
+- **Arweave Proof**: [4rQquUFx1NQsogG82WXkNBXpW8tahuRBVyc1NwM9jGcQ](https://devnet.irys.xyz/4rQquUFx1NQsogG82WXkNBXpW8tahuRBVyc1NwM9jGcQ)
+  - Contains `target_asset_id`: `2XPSV8iGSUYRuv2ggGtXCDZ7z9uP2pGVVohNWfbQxDLx`
+
+- **Solana cNFT**: [2XPSV8iGSUYRuv2ggGtXCDZ7z9uP2pGVVohNWfbQxDLx](https://orb.helius.dev/address/2XPSV8iGSUYRuv2ggGtXCDZ7z9uP2pGVVohNWfbQxDLx?cluster=devnet)
+  - Metadata URI points to: `https://devnet.irys.xyz/4rQquUFx...`
+
+→ Both records reference each other, creating immutable mutual proof
+
 ---
 
 ## 💰 Cost Efficiency: How Much Does It Cost Per Image?
@@ -242,7 +252,7 @@ One of RootLens's key advantages is its **exceptional cost efficiency** for perm
 
 **Smart Hybrid Approach:**
 1. **Arweave** stores **immutable proof metadata** (~2KB JSON):
-   - original_hash, root_signer, claim_generator, created_at
+   - original_hash, root_signer, claim_generator, source_type, created_at
    - Target cNFT address (mutual linking)
    - Thumbnail URL reference
 
