@@ -423,7 +423,7 @@
           "burnedDesc": "The ownership token (cNFT) of this content has been destroyed.",
           "rootLensStructure": "Structure of Authenticity Assurance in RootLens",
           "content": "CONTENT",
-          "contentDesc": "File Content (Tamper Detection)\nGuarantees that image pixels and metadata have not been changed by C2PA digital signature. (Verifiable by external tools)",
+          "contentDesc": "File Content (Tamper Detection)\nGuarantees that image pixels and metadata have not been changed by C2PA digital signature.",
           "ownership": "OWNERSHIP",
           "ownershipDesc": "File Ownership (Asset Proof)\nLinks to NFT on Solana blockchain using file hash value as key. Guarantees 'who is the owner of this file'.",
           "section4": "4. Robust Ownership Proof (Mutual Link)",
