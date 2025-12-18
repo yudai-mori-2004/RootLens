@@ -1142,7 +1142,7 @@ ${debugData.sourceType}
                   <Button
                     asChild
                     size="lg"
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all rounded-xl h-12 sm:h-14"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5 rounded-full h-12 sm:h-14"
                   >
                     <Link href={`/asset/${uploadResult.hash}`} className="flex items-center justify-center gap-2 w-full h-full">
                       <ExternalLink className="w-5 h-5" />
@@ -1153,7 +1153,7 @@ ${debugData.sourceType}
                     onClick={() => window.location.reload()}
                     variant="outline"
                     size="lg"
-                    className="flex-1 border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl h-12 sm:h-14"
+                    className="flex-1 border-slate-200 hover:bg-slate-50 text-slate-600 rounded-full h-12 sm:h-14 transition-all hover:-translate-y-0.5"
                   >
                     {t('complete.uploadMore')}
                   </Button>
