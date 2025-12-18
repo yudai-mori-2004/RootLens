@@ -60,7 +60,7 @@ export default function SpecsPage() {
                           {typeof spec.matcher === 'string' ? spec.matcher : spec.matcher.source}
                         </TableCell>
                         <TableCell className="px-6 py-4 whitespace-nowrap text-sm text-indigo-600 font-mono">
-                          {spec.targetLabel}
+                          {spec.targetLabels.join(', ')}
                         </TableCell>
                         <TableCell className="px-6 py-4 text-sm text-gray-600">
                           {spec.description}
