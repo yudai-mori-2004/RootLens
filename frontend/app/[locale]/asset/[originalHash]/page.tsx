@@ -518,7 +518,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
   }
 
   // Explorer URL設定
-  const arweaveExplorer = process.env.NEXT_PUBLIC_ARWEAVE_EXPLORER_URL || 'https://viewblock.io/arweave/tx';
+  const arweaveExplorer = process.env.NEXT_PUBLIC_ARWEAVE_EXPLORER_URL || 'https://viewblock.io/arweave/';
   const solanaExplorer = process.env.NEXT_PUBLIC_SOLANA_EXPLORER_URL || 'https://orb.helius.dev/address';
 
   return (

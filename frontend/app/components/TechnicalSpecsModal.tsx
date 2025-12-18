@@ -1,5 +1,6 @@
 'use client';
 
+import { getSourceTypeLabel } from '@/app/lib/c2pa-parser';
 import { C2PASummaryData } from '@/app/lib/c2pa-parser';
 import {
   Dialog,
@@ -59,6 +60,13 @@ export default function TechnicalSpecsModal({
 }: TechnicalSpecsModalProps) {
   const t = useTranslations('components.technicalSpecsModal');
   const manifest = c2paSummary.activeManifest;
+
+  // Prepare data for the detailed validity message
+  const issuer = manifest?.signatureInfo.issuer || 'Unknown';
+  const claimGenerator = manifest?.claimGenerator || 'Unknown';
+  const sourceType = c2paSummary.sourceType;
+  const { label: sourceTypeLabel, isHardware } = getSourceTypeLabel(sourceType);
+  const isTrustedActiveIssuer = c2paSummary.activeManifest?.isTrustedIssuer || false;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -172,41 +180,62 @@ export default function TechnicalSpecsModal({
                         </p>
 
                         <div className="bg-slate-50/80 p-6 rounded-xl border border-slate-200">
-                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">{t('checkPoint')}</p>
-                            <ul className="space-y-4 text-slate-700">
-                                <li className="flex items-start gap-3">
-                                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                                    <div>
-                                        <div className="font-bold text-slate-900 mb-1">{t('validity')}</div>
-                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium ${
-                                            c2paSummary.validationStatus.isValid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                        }`}>
-                                            {t('validMsg', { status: c2paSummary.validationStatus.isValid ? 'Valid' : 'Invalid' })}
-                                        </span>
-                                    </div>
-                                </li>
+                            <div className="flex items-center justify-between mb-4">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t('checkPoint')}</p>
+                                <span className="text-[10px] sm:text-xs text-slate-400 font-medium bg-slate-100 px-2 py-1 rounded-full border border-slate-200">
+                                    {t('refOldest')}
+                                </span>
+                            </div>
+
+                            <ul className="space-y-4 text-slate-700 mb-6">
+                                {/* 1. Signer */}
                                 <li className="flex items-start gap-3">
                                     <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
                                     <div className="w-full">
-                                        <div className="font-bold text-slate-900 mb-1">{t('signer')}</div>
+                                        <div className="font-bold text-slate-900 mb-1">{t('checkPointSigner')}</div>
                                         <div className="bg-white p-2 rounded border border-slate-200 text-sm font-mono text-slate-600 break-all">
-                                            {manifest?.signatureInfo.issuer || 'Unknown'}
+                                            {issuer}
                                         </div>
                                     </div>
                                 </li>
+
+                                {/* 2. Generator */}
                                 <li className="flex items-start gap-3">
                                     <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
-                                    <div>
-                                        <div className="font-bold text-slate-900 mb-1">{t('date')}</div>
-                                        <div className="text-slate-700">
-                                            {manifest?.signatureInfo.time
-                                                ? new Date(manifest.signatureInfo.time).toLocaleString()
-                                                : t('unknown')
-                                            }
+                                    <div className="w-full">
+                                        <div className="font-bold text-slate-900 mb-1">{t('checkPointGenerator')}</div>
+                                        <div className="bg-white p-2 rounded border border-slate-200 text-sm font-mono text-slate-600 break-all">
+                                            {claimGenerator}
+                                        </div>
+                                    </div>
+                                </li>
+
+                                {/* 3. Source Type */}
+                                <li className="flex items-start gap-3">
+                                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+                                    <div className="w-full">
+                                        <div className="font-bold text-slate-900 mb-1">{t('checkPointSource')}</div>
+                                        <div className="bg-white p-2 rounded border border-slate-200 text-sm font-mono text-slate-600 break-all">
+                                            {sourceTypeLabel}
                                         </div>
                                     </div>
                                 </li>
                             </ul>
+
+                            {/* Judgement Conclusion */}
+                            <div className={`p-4 rounded-lg border ${
+                                isHardware ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'
+                            }`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <CheckCircle className={`w-5 h-5 ${isHardware ? 'text-green-600' : 'text-slate-500'}`} />
+                                    <span className={`font-bold ${isHardware ? 'text-green-900' : 'text-slate-700'}`}>
+                                        {t('judgement')}
+                                    </span>
+                                </div>
+                                <p className={`text-sm leading-relaxed ${isHardware ? 'text-green-800' : 'text-slate-600'}`}>
+                                    {t('judgementDesc', { status: isHardware ? t('hardwareDerived') : t('notHardwareDerived') })}
+                                </p>
+                            </div>
                         </div>
 
                         <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 flex gap-4 items-start">
@@ -320,8 +349,7 @@ export default function TechnicalSpecsModal({
                         </p>
 
                         <div className="grid grid-cols-1 gap-6">
-                            {/* 1. アンカーとしてのハッシュ値 */}
-                            <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                            <div className="flex flex-col gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">1</div>
                                 <div className="space-y-2 min-w-0 flex-1">
                                     <p className="font-bold text-slate-900">{t('bindingHash')}</p>
@@ -337,10 +365,10 @@ export default function TechnicalSpecsModal({
                             </div>
 
                             {/* 2. Arweave（登録簿） */}
-                            <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                            <div className="flex flex-col gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">2</div>
                                 <div className="space-y-2 min-w-0 flex-1">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div className="flex flex-col gap-2">
                                         <p className="font-bold text-slate-900">{t('arweave')}</p>
                                         <a
                                             href={`https://devnet.irys.xyz/${arweaveTxId}`}
@@ -363,10 +391,10 @@ export default function TechnicalSpecsModal({
                             </div>
 
                             {/* 3. Solana（所有権） */}
-                            <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                            <div className="flex flex-col gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">3</div>
                                 <div className="space-y-2 min-w-0 flex-1">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div className="flex flex-col gap-2">
                                         <p className="font-bold text-slate-900">{t('solana')}</p>
                                         {isBurned ? (
                                             <span className="bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">
@@ -404,17 +432,17 @@ export default function TechnicalSpecsModal({
                                 <CheckCircle className="w-5 h-5 text-green-600" /> {t('rootLensStructure')}
                             </p>
                             <ul className="space-y-3 ml-1">
-                                <li className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 text-sm text-green-800">
+                                <li className="flex flex-col gap-2 text-sm text-green-800">
                                     <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5 w-fit">{t('content')}</span>
-                                    <span>
+                                    <span className="whitespace-pre-wrap">
                                         {t.rich('contentDesc', {
                                             strong: (chunks) => <strong>{chunks}</strong>
                                         })}
                                     </span>
                                 </li>
-                                <li className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 text-sm text-green-800">
+                                <li className="flex flex-col gap-2 text-sm text-green-800">
                                     <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5 w-fit">{t('ownership')}</span>
-                                    <span>
+                                    <span className="whitespace-pre-wrap">
                                         {t.rich('ownershipDesc', {
                                             strong: (chunks) => <strong>{chunks}</strong>
                                         })}
