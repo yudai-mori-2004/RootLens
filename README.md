@@ -428,7 +428,7 @@ Arweave (Proof Data) ←→ cNFT (Ownership)
 ### 1. No Worker-Side C2PA Re-Verification
 
 **Current State**:
-- Worker trusts `rootSigner`/`rootCertChain` sent from frontend
+- Worker trusts `rootSigner`/`claimGenerator`/`sourceType` sent from frontend
 - Attackers could directly call `/api/upload` with fake data
 - RootLens display would be fooled (but forgery detected after download with c2pa.read())
 

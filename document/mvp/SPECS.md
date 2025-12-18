@@ -231,7 +231,8 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
   "attributes": [
     { "trait_type": "original_hash", "value": "abc123ef..." },
     { "trait_type": "root_signer", "value": "Google LLC" },
-    { "trait_type": "root_cert_chain", "value": "Base64エンコードされた証明書チェーン" },
+    { "trait_type": "claim_generator", "value": "Google C2PA SDK for Android 8.4" },
+    { "trait_type": "source_type", "value": "hardwareSigned" },
     { "trait_type": "created_at", "value": "2025-01-15T12:00:00Z" }
   ]
 }
@@ -248,8 +249,9 @@ RootLensは2つの技術を組み合わせていますが、それぞれの役�
 | `image` | サムネイル公開URL | 100 bytes | R2 Public Bucketへのリンク |
 | `target_asset_id` | cNFTアドレス | 44 bytes | 相互リンク検証 |
 | `original_hash` | 元ファイルのSHA-256 | 64 bytes | ファイル識別 |
-| `root_signer` | Root CA名 | 50-100 bytes | 署名者表示・検索 |
-| `root_cert_chain` | 証明書チェーン(Base64) | 1-3 KB | 参照用(実際の検証は元ファイルで行う) |
+| `root_signer` | Root署名者名 | 50-100 bytes | 署名者表示・検証 |
+| `claim_generator` | C2PA生成ツール名 | 50-100 bytes | デバイス/SDK識別 |
+| `source_type` | ソースタイプ | 20 bytes | hardwareSigned/cameraSoftware等 |
 | `created_at` | タイムスタンプ | 30 bytes | 発行日時 |
 
 **特徴:**
@@ -487,7 +489,7 @@ CREATE TABLE feature_vectors (
 ### 1. Worker側でのC2PA再検証なし
 
 **現状**:
-- フロントエンドから送信される `rootSigner`/`rootCertChain` をそのまま信頼
+- フロントエンドから送信される `rootSigner`/`claimGenerator`/`sourceType` をそのまま信頼
 - 攻撃者が `/api/upload` を直接叩くことで偽装が可能
 - RootLens上の表示は騙される（ダウンロード後のc2pa.read()では偽造が発覚）
 
@@ -546,8 +548,9 @@ CREATE TABLE feature_vectors (
 │  │   ・signatureInfo.issuer が "Google LLC" に一致              │
 │  │   ・targetLabel: "c2pa.hash.data.part"                      │
 │  │   ・他デバイス(Sony, Leica等)は動作確認後に順次有効化        │
-│  ├─ root_signer(CA名)を抽出                                   │
-│  ├─ 証明書チェーン(cert_chain)をBase64エンコード               │
+│  ├─ root_signer(署名者名)を抽出                               │
+│  ├─ claim_generator(SDK/デバイス名)を抽出                     │
+│  ├─ source_type(ソースタイプ)を判定                           │
 │  ├─ サムネイルをData URIに変換                                  │
 │  └─ 検証失敗 → エラー表示、アップロード不可                       │
 │                                                                 │
@@ -606,7 +609,8 @@ CREATE TABLE feature_vectors (
 │  │   - userWallet                                              │
 │  │   - originalHash                                            │
 │  │   - rootSigner  ⚠️ Worker側で未再検証                       │
-│  │   - rootCertChain  ⚠️ Worker側で未再検証                    │
+│  │   - claimGenerator  ⚠️ Worker側で未再検証                   │
+│  │   - sourceType  ⚠️ Worker側で未再検証                       │
 │  │   - mediaFilePath                                           │
 │  │   - thumbnailPublicUrl                                      │
 │  │   - price, title, description                               │
@@ -631,7 +635,8 @@ CREATE TABLE feature_vectors (
         │  ├─ 証明参照データJSONを作成:                            │
         │  │   - target_asset_id: 予測したcNFTアドレス            │
         │  │   - image: サムネイル公開URL(R2)                   │
-        │  │   - attributes: ハッシュ、署名者、証明書チェーン等    │
+        │  │   - attributes: original_hash, root_signer,         │
+        │  │     claim_generator, source_type, created_at       │
         │  │      ⚠️ フロントエンドからの値をそのまま使用         │
         │  └─ umi.uploader.uploadJson()                           │
         │                                                         │

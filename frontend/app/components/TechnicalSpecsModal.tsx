@@ -7,8 +7,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from '@/components/ui/dialog';
-import { Shield, CheckCircle, XCircle, Search, FileCode, Fingerprint, Lock, Link as LinkIcon, BookOpen, Eye, AlertCircle, HelpCircle, Camera, Sparkles, Check, Activity, Database, ExternalLink } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, Search, FileCode, Fingerprint, Lock, Link as LinkIcon, BookOpen, Eye, AlertCircle, HelpCircle, Camera, Sparkles, Check, Activity, Database, ExternalLink, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   Accordion,
@@ -61,18 +62,24 @@ export default function TechnicalSpecsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] p-0 bg-white shadow-2xl rounded-xl sm:rounded-2xl flex flex-col overflow-hidden border border-slate-100 gap-0">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] p-0 bg-white shadow-2xl rounded-xl sm:rounded-2xl flex flex-col overflow-hidden border border-slate-100 gap-0" showCloseButton={false}>
         
         {/* ヘッダー (固定) */}
         <div className="bg-white border-b border-slate-100 px-6 py-5 shrink-0 z-10 sticky top-0">
             <DialogHeader className="text-left">
-                <div className="flex items-center gap-3">
-                    <div className="bg-indigo-50 rounded-xl border border-indigo-100 shrink-0">
-                        <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-indigo-50 rounded-xl border border-indigo-100 shrink-0">
+                            <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
+                        </div>
+                        <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                            {t('title')}
+                        </DialogTitle>
                     </div>
-                    <DialogTitle className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                        {t('title')}
-                    </DialogTitle>
+                    <DialogClose className="rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-slate-100 data-[state=open]:text-slate-500 dark:ring-offset-slate-950 dark:focus:ring-slate-300 dark:data-[state=open]:bg-slate-800 dark:data-[state=open]:text-slate-400">
+                        <X className="h-5 w-5" />
+                        <span className="sr-only">Close</span>
+                    </DialogClose>
                 </div>
             </DialogHeader>
         </div>
@@ -333,15 +340,15 @@ export default function TechnicalSpecsModal({
                             <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">2</div>
                                 <div className="space-y-2 min-w-0 flex-1">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                         <p className="font-bold text-slate-900">{t('arweave')}</p>
-                                        <a 
-                                            href={`https://devnet.irys.xyz/tx/${arweaveTxId}`}
+                                        <a
+                                            href={`https://devnet.irys.xyz/${arweaveTxId}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-xs text-blue-600 hover:underline flex items-center gap-1"
                                         >
-                                            View on Explorer <ExternalLink className="w-3 h-3" />
+                                            View JSON <ExternalLink className="w-3 h-3" />
                                         </a>
                                     </div>
                                     <div className="bg-white rounded-lg p-3 border border-slate-200">
@@ -359,20 +366,20 @@ export default function TechnicalSpecsModal({
                             <div className="flex flex-col sm:flex-row gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-200 text-slate-600 font-bold shrink-0">3</div>
                                 <div className="space-y-2 min-w-0 flex-1">
-                                    <div className="flex items-center justify-between gap-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                         <p className="font-bold text-slate-900">{t('solana')}</p>
                                         {isBurned ? (
                                             <span className="bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded font-bold whitespace-nowrap">
                                                 {t('burned')}
                                             </span>
                                         ) : (
-                                            <a 
+                                            <a
                                                 href={`https://orb.helius.dev/address/${cnftMintAddress}?cluster=devnet`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-xs text-blue-600 hover:underline flex items-center gap-1"
                                             >
-                                                View on Solscan <ExternalLink className="w-3 h-3" />
+                                                View on Helius <ExternalLink className="w-3 h-3" />
                                             </a>
                                         )}
                                     </div>
@@ -397,16 +404,16 @@ export default function TechnicalSpecsModal({
                                 <CheckCircle className="w-5 h-5 text-green-600" /> {t('rootLensStructure')}
                             </p>
                             <ul className="space-y-3 ml-1">
-                                <li className="flex items-start gap-3 text-sm text-green-800">
-                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5">{t('content')}</span>
+                                <li className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 text-sm text-green-800">
+                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5 w-fit">{t('content')}</span>
                                     <span>
                                         {t.rich('contentDesc', {
                                             strong: (chunks) => <strong>{chunks}</strong>
                                         })}
                                     </span>
                                 </li>
-                                <li className="flex items-start gap-3 text-sm text-green-800">
-                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5">{t('ownership')}</span>
+                                <li className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 text-sm text-green-800">
+                                    <span className="bg-green-200 text-green-800 text-xs font-bold px-2 py-0.5 rounded mt-0.5 w-fit">{t('ownership')}</span>
                                     <span>
                                         {t.rich('ownershipDesc', {
                                             strong: (chunks) => <strong>{chunks}</strong>
