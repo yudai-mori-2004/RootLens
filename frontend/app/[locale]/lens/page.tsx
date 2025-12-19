@@ -181,10 +181,7 @@ export default function LensPage() {
           return;
         }
 
-        // ⚠️ 重要: アップロード時と完全に同じ設定にする
-        // lens-workerのキャプション生成は画像のピクセル値に依存するため、
-        // サイズや圧縮率が異なると同一画像でも異なるキャプション→異なるembeddingになる
-        const MAX_SIZE = 512; // upload/page.tsxと統一
+        const MAX_SIZE = 512;
         let width = img.width;
         let height = img.height;
 
@@ -213,7 +210,7 @@ export default function LensPage() {
             }
           },
           'image/jpeg',
-          0.8 // upload/page.tsxと統一
+          0.8
         );
       };
       img.onerror = (error) => reject(error);

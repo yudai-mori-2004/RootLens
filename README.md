@@ -93,7 +93,7 @@ RootLens requires **C2PA hardware signatures** for all uploads. This technology 
 - Most people don't have compatible devices yet
 
 **Solution**: We've prepared **sample images with C2PA signatures** in Google Drive:
-- [Sample Images Link] ← Please download from here
+- [[Sample Images Link](https://drive.google.com/drive/folders/1kGeYKn7g8zuOpqfZJXkmI4iRexAkjvc3?usp=sharing)] ← Please download from here
 
 **⚠️ Important**: Once an image is uploaded, it **cannot be uploaded again** (duplicate hash detection). You may encounter failures due to duplicates. We apologize for the inconvenience.
 
@@ -126,7 +126,7 @@ Since this is an MVP, we only created **one Merkle Tree**:
 4. **Access RootLens from Phantom Browser**
    - Open Phantom app
    - Use the built-in browser
-   - Navigate to: [Your Demo URL]
+   - Navigate to: [https://www.rootlens.io](https://www.rootlens.io/)
 
 #### For Desktop Users
 
@@ -143,7 +143,7 @@ Since this is an MVP, we only created **one Merkle Tree**:
    - Request airdrop to your wallet
 
 4. **Access the App**
-   - Navigate to: [Your Demo URL]
+   - Navigate to: [https://www.rootlens.io](https://www.rootlens.io/)
    - Connect your Phantom wallet
 
 ### What You Can Try
@@ -519,14 +519,14 @@ A: cNFT (compressed NFT) technology enables mass minting at low cost. For a mode
 ## 📞 Contact
 
 For questions about this submission:
-- GitHub Issues: [Your Repo]
-- Demo Site: [Your Demo URL]
+- GitHub: [github.com/yudai-mori-2004/RootLens](https://github.com/yudai-mori-2004/RootLens)
+- Demo Site: [rootlens.io](https://www.rootlens.io/)
 
 ---
 
 ## 📜 License
 
-[Your License]
+MIT License - see [LICENSE](./LICENSE) file for details
 
 ---
 
