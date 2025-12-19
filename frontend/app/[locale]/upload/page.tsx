@@ -952,7 +952,7 @@ ${debugData.sourceType}
               setPrivacyAcknowledged(false);
             }}
             onNext={handlePrivacyNext}
-            nextLabel="次へ: 価格設定"
+            nextLabel={t('verify.success.nextLabel')}
             nextDisabled={!privacyAcknowledged || !validationResult.isValid}
           >
             {validationResult.isValid && (

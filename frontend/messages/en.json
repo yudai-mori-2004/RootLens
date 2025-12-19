@@ -227,7 +227,8 @@
             "desc": "Digital signature from capture device confirmed.\nThis content is proven not to be 'AI Generated' or 'Tampered'.",
             "rootIssuer": "Root Issuer",
             "nextTitle": "Assetize and Publish Content",
-            "nextDesc": "Create a page visualizing C2PA provenance and\npublish this content to the world as a trusted digital asset."
+            "nextDesc": "Create a page visualizing C2PA provenance and\npublish this content to the world as a trusted digital asset.",
+            "nextLabel": "Next: Pricing & Info"
         },
         "error": {
             "title": "Verification Failed"

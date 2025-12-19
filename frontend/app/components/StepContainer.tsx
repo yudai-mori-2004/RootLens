@@ -3,6 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTranslations } from 'next-intl';
+import { Loader2, ArrowRight } from 'lucide-react';
 
 interface StepContainerProps {
   title: React.ReactNode;
@@ -50,16 +51,21 @@ export default function StepContainer({
           )}
 
           {onNext && (
-            <Button onClick={onNext} disabled={nextDisabled || isLoading} size="lg">
+            <Button
+              onClick={onNext}
+              disabled={nextDisabled || isLoading}
+              size="lg"
+              className="rounded-full shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+            >
               {isLoading ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   <span>{t('processing')}</span>
                 </>
               ) : (
                 <>
                   <span>{finalNextLabel}</span>
-                  <span className="ml-2">→</span>
+                  <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}
             </Button>
