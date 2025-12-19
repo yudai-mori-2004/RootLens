@@ -4,6 +4,10 @@
 
 **RootLens** is a platform that combines C2PA hardware signatures with blockchain technology to redefine and protect the value of "reality" in the AI era.
 
+## 🎬 Demo Video
+
+**Watch the 3-minute pitch:** [RootLens | Proof of Reality Marketplace on Solana](https://youtu.be/d0EfjTB6ceM)
+
 ---
 
 ## 🎯 One-Liner
