@@ -28,8 +28,8 @@
     "hero": {
       "badge": "Proof of Reality, Ownership on Chain.",
       "title": {
-        "prefix": "「本物」を、",
-        "suffix": "あなたの『デジタル資産』に。"
+        "prefix": "現実を、撮って、",
+        "suffix": "所有する。"
       },
       "description": "AIが何でも生成できる時代、本当の価値は「実際にそこにいた人の記録」に宿る。ハードウェア署名で真実を証明し、ブロックチェーンで資産として所有・取引できる新しいマーケットプレイス。",
       "buttons": {
