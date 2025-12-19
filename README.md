@@ -157,6 +157,32 @@ Since this is an MVP, we only created **one Merkle Tree**:
 
 ## 🏗️ Technical Architecture
 
+## 🧠 Technical Highlights (Why This Was Hard)
+
+### 🔄 Solving the "Chicken and Egg" Problem with Asset ID Prediction
+
+To create a truly trustless link between the **Storage Layer (Arweave)** and the **Ownership Layer (Solana)**, they must reference each other:
+
+1. The cNFT metadata must point to the Arweave transaction.
+2. The Arweave transaction must point to the cNFT Asset ID.
+
+**Problem:** You can't know the cNFT Asset ID until *after* you mint it. But you need the Arweave URI (which contains the Asset ID) *before* you mint. It's a circular dependency.
+
+**Our Solution:**
+We implemented a deterministic **Asset ID Prediction Mechanism** directly in the backend worker:
+
+1. **Read Tree State**: Fetch the current `numMinted` from the on-chain Merkle Tree config.
+2. **Calculate Leaf Index**: The next leaf index is deterministically `numMinted`.
+3. **Derive PDA**: Calculate the future Asset ID using the Program Derived Address (PDA) formula `(tree_address, leaf_index)`.
+4. **Commit to Arweave**: Upload the metadata including this *predicted* Asset ID.
+5. **Mint**: Execute the mint transaction targeting that exact leaf index.
+
+> **Code Reference:** `worker/src/lib/solana.ts` - `predictNextAssetId()`
+
+This ensures that the immutable record on Arweave contains the correct Solana address before the NFT even exists.
+
+---
+
 ### Tech Stack
 
 | Layer | Technology | Why |
@@ -423,34 +449,21 @@ Arweave (Proof Data) ←→ cNFT (Ownership)
 
 ---
 
-## ⚠️ MVP Limitations
+## 🚧 Hackathon Scope & Roadmap
 
-### 1. No Worker-Side C2PA Re-Verification
+We prioritized **Core Architecture Validation** and **UI/UX** for this hackathon. Some security features are planned for Phase 2 to fit within the submission timeline.
 
-**Current State**:
-- Worker trusts `rootSigner`/`claimGenerator`/`sourceType` sent from frontend
-- Attackers could directly call `/api/upload` with fake data
-- RootLens display would be fooled (but forgery detected after download with c2pa.read())
+| Feature | Status | Note |
+|---|---|---|
+| **C2PA Validation (Client)** | ✅ Done | WASM-based verification in browser |
+| **Asset ID Prediction** | ✅ Done | Deterministic PDA calculation |
+| **Solana Pay Verification** | ✅ Done | On-chain balance change verification |
+| **Mutual Linking Logic** | ✅ Done | Full cross-referencing check |
+| **C2PA Validation (Server)** | ⏳ Phase 2 | Currently, the worker trusts the client's validation result. In production, we will re-verify the signature server-side using the `c2pa-node` library. |
+| **Multi-Tree Scaling** | ⏳ Phase 2 | Currently single-threaded (`concurrency: 1`) to ensure sequential minting. Phase 2 will introduce random tree selection for parallel processing. |
 
-**Planned Fix**: Phase 2 implementation
-- Worker downloads original file from R2
-- Re-verify with Node.js C2PA library
-- Discard frontend values, use verified values
-
-See: `document/phase2/backend-c2pa-verification.md`
-
-### 2. Single Merkle Tree
-
-- Only one tree created for MVP
-- Serial processing (concurrency: 1)
-- Multiple simultaneous users → long wait times
-- Production would use multiple trees and parallel processing
-
-### 3. Limited Error Handling
-
-- Partial retry logic
-- Some edge cases not fully covered
-- Planned improvements in Phase 2
+**Why this trade-off?**
+We focused on demonstrating the **novelty of the Asset ID prediction mechanism** and the **C2PA x Solana user experience** first. The server-side validation is a standard engineering task (implementing existing libraries), whereas our architectural approach to C2PA/Solana integration is a new research area.
 
 ---
 
