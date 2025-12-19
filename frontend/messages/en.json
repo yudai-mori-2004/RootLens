@@ -31,7 +31,7 @@
         "prefix": "Turn 'Real' into",
         "suffix": "Your Digital Asset"
       },
-      "description": "In an era flooded with AI-generated content. A next-generation marketplace that proves 'reality' with C2PA hardware signatures and establishes unique 'digital ownership' and 'liquidity' on the blockchain.",
+      "description": "In a world of infinite AI generation, human witness becomes the ultimate scarcity. A marketplace where proof of reality is verified by hardware signatures and owned as digital assets on blockchain.",
       "buttons": {
         "upload": "Upload with Proof",
         "search": "Search Content"
@@ -40,7 +40,7 @@
     "why": {
       "title": "The 'Crisis of Trust' in the AI Era and\nthe Fading 'Value of Reality'",
       "p1": "In 2024, the explosive spread of generative AI has made it possible for anyone to create 'lifelike' images in seconds. However, this has caused a serious problem: 'indistinguishability between reality and AI'.",
-      "p2": "Ironically, what is now becoming most valuable is 'unprocessed reality truly captured by a camera'.",
+      "p2": "In a world of infinite generation, human witness becomes the ultimate scarcity. Reality captured by those who were actually there holds irreplaceable value.",
       "p3": "RootLens combines hardware signatures from C2PA-compliant cameras with blockchain to properly evaluate and monetize this 'value of reality'.",
       "aiImage": {
         "title": "AI Generated Image",
@@ -174,7 +174,7 @@
         }
     },
     "cta": {
-        "title": "Proof of Reality, as Your Asset.",
+        "title": "Don't Just Capture Reality. Own It.",
         "subtitle": "Start now with 0% fees.",
         "button": "Start Upload",
         "builtWith": "© 2025 RootLens. Built with C2PA, Arweave, and Solana."
