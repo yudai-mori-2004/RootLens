@@ -21,8 +21,8 @@ export function generateStaticParams() {
 
 export function generateMetadata() {
   return {
-    title: "RootLens - Decentralized Content Provenance",
-    description: "Verify and protect content authenticity with blockchain and C2PA",
+    title: "RootLens - Proof of Reality, Ownership on Chain",
+    description: "In an age of AI-generated everything, proof of reality becomes valuable. Verify, own, and trade authentic content captured by real cameras.",
   };
 }
 
