@@ -451,6 +451,8 @@ ${debugData.sourceType}
           return;
         }
 
+        // ⚠️ 重要: lens/page.tsxと完全に統一すること
+        // AIキャプション生成の再現性のため、サイズと品質を固定
         const MAX_SIZE = 512;
         let width = img.width;
         let height = img.height;
@@ -480,7 +482,7 @@ ${debugData.sourceType}
             }
           },
           'image/jpeg',
-          0.8
+          0.8 // ⚠️ lens/page.tsxと統一（変更厳禁）
         );
       };
       img.onerror = (error) => reject(error);
