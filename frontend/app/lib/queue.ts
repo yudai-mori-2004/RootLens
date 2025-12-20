@@ -36,21 +36,39 @@ const createRedisConnection = () => {
 };
 
 
+// シングルトンパターンでQueueインスタンスを管理（Next.jsホットリロード対策）
+// グローバル変数を使用してインスタンスを永続化
+declare global {
+  var __mintQueue: Queue | undefined;
+  var __redisConnection: IORedis | undefined;
+}
+
+function getQueue() {
+  if (!global.__mintQueue) {
+    console.log('🆕 Creating new Queue instance...');
+    global.__redisConnection = createRedisConnection();
+    global.__mintQueue = new Queue('rootlens-mint-queue', {
+      connection: global.__redisConnection,
+      defaultJobOptions: {
+        attempts: 3,                    // 最大3回リトライ
+        backoff: {
+          type: 'exponential',          // 指数バックオフ
+          delay: 2000,                  // 初回2秒待ち
+        },
+        removeOnComplete: {
+          age: 3600,                    // 完了後1時間で削除（Workerと統一）
+          count: 100,                   // 最大100件保持（Workerと統一）
+        },
+        removeOnFail: {
+          age: 86400,                   // 失敗後24時間保持（Workerと統一）
+        },
+      },
+    });
+  } else {
+    console.log('♻️  Reusing existing Queue instance');
+  }
+  return global.__mintQueue;
+}
+
 // Mintジョブ用のキュー
-export const mintQueue = new Queue('rootlens-mint-queue', {
-  connection: createRedisConnection(),
-  defaultJobOptions: {
-    attempts: 3,                    // 最大3回リトライ
-    backoff: {
-      type: 'exponential',          // 指数バックオフ
-      delay: 2000,                  // 初回2秒待ち
-    },
-    removeOnComplete: {
-      age: 24 * 3600,               // 完了後24時間で削除
-      count: 1000,                  // 最大1000件保持
-    },
-    removeOnFail: {
-      age: 7 * 24 * 3600,           // 失敗後7日間保持（調査用）
-    },
-  },
-});
+export const mintQueue = getQueue();
