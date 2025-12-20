@@ -505,11 +505,95 @@ We prioritized **Core Architecture Validation** and **UI/UX** for this hackathon
 | **Asset ID Prediction** | ✅ Done | Deterministic PDA calculation |
 | **Solana Pay Verification** | ✅ Done | On-chain balance change verification |
 | **Mutual Linking Logic** | ✅ Done | Full cross-referencing check |
-| **C2PA Validation (Server)** | ⏳ Phase 2 | Currently, the worker trusts the client's validation result. In production, we will re-verify the signature server-side using the `c2pa-node` library. |
+| **Server-Side C2PA + TEE** | ⏳ Phase 2 | Complete trustless execution: Server-side C2PA re-verification using `c2pa-node` + TEE-based worker execution (AWS Nitro Enclaves/Intel SGX) with cryptographic attestation. |
 | **Multi-Tree Scaling** | ⏳ Phase 2 | Currently single-threaded (`concurrency: 1`) to ensure sequential minting. Phase 2 will introduce random tree selection for parallel processing. |
 
 **Why this trade-off?**
 We focused on demonstrating the **novelty of the Asset ID prediction mechanism** and the **C2PA x Solana user experience** first. The server-side validation is a standard engineering task (implementing existing libraries), whereas our architectural approach to C2PA/Solana integration is a new research area.
+
+### 🔮 Phase 2 Vision: Complete Trustless Execution
+
+RootLens's goal is **complete trustless operation** from capture to verification.
+
+**Current Architecture Challenge:**
+- ✅ **Camera hardware** cryptographically proves image authenticity (C2PA)
+- ✅ **Post-mint verification** is fully trustless (anyone can verify on-chain)
+- ⚠️ **Upload process** requires trusting the server operator
+
+**Why Server-Side Minting is Architecturally Required:**
+
+RootLens's mutual linking design depends on **Asset ID prediction**, which requires:
+1. **Serial processing**: One mint at a time to read `numMinted` accurately
+2. **Deterministic ordering**: Predict → Upload to Arweave → Mint in sequence
+3. **Gas-free UX**: Server pays minting costs, users don't need SOL
+
+❌ **Client-side minting** would break this:
+- Users could mint in any order → prediction accuracy drops
+- Users would need SOL for gas fees → bad UX
+- Users would need to sign mint transactions → added friction
+
+✅ **Server-side minting is necessary**, but creates a trust assumption.
+
+**Phase 2 Solution: Server-Side C2PA Re-Verification + TEE Execution**
+
+Two-pronged approach to achieve trustless server operation:
+
+**1. Server-Side C2PA Re-Verification**
+- Worker downloads uploaded files from R2
+- Re-verifies C2PA signatures using `c2pa-node` library
+- Rejects uploads if server-side verification fails
+- Eliminates trust assumption for C2PA validation
+
+**2. Trusted Execution Environments (TEE)**
+
+Execute the worker code inside a **cryptographically isolated hardware environment**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  TEE (AWS Nitro Enclaves / Intel SGX / AMD SEV)             │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │  RootLens Worker (Public Code)                        │  │
+│  │  ├─ Download file from R2                             │  │
+│  │  ├─ C2PA verification (c2pa-node) ← Server-side       │  │
+│  │  ├─ Asset ID prediction                               │  │
+│  │  ├─ Arweave upload                                    │  │
+│  │  └─ cNFT mint                                         │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                                             │
+│  🔒 Code is cryptographically locked                        │
+│     Even the operator cannot modify it                      │
+│                                                             │
+│  📜 Attestation: "Running SHA256(code) = abc123..."         │
+│     → Anyone can verify the exact code being executed       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Benefits:**
+- **Trustless server operation**: Code integrity proven by hardware
+- **Same UX**: Users still don't sign anything or pay gas
+- **Same performance**: Serial processing maintained
+- **Verifiable**: Anyone can check the attestation and code hash
+
+**The Ultimate Vision:**
+
+> **"Camera hardware proves the image is real. Server hardware proves the minting is honest. End-to-end hardware trust."**
+
+This completes RootLens's "Hardware Trust" philosophy:
+- **MVP (Current)**: C2PA hardware signatures + trustless post-mint verification (✅ Done)
+- **Phase 2**: Server-side C2PA re-verification + TEE-based execution (⏳ ~2 months)
+
+**Why This Matters:**
+
+RootLens is built on the concept of **"Proof of Reality"** — trusting hardware over humans. Phase 2 extends this trust model to the server layer, creating a fully trustless system while maintaining the UX and architectural benefits of centralized processing.
+
+**Implementation Approach:**
+1. Add `c2pa-node` verification to worker (straightforward port of frontend logic)
+2. Migrate infrastructure to AWS EC2 Nitro-enabled instances
+3. Containerize worker for Enclave execution
+4. Implement Attestation API for public verification
+5. Integrate AWS KMS for secure key management
+
+📅 **Implementation Timeline**: ~2 months post-hackathon for production-ready trustless execution.
 
 ---
 
