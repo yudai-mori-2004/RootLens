@@ -671,10 +671,10 @@ ${debugData.sourceType}
       // 6. ジョブステータスをポーリング
       let completed = false;
       let attempts = 0;
-      const maxAttempts = 60; // 60秒タイムアウト
+      const maxAttempts = 40; // 120秒タイムアウト (3秒 × 40回)
 
       while (!completed && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Redisコマンド削減のため3秒に変更
 
         const statusResponse = await fetch(`/api/job-status/${jobId}`);
         if (!statusResponse.ok) {
