@@ -505,8 +505,9 @@ We prioritized **Core Architecture Validation** and **UI/UX** for this hackathon
 | **Asset ID Prediction** | ✅ Done | Deterministic PDA calculation |
 | **Solana Pay Verification** | ✅ Done | On-chain balance change verification |
 | **Mutual Linking Logic** | ✅ Done | Full cross-referencing check |
-| **Server-Side C2PA + TEE** | ⏳ Phase 2 | Complete trustless execution: Server-side C2PA re-verification using `c2pa-node` + TEE-based worker execution (AWS Nitro Enclaves/Intel SGX) with cryptographic attestation. |
+| **Server-Side C2PA Verification** | ⏳ Phase 2 | Add server-side C2PA re-verification using `c2pa-node` to prevent fraudulent uploads at the source. |
 | **Multi-Tree Scaling** | ⏳ Phase 2 | Currently single-threaded (`concurrency: 1`) to ensure sequential minting. Phase 2 will introduce random tree selection for parallel processing. |
+| **DoS Protection** | ⏳ Phase 2 | Subscription plans with Privy KYC-based rate limiting for free tier. |
 
 **Why this trade-off?**
 We focused on demonstrating the **novelty of the Asset ID prediction mechanism** and the **C2PA x Solana user experience** first. The server-side validation is a standard engineering task (implementing existing libraries), whereas our architectural approach to C2PA/Solana integration is a new research area.
