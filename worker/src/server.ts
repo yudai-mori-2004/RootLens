@@ -35,8 +35,32 @@ if (redisUrl.startsWith('rediss://')) {
 
 const connection = new IORedis(redisUrl, config);
 
-// Queue参照
-const queue = new Queue('rootlens-mint-queue', { connection });
+// Queue参照（ジョブ自動削除設定を追加）
+const queue = new Queue('rootlens-mint-queue', {
+  connection,
+  defaultJobOptions: {
+    removeOnComplete: {
+      age: 3600,  // 完了から1時間後に削除（デバッグ用に一定期間保持）
+      count: 100, // 最新100件のみ保持
+    },
+    removeOnFail: {
+      age: 86400, // 失敗から24時間後に削除（エラー調査のため長めに保持）
+    },
+  },
+});
+
+// 起動時に古いジョブをクリーンアップ（初回のみ実行）
+(async () => {
+  try {
+    console.log('🧹 Cleaning up old completed jobs...');
+    await queue.clean(3600 * 1000, 100, 'completed'); // 1時間以上前の完了ジョブを削除（最新100件は保持）
+    console.log('🧹 Cleaning up old failed jobs...');
+    await queue.clean(86400 * 1000, 0, 'failed');     // 24時間以上前の失敗ジョブを削除
+    console.log('✅ Cleanup complete!');
+  } catch (error) {
+    console.error('⚠️  Cleanup error:', error);
+  }
+})();
 
 // ヘルスチェック
 app.get('/health', (req, res) => {
