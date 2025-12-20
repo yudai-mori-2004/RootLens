@@ -8,6 +8,10 @@
 
 **Watch the 3-minute pitch:** [RootLens | Proof of Reality Marketplace on Solana](https://youtu.be/d0EfjTB6ceM)
 
+## 🐦 Follow Us
+
+**Stay updated:** [@RootLens_sol on X](https://x.com/RootLens_sol)
+
 ---
 
 ## 🎯 One-Liner
