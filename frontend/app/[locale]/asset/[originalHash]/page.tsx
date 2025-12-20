@@ -28,7 +28,6 @@ import {
   getIrysGatewayUrl,
   fetchArweaveMetadata,
   checkSolanaAssetExists,
-  fallbackToDatabase
 } from '@/app/lib/verification-helpers';
 import {
   CheckCircle,
@@ -244,7 +243,6 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         setError(null);
 
         let arweaveTxId: string = '';
-        let verificationSource: 'onchain' | 'db' = 'onchain';
         let targetAssetId: string | undefined;
         let cnftData: any = null;
         let currentOwner = '';
@@ -299,57 +297,15 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
             updateStep('db', 'success', t('verificationSteps.db.success'));
             updateStep('arweave', 'success', t('verificationSteps.arweave.success'));
             updateStep('cnft', 'success', t('verificationSteps.cnft.success'));
-            verificationSource = 'onchain';
           } else {
-            console.warn('Fallback to DB.');
-            const fallback = await fallbackToDatabase(originalHash);
-            if (!fallback) throw new Error(t('status.notFound'));
-
-            updateStep('db', 'success', t('verificationSteps.db.successDB'));
-            arweaveTxId = fallback.arweaveTxId;
-            arweaveData = fallback.arweaveData;
-            targetAssetId = fallback.targetAssetId;
-            verificationSource = 'db';
-            if (arweaveData) updateStep('arweave', 'success', t('verificationSteps.arweave.success'));
+            // Arweaveは見つかったが、Solana上の資産とリンクしていない場合
+            // DBフォールバックを削除したため、ここでエラーとする
+            throw new Error(t('status.notFound'));
           }
         } else {
-          console.warn('Fallback to DB.');
-          const fallback = await fallbackToDatabase(originalHash);
-          if (!fallback) throw new Error(t('status.notFound'));
-
-          updateStep('db', 'success', t('verificationSteps.db.successDB'));
-          arweaveTxId = fallback.arweaveTxId;
-          arweaveData = fallback.arweaveData;
-          targetAssetId = fallback.targetAssetId;
-          verificationSource = 'db';
-          if (arweaveData) updateStep('arweave', 'success', t('verificationSteps.arweave.success'));
-        }
-
-        if (verificationSource === 'db' && targetAssetId && !cnftData) {
-          updateStep('cnft', 'loading');
-          try {
-            const checkResult = await checkSolanaAssetExists(targetAssetId);
-            const result = checkResult as any;
-            cnftData = result;
-            if (result) {
-              isBurned = result.burnt === true;
-              if (result.ownership) {
-                if (isBurned) {
-                  lastOwnerBeforeBurn = result.ownership.owner;
-                  currentOwner = '';
-                } else {
-                  currentOwner = result.ownership.owner;
-                }
-              }
-              if (result.content?.json_uri) cnftUri = result.content.json_uri;
-              cnftExists = true;
-              updateStep('cnft', 'success', t('verificationSteps.cnft.success'));
-            } else {
-              updateStep('cnft', 'pending', t('verificationSteps.cnft.pending'));
-            }
-          } catch (e) {
-            updateStep('cnft', 'error', t('verificationSteps.cnft.error'));
-          }
+          // Arweaveに記録がない場合
+          // DBフォールバックを削除したため、ここでエラーとする
+          throw new Error(t('status.notFound'));
         }
 
         updateStep('crosslink', 'loading');
@@ -362,11 +318,7 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         if (crossLinkValid) {
           updateStep('crosslink', 'success', t('verificationSteps.crosslink.success'));
         } else {
-          if (verificationSource === 'db') {
-            updateStep('crosslink', 'pending', t('verificationSteps.crosslink.pending'));
-          } else {
-            updateStep('crosslink', 'error', t('verificationSteps.crosslink.error'));
-          }
+           updateStep('crosslink', 'error', t('verificationSteps.crosslink.error'));
         }
 
         updateStep('duplicate', 'loading');
@@ -419,7 +371,9 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
         const claimGeneratorAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'claim_generator');
         const sourceTypeAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'source_type');
         const createdAtAttr = (arweaveData as any).attributes.find((a: any) => a.trait_type === 'created_at');
-        const isValid = (verificationSource === 'db') ? true : (crossLinkValid && noDuplicates);
+        
+        // 検証ソースがDBの場合はtrueにするロジックを削除し、厳密にオンチェーン検証のみとする
+        const isValid = crossLinkValid && noDuplicates;
 
         interface DbProofInfo {
           id: string;

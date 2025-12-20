@@ -247,6 +247,48 @@ Arweave (Proof Data) ←→ cNFT (Ownership)
 
 → Both records reference each other, creating immutable mutual proof
 
+### ❓ FAQ: What If Asset ID Prediction Fails?
+
+**Q: "If the prediction is wrong or minting fails, won't that create broken links on Arweave?"**
+
+**A: No, the system is designed with resilience in mind.**
+
+Our verification logic uses a **"Search & Match"** approach, not a single-link dependency:
+
+1. **Multiple Records Allowed**: For a given image hash, there can be multiple Arweave records (due to retries, prediction mismatches, etc.)
+2. **Smart Verification**: When verifying, the system:
+   - Searches for *all* Arweave records matching the original hash
+   - Checks each record's `target_asset_id` against Solana
+   - Only accepts pairs where **both directions link correctly**
+3. **Ghost Records Ignored**: If prediction fails, the Arweave record becomes a "ghost" (points to non-existent cNFT) and is automatically ignored during verification
+
+**Example Scenario:**
+
+```
+User uploads image → Worker predicts Asset #100
+                   ↓
+Case 1 (Success):  Mint creates Asset #100 ✅
+                   → Mutual link valid → Verification passes
+
+Case 2 (Failure):  Mint creates Asset #101 instead ❌
+                   → Arweave points to #100 (doesn't exist)
+                   → This record is ignored
+
+User retries    →  New prediction: Asset #102
+                   → Mint creates Asset #102 ✅
+                   → New mutual link valid → Verification passes
+```
+
+**Why This Works:**
+- Solana cNFT minting costs only **$0.00005** per attempt
+- Arweave storage is **permanent but cheap** (~$0.0001 per 2KB)
+- Failed attempts don't break the system—they're just noise that gets filtered out
+- **Eventual consistency**: As long as one valid pair exists, verification succeeds
+
+**Result:** The system prioritizes **trustless verification** over perfect efficiency. Even with occasional prediction mismatches, the mutual linking design ensures only legitimate ownership claims are validated.
+
+> For technical details, see `document/mvp/SPECS.md` § "Resilience and Prediction Mismatch Behavior"
+
 ---
 
 ## 💰 Cost Efficiency: How Much Does It Cost Per Image?
