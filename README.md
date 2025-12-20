@@ -287,7 +287,7 @@ User retries    →  New prediction: Asset #102
 
 **Result:** The system prioritizes **trustless verification** over perfect efficiency. Even with occasional prediction mismatches, the mutual linking design ensures only legitimate ownership claims are validated.
 
-> For technical details, see `document/mvp/SPECS.md` § "Resilience and Prediction Mismatch Behavior"
+> **Implementation:** See `frontend/app/lib/verification-helpers.ts` (verification logic) and `worker/src/lib/verification.ts` (duplicate checking with on-chain validation)
 
 ---
 
