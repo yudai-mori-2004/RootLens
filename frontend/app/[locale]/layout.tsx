@@ -5,6 +5,7 @@ import { locales } from '@/i18n';
 import Providers from "../providers";
 import { Analytics } from "@vercel/analytics/next"
 import "../globals.css";
+import { Layout } from "lucide-react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,6 +51,7 @@ export default async function LocaleLayout({
         <NextIntlClientProvider messages={messages}>
           <Providers>
             {children}
+            <Analytics/>
           </Providers>
         </NextIntlClientProvider>
       </body>
