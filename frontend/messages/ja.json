@@ -65,9 +65,9 @@
       "blockchain": {
         "title": "Blockchain (Solana + Arweave)",
         "desc": "権利の「所有」と「流動化」",
-        "point1": "所有権の明確化（ウォレット紐付け）",
-        "point2": "NFTとしての自由な売買・譲渡",
-        "point3": "相互リンクによる乗っ取り防止" 
+        "point1": "ウォレット紐付けによる所有権の確立",
+        "point2": "販売収益の99.9%を権利者へ直接還元",
+        "point3": "NFTによる「権利そのもの」の自由な売買・譲渡" 
       },
       "comparison": {
         "title": "なぜWeb3なのか？ - Web2的アプローチとの比較",

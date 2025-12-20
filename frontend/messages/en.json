@@ -64,10 +64,10 @@
       },
       "blockchain": {
         "title": "Blockchain (Solana + Arweave)",
-        "desc": "'Ownership' and 'Liquidity' of Rights",
-        "point1": "Clarification of ownership (Wallet binding)",
-        "point2": "Free trading and transfer as NFT",
-        "point3": "Hijacking prevention by mutual linking"
+        "desc": "Ownership and Liquidity of Rights",
+        "point1": "Established ownership through wallet linking",
+        "point2": "99.9% of sales revenue directly returned to rights holders",
+        "point3": "Seamless trading and transfer of 'the rights themselves' via NFTs"
       },
       "comparison": {
         "title": "Why Web3? - Comparison with Web2 Approach",
