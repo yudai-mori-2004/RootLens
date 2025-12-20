@@ -8,6 +8,8 @@ import { uploadToArweave } from './lib/arweave';
 import { mintCNFT } from './lib/cnft';
 import { saveToDatabase } from './lib/database';
 import { searchArweaveTransactionsByHash, checkSolanaAssetExists } from './lib/verification';
+import { downloadFromR2 } from './lib/r2';
+import { verifyC2PAOnServer, validateC2PAResult } from './lib/c2pa-verification';
 
 /**
  * Mint処理のメインロジック
@@ -64,8 +66,71 @@ export async function processMint(
 
     console.log('✅ No active duplicate found from this issuer - proceeding with mint');
 
-    // === 1. 次のcNFTアドレスを予測（mint直前に再取得） ===
+    // === 1. R2からファイルをダウンロード ===
+    onProgress(10);
+    console.log('📥 Step 1: Downloading file from R2 for verification...');
+
+    const fileBuffer = await downloadFromR2(data.mediaFilePath);
+    console.log(`✅ File downloaded: ${fileBuffer.length} bytes`);
+
+    // === 2. サーバー側でC2PA検証 ===
     onProgress(15);
+    console.log('🔐 Step 2: Server-side C2PA verification...');
+    console.log('   ⚠️  Ignoring client-provided values - re-verifying from scratch');
+
+    const c2paSummary = await verifyC2PAOnServer(fileBuffer);
+
+    // 検証結果の妥当性チェック
+    const validation = validateC2PAResult(c2paSummary);
+    if (!validation.valid) {
+      console.error(`❌ C2PA validation failed: ${validation.reason}`);
+      return {
+        success: false,
+        error: validation.reason,
+      };
+    }
+
+    // 検証済みデータを使用（フロントエンドからの値は破棄）
+    const verifiedRootSigner = c2paSummary.originalIssuer || 'Unknown';
+    const verifiedClaimGenerator = c2paSummary.originalClaimGenerator || 'Unknown';
+    const verifiedSourceType = c2paSummary.sourceType || 'unknown';
+    const verifiedDataHash = c2paSummary.activeManifest?.dataHash;
+
+    console.log('✅ Server-side C2PA verification passed');
+    console.log(`   Verified Root Signer: ${verifiedRootSigner}`);
+    console.log(`   Verified Claim Generator: ${verifiedClaimGenerator}`);
+    console.log(`   Verified Source Type: ${verifiedSourceType}`);
+    console.log(`   Verified Data Hash: ${verifiedDataHash}`);
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🛑 テスト用: ここで処理を停止（検証結果のみ確認）
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    console.log('');
+    console.log('═'.repeat(60));
+    console.log('🔍 C2PA VERIFICATION RESULT');
+    console.log('═'.repeat(60));
+    console.log(`Client provided Root Signer:      ${data.rootSigner}`);
+    console.log(`Server verified Root Signer:      ${verifiedRootSigner}`);
+    console.log(`Match: ${data.rootSigner === verifiedRootSigner ? '✅' : '❌'}`);
+    console.log('');
+    console.log(`Client provided Claim Generator:  ${data.claimGenerator}`);
+    console.log(`Server verified Claim Generator:  ${verifiedClaimGenerator}`);
+    console.log(`Match: ${data.claimGenerator === verifiedClaimGenerator ? '✅' : '❌'}`);
+    console.log('');
+    console.log(`Client provided Source Type:      ${data.sourceType}`);
+    console.log(`Server verified Source Type:      ${verifiedSourceType}`);
+    console.log(`Match: ${data.sourceType === verifiedSourceType ? '✅' : '❌'}`);
+    console.log('═'.repeat(60));
+    console.log('');
+    console.log('🛑 Stopping here for testing - NOT proceeding to mint');
+
+    return {
+      success: false,
+      error: '【テスト中】C2PA検証は成功しましたが、Mintは実行していません。上記のログを確認してください。',
+    };
+
+    // === 3. 次のcNFTアドレスを予測（mint直前に再取得） ===
+    onProgress(25);
     console.log('🔮 Step 1: Predicting next cNFT Asset ID (just before mint)...');
 
     // ⚠️ 重要: この予測とmintの間に他の処理が入らないようにする
@@ -73,23 +138,23 @@ export async function processMint(
     console.log(`   Predicted Asset ID: ${predictedAssetId}`);
     console.log(`   Leaf Index: ${nextLeafIndex}`);
 
-    // === 2. Arweaveにアップロード ===
-    onProgress(35);
-    console.log('📤 Step 2: Uploading to Arweave...');
+    // === 4. Arweaveにアップロード（検証済みデータを使用） ===
+    onProgress(45);
+    console.log('📤 Step 4: Uploading to Arweave with verified data...');
 
     const arweaveUri = await uploadToArweave({
       originalHash: data.originalHash,
-      rootSigner: data.rootSigner,
-      claimGenerator: data.claimGenerator,
-      sourceType: data.sourceType,
+      rootSigner: verifiedRootSigner,          // ← サーバー検証済み
+      claimGenerator: verifiedClaimGenerator,  // ← サーバー検証済み
+      sourceType: verifiedSourceType,          // ← サーバー検証済み
       predictedAssetId,
       thumbnailPublicUrl: data.thumbnailPublicUrl,
     });
     console.log(`   Arweave URI: ${arweaveUri}`);
 
-    // === 3. cNFTをMint ===
+    // === 5. cNFTをMint ===
     onProgress(65);
-    console.log('🎨 Step 3: Minting cNFT...');
+    console.log('🎨 Step 5: Minting cNFT...');
 
     const { signature, actualAssetId } = await mintCNFT({
       leafOwner: data.userWallet,
@@ -99,7 +164,7 @@ export async function processMint(
     console.log(`   Signature: ${signature}`);
     console.log(`   Asset ID: ${actualAssetId}`);
 
-    // === 4. 予測が正しかったか確認 ===
+    // === 6. 予測が正しかったか確認 ===
     if (actualAssetId !== predictedAssetId) {
       console.warn(`⚠️  Asset ID mismatch! Predicted: ${predictedAssetId}, Actual: ${actualAssetId}`);
       console.warn('   This is not critical. Using actual Asset ID.');
@@ -107,9 +172,9 @@ export async function processMint(
       console.log('✅ Asset ID prediction was correct!');
     }
 
-    // === 5. データベースに保存 ===
+    // === 7. データベースに保存 ===
     onProgress(85);
-    console.log('💾 Step 5: Saving to database...');
+    console.log('💾 Step 7: Saving to database...');
 
     // ファイル拡張子を抽出（例: "media/abc123.../original.jpg" → "jpg"）
     const fileExtension = data.mediaFilePath.split('.').pop() || 'bin';
