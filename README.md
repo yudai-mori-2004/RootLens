@@ -512,14 +512,7 @@ We prioritized **Core Architecture Validation** and **UI/UX** for this hackathon
 **Why this trade-off?**
 We focused on demonstrating the **novelty of the Asset ID prediction mechanism** and the **C2PA x Solana user experience** first. The server-side validation is a standard engineering task (implementing existing libraries), whereas our architectural approach to C2PA/Solana integration is a new research area.
 
-### 🔮 Phase 2 Vision: Complete Trustless Execution
-
-RootLens's goal is **complete trustless operation** from capture to verification.
-
-**Current Architecture Challenge:**
-- ✅ **Camera hardware** cryptographically proves image authenticity (C2PA)
-- ✅ **Post-mint verification** is fully trustless (anyone can verify on-chain)
-- ⚠️ **Upload process** requires trusting the server operator
+### 🔮 Phase 2 Vision: Enhanced Trust and Verifiability
 
 **Why Server-Side Minting is Architecturally Required:**
 
@@ -533,68 +526,46 @@ RootLens's mutual linking design depends on **Asset ID prediction**, which requi
 - Users would need SOL for gas fees → bad UX
 - Users would need to sign mint transactions → added friction
 
-✅ **Server-side minting is necessary**, but creates a trust assumption.
+✅ **Server-side minting is necessary**, but creates a trust assumption during upload.
 
-**Phase 2 Solution: Server-Side C2PA Re-Verification + TEE Execution**
+**Current Security Model: Post-Mint Verification**
 
-Two-pronged approach to achieve trustless server operation:
+RootLens uses a **"verify after minting"** approach:
 
-**1. Server-Side C2PA Re-Verification**
-- Worker downloads uploaded files from R2
-- Re-verifies C2PA signatures using `c2pa-node` library
-- Rejects uploads if server-side verification fails
-- Eliminates trust assumption for C2PA validation
+**What's Already Trustless:**
+- ✅ **Camera hardware** cryptographically proves image authenticity (C2PA)
+- ✅ **Post-mint verification** is fully trustless (anyone can re-verify C2PA + on-chain data)
+- ✅ **Mutual linking** prevents ownership hijacking
 
-**2. Trusted Execution Environments (TEE)**
+**Where Trust is Required (MVP):**
+- ⚠️ Server operator during the upload/mint process
 
-Execute the worker code inside a **cryptographically isolated hardware environment**:
+**Two Potential Server Tampering Vectors:**
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  TEE (AWS Nitro Enclaves / Intel SGX / AMD SEV)             │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  RootLens Worker (Public Code)                        │  │
-│  │  ├─ Download file from R2                             │  │
-│  │  ├─ C2PA verification (c2pa-node) ← Server-side       │  │
-│  │  ├─ Asset ID prediction                               │  │
-│  │  ├─ Arweave upload                                    │  │
-│  │  └─ cNFT mint                                         │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-│  🔒 Code is cryptographically locked                        │
-│     Even the operator cannot modify it                      │
-│                                                             │
-│  📜 Attestation: "Running SHA256(code) = abc123..."         │
-│     → Anyone can verify the exact code being executed       │
-└─────────────────────────────────────────────────────────────┘
-```
+1. **Image Substitution**: Server could store a different image in R2 than what was uploaded
+2. **Owner Address Manipulation**: Server could change the cNFT owner address during minting
 
-**Benefits:**
-- **Trustless server operation**: Code integrity proven by hardware
-- **Same UX**: Users still don't sign anything or pay gas
-- **Same performance**: Serial processing maintained
-- **Verifiable**: Anyone can check the attestation and code hash
+**Phase 2 Solution: Verifiable Server Operations**
 
-**The Ultimate Vision:**
+We will provide mechanisms to **verify these critical operations post-mint**:
 
-> **"Camera hardware proves the image is real. Server hardware proves the minting is honest. End-to-end hardware trust."**
+- **Image Integrity Verification**: Allow users to cryptographically verify that the R2-stored image matches what was originally uploaded
+- **Owner Address Verification**: Provide transparent proof that the minted cNFT owner matches the uploader's wallet
 
-This completes RootLens's "Hardware Trust" philosophy:
-- **MVP (Current)**: C2PA hardware signatures + trustless post-mint verification (✅ Done)
-- **Phase 2**: Server-side C2PA re-verification + TEE-based execution (⏳ ~2 months)
+These verification mechanisms will ensure that even though the server performs minting, **any tampering is detectable by anyone**.
 
-**Why This Matters:**
+**Additional Phase 2 Features:**
+- **Server-Side C2PA Re-Verification**: Prevent fraudulent uploads at the source using `c2pa-node`
+- **DoS Protection**: Subscription plans with Privy KYC-based rate limiting
+- **Multi-Tree Scaling**: Parallel processing with multiple Merkle Trees
 
-RootLens is built on the concept of **"Proof of Reality"** — trusting hardware over humans. Phase 2 extends this trust model to the server layer, creating a fully trustless system while maintaining the UX and architectural benefits of centralized processing.
+**Design Philosophy:**
 
-**Implementation Approach:**
-1. Add `c2pa-node` verification to worker (straightforward port of frontend logic)
-2. Migrate infrastructure to AWS EC2 Nitro-enabled instances
-3. Containerize worker for Enclave execution
-4. Implement Attestation API for public verification
-5. Integrate AWS KMS for secure key management
+> **"Trust minimization through verifiability, not through obscurity."**
 
-📅 **Implementation Timeline**: ~2 months post-hackathon for production-ready trustless execution.
+RootLens prioritizes making server operations **auditable and verifiable** rather than relying solely on operational security. This aligns with Web3 principles while maintaining the UX benefits of server-side processing.
+
+📅 **Implementation Timeline**: Phase 2 roadmap to be detailed post-hackathon.
 
 ---
 

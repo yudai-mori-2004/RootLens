@@ -109,8 +109,12 @@ export async function GET(
       3600 // 1時間有効
     );
 
-    // 6. リダイレクト
-    return NextResponse.redirect(presignedUrl);
+    // 6. ダウンロード情報をJSON形式で返す（クライアント側でバイナリ取得用）
+    return NextResponse.json({
+      presignedUrl,
+      originalHash,
+      fileExtension,
+    });
 
   } catch (error) {
     console.error('Download API error:', error);

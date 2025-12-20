@@ -44,9 +44,41 @@ export default function DownloadPage({ params }: { params: Promise<{ token: stri
     }
   }, [token]);
 
-  const handleDownload = () => {
-    if (state.downloadUrl) {
-      window.location.href = state.downloadUrl;
+  const handleDownload = async () => {
+    if (!state.downloadUrl) return;
+
+    try {
+      // 1. ダウンロード情報を取得
+      const infoResponse = await fetch(state.downloadUrl);
+      if (!infoResponse.ok) {
+        throw new Error('ダウンロード情報の取得に失敗しました');
+      }
+
+      const { presignedUrl, originalHash, fileExtension } = await infoResponse.json();
+
+      // 2. 実際の画像バイナリを取得
+      const imageResponse = await fetch(presignedUrl);
+      if (!imageResponse.ok) {
+        throw new Error('画像のダウンロードに失敗しました');
+      }
+
+      const blob = await imageResponse.blob();
+
+      // 3. ダウンロード実行
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${originalHash}.${fileExtension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      setState({
+        status: 'error',
+        error: 'ダウンロードに失敗しました',
+      });
     }
   };
 

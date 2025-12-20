@@ -160,8 +160,28 @@ export default function PurchaseModal({
       toast.success(t('complete'));
 
       if (isFree) {
-        const downloadUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/download/${result.downloadToken}`;
-        window.open(downloadUrl, '_blank');
+        // 無料コンテンツは即座にダウンロード開始
+        const freeDownloadUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/download/${result.downloadToken}`;
+        try {
+          const infoResponse = await fetch(freeDownloadUrl);
+          if (infoResponse.ok) {
+            const { presignedUrl, originalHash, fileExtension } = await infoResponse.json();
+            const imageResponse = await fetch(presignedUrl);
+            if (imageResponse.ok) {
+              const blob = await imageResponse.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${originalHash}.${fileExtension}`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }
+          }
+        } catch (err) {
+          console.error('Free download error:', err);
+        }
       }
 
       if (onSuccess) {
@@ -186,6 +206,43 @@ export default function PurchaseModal({
   const downloadUrl = downloadToken
     ? `${process.env.NEXT_PUBLIC_APP_URL}/api/download/${downloadToken}`
     : null;
+
+  const handleDownload = async () => {
+    if (!downloadUrl) return;
+
+    try {
+      // 1. ダウンロード情報を取得
+      const infoResponse = await fetch(downloadUrl);
+      if (!infoResponse.ok) {
+        throw new Error('ダウンロード情報の取得に失敗しました');
+      }
+
+      const { presignedUrl, originalHash, fileExtension } = await infoResponse.json();
+
+      // 2. 実際の画像バイナリを取得
+      const imageResponse = await fetch(presignedUrl);
+      if (!imageResponse.ok) {
+        throw new Error('画像のダウンロードに失敗しました');
+      }
+
+      const blob = await imageResponse.blob();
+
+      // 3. ダウンロード実行
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${originalHash}.${fileExtension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success('ダウンロードが完了しました');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(error instanceof Error ? error.message : 'ダウンロードに失敗しました');
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -328,13 +385,11 @@ export default function PurchaseModal({
 
                     {downloadUrl && (
                         <Button
-                            asChild
+                            onClick={handleDownload}
                             className="w-full h-12 text-base font-bold bg-indigo-600 hover:bg-indigo-700 shadow-md rounded-xl"
                         >
-                            <a href={downloadUrl} target="_blank" rel="noopener noreferrer">
-                                <Download className="w-5 h-5 mr-2" />
-                                {t('saveFile')}
-                            </a>
+                            <Download className="w-5 h-5 mr-2" />
+                            {t('saveFile')}
                         </Button>
                     )}
                     

@@ -49,6 +49,41 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const handleDownload = async (downloadToken: string) => {
+    try {
+      const downloadUrl = `/api/download/${downloadToken}`;
+
+      // 1. ダウンロード情報を取得
+      const infoResponse = await fetch(downloadUrl);
+      if (!infoResponse.ok) {
+        throw new Error('ダウンロード情報の取得に失敗しました');
+      }
+
+      const { presignedUrl, originalHash, fileExtension } = await infoResponse.json();
+
+      // 2. 実際の画像バイナリを取得
+      const imageResponse = await fetch(presignedUrl);
+      if (!imageResponse.ok) {
+        throw new Error('画像のダウンロードに失敗しました');
+      }
+
+      const blob = await imageResponse.blob();
+
+      // 3. ダウンロード実行
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${originalHash}.${fileExtension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('ダウンロードに失敗しました');
+    }
+  };
+
   const [creatorContents, setCreatorContents] = useState<CreatorContent[]>([]);
   const [purchasedContents, setPurchasedContents] = useState<PurchasedContent[]>([]);
 
@@ -417,7 +452,7 @@ export default function DashboardPage() {
 
                     <CardContent className="p-3 pt-0">
                       <div className="flex flex-col gap-2">
-                        <Button size="sm" className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all" onClick={() => window.open(`/api/download/${content.downloadToken}`, '_blank')}>
+                        <Button size="sm" className="w-full h-8 text-xs bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all" onClick={() => handleDownload(content.downloadToken)}>
                           <Download className="w-3 h-3 mr-1.5" />
                           {t('download')}
                         </Button>

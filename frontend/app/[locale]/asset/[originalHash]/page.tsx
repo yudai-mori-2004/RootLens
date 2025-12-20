@@ -107,6 +107,7 @@ interface VerificationStep {
 export default function AssetPage({ params }: { params: Promise<{ originalHash: string }> }) {
   const { originalHash } = use(params);
   const t = useTranslations('asset');
+  const tCommon = useTranslations('common');
   
   const [proof, setProof] = useState<ProofData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -234,6 +235,46 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
     }
     checkAccessStatus();
   }, [proof, authenticated, userWalletAddress, isPurchased]);
+
+  // ダウンロード処理
+  const handleDownload = async () => {
+    if (!downloadToken) return;
+
+    try {
+      const downloadUrl = `/api/download/${downloadToken}`;
+
+      // 1. ダウンロード情報を取得
+      const infoResponse = await fetch(downloadUrl);
+      if (!infoResponse.ok) {
+        throw new Error('ダウンロード情報の取得に失敗しました');
+      }
+
+      const { presignedUrl, originalHash: hash, fileExtension } = await infoResponse.json();
+
+      // 2. 実際の画像バイナリを取得
+      const imageResponse = await fetch(presignedUrl);
+      if (!imageResponse.ok) {
+        throw new Error('画像のダウンロードに失敗しました');
+      }
+
+      const blob = await imageResponse.blob();
+
+      // 3. ダウンロード実行
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${hash}.${fileExtension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success('ダウンロードが完了しました');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('ダウンロードに失敗しました');
+    }
+  };
 
   // 証明データ取得
   useEffect(() => {
@@ -658,15 +699,15 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
                                 )}
                             </div>
 
-                            <Button 
+                            <Button
                                 className={`w-full font-bold h-12 text-base transition-all ${
-                                    isPurchased 
-                                    ? 'bg-white text-slate-900 hover:bg-slate-100' 
+                                    isPurchased
+                                    ? 'bg-white text-slate-900 hover:bg-slate-100'
                                     : 'bg-white text-blue-600 hover:bg-blue-50 shadow-md'
                                 }`}
                                 onClick={() => {
                                     if(downloadToken) {
-                                        window.open(`/api/download/${downloadToken}`, '_blank');
+                                        handleDownload();
                                     } else {
                                         setShowPurchaseModal(true);
                                     }
@@ -1081,13 +1122,36 @@ export default function AssetPage({ params }: { params: Promise<{ originalHash: 
           onClose={() => {
             setShowPurchaseModal(false);
           }}
-          onSuccess={(token) => {
+          onSuccess={async (token) => {
             setIsPurchased(true);
             setDownloadToken(token);
             setShowPurchaseModal(false);
             // 購入チェックを再実行
             setPurchaseCheckTrigger(prev => prev + 1);
-            toast.success(t('common.success'));
+            toast.success(tCommon('success'));
+
+            // 自動的にダウンロード開始
+            try {
+              const downloadUrl = `/api/download/${token}`;
+              const infoResponse = await fetch(downloadUrl);
+              if (infoResponse.ok) {
+                const { presignedUrl, originalHash: hash, fileExtension } = await infoResponse.json();
+                const imageResponse = await fetch(presignedUrl);
+                if (imageResponse.ok) {
+                  const blob = await imageResponse.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${hash}.${fileExtension}`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }
+              }
+            } catch (err) {
+              console.error('Auto download error:', err);
+            }
           }}
           mediaProofId={proof.mediaProofId}
           priceLamports={proof.priceLamports}
