@@ -74,11 +74,9 @@ const worker = new Worker<MintJobData, MintJobResult>(
   {
     connection: createRedisConnection(), // ★ 新しいインスタンスを渡す（duplicate()問題を回避）
     concurrency: 1,  // ★★★ 最重要: 完全に1つずつ処理する設定 ★★★
-    settings: {
-      stalledInterval: 30000,  // 固まったジョブ検出を30秒ごとに（Redisコマンド削減）
-      lockDuration: 30000,     // ジョブロック時間
-      maxStalledCount: 1,      // 固まったと判定する最大回数
-    },
+    stalledInterval: 30000,  // 固まったジョブ検出を30秒ごとに（Redisコマンド削減）
+    lockDuration: 30000,     // ジョブロック時間
+    maxStalledCount: 1,      // 固まったと判定する最大回数
   }
 );
 
