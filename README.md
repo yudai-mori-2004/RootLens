@@ -463,7 +463,7 @@ Payment goes directly to the creator's wallet (99.9% via SolanaPay). No intermed
 Previously, digital content "ownership" was ambiguous—creators had no way to prove they own their work.
 
 With RootLens:
-- Content rights are **linked to wallets as NFTs** (immutable rights registry)
+- Content rights are **linked to wallets as NFTs** (on-chain rights registry)
 - **99.9% of licensing fees go directly to creators** via SolanaPay (no intermediaries)
 - Even if original files leak, **legitimate rights holders can be identified on-chain**
 
@@ -629,14 +629,14 @@ For this demo, please use our provided sample images.
 
 ### Q: How is this different from a Web2 C2PA stock site?
 
-A: Authenticity proof is the same (C2PA's power). The difference is in handling "ownership":
+A: Authenticity proof is the same (C2PA's power). The difference is in handling "ownership" and "revenue flow":
 
-- **Web2**: Just records "who owns what" in DB. Difficult to claim rights after leaks, trade rights, prevent hijacking
-- **RootLens**: Links to wallets, NFT-izes for rights liquidity, completely prevents hijacking with mutual linking
+- **Web2**: Records in DB. High fees (30-70%), difficult to prove ownership after leaks, platform-dependent
+- **RootLens**: Links to wallets as NFTs, 99.9% goes directly to creators via P2P transactions, completely prevents hijacking with mutual linking
 
 ### Q: Is "tamper-proof" thanks to blockchain?
 
-A: No. Content tamper-proof/detection is achieved by **C2PA alone**. Blockchain's role is recording "who owns it" and "rights liquidity."
+A: No. Content tamper-proof/detection is achieved by **C2PA alone**. Blockchain's role is recording "who owns it" and enabling "P2P direct transactions."
 
 ### Q: Why Solana?
 
