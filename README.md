@@ -505,13 +505,22 @@ This transforms content licensing into a **transparent, creator-first marketplac
 
 ### Value ③: Trust Search Engine (Lens Function)
 
-RootLens search isn't just image search—it's a **trust verification tool**:
+RootLens search isn't just image search—it's a **trust verification tool** that recovers proof even when metadata is stripped:
 
 > "Is this image registered as a verified 'authentic' proof?"
 
+**Key Use Cases:**
+
+1. **Metadata Recovery**: Image shared on social media (C2PA stripped) → Lens search by visual similarity → Find original certificate page with full provenance
+2. **Fact-Checking**: Journalist sees viral photo → Upload to Lens → Verify if hardware-captured or AI-generated
+3. **Content Sourcing**: AI company needs clean training data → Search by keyword → License only verified authentic images
+
+**Network Effect:**
 - Supports both semantic (text) and image (camera) search
 - Value increases as more users register more images
 - "No hit ≠ fake" but "Hit = verified" is certain
+
+> **This turns Lens into a "reverse image search for reality"**—bridging the gap between stripped social media images and their original cryptographic proofs.
 
 ---
 
