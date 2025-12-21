@@ -95,15 +95,15 @@ C2PA signatures are often **lost when images are compressed or shared on social 
 
 **RootLens's Solution: Optimistic Proof via Asset Pages**
 
-RootLens solves this by creating a **permanent "Asset Page"** (proof certificate + marketplace listing) on-chain:
+RootLens solves this by storing **permanent proof records on-chain** (Arweave + Solana) and displaying them via **Asset Pages**:
 
-1. **Upload Phase**: C2PA-verified content → Asset Page created on Arweave (permanent)
+1. **Upload Phase**: C2PA-verified content → Proof data stored on Arweave (permanent) + cNFT minted on Solana
 2. **Distribution Phase**: Image spreads on social media → C2PA metadata gets stripped
 3. **Verification Phase**: Anyone can use **Lens (AI-powered visual search)** to find the original Asset Page
 
 **Result:** Even without the original file's C2PA signature, the **"Proof of Reality" can be recovered** by searching visually similar content on RootLens.
 
-> **This provides an "Optimistic Proof" of origin**—the Asset Page's existence on-chain serves as trusted evidence, even when you don't have access to the original file with embedded metadata.
+> **This provides an "Optimistic Proof" of origin**—the on-chain proof records (Arweave + Solana) serve as trusted evidence, displayed via Asset Pages, even when you don't have access to the original file with embedded metadata.
 
 **How It Works:**
 - **Lens Search**: AI generates semantic descriptions of images and matches them via vector similarity
@@ -705,6 +705,10 @@ A: No. Content tamper-proof/detection is achieved by **C2PA alone**. Blockchain'
 ### Q: Why Solana?
 
 A: cNFT (compressed NFT) technology enables mass minting at low cost. For a model issuing one proof NFT per image, low gas fees are essential.
+
+### Q: Can NFTs be transferred?
+
+A: Technically, yes. cNFTs are transferable on Solana. If the cNFT holder changes, all subsequent licensing revenue will be paid to the new holder's wallet. This allows creators to sell future revenue rights to third parties if desired. However, RootLens primarily focuses on direct creator-to-buyer licensing and maximizing revenue for creators—not speculative NFT trading.
 
 ---
 
