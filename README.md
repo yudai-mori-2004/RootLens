@@ -66,7 +66,7 @@ Yet there's no mechanism to **monetize** that value:
 - Prevents hijacking through **mutual linking design**
 
 **Additional value blockchain provides:**
-- Clear ownership attribution (immutable rights registry)
+- Clear ownership attribution (on-chain rights registry)
 - Direct creator monetization (99.9% revenue share)
 - Hijacking prevention (mutual linking)
 
