@@ -1,3 +1,39 @@
+# Phase 2: Multi-Tree Scalability (The "Cashier Lane" Architecture)
+
+## 🚧 Current Bottleneck
+
+The MVP operates with a **Single Merkle Tree** strategy to ensure deterministic Asset ID prediction.
+
+- **Constraint**: `concurrency: 1`
+- **Throughput**: ~4 mints/minute (limited by Solana block finalization and serial processing)
+- **Risk**: If 100 users upload simultaneously, the queue wait time increases linearly.
+
+## 🚀 Phase 2 Solution: Parallel Processing with Multiple Trees
+
+We can scale linearly by adding more Merkle Trees, analogous to opening more "cashier lanes" at a supermarket.
+
+### Architecture Design
+
+1. **Tree Pool**: Deploy N Merkle Trees (e.g., 50 trees).
+2. **Job Routing**:
+   - When a job enters the Redis Queue, assign it to a specific `TreeID` (Round-Robin or Random).
+   - Or, run multiple Worker instances, each subscribed to a specific `TreeID`.
+3. **Parallel Execution**:
+   - Tree #1 processes Job A.
+   - Tree #2 processes Job B.
+   - ...
+   - Tree #50 processes Job Z.
+
+### Impact
+- **Throughput**: 50x increase (with 50 trees).
+- **Cost**: Only the one-time cost of creating trees (~$10 per tree). No increase in per-mint cost.
+- **Verification Logic**: Our "Search & Match" verification logic is already tree-agnostic. It verifies the mutual link between Arweave and *any* valid cNFT, regardless of which tree it belongs to.
+
+### Database Schema Changes
+No major schema changes required. The `merkle_tree_address` can be dynamically selected from a configuration pool instead of an environment variable.
+
+---
+
 # 複数Merkle Tree戦略の実現可能性分析
 
 ## 背景

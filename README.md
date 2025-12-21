@@ -588,9 +588,14 @@ We prioritized **Core Architecture Validation** and **UI/UX** for this hackathon
 
 **Why this trade-off? (Strategic Focus)**
 
-We prioritized proving the feasibility of our **unique protocol**—the Lens search and deterministic Asset ID prediction—over implementing established security patterns. 
+For this hackathon submission, we made a strategic decision to defer **Server-side C2PA Re-verification**.
 
-Server-side C2PA validation is a well-documented engineering task that we have already architected for Phase 2. By focusing on the "First Frame" principle and the AI-Blockchain integration, we aimed to demonstrate the **high-innovation components** that make RootLens a new category of marketplace.
+- **Why?**: Implementing server-side verification is a standard engineering task using existing libraries (e.g., `c2pa-node`). We prioritized proving the feasibility of our **unique protocol** over implementing established security patterns.
+- **Our Focus**: We allocated our limited timeline to prove the feasibility of **novel architectural components**:
+  1. **Deterministic Asset ID Prediction**: Solving the circular dependency between Arweave and Solana.
+  2. **Lens Search**: Demonstrating how AI can recover "trust" from visual data alone.
+
+*Note: The architecture for server-side verification is fully designed and documented in `document/phase2/`.*
 
 ### 🔮 Phase 2 Vision: Enhanced Trust and Verifiability
 
