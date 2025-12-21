@@ -171,6 +171,10 @@
         "q4": {
             "q": "Why did you choose Solana and Arweave?",
             "a": "Arweave is optimal for permanent storage of image data (large capacity), and Solana's cNFT (compressed NFT) technology was essential for issuing a large number of certificates (NFTs) at low cost. In a model where one certificate is issued per image, low gas fees and processing speed are very important."
+        },
+        "q5": {
+            "q": "Can NFTs be transferred?",
+            "a": "Technically, yes. If the cNFT holder changes, all subsequent licensing revenue will be paid to the new holder's wallet. This allows creators to sell future revenue rights to third parties if desired. However, RootLens primarily focuses on direct creator-to-buyer licensing and maximizing revenue for creators—not speculative NFT trading."
         }
     },
     "cta": {
