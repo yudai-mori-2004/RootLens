@@ -112,7 +112,7 @@ RootLens solves this by creating a **permanent "Asset Page"** (proof certificate
 
 **Real-World Use Case:**
 - A news photo spreads on Twitter (C2PA metadata stripped)
-- Fact-checkers upload the image to **RootLens Lens** (visual search)
+- Fact-checkers upload the image to **RootLens Search** (visual + semantic search)
 - System finds the original Asset Page → shows it was captured by a verified photographer with hardware proof
 - Trust restored, even without the original file's metadata
 
