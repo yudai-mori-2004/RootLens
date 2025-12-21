@@ -65,8 +65,8 @@
       "blockchain": {
         "title": "Blockchain (Solana + Arweave)",
         "desc": "Full Ownership Control & Direct Monetization",
-        "point1": "Full ownership control by creators",
-        "point2": "99.9% of revenue paid instantly to rights holders (NFT holders)",
+        "point1": "Full ownership control by creators (NFT)",
+        "point2": "99.9% of revenue paid directly to creators",
         "point3": "Transparent content licensing managed via NFTs"
       },
       "comparison": {
@@ -85,7 +85,7 @@
             "ownership": {
                 "label": "Record of Ownership",
                 "web2": "Record in DB (Platform dependent)",
-                "web3": "Linked to Wallet (Autonomous Decentralized)"
+                "web3": "cNFT as digital rights certificate linked to wallet"
             },
             "leak": {
                 "label": "In case of content leak",
@@ -100,7 +100,7 @@
             "takeover": {
                 "label": "Hijack Prevention",
                 "web2": "Difficult",
-                "web3": "Complete prevention by mutual link"
+                "web3": "Complete prevention by Arweave/cNFT mutual link"
             }
         }
       }
