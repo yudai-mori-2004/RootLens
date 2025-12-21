@@ -458,6 +458,12 @@ export default function Home() {
                   {t('faq.q4.a')}
                 </AccordionContent>
               </AccordionItem>
+              <AccordionItem value="item-4">
+                <AccordionTrigger>{t('faq.q5.q')}</AccordionTrigger>
+                <AccordionContent>
+                  {t('faq.q5.a')}
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           </div>
         </section>
