@@ -87,6 +87,32 @@ Yet there's no mechanism to **monetize** that value:
 
 ---
 
+### 🔗 Bridging C2PA's Metadata Gap
+
+**The Problem with C2PA Alone:**
+
+C2PA signatures are often **lost when images are compressed or shared on social media**. When you download an image from Twitter/Instagram, the embedded C2PA metadata is typically stripped away—making verification impossible even if the image was originally authenticated.
+
+**RootLens's Solution: Optimistic Proof via Certificate Pages**
+
+RootLens solves this by creating a **permanent "Certificate Page" on-chain** linked to the image's content hash:
+
+1. **Upload Phase**: Image hash + C2PA proof → stored on Arweave (permanent)
+2. **Distribution Phase**: Image spreads on social media → metadata gets stripped
+3. **Verification Phase**: Anyone can search the image hash via **Lens** → finds the original certificate page
+
+**Result:** Even if the file's C2PA signature is gone, the image's **"Proof of Reality" can be recovered** by searching its visual fingerprint on RootLens.
+
+> **This provides an "Optimistic Proof" of origin**—the certificate page's existence on-chain serves as trusted evidence, even without the original file's metadata.
+
+**Real-World Use Case:**
+- A news photo spreads on Twitter (metadata stripped)
+- Fact-checkers use RootLens Lens search (image or hash)
+- Find the original certificate → verify it was captured by a legitimate photographer with hardware proof
+- Trust restored, even without the original file
+
+---
+
 ## 🚀 Demo Instructions for Judges
 
 ### Important Notes Before You Start
