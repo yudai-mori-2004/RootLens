@@ -491,28 +491,44 @@ RootLens search isn't just image search—it's a **trust verification tool**:
 
 ## 🔑 Technical Differentiation
 
-### "Accept if Root is Hardware Signed" Design
+### 1. The "Hardware-First" Protocol
 
-> Even if edited/processed, if the root is hardware-signed, we accept it as valuable content
+**"Accept if Root is Hardware-Signed, Reject if Content is AI-Synthesized"**
 
-Why?
-- News photos require cropping and color adjustment
-- Art requires editing as part of creation
-- What matters is "the first frame was captured by camera"
+We draw a clear line between **Post-Processing (Adjustment)** and **Generative Editing (Synthesis)**.
 
-### Robust Ownership via Mutual Linking
+**Valid (Standard Post-Processing):**
+Adjusting what was captured by the sensor. This includes cropping, color correction, and exposure adjustment—essential steps for professional journalism and art.
 
-```
-Arweave (Proof Data) ←→ cNFT (Ownership)
+**Invalid (Generative AI Modification):**
+Creating what was never there. Our protocol rejects any content modified by Generative Fill, In-painting, or Out-painting. Even if the original was a real photo, AI-injected pixels break the "Chain of Reality."
 
-• Arweave records target cNFT address
-• cNFT records Arweave URI
-• Valid proof requires both to match
+> **The "First Frame" Principle:**
+>
+> What matters is that the *Pixel Provenance* originates from a physical sensor. RootLens mandates that the C2PA manifest must prove the content is a descendant of a hardware-signed capture, without generative "creation" steps in its history.
 
-→ Copying one side is invalid
-→ After burn, re-minting doesn't match Arweave record
-→ Hijacking is impossible
-```
+---
+
+### 2. Robust Ownership via Mutual Linking
+
+**Bridging Reality and Scarcity**
+
+We don't just store an image; we lock the **Audit Trail** of that reality.
+
+**Arweave (Proof Data) ←→ cNFT (Ownership)**
+
+- **Immutable Manifest:** Arweave stores the original hardware signature and the full edit history. If an AI tool modifies the image, the C2PA signature chain is flagged, rendering the proof invalid.
+- **Mutual Verification:**
+  1. **Arweave** records the target **cNFT address**.
+  2. **cNFT** records the **Arweave URI**.
+
+  *Validation requirement:* A proof is only "Authentic" if both records point to each other.
+
+> **Why this matters:**
+>
+> - **No Hijacking:** You cannot attach a real proof to a fake NFT.
+> - **No Spoofing:** You cannot re-mint a burned asset and claim its old history.
+> - **No AI Injection:** Any generative modification breaks the mathematical link between the physical sensor and the digital asset.
 
 ---
 
