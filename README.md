@@ -2,7 +2,7 @@
 
 > **Proof of Reality, Ownership on Chain**
 
-**RootLens** is a platform that combines C2PA hardware signatures with blockchain technology to redefine and protect the value of "reality" in the AI era.
+**RootLens** is a P2P marketplace that combines C2PA hardware signatures with blockchain technology to enable direct licensing of verified authentic content—establishing clear ownership while eliminating intermediaries.
 
 ## 🎬 Demo Video
 
@@ -16,7 +16,7 @@
 
 ## 🎯 One-Liner
 
-**"A platform that gives ownership and liquidity to authentic content captured by hardware"**
+**"A P2P marketplace that establishes ownership and enables direct licensing of verified authentic content"**
 
 ---
 
@@ -39,8 +39,8 @@ Ironically, AI's advancement has made **"content actually captured by cameras, u
 Yet there's no mechanism to **monetize** that value:
 
 - C2PA-compatible cameras can prove authenticity
-- But there's no marketplace to buy/sell content with that proof
-- No clear way to establish who owns the rights to that image
+- But there's no marketplace to **license** content with that proof directly from creators
+- No clear way to establish who owns the rights to that content
 
 ---
 
@@ -61,13 +61,13 @@ Yet there's no mechanism to **monetize** that value:
 
 ### Technology ②: Blockchain (Solana + Arweave)
 
-- Links ownership of verified content to wallets
-- Enables rights to be **bought/sold as NFTs**
+- Links ownership of verified content to wallets as **NFTs (digital rights anchor)**
+- Enables **direct P2P licensing** without intermediaries
 - Prevents hijacking through **mutual linking design**
 
 **Additional value blockchain provides:**
-- Clear ownership attribution
-- Rights liquidity (buying/selling/transfer)
+- Clear ownership attribution (immutable rights registry)
+- Direct creator monetization (99.9% revenue share)
 - Hijacking prevention (mutual linking)
 
 ---
@@ -80,10 +80,10 @@ Yet there's no mechanism to **monetize** that value:
 | Tamper detection | **C2PA** | ✓ Yes |
 | Provenance preservation | **C2PA** | ✓ Yes |
 | Clear ownership attribution | **Blockchain** | △ DB records possible, but... |
-| Rights liquidity (buy/sell/transfer) | **Blockchain** | ✗ Difficult |
+| Direct P2P creator payments | **Blockchain** | ✗ Difficult |
 | Hijacking prevention | **Blockchain** | ✗ Difficult |
 
-> C2PA alone enables trustless authenticity verification. Blockchain handles "who owns it" and "rights liquidity."
+> C2PA alone enables trustless authenticity verification. Blockchain handles "who owns it" and "direct monetization without intermediaries."
 
 ---
 
@@ -159,7 +159,7 @@ Since this is an MVP, we only created **one Merkle Tree**:
 1. **Upload** - Submit C2PA-signed images (use our samples)
 2. **Verify** - View certificate pages with full provenance
 3. **Search** - Use Lens feature (text or image search)
-4. **Trade** - Buy/sell verified content with SolanaPay
+4. **Purchase** - License verified content directly from creators via SolanaPay
 
 ---
 
@@ -447,18 +447,27 @@ RootLens is the first platform where this value can be priced.
 - **AI companies**: Purchase clean training data with provenance
 - **Insurance/Legal**: Use tamper-proof records as evidence
 
-SolanaPay direct transactions minimize platform fees and return value to creators.
+#### What You Get When You Purchase
 
-### Value ②: Ownership Visualization and Liquidity
+Unlike NFT speculation platforms, RootLens is a **professional content licensing marketplace**:
 
-Previously, digital content "ownership" was ambiguous.
+1. **Full-resolution original file** with embedded C2PA signature
+2. **Permanent download access** - Re-download anytime (like traditional stock photo sites)
+
+**That's it.** No complicated tokens, no speculation. Just high-quality verified content with cryptographic proof of authenticity.
+
+Payment goes directly to the creator's wallet (99.9% via SolanaPay). No intermediaries.
+
+### Value ②: Clear Rights Ownership & Direct Creator Payments
+
+Previously, digital content "ownership" was ambiguous—creators had no way to prove they own their work.
 
 With RootLens:
-- Content rights are **linked to wallets**, attribution is clear
-- **Tradable as NFTs** for buying/selling/transfer
-- Even if original files leak, **legitimate owners can be identified**
+- Content rights are **linked to wallets as NFTs** (immutable rights registry)
+- **99.9% of licensing fees go directly to creators** via SolanaPay (no intermediaries)
+- Even if original files leak, **legitimate rights holders can be identified on-chain**
 
-This turns "verified content rights" into a liquid, tradable asset.
+This transforms content licensing into a **transparent, creator-first marketplace**—like Shutterstock, but P2P with cryptographic proof of ownership.
 
 ### Value ③: Trust Search Engine (Lens Function)
 

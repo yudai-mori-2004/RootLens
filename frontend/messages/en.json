@@ -31,7 +31,7 @@
         "prefix": "Turn 'Real' into",
         "suffix": "Your Digital Asset"
       },
-      "description": "The power to prove \"This is reality,\" no matter how far it spreads. RootLens leverages hardware signatures to authenticate reality and blockchain to secure it as your asset. A new marketplace of trust, where unforgeable proof is owned and traded.",
+      "description": "The power to prove \"This is reality,\" no matter how far it spreads. RootLens leverages hardware signatures to authenticate reality and blockchain to protect your rights. A P2P stock library where you can license C2PA-verified data directly from creators.",
       "buttons": {
         "upload": "Upload with Proof",
         "search": "Search Content"
@@ -64,10 +64,10 @@
       },
       "blockchain": {
         "title": "Blockchain (Solana + Arweave)",
-        "desc": "Ownership and Liquidity of Rights",
-        "point1": "Established ownership through wallet linking",
-        "point2": "99.9% of sales revenue directly returned to rights holders",
-        "point3": "Seamless trading and transfer of 'the rights themselves' via NFTs"
+        "desc": "Immutable Ownership & Direct Monetization",
+        "point1": "Immutable ownership anchored to your wallet",
+        "point2": "99.9% of revenue paid instantly to rights holders (NFT holders)",
+        "point3": "Transparent content licensing managed via NFTs"
       },
       "comparison": {
         "title": "Why Web3? - Comparison with Web2 Approach",
@@ -93,9 +93,9 @@
                 "web3": "Identify rights holder via Wallet"
             },
             "liquidity": {
-                "label": "Trading / Liquidity of Rights",
-                "web2": "Difficult (Platform specific)",
-                "web3": "Free circulation as NFT"
+                "label": "Monetization Model",
+                "web2": "High fees (30-70%) via intermediaries",
+                "web3": "P2P direct transactions — 99.9% to creators"
             },
             "takeover": {
                 "label": "Hijack Prevention",
@@ -108,12 +108,12 @@
     "values": {
         "title": "3 Values Provided by RootLens",
         "value1": {
-            "title": "Marketplace for\nHardware Proof",
-            "desc": "The first place where value is found in 'being taken by a person who was really there' and compensation can be paid. For journalism, AI training data, legal evidence, etc."
+            "title": "P2P Stock Library of\nVerified Reality",
+            "desc": "License and download original C2PA-verified data directly from creators. Built for those who demand 'the truth' — journalism, AI training, legal evidence. Download anytime after purchase."
         },
         "value2": {
-            "title": "Visualization and\nLiquidity of Ownership",
-            "desc": "NFTs link digital ownership to your wallet, making rights transparent. Payments for certified content are sent directly to the owner through P2P."
+            "title": "Direct Creator Payouts\n& Rights Protection",
+            "desc": "NFTs serve as a digital ledger proving who the legitimate rights holder is. Zero intermediaries — licensing fees are instantly transferred to the creator's wallet."
         },
         "value3": {
             "title": "Search Engine of Trust\n(Lens Function)",
@@ -162,11 +162,11 @@
         },
         "q2": {
             "q": "What is the difference from traditional stock photo sites?",
-            "a": "The biggest difference is the 'handling of ownership'. In Web2 services, it is just a record in a database, but in RootLens, ownership is linked to the user's wallet using blockchain (NFT). This enables free buying and selling and transfer of rights, and the true owner can be identified even in the unlikely event of a leak."
+            "a": "The biggest differences are 'ownership handling' and 'revenue flow'. In Web2 services, ownership is just a database record, but RootLens links ownership to the creator's wallet via blockchain (NFT). Buyers purchase download licenses, and 99.9% of the fee goes directly to creators without intermediaries. Even in case of content leaks, the legitimate rights holder can be identified on-chain."
         },
         "q3": {
             "q": "Is it 'tamper-proof' thanks to the blockchain?",
-            "a": "No. Tamper detection and proof of authenticity of images are realized by 'C2PA' technology itself. The role of the blockchain is to record 'whose' proved content it is and to mobilize rights. By combining these two, both authenticity and ownership are secured."
+            "a": "No. Tamper detection and proof of authenticity of images are realized by 'C2PA' technology itself. The role of the blockchain is to record 'whose' proved content it is and to enable P2P direct transactions. By combining these two, both authenticity and ownership are secured."
         },
         "q4": {
             "q": "Why did you choose Solana and Arweave?",
