@@ -77,6 +77,13 @@ const worker = new Worker<MintJobData, MintJobResult>(
     stalledInterval: 30000,  // 固まったジョブ検出を30秒ごとに（Redisコマンド削減）
     lockDuration: 30000,     // ジョブロック時間
     maxStalledCount: 1,      // 固まったと判定する最大回数
+    removeOnComplete: {
+      age: 86400,   // 24時間後に自動削除（メモリ節約）
+      count: 1000,  // または最大1000件まで保持
+    },
+    removeOnFail: {
+      age: 604800,  // 失敗ジョブは7日間保持（デバッグ用）
+    },
   }
 );
 
