@@ -93,23 +93,28 @@ Yet there's no mechanism to **monetize** that value:
 
 C2PA signatures are often **lost when images are compressed or shared on social media**. When you download an image from Twitter/Instagram, the embedded C2PA metadata is typically stripped away—making verification impossible even if the image was originally authenticated.
 
-**RootLens's Solution: Optimistic Proof via Certificate Pages**
+**RootLens's Solution: Optimistic Proof via Asset Pages**
 
-RootLens solves this by creating a **permanent "Certificate Page" on-chain** linked to the image's content hash:
+RootLens solves this by creating a **permanent "Asset Page"** (proof certificate + marketplace listing) on-chain:
 
-1. **Upload Phase**: Image hash + C2PA proof → stored on Arweave (permanent)
-2. **Distribution Phase**: Image spreads on social media → metadata gets stripped
-3. **Verification Phase**: Anyone can search the image hash via **Lens** → finds the original certificate page
+1. **Upload Phase**: C2PA-verified content → Asset Page created on Arweave (permanent)
+2. **Distribution Phase**: Image spreads on social media → C2PA metadata gets stripped
+3. **Verification Phase**: Anyone can use **Lens (AI-powered visual search)** to find the original Asset Page
 
-**Result:** Even if the file's C2PA signature is gone, the image's **"Proof of Reality" can be recovered** by searching its visual fingerprint on RootLens.
+**Result:** Even without the original file's C2PA signature, the **"Proof of Reality" can be recovered** by searching visually similar content on RootLens.
 
-> **This provides an "Optimistic Proof" of origin**—the certificate page's existence on-chain serves as trusted evidence, even without the original file's metadata.
+> **This provides an "Optimistic Proof" of origin**—the Asset Page's existence on-chain serves as trusted evidence, even when you don't have access to the original file with embedded metadata.
+
+**How It Works:**
+- **Lens Search**: AI generates semantic descriptions of images and matches them via vector similarity
+- **Not perceptual hashing**: Uses Cloudflare Workers AI (image captioning + text embeddings) for flexible, content-aware search
+- **Asset Page**: Displays C2PA provenance data, ownership info, and licensing options—all verifiable on-chain
 
 **Real-World Use Case:**
-- A news photo spreads on Twitter (metadata stripped)
-- Fact-checkers use RootLens Lens search (image or hash)
-- Find the original certificate → verify it was captured by a legitimate photographer with hardware proof
-- Trust restored, even without the original file
+- A news photo spreads on Twitter (C2PA metadata stripped)
+- Fact-checkers upload the image to **RootLens Lens** (visual search)
+- System finds the original Asset Page → shows it was captured by a verified photographer with hardware proof
+- Trust restored, even without the original file's metadata
 
 ---
 
@@ -183,7 +188,7 @@ Since this is an MVP, we only created **one Merkle Tree**:
 ### What You Can Try
 
 1. **Upload** - Submit C2PA-signed images (use our samples)
-2. **Verify** - View certificate pages with full provenance
+2. **Verify** - View Asset Pages with full provenance
 3. **Search** - Use Lens feature (text or image search)
 4. **Purchase** - License verified content directly from creators via SolanaPay
 
@@ -511,7 +516,7 @@ RootLens search isn't just image search—it's a **trust verification tool** tha
 
 **Key Use Cases:**
 
-1. **Metadata Recovery**: Image shared on social media (C2PA stripped) → Lens search by visual similarity → Find original certificate page with full provenance
+1. **Metadata Recovery**: Image shared on social media (C2PA stripped) → Lens search by visual similarity → Find original Asset Page with full provenance
 2. **Fact-Checking**: Journalist sees viral photo → Upload to Lens → Verify if hardware-captured or AI-generated
 3. **Content Sourcing**: AI company needs clean training data → Search by keyword → License only verified authentic images
 
