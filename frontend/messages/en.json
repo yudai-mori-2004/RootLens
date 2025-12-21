@@ -197,7 +197,7 @@
         "desc": "Connect your Solana wallet to prove ownership of your captured content",
         "notConnected": {
             "title": "Connect Wallet to Start",
-            "desc": "RootLens links content rights directly to your wallet.\nThis enables proof of authenticity and sales of rights.",
+            "desc": "RootLens links content rights directly to your wallet.\nThis enables proof of authenticity and content licensing.",
             "button": "Select Wallet to Connect",
             "connecting": "Connecting..."
         },
@@ -240,14 +240,14 @@
     },
     "settings": {
         "title": "Pricing & Info",
-        "desc": "Set information to verify on the public page and sales price as an asset",
+        "desc": "Set information to display on the public page and download license price",
         "cardTitle": "Content Information",
         "cardDesc": "Enter content information to be displayed on the public page",
         "inputTitle": "Title (Optional)",
         "placeholderTitle": "Ex: Mt. Fuji at Sunset",
         "inputDesc": "Description (Optional)",
         "placeholderDesc": "Ex: Taken in Yamanashi, Jan 2025. C2PA Verified.",
-        "inputPrice": "Sales Price",
+        "inputPrice": "Download Price",
         "priceInfo": "If set to 0 SOL, it will be provided as free material (record as asset remains)",
         "next": "Start Upload"
     },
@@ -354,7 +354,7 @@
         "data": "Permanent Data",
         "dataDesc": "The hash value of this content and the address of the cNFT representing ownership are permanently stored on the Arweave blockchain. No risk of server downtime or tampering.",
         "ownership": "Digital Ownership",
-        "ownershipDesc": "Ownership is managed as a compressed NFT (cNFT) on the Solana blockchain. This clarifies rights and enables immediate trading.",
+        "ownershipDesc": "Ownership is managed as a compressed NFT (cNFT) on the Solana blockchain. This gives creators full control over ownership—they can hold, transfer, or monetize as they choose.",
         "explorer": "View on Explorer",
         "hardwareSealed": "Hardware Sealed",
         "hardwareBadge": "Hardware",
