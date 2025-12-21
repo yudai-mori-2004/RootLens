@@ -586,8 +586,11 @@ We prioritized **Core Architecture Validation** and **UI/UX** for this hackathon
 | **Multi-Tree Scaling** | ⏳ Phase 2 | Currently single-threaded (`concurrency: 1`) to ensure sequential minting. Phase 2 will introduce random tree selection for parallel processing. |
 | **DoS Protection** | ⏳ Phase 2 | Subscription plans with Privy KYC-based rate limiting for free tier. |
 
-**Why this trade-off?**
-We focused on demonstrating the **novelty of the Asset ID prediction mechanism** and the **C2PA x Solana user experience** first. The server-side validation is a standard engineering task (implementing existing libraries), whereas our architectural approach to C2PA/Solana integration is a new research area.
+**Why this trade-off? (Strategic Focus)**
+
+We prioritized proving the feasibility of our **unique protocol**—the Lens search and deterministic Asset ID prediction—over implementing established security patterns. 
+
+Server-side C2PA validation is a well-documented engineering task that we have already architected for Phase 2. By focusing on the "First Frame" principle and the AI-Blockchain integration, we aimed to demonstrate the **high-innovation components** that make RootLens a new category of marketplace.
 
 ### 🔮 Phase 2 Vision: Enhanced Trust and Verifiability
 
@@ -651,16 +654,17 @@ RootLens prioritizes making server operations **auditable and verifiable** rathe
 ```
 RootLens/
 ├── frontend/              # Next.js 15 app
-│   ├── app/              # App Router pages
-│   ├── components/       # React components
-│   └── lib/              # Utilities, C2PA verification
-├── worker/               # Background job processor (Railway)
-│   ├── src/              # Worker logic
-│   └── jobs/             # Job handlers
-├── lens-worker/          # Cloudflare Workers (Lens search)
-└── document/             # Documentation
-    ├── mvp/              # MVP specs
-    └── phase2/           # Future improvements
+│   ├── app/
+│   │   ├── [locale]/      # i18n Routing pages
+│   │   ├── components/    # Domain components
+│   │   └── lib/           # C2PA verification & Helpers
+│   └── components/ui/     # shadcn/ui components
+├── worker/                # Background job processor (Railway)
+│   └── src/               # Worker logic (Minting, Arweave)
+├── lens-worker/           # Cloudflare Workers (Lens search)
+└── document/              # Documentation
+    ├── mvp/               # MVP specs
+    └── phase2/            # Future improvements
 ```
 
 ---
