@@ -191,6 +191,14 @@ This ensures that the immutable record on Arweave contains the correct Solana ad
 
 ---
 
+### 📱 Empirical Hardware Verification with Physical Devices
+
+Unlike many projects that rely on simulated data, **RootLens was built and tested using physical Pixel 10 hardware.** We invested in the latest hardware to ensure our C2PA parsing and verification logic correctly handles **hardware-level signatures**. 
+
+This hands-on validation allowed us to identify and resolve real-world edge cases—such as missing data hashes (relying on Instance ID as a fallback)—that simply cannot be observed in emulated environments. This ensures RootLens is production-ready for the next generation of C2PA-enabled devices.
+
+---
+
 ### Tech Stack
 
 | Layer | Technology | Why |
