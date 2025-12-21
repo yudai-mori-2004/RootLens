@@ -729,6 +729,14 @@ For questions about this submission:
 
 ---
 
+## 👨‍💻 Team
+
+**Yudai Mori** (Solo Project)
+
+> "Built entirely by one person in 2 weeks for the Solana Student Hackathon 2025."
+
+---
+
 ## 📜 License
 
 MIT License - see [LICENSE](./LICENSE) file for details
