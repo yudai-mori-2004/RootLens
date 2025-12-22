@@ -597,60 +597,34 @@ For this hackathon submission, we made a strategic decision to defer **Server-si
 
 *Note: The architecture for server-side verification is fully designed and documented in `document/phase2/`.*
 
-### 🔮 Phase 2 Vision: Enhanced Trust and Verifiability
+### 🔮 Phase 2 Vision: Trustless Infrastructure via TEE
 
-**Why Server-Side Minting is Architecturally Required:**
+**The "Trust Gap" in Current Web3-Bridge Architecture:**
 
-RootLens's mutual linking design depends on **Asset ID prediction**, which requires:
-1. **Serial processing**: One mint at a time to read `numMinted` accurately
-2. **Deterministic ordering**: Predict → Upload to Arweave → Mint in sequence
-3. **Gas-free UX**: Server pays minting costs, users don't need SOL
+RootLens's mutual linking design depends on **Asset ID prediction**, which currently requires a server-side worker to:
+1. Fetch the latest Merkle Tree state.
+2. Predict the next leaf index.
+3. Perform the minting transaction.
 
-❌ **Client-side minting** would break this:
-- Users could mint in any order → prediction accuracy drops
-- Users would need SOL for gas fees → bad UX
-- Users would need to sign mint transactions → added friction
+While the *result* is verifiable on-chain, the *process* of minting (specifically the C2PA re-verification and the integrity of the upload) currently relies on a centralized server.
 
-✅ **Server-side minting is necessary**, but creates a trust assumption during upload.
+**Phase 2 Solution: Trusted Execution Environment (TEE)**
 
-**Current Security Model: Post-Mint Verification**
+To eliminate the need to trust the server operator, we are moving the core processing logic into a **TEE (e.g., AWS Nitro Enclaves, Azure Confidential Computing, or Phala Network)**.
 
-RootLens uses a **"verify after minting"** approach:
+1.  **Verifiable C2PA Parsing**: The Node.js worker running inside the TEE will perform the hardware signature verification. Because it's in a TEE, the server owner cannot modify the verification code to accept fake signatures.
+2.  **Attestation-based Minting**: The TEE generates a **Remote Attestation**, a cryptographic proof that the exact, audited code is running on genuine hardware.
+3.  **Trustless Bridge**: The TEE itself will hold the Solana private key (or sign via a proxy) and execute the minting only after successful C2PA validation.
 
-**What's Already Trustless:**
-- ✅ **Camera hardware** cryptographically proves image authenticity (C2PA)
-- ✅ **Post-mint verification** is fully trustless (anyone can re-verify C2PA + on-chain data)
-- ✅ **Mutual linking** prevents ownership hijacking
+> **The Result: Total Verification Sovereignty**
+>
+> - **Trustless Content**: Guaranteed by C2PA Hardware Signatures.
+> - **Trustless Ownership**: Guaranteed by Solana/Arweave Mutual Linking.
+> - **Trustless Processing**: Guaranteed by TEE Execution Proofs.
 
-**Where Trust is Required (MVP):**
-- ⚠️ Server operator during the upload/mint process
+By shifting to TEE, RootLens transforms from a "Verifiable Marketplace" to a **"Trustless Provenance Protocol"**, where the server operator has zero power to forge or manipulate content records.
 
-**Two Potential Server Tampering Vectors:**
-
-1. **Image Substitution**: Server could store a different image in R2 than what was uploaded
-2. **Owner Address Manipulation**: Server could change the cNFT owner address during minting
-
-**Phase 2 Solution: Verifiable Server Operations**
-
-We will provide mechanisms to **verify these critical operations post-mint**:
-
-- **Image Integrity Verification**: Allow users to cryptographically verify that the R2-stored image matches what was originally uploaded
-- **Owner Address Verification**: Provide transparent proof that the minted cNFT owner matches the uploader's wallet
-
-These verification mechanisms will ensure that even though the server performs minting, **any tampering is detectable by anyone**.
-
-**Additional Phase 2 Features:**
-- **Server-Side C2PA Re-Verification**: Prevent fraudulent uploads at the source using `c2pa-node`
-- **DoS Protection**: Subscription plans with Privy KYC-based rate limiting
-- **Multi-Tree Scaling**: Parallel processing with multiple Merkle Trees
-
-**Design Philosophy:**
-
-> **"Trust minimization through verifiability, not through obscurity."**
-
-RootLens prioritizes making server operations **auditable and verifiable** rather than relying solely on operational security. This aligns with Web3 principles while maintaining the UX benefits of server-side processing.
-
-📅 **Implementation Timeline**: Phase 2 roadmap to be detailed post-hackathon.
+📅 **Implementation Timeline**: Phase 2 implementation focusing on TEE integration is scheduled for Q1 2026.
 
 ---
 
