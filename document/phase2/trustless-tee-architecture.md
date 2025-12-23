@@ -85,7 +85,7 @@ graph TD
 
     subgraph "Governance Layer (Solana)"
         Registry[Policy Registry<br/>Program]
-        ProofAccount[Proof Account<br/>PDA]
+        Bubblegum[Bubblegum Program<br/>cNFT Mint]
     end
 
     %% TEE Process
@@ -96,8 +96,8 @@ graph TD
     TEE -->|12. Execute Policy| TEE
     TEE -->|13. Extract JUMBF| TEE
     TEE -->|14. Upload JUMBF| Arweave
-    TEE -->|15. Sign & Submit Tx| Registry
-    Registry -->|16. Create Proof Record| ProofAccount
+    TEE -->|15. Upload cNFT Metadata<br/>(includes Attestation)| Arweave
+    TEE -->|16. Mint cNFT| Bubblegum
 
     %% Secret Management
     TEE -.->|Attestation + Decrypt| KMS[AWS KMS]
@@ -395,20 +395,73 @@ async function verifyFromArweave(jumbfUrl: string, currentImage: Buffer) {
 
 ### D. Blockchain: Solana Program Design
 
-#### Program構造
+**重要な設計決定**: 証明データの記録には**既存のcNFT metadata（Arweave JSON）を活用**し、新しいSolana Accountは作成しない。
+
+#### 既存の相互リンク設計を拡張
+
+**Phase 1（現在）**:
+```json
+// Arweave: https://devnet.irys.xyz/4rQqu...
+{
+  "name": "RootLens Proof #abc123",
+  "symbol": "RLENS",
+  "description": "Media authenticity proof verified by RootLens",
+  "target_asset_id": "2XPSV8i...",  // ← cNFTへの参照
+  "attributes": [
+    { "trait_type": "original_hash", "value": "..." },
+    { "trait_type": "root_signer", "value": "Google LLC" },
+    { "trait_type": "claim_generator", "value": "Pixel 10" },
+    { "trait_type": "source_type", "value": "digitalCapture" }
+  ]
+}
+```
+
+**Phase 2（TEE統合後）**:
+```json
+{
+  "name": "RootLens Proof #abc123",
+  "symbol": "RLENS",
+  "description": "Media authenticity proof verified by RootLens TEE",
+  "target_asset_id": "2XPSV8i...",
+  "attributes": [
+    { "trait_type": "original_hash", "value": "..." },
+    { "trait_type": "root_signer", "value": "Google LLC" },
+    { "trait_type": "claim_generator", "value": "Pixel 10" },
+    { "trait_type": "source_type", "value": "digitalCapture" },
+    // ↓ 以下を追加
+    { "trait_type": "jumbf_url", "value": "https://arweave.net/xyz..." },
+    { "trait_type": "attestation_url", "value": "https://arweave.net/attestation123..." },
+    { "trait_type": "policy_version", "value": "1.0.0" },
+    { "trait_type": "verified_at", "value": "2025-12-23T10:30:00Z" }
+  ],
+  // オプション: Attestationデータを直接埋め込む（効率化）
+  "tee_attestation": {
+    "pcr0": "a1b2c3d4...",  // Enclave Image Hash
+    "pcr1": "e5f6g7h8...",
+    "pcr2": "i9j0k1l2...",
+    "timestamp": 1703328600,
+    "nonce": "random_nonce_123",
+    "signature": "AWS_Nitro_Signature..."
+  }
+}
+```
+
+#### 必要なSolana Program: Policy Registry のみ
+
+**目的**: 検証ポリシー（JavaScript）の管理とガバナンス
 
 ```rust
-// programs/rootlens-registry/src/lib.rs
+// programs/policy-registry/src/lib.rs
 use anchor_lang::prelude::*;
 
-declare_id!("RooTxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+declare_id!("PoLixxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
 #[program]
-pub mod rootlens_registry {
+pub mod policy_registry {
     use super::*;
 
     /// ポリシーレジストリの初期化
-    pub fn initialize_registry(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         let registry = &mut ctx.accounts.registry;
         registry.authority = ctx.accounts.authority.key();
         registry.current_policy_url = String::from("");
@@ -437,42 +490,15 @@ pub mod rootlens_registry {
 
         Ok(())
     }
-
-    /// TEEからの証明記録（Attestation付き）
-    pub fn record_proof(
-        ctx: Context<RecordProof>,
-        original_hash: String,
-        jumbf_url: String,
-        jumbf_hash: [u8; 32],
-        enclave_attestation: Vec<u8>,
-    ) -> Result<()> {
-        // 1. Attestation検証（簡易版）
-        require!(
-            verify_nitro_attestation(&enclave_attestation),
-            ErrorCode::InvalidAttestation
-        );
-
-        // 2. Proof Account作成
-        let proof = &mut ctx.accounts.proof;
-        proof.original_hash = original_hash;
-        proof.jumbf_url = jumbf_url;
-        proof.jumbf_hash = jumbf_hash;
-        proof.verified_at = Clock::get()?.unix_timestamp;
-        proof.policy_version = ctx.accounts.registry.version;
-        proof.tee_attestation = enclave_attestation;
-
-        Ok(())
-    }
 }
 
 #[account]
-pub struct ProofAccount {
-    pub original_hash: String,
-    pub jumbf_url: String,
-    pub jumbf_hash: [u8; 32],
-    pub verified_at: i64,
-    pub policy_version: u32,
-    pub tee_attestation: Vec<u8>,  // Nitro Attestation Document
+pub struct PolicyRegistry {
+    pub authority: Pubkey,
+    pub current_policy_url: String,     // "https://arweave.net/policy_v1.0.0.js"
+    pub current_policy_hash: [u8; 32],  // SHA-256
+    pub version: u32,
+    pub last_updated: i64,
 }
 
 #[event]
@@ -483,25 +509,81 @@ pub struct PolicyUpdated {
 }
 ```
 
-#### Attestation検証
+**設計の利点**:
+1. ✅ **Solanaへの追加書き込みなし** - cNFT mintは既存通りBubblegumを使用
+2. ✅ **トランザクションサイズ制限回避** - Attestation本体はArweaveへ
+3. ✅ **相互リンク設計の一貫性** - cNFT ←→ Arweave の既存パターンを維持
+4. ✅ **コスト効率** - Arweave料金のみ（Solana transaction fee増加なし）
 
-```rust
-// Nitro Attestation検証（簡易版）
-fn verify_nitro_attestation(attestation: &[u8]) -> bool {
-    // 1. CBOR Decode
-    let doc: AttestationDocument = cbor::from_slice(attestation).ok()?;
+#### Attestation検証フロー
 
-    // 2. 署名検証（AWS公開鍵）
-    let aws_root_cert = include_bytes!("aws_nitro_root.pem");
-    verify_signature(&doc, aws_root_cert)?;
+**検証は完全にクライアント側で実行**
 
-    // 3. PCR検証（期待されるイメージハッシュ）
-    let expected_pcr0 = env!("EXPECTED_ENCLAVE_IMAGE_HASH");
-    require!(doc.pcrs[0] == expected_pcr0, "PCR mismatch");
+```typescript
+// クライアント側の検証フロー
+async function verifyProof(cnftAddress: string) {
+  // 1. cNFTからmetadata URIを取得
+  const cnft = await helius.getAsset(cnftAddress);
+  const metadataUri = cnft.content.json_uri;
 
-    true
+  // 2. Arweave metadataを取得
+  const metadata = await fetch(metadataUri).then(r => r.json());
+
+  // 3. Attestationを取得（2つの方法）
+  let attestation;
+  if (metadata.tee_attestation) {
+    // 方法A: 直接埋め込み（効率的）
+    attestation = metadata.tee_attestation;
+  } else {
+    // 方法B: 別Arweaveから取得
+    const attestationUrl = metadata.attributes.find(
+      a => a.trait_type === 'attestation_url'
+    )?.value;
+    attestation = await fetch(attestationUrl).then(r => r.json());
+  }
+
+  // 4. Attestation署名検証（AWS公開鍵）
+  const isValidSignature = await verifyNitroSignature(
+    attestation.signature,
+    attestation
+  );
+
+  // 5. PCR検証（Enclave Imageが正しいか）
+  const expectedPCR0 = await fetch('https://rootlens.io/enclave-hash.txt')
+    .then(r => r.text());
+  const isValidPCR = attestation.pcr0 === expectedPCR0;
+
+  // 6. JUMBFからC2PA検証
+  const jumbfUrl = metadata.attributes.find(
+    a => a.trait_type === 'jumbf_url'
+  )?.value;
+  const jumbf = await fetch(jumbfUrl).then(r => r.arrayBuffer());
+  const c2paValid = await verifyC2PA(jumbf);
+
+  return {
+    attestationValid: isValidSignature && isValidPCR,
+    c2paValid,
+    policyVersion: metadata.attributes.find(
+      a => a.trait_type === 'policy_version'
+    )?.value
+  };
 }
 ```
+
+**Trust Model（3層検証）**:
+
+| 層 | 役割 | 検証者 | 信頼の根拠 |
+|----|------|--------|-----------|
+| **Layer 1: C2PA** | コンテンツ真正性 | クライアント | ハードウェア署名（カメラ） |
+| **Layer 2: TEE** | 検証プロセス正当性 | クライアント | Nitro Attestation（AWS署名） |
+| **Layer 3: Blockchain** | 所有権・時系列 | 全ノード | Solana consensus |
+
+**データの配置**:
+- **Arweave**: JUMBF、Attestation、Policy Script、cNFT metadata → 永続・改ざん不可
+- **Solana**: cNFT（所有権）、Policy Registry（ガバナンス） → 分散・検証可能
+- **R2**: 元画像（高速配信用） → 一時的・可変
+
+→ **サーバーは証明を作るが、誰でも後から完全に検証可能**
 
 ---
 
@@ -594,26 +676,77 @@ async function processInEnclave(task: VerificationTask) {
   // 5. JUMBF抽出
   const jumbf = extractJUMBF(content);
 
-  // 6. Arweaveアップロード（Host経由）
-  const arweaveTx = await uploadViaVSock('/arweave/upload', jumbf);
+  // 6. JUMBFをArweaveへアップロード（Host経由）
+  const jumbfTx = await uploadViaVSock('/arweave/upload', jumbf, {
+    tags: [
+      { name: 'Content-Type', value: 'application/octet-stream' },
+      { name: 'RootLens-Type', value: 'JUMBF-Box' },
+    ]
+  });
 
   // 7. Attestation生成
   const attestation = await generateAttestation();
 
-  // 8. Solanaトランザクション署名
-  const tx = await createProofTransaction({
-    originalHash: sha256(content),
-    jumbfUrl: arweaveTx.url,
-    jumbfHash: sha256(jumbf),
-    attestation,
+  // 8. 次のAsset ID予測
+  const { predictedAssetId, nextLeafIndex } = await predictNextAssetId();
+
+  // 9. cNFT Metadata構築（Attestation含む）
+  const metadata = {
+    name: `RootLens Proof #${sha256(content).slice(0, 8)}`,
+    symbol: 'RLENS',
+    description: 'Media authenticity proof verified by RootLens TEE',
+    target_asset_id: predictedAssetId,  // ← 相互リンク
+    attributes: [
+      { trait_type: 'original_hash', value: sha256(content) },
+      { trait_type: 'root_signer', value: manifest.signatureInfo.issuer },
+      { trait_type: 'claim_generator', value: manifest.claimGenerator },
+      { trait_type: 'source_type', value: result.sourceType },
+      { trait_type: 'jumbf_url', value: jumbfTx.url },  // ← JUMBF参照
+      { trait_type: 'policy_version', value: policy.version.toString() },
+      { trait_type: 'verified_at', value: new Date().toISOString() },
+    ],
+    // Attestationを直接埋め込み（効率的）
+    tee_attestation: {
+      pcr0: attestation.pcr0,
+      pcr1: attestation.pcr1,
+      pcr2: attestation.pcr2,
+      timestamp: attestation.timestamp,
+      nonce: attestation.nonce,
+      signature: attestation.signature,
+    }
+  };
+
+  // 10. MetadataをArweaveへアップロード
+  const metadataTx = await uploadViaVSock('/arweave/upload',
+    JSON.stringify(metadata), {
+    tags: [
+      { name: 'Content-Type', value: 'application/json' },
+      { name: 'RootLens-Type', value: 'cNFT-Metadata' },
+    ]
   });
 
-  const signedTx = await signWithEnclaveKey(tx);
+  // 11. cNFT Mint（Bubblegum使用）
+  const mintTx = await createMintTransaction({
+    leafOwner: task.userWallet,
+    merkleTree: process.env.MERKLE_TREE_ADDRESS,
+    metadata: {
+      name: metadata.name,
+      symbol: metadata.symbol,
+      uri: metadataTx.url,  // ← Arweave metadata URI
+    }
+  });
 
-  // 9. 送信（Host経由）
-  await submitViaVSock('/solana/send', signedTx);
+  const signedMintTx = await signWithEnclaveKey(mintTx);
 
-  return { success: true, proofId: tx.proofAccount };
+  // 12. Mint実行（Host経由）
+  await submitViaVSock('/solana/send', signedMintTx);
+
+  return {
+    success: true,
+    cnftAddress: predictedAssetId,
+    metadataUrl: metadataTx.url,
+    jumbfUrl: jumbfTx.url,
+  };
 }
 ```
 
@@ -758,25 +891,7 @@ $110.8 ÷ 10,000件 = $0.011/件
 
 ## 🚀 技術的課題と解決策
 
-### Challenge 1: Attestation検証のガスコスト
-
-**問題**: Nitro AttestationはCBOR形式で数KB。Solana上で検証するとガスコストが高い。
-
-**解決策**:
-```rust
-// 完全検証ではなく「ハッシュ検証」のみをオンチェーン化
-pub fn record_proof(
-    ctx: Context<RecordProof>,
-    attestation_hash: [u8; 32], // ← ハッシュのみ渡す
-) -> Result<()> {
-    // オフチェーンで検証済みであることを前提
-    // 必要に応じてAttestationのフルデータはArweaveへ
-    proof.attestation_hash = attestation_hash;
-    Ok(())
-}
-```
-
-### Challenge 2: Policy Script実行の脆弱性
+### Challenge 1: Policy Script実行の脆弱性
 
 **問題**: 任意のJavaScriptを実行することのリスク。
 
@@ -801,7 +916,7 @@ const vm = new VM({
 });
 ```
 
-### Challenge 3: Enclave起動時間
+### Challenge 2: Enclave起動時間
 
 **問題**: Enclaveの起動に10-30秒かかる。
 
