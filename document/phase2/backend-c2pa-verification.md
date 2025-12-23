@@ -43,6 +43,12 @@ For the Hackathon MVP, we prioritized **Asset ID Prediction logic** and **Lens S
 - **Library**: `c2pa-node` (Official ContentAuth SDK)
 - **Infrastructure**: Custom Docker container for Railway (to support Rust bindings)
 
+> **⚠️ Important Note**: This document describes the **Phase 2.0 (Basic Server Verification)** approach. For the complete **Trustless Architecture using TEE**, see:
+>
+> 📄 **[Trustless TEE Architecture](./trustless-tee-architecture.md)** (Phase 2.2)
+>
+> The TEE approach eliminates trust in server operators through AWS Nitro Enclaves, cryptographic attestation, and on-chain policy governance.
+
 ---
 
 # バックエンドC2PA検証の必要性

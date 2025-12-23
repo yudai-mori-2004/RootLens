@@ -582,9 +582,11 @@ We prioritized **Core Architecture Validation** and **UI/UX** for this hackathon
 | **Asset ID Prediction** | ✅ Done | Deterministic PDA calculation |
 | **Solana Pay Verification** | ✅ Done | On-chain balance change verification |
 | **Mutual Linking Logic** | ✅ Done | Full cross-referencing check |
-| **Server-Side C2PA Verification** | ⏳ Phase 2 | Add server-side C2PA re-verification using `c2pa-node` to prevent fraudulent uploads at the source. |
-| **Multi-Tree Scaling** | ⏳ Phase 2 | Currently single-threaded (`concurrency: 1`) to ensure sequential minting. Phase 2 will introduce random tree selection for parallel processing. |
-| **DoS Protection** | ⏳ Phase 2 | Subscription plans with Privy KYC-based rate limiting for free tier. |
+| **Server-Side C2PA Verification** | ⏳ Phase 2.0 | Add server-side C2PA re-verification using `c2pa-node` to prevent fraudulent uploads at the source. |
+| **TEE Integration (AWS Nitro)** | ⏳ Phase 2.1 | Move verification into Trusted Execution Environment for cryptographic proof of correct execution. |
+| **Policy as Code + On-chain Governance** | ⏳ Phase 2.2 | JavaScript-based verification policies managed via Solana Registry Program. |
+| **Multi-Tree Scaling** | ⏳ Phase 2.0 | Currently single-threaded (`concurrency: 1`) to ensure sequential minting. Phase 2 will introduce random tree selection for parallel processing. |
+| **DoS Protection** | ⏳ Phase 2.0 | Subscription plans with Privy KYC-based rate limiting for free tier. |
 
 **Why this trade-off? (Strategic Focus)**
 
@@ -625,6 +627,13 @@ To eliminate the need to trust the server operator, we are moving the core proce
 By shifting to TEE, RootLens transforms from a "Verifiable Marketplace" to a **"Trustless Provenance Protocol"**, where the server operator has zero power to forge or manipulate content records.
 
 📅 **Implementation Timeline**: Phase 2 implementation focusing on TEE integration is scheduled for Q1 2026.
+
+> 📄 **Complete Technical Specification**: See [`document/phase2/trustless-tee-architecture.md`](./document/phase2/trustless-tee-architecture.md) for the full design including:
+> - AWS Nitro Enclaves architecture
+> - Policy as Code (JavaScript-based governance)
+> - Hybrid Storage Model (R2 + Arweave JUMBF)
+> - Solana Registry Program design
+> - Cost analysis and scaling strategy
 
 ---
 
