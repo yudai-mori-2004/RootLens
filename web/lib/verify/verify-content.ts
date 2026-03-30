@@ -374,7 +374,10 @@ async function verifyTeeSignature(
 ): Promise<VerifyStepStatus> {
   try {
     const { tee_pubkey, tee_signature, payload, attributes } = signedJson;
-    const signatureTarget = JSON.stringify({ payload, attributes });
+    // RFC 8785 JCS — TP の serde_json_canonicalizer と同一の正規化
+    const canonicalize = (await import("canonicalize")).default;
+    const signatureTarget = canonicalize({ payload, attributes });
+    if (!signatureTarget) return "failed";
     const data = new TextEncoder().encode(signatureTarget);
     const pubkeyBytes = base58Decode(tee_pubkey);
     const sigBytes = base64ToBytes(tee_signature);

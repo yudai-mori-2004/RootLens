@@ -49,27 +49,46 @@ export function useC2paCache(assets: MediaLibrary.Asset[]) {
   const [, setVersion] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
     loadPersistedCache().then(() => {
-      setVersion(v => v + 1); // 永続キャッシュ復元後に再描画
+      if (cancelled) return;
+      setVersion(v => v + 1);
 
       const unchecked = assets.filter(a => !memCache[a.id] && !checking.has(a.id));
+      if (unchecked.length === 0) return;
+
+      // 同時実行数を制限（JNI参照テーブル溢れ防止）
+      const CONCURRENCY = 3;
+      let idx = 0;
       let newEntries = 0;
 
-      for (const asset of unchecked) {
-        checking.add(asset.id);
-        readManifest(asset.uri).then(info => {
-          memCache[asset.id] = info;
+      const processNext = async () => {
+        while (idx < unchecked.length && !cancelled) {
+          const asset = unchecked[idx++];
+          checking.add(asset.id);
+          try {
+            const info = await readManifest(asset.uri);
+            if (cancelled) return;
+            memCache[asset.id] = info;
+            newEntries++;
+            setVersion(v => v + 1);
+            if (newEntries % 10 === 0) persistCache();
+          } catch {}
           checking.delete(asset.id);
-          newEntries++;
-          setVersion(v => v + 1);
+        }
+        if (!cancelled && checking.size === 0 && newEntries > 0) {
+          persistCache();
+        }
+      };
 
-          // 10件ごとにバッチ永続化（毎回は重い）
-          if (newEntries % 10 === 0 || checking.size === 0) {
-            persistCache();
-          }
-        });
+      // CONCURRENCY 個のワーカーを並列起動
+      for (let i = 0; i < Math.min(CONCURRENCY, unchecked.length); i++) {
+        processNext();
       }
     });
+
+    return () => { cancelled = true; };
   }, [assets]);
 
   return memCache;
