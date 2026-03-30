@@ -10,7 +10,7 @@
  *
  * NFT固有ステップ (specificChecks):
  *  Core (c2pa): C2PA来歴チェーン確認, content_hash一致, 重複解決
- *  Extension (image-phash): pHash同一性検証
+ *  Extension (image-pdq): PDQ同一性検証
  *  Extension (hardware-*): ハードウェア署名検出
  *  Extension (その他): WASMハッシュ検証
  */
@@ -22,11 +22,11 @@ import {
   getGlobalConfigData,
   findWasmVersionByHash,
   type GlobalConfigData,
-  PHASH_THRESHOLD,
+  PDQ_THRESHOLD,
   DAS_RPC_URL,
 } from "./config";
 import { contentResolver } from "./content-resolver";
-import { computePHashWasm } from "./phash-wasm";
+import { computePdqWasm } from "./pdq-wasm";
 
 // ---------------------------------------------------------------------------
 // メインの検証関数
@@ -37,7 +37,7 @@ export type CheckTranslator = (key: string, params?: Record<string, string | num
 
 /**
  * ユーザーが手元で知覚しているメディアへの参照。
- * オンチェーンに記録された知覚特徴量（pHash等）との同一性検証に使用する。
+ * オンチェーンに記録された知覚特徴量（PDQ等）との同一性検証に使用する。
  *
  * これらはRootLensサーバー由来であり、信頼境界の外にある。
  * 検証結果は「この表示データがオンチェーン記録と一致するか」を示すものであり、
@@ -46,9 +46,9 @@ export type CheckTranslator = (key: string, params?: Record<string, string | num
  * 全フィールドはURL形式。ローカルデータは URL.createObjectURL(blob) で変換可能。
  */
 export interface PerceptualInputs {
-  /** 画像pHash比較対象。image-phash Extension の検証に使用 */
+  /** 画像PDQ比較対象。image-pdq Extension の検証に使用 */
   imageUrl?: string;
-  /** 動画pHash比較対象。video-phash Extension の検証に使用（将来） */
+  /** 動画vPDQ比較対象。video-vpdq Extension の検証に使用（将来） */
   videoUrl?: string;
 }
 
@@ -263,39 +263,39 @@ export async function verifyContentOnChain(
       });
     }
 
-    // Extension固有: image-phash → pHash同一性検証
-    if (extId === "image-phash") {
-      const phashPayload = extPayload as ExtensionPayload & { phash?: string };
-      if (phashPayload.phash) {
-        const phashResult = perceptual.imageUrl
-          ? await verifyPHashWithImage(phashPayload.phash, perceptual.imageUrl, wasmHash)
-          : { status: "skipped" as const, reason: "No image URL provided for pHash comparison" };
-        if (phashResult.distance !== undefined) {
-          const phashIcon = phashResult.status === "verified" ? "\u2713" : "\u2717";
-          const phashStyle = phashResult.status === "verified" ? S.pass : S.fail;
+    // Extension固有: image-pdq → PDQ同一性検証
+    if (extId === "image-pdq") {
+      const pdqPayload = extPayload as ExtensionPayload & { pdqhash?: string };
+      if (pdqPayload.pdqhash) {
+        const pdqResult = perceptual.imageUrl
+          ? await verifyPdqWithImage(pdqPayload.pdqhash, perceptual.imageUrl, wasmHash)
+          : { status: "skipped" as const, reason: "No image URL provided for PDQ comparison" };
+        if (pdqResult.distance !== undefined) {
+          const pdqIcon = pdqResult.status === "verified" ? "\u2713" : "\u2717";
+          const pdqStyle = pdqResult.status === "verified" ? S.pass : S.fail;
           console.log("");
-          console.log("%cpHash Identity Check", S.section);
-          console.log(`%cOn-chain (TEE computed): %c${phashPayload.phash}`, S.label, S.value);
-          console.log(`%cBrowser (recomputed):    %c${phashResult.computedHash || "?"}`, S.label, S.value);
-          console.log(`%cHamming distance: %c${phashResult.distance} %c(threshold: ${PHASH_THRESHOLD})`, S.label, phashStyle, S.muted);
-          console.log(`%c${phashIcon} ${phashResult.distance} \u2264 ${PHASH_THRESHOLD} → ${phashResult.status}`, phashStyle);
+          console.log("%cPDQ Identity Check", S.section);
+          console.log(`%cOn-chain (TEE computed): %c${pdqPayload.pdqhash}`, S.label, S.value);
+          console.log(`%cBrowser (recomputed):    %c${pdqResult.computedHash || "?"}`, S.label, S.value);
+          console.log(`%cHamming distance: %c${pdqResult.distance} %c(threshold: ${PDQ_THRESHOLD})`, S.label, pdqStyle, S.muted);
+          console.log(`%c${pdqIcon} ${pdqResult.distance} \u2264 ${PDQ_THRESHOLD} → ${pdqResult.status}`, pdqStyle);
           nftVerif.specificChecks.push({
-            label: tc("phash_identity"),
-            status: phashResult.status,
-            detail: tc(phashResult.status === "verified" ? "phash_identity_pass" : "phash_identity_fail", { distance: phashResult.distance, threshold: PHASH_THRESHOLD }),
+            label: tc("pdq_identity"),
+            status: pdqResult.status,
+            detail: tc(pdqResult.status === "verified" ? "pdq_identity_pass" : "pdq_identity_fail", { distance: pdqResult.distance, threshold: PDQ_THRESHOLD }),
           });
         } else {
           nftVerif.specificChecks.push({
-            label: tc("phash_identity"),
+            label: tc("pdq_identity"),
             status: "skipped",
-            detail: tc("phash_identity_error", { reason: phashResult.reason || "unknown" }),
+            detail: tc("pdq_identity_error", { reason: pdqResult.reason || "unknown" }),
           });
         }
       } else {
         nftVerif.specificChecks.push({
-          label: tc("phash_identity"),
+          label: tc("pdq_identity"),
           status: "skipped",
-          detail: tc("phash_identity_skip"),
+          detail: tc("pdq_identity_skip"),
         });
       }
     }
@@ -395,31 +395,31 @@ async function verifyTeeSignature(
 }
 
 // ---------------------------------------------------------------------------
-// pHash 照合
+// PDQ 照合
 // ---------------------------------------------------------------------------
 
-interface PHashResult {
+interface PdqResult {
   status: VerifyStepStatus;
   distance?: number;
   computedHash?: string;
   reason?: string;
 }
 
-async function verifyPHashWithImage(
+async function verifyPdqWithImage(
   onchainHash: string,
   imageUrl: string,
   wasmHash?: string,
-): Promise<PHashResult> {
+): Promise<PdqResult> {
   try {
-    const computed = await computePHashWasm(imageUrl, wasmHash);
+    const computed = await computePdqWasm(imageUrl, wasmHash);
     const distance = hammingDistance(onchainHash, computed);
     return {
-      status: distance <= PHASH_THRESHOLD ? "verified" : "failed",
+      status: distance <= PDQ_THRESHOLD ? "verified" : "failed",
       distance,
       computedHash: computed,
     };
   } catch (e) {
-    console.warn("  → pHash computation error:", e);
+    console.warn("  → PDQ computation error:", e);
     return { status: "failed", reason: `Computation failed: ${e}` };
   }
 }

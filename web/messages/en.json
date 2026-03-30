@@ -285,15 +285,15 @@
         "dataTitle": "Data"
       },
 
-      "phash": {
-        "title": "image-phash — Image Identity Verification",
-        "desc": "A perceptual hash (pHash) is a numerical fingerprint of an image's visual appearance. A WASM module inside the TEE computes it from the original image and records it on-chain. The viewer's browser recomputes the pHash from the displayed image using the identical WASM binary, then compares it with the on-chain value. If the Hamming distance (bit-level difference) is within the threshold, the images are deemed identical.",
-        "match": "pHash Match",
+      "pdq": {
+        "title": "image-pdq — Image Identity Verification",
+        "desc": "PDQ (Perceptual hash by Meta) is a 256-bit numerical fingerprint of an image's visual appearance. A WASM module inside the TEE computes it from the original image and records it on-chain. The viewer's browser recomputes the PDQ hash from the displayed image using the identical WASM binary and Jarosz downsampling, then compares it with the on-chain value. If the Hamming distance (bit-level difference) is within the threshold, the images are deemed identical.",
+        "match": "PDQ Match",
         "matchPass": "Hamming distance: {distance} (threshold: {threshold} or less to pass)",
         "matchFail": "Hamming distance: {distance} (exceeds threshold: {threshold})",
-        "matchSkip": "No pHash data found",
-        "onchain": "On-chain pHash",
-        "computed": "Recomputed pHash (browser)"
+        "matchSkip": "No PDQ data found",
+        "onchain": "On-chain PDQ hash",
+        "computed": "Recomputed PDQ hash (browser)"
       },
 
       "hardware": {
@@ -327,7 +327,7 @@
         "tsaCertified": "Capture time certified by {provider} at {time} (RFC 3161).",
         "ownerSame": "Registered by {wallet} (current owner, no transfer).",
         "ownerTransferred": "Registered by {creator}. Current owner: {owner}.",
-        "phashResult": "On-chain pHash: {hash}. {detail}. WASM: {wasmHash}",
+        "pdqResult": "On-chain PDQ: {hash}. {detail}. WASM: {wasmHash}",
         "teeSigResult": "This content: TEE signature by {pubkey} — {result}",
         "teeSigValid": "valid ✓",
         "teeSigPending": "verification pending",
@@ -366,7 +366,7 @@
     "tee_pubkey": "TEE Public Key",
     "tee_signature": "TEE Signature",
     "tee_attestation": "TEE Attestation",
-    "phash": "Perceptual Hash",
+    "pdqhash": "PDQ Hash (256-bit)",
     "collection": "Collection",
     "owner": "Owner",
     "currentOwner": "Current Owner",
@@ -380,7 +380,7 @@
     "trustedWasmModules": "Trusted WASM Modules",
     "network": "Network",
     "none": "(none)",
-    "phashThreshold": "pHash Threshold",
+    "pdqThreshold": "PDQ Threshold",
     "c2paSigning": "C2PA Signing",
     "teeSigning": "TEE Signing",
     "dimensions": "Dimensions",
@@ -406,11 +406,11 @@
     "wasm_hash_fail": "The WASM Hash in the off-chain data does not appear in GlobalConfig's trusted WASM module list. An unknown or modified WASM module may have been used",
     "wasm_hash_skip": "GlobalConfig's trusted WASM module list is empty — comparison skipped (may be unset on devnet)",
     "wasm_hash_missing": "No WASM hash found in off-chain data. Extension NFT data is incomplete",
-    "phash_identity": "pHash Identity Verification",
-    "phash_identity_pass": "Hamming distance between on-chain pHash (64-bit DCT hash computed from the original image by WASM inside TEE) and browser-recomputed pHash (same WASM, from displayed image): {distance}. Pass: {threshold} or less (0 = identical, lower = more similar)",
-    "phash_identity_fail": "Hamming distance between on-chain pHash (64-bit DCT hash from TEE WASM) and browser-recomputed pHash (from displayed image): {distance}. Exceeds threshold of {threshold} (0 = identical, higher = more different)",
-    "phash_identity_skip": "No pHash data found in the Extension NFT",
-    "phash_identity_error": "Could not load the displayed image, so the browser-side pHash recomputation was not possible ({reason})",
+    "pdq_identity": "PDQ Identity Verification",
+    "pdq_identity_pass": "Hamming distance between on-chain PDQ (256-bit perceptual hash computed by WASM inside TEE) and browser-recomputed PDQ (same WASM + Jarosz downsampling, from displayed image): {distance}. Pass: {threshold} or less (0 = identical, lower = more similar)",
+    "pdq_identity_fail": "Hamming distance between on-chain PDQ (256-bit hash from TEE WASM) and browser-recomputed PDQ (from displayed image): {distance}. Exceeds threshold of {threshold} (0 = identical, higher = more different)",
+    "pdq_identity_skip": "No PDQ data found in the Extension NFT",
+    "pdq_identity_error": "Could not load the displayed image, so the browser-side PDQ recomputation was not possible ({reason})",
     "hardware_signing": "Hardware Capture Proof",
     "hardware_signing_pass": "Hardware secure element signature ({id}) detected in the C2PA signature chain. Proves physical capture by the device",
     "hardware_signing_fail": "Hardware signing verification failed"

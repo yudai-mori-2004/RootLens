@@ -23,6 +23,35 @@ export interface TitleProtocolResult {
   txSignature: string;
 }
 
+// ---------------------------------------------------------------------------
+// Extension 選択 — ガバナンス定義に基づく processor_ids 構築
+// ---------------------------------------------------------------------------
+
+/** C2PA署名者のsigner_orgに基づいて適用可能な cert extension を判定する */
+const CERT_EXTENSION_MAP: { id: string; matchSignerOrg: string }[] = [
+  { id: 'cert-rootlens', matchSignerOrg: 'RootLens' },
+  { id: 'cert-google', matchSignerOrg: 'Google' },
+  { id: 'cert-sony', matchSignerOrg: 'Sony' },
+  { id: 'cert-leica', matchSignerOrg: 'Leica' },
+];
+
+function buildProcessorIds(signerOrg: string, mediaType: 'image' | 'video'): string[] {
+  const ids: string[] = ['core-c2pa'];
+
+  // cert extension: signer_org にマッチするものを追加
+  const certMatch = CERT_EXTENSION_MAP.find(
+    (e) => signerOrg.includes(e.matchSignerOrg),
+  );
+  if (certMatch) {
+    ids.push(certMatch.id);
+  }
+
+  // perceptual hash: メディア種別で選択
+  ids.push(mediaType === 'video' ? 'video-vpdq' : 'image-pdq');
+
+  return ids;
+}
+
 function toBase64(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
@@ -40,6 +69,8 @@ function toBase64(bytes: Uint8Array): string {
 export async function registerOnTitleProtocol(
   contentFilePath: string,
   ownerWallet: string,
+  signerOrg: string = 'RootLens',
+  mediaType: 'image' | 'video' = 'image',
 ): Promise<TitleProtocolResult> {
   const t0 = Date.now();
   const lap = (l: string) => console.log(`[TP] ${l}: ${Date.now() - t0}ms`);
@@ -97,7 +128,7 @@ export async function registerOnTitleProtocol(
   // verify
   const encryptedResponse = await client.verifyRaw(node.gatewayUrl, {
     download_url: downloadUrl,
-    processor_ids: ['core-c2pa', 'image-phash'],
+    processor_ids: buildProcessorIds(signerOrg, mediaType),
   });
   lap('verify done');
 

@@ -12,10 +12,12 @@ import { Connection } from '@solana/web3.js';
 /** DAS (Digital Asset Standard) API エンドポイント */
 export const DAS_RPC_URL = process.env.NEXT_PUBLIC_DAS_RPC_URL!;
 
-/** pHash照合の閾値 (ハミング距離)
+/** PDQ照合の閾値 (ハミング距離, 256bit空間)
  * DCT計算はTEEと同一のWASMバイナリで実行。
- * TEE側でEXIF orientation適用済み（Title Protocol修正済み）。 */
-export const PHASH_THRESHOLD = 5;
+ * Jaroszダウンサンプリングも同一Rustソースからビルドしたjarosz.wasmで実行。
+ * Meta PDQの推奨閾値: 31 (類似判定) 。RootLensでは同一コンテンツの再エンコード差のみを
+ * 許容するため、より厳しい閾値を使用。 */
+export const PDQ_THRESHOLD = 31;
 
 /** プロトコル定数（PDA導出で動的に取得） */
 export function getProtocolAddresses() {

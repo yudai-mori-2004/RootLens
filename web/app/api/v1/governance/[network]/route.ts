@@ -4,23 +4,34 @@
  *
  * ネットワーク別（devnet / mainnet）のRootLensガバナンス情報を返す。
  * 認証不要（公開情報）。アプリ起動時にフェッチしてローカルキャッシュする想定。
+ *
+ * extensions は3カテゴリ:
+ *   core — 常に含める
+ *   certificate — C2PA署名者(signer_org)から判定して選択
+ *   perceptual_hash — メディア種別から判定して選択
+ *
+ * アプリは processor_ids = [core] + [matched cert] + [matched hash] を構築してTPに送信する。
  */
 
 import { NextRequest, NextResponse } from "next/server";
 
 // ---------------------------------------------------------------------------
-// ガバナンスデータ定義
+// 型定義
 // ---------------------------------------------------------------------------
 
-interface TrustedExtension {
-  extension_id: string;
+interface CertExtension {
+  /** Title Protocol Extension ID */
+  id: string;
+  /** C2PA readManifest() の signer_org にこの文字列が含まれていればマッチ */
+  match_signer_org: string;
+  /** UI表示名 */
   label: string;
-  category: "hardware" | "app";
 }
 
-interface PHashExtension {
-  extension_id: string;
-  version: string;
+interface PerceptualHashExtension {
+  id: string;
+  /** "image" | "video" */
+  media_type: string;
 }
 
 interface TsaProvider {
@@ -37,8 +48,11 @@ interface IntermediateCaInfo {
 interface GovernanceResponse {
   network: string;
   version: string;
-  trusted_extensions: TrustedExtension[];
-  phash_extensions: PHashExtension[];
+  extensions: {
+    core: string[];
+    certificate: CertExtension[];
+    perceptual_hash: PerceptualHashExtension[];
+  };
   tsa_policy: {
     required: boolean;
     trusted_providers: TsaProvider[];
@@ -54,20 +68,21 @@ interface GovernanceResponse {
 }
 
 // ---------------------------------------------------------------------------
-// 仕様書 §8.2 ホワイトリスト内容 — 信頼する Extension ID
+// Extension 定義
 // ---------------------------------------------------------------------------
 
-const TRUSTED_EXTENSIONS: TrustedExtension[] = [
-  { extension_id: "hardware-google", label: "Google Pixel", category: "hardware" },
-  { extension_id: "hardware-nikon", label: "Nikon", category: "hardware" },
-  { extension_id: "hardware-canon", label: "Canon", category: "hardware" },
-  { extension_id: "hardware-sony", label: "Sony", category: "hardware" },
-  { extension_id: "rootlens-app", label: "RootLens", category: "app" },
+const CORE_EXTENSIONS = ["core-c2pa"];
+
+const CERT_EXTENSIONS: CertExtension[] = [
+  { id: "cert-rootlens", match_signer_org: "RootLens", label: "RootLens" },
+  { id: "cert-google", match_signer_org: "Google", label: "Google Pixel" },
+  { id: "cert-sony", match_signer_org: "Sony", label: "Sony" },
+  { id: "cert-leica", match_signer_org: "Leica", label: "Leica" },
 ];
 
-const PHASH_EXTENSIONS: PHashExtension[] = [
-  { extension_id: "image-phash", version: "1.0" },
-  { extension_id: "video-phash", version: "1.0" },
+const PERCEPTUAL_HASH_EXTENSIONS: PerceptualHashExtension[] = [
+  { id: "image-pdq", media_type: "image" },
+  { id: "video-vpdq", media_type: "video" },
 ];
 
 const TSA_PROVIDERS: TsaProvider[] = [
@@ -90,8 +105,7 @@ const NETWORK_CONFIG: Record<string, { cluster: string; rpc_url: string }> = {
 };
 
 // ---------------------------------------------------------------------------
-// PKI — 中間CAフィンガープリントは環境変数から読み込み
-// Phase 4 (3層PKI) 実装後に実際のフィンガープリントを設定する
+// PKI
 // ---------------------------------------------------------------------------
 
 function getPkiInfo(): GovernanceResponse["pki"] {
@@ -129,24 +143,24 @@ export async function GET(
     );
   }
 
-  const solanaConfig = NETWORK_CONFIG[network];
-
   const response: GovernanceResponse = {
     network,
     version: "0.1.0",
-    trusted_extensions: TRUSTED_EXTENSIONS,
-    phash_extensions: PHASH_EXTENSIONS,
+    extensions: {
+      core: CORE_EXTENSIONS,
+      certificate: CERT_EXTENSIONS,
+      perceptual_hash: PERCEPTUAL_HASH_EXTENSIONS,
+    },
     tsa_policy: {
       required: true,
       trusted_providers: TSA_PROVIDERS,
     },
     pki: getPkiInfo(),
-    solana: solanaConfig,
+    solana: NETWORK_CONFIG[network],
   };
 
   return NextResponse.json(response, {
     headers: {
-      // CDNキャッシュ: 5分。ガバナンス変更は即時性を要求しない
       "Cache-Control": "public, max-age=300, s-maxage=300",
     },
   });

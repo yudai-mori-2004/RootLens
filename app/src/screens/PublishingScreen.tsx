@@ -22,6 +22,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList, PublishResult } from '../navigation/types';
 import { config } from '../config';
 import { registerOnTitleProtocol } from '../services/titleProtocol';
+import { readManifest } from '../native/c2paBridge';
 import { colors, typography, spacing, radii, shadows } from '../theme';
 import { t } from '../i18n';
 
@@ -138,8 +139,14 @@ export default function PublishingScreen() {
     // パイプラインA (TP登録) と パイプラインB (R2アップロード) を並列実行
     const [tpResult, r2Urls] = await Promise.all([
       (async () => {
+        // C2PAマニフェストから署名者情報を取得し、適切なcert extensionを選択
+        lap('readManifest start');
+        const manifest = await readManifest(fileUri);
+        const signerOrg = manifest?.signer_org || 'RootLens';
+        lap(`readManifest done (signer_org: ${signerOrg})`);
+
         lap('TP register start');
-        const r = await registerOnTitleProtocol(fileUri, address);
+        const r = await registerOnTitleProtocol(fileUri, address, signerOrg, mediaType as 'image' | 'video');
         lap('TP register done');
         advanceToStep('recording');
         return r;

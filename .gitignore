@@ -43,3 +43,4 @@ native/c2pa-bridge/target/
 # Misc
 *.tsbuildinfo
 .expo/
+native/jarosz-wasm/target/

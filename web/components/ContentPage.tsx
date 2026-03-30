@@ -12,7 +12,7 @@ import type {
 import type { ResolvedContent, ExtensionNft } from "@/lib/verify/content-resolver";
 import type { CorePayload, ExtensionPayload, GraphNode, SignedJson } from "@title-protocol/sdk";
 import { fetchContentRecord, verifyContent } from "@/lib/data";
-import { PHASH_THRESHOLD, getProtocolAddresses, getGlobalConfigData, type GlobalConfigData } from "@/lib/verify/config";
+import { PDQ_THRESHOLD, getProtocolAddresses, getGlobalConfigData, type GlobalConfigData } from "@/lib/verify/config";
 import styles from "./ContentPage.module.css";
 
 interface Props {
@@ -439,26 +439,26 @@ export default function ContentPage({ page }: Props) {
               <h3 className={styles.techGroupTitle}>{t("tech.ext.title")}</h3>
               <p className={styles.techDesc}>{t("tech.ext.desc")}</p>
 
-              {/* pHash */}
+              {/* PDQ */}
               {(() => {
-                const phashNft = resolved?.extensionNfts.find(n => {
+                const pdqNft = resolved?.extensionNfts.find(n => {
                   const p = n.signedJson.payload as Record<string, unknown>;
-                  return p.extension_id === "image-phash";
+                  return p.extension_id === "image-pdq";
                 });
-                const phashVerif = verification.nfts.find(n => n.id === "image-phash");
-                const phashCheck = phashVerif?.specificChecks.find(s => s.label === tCheck("phash_identity"));
-                const phashPayload = phashNft?.signedJson.payload as Record<string, unknown> | undefined;
+                const pdqVerif = verification.nfts.find(n => n.id === "image-pdq");
+                const pdqCheck = pdqVerif?.specificChecks.find(s => s.label === tCheck("pdq_identity"));
+                const pdqPayload = pdqNft?.signedJson.payload as Record<string, unknown> | undefined;
 
-                return phashNft ? (
+                return pdqNft ? (
                   <div className={styles.extBlock}>
-                    <h5 className={styles.extTitle}>{t("tech.phash.title")}</h5>
-                    <p className={styles.techDescSmall}>{t("tech.phash.desc")}</p>
-                    {!!phashPayload?.phash && (
+                    <h5 className={styles.extTitle}>{t("tech.pdq.title")}</h5>
+                    <p className={styles.techDescSmall}>{t("tech.pdq.desc")}</p>
+                    {!!pdqPayload?.pdqhash && (
                       <p className={styles.techDesc}>
-                        {t("tech.dyn.phashResult", {
-                          hash: String(phashPayload.phash),
-                          detail: phashCheck?.detail ?? "",
-                          wasmHash: truncate(String(phashPayload.wasm_hash ?? ""), 10),
+                        {t("tech.dyn.pdqResult", {
+                          hash: String(pdqPayload.pdqhash),
+                          detail: pdqCheck?.detail ?? "",
+                          wasmHash: truncate(String(pdqPayload.wasm_hash ?? ""), 10),
                         })}
                       </p>
                     )}
@@ -565,8 +565,9 @@ function ExtensionBlock({
   resolved: ResolvedContent | null;
   t: ReturnType<typeof useTranslations>;
 }) {
-  const isPhash = ext.id === "image-phash";
+  const isPdq = ext.id === "image-pdq";
   const isHardware = ext.id.startsWith("hardware-");
+  const isCert = ext.id.startsWith("cert-");
 
   // 対応する extension NFT を検索
   const extNft = resolved?.extensionNfts.find(n => {
@@ -576,19 +577,19 @@ function ExtensionBlock({
   const extSj = extNft?.signedJson;
   const extPayload = extSj?.payload as ExtensionPayload | undefined;
 
-  if (isPhash) {
+  if (isPdq) {
     return (
       <div className={styles.extBlock}>
-        <h5 className={styles.extTitle}>{t("tech.phash.title")}</h5>
-        <p className={styles.techDescSmall}>{t("tech.phash.desc")}</p>
+        <h5 className={styles.extTitle}>{t("tech.pdq.title")}</h5>
+        <p className={styles.techDescSmall}>{t("tech.pdq.desc")}</p>
 
         <div className={styles.verifyList}>
           {(() => {
-            const phashCheck = verification.nfts.find(n => n.id === "image-phash")?.specificChecks.find(s => s.label === "phash_identity");
-            return phashCheck ? (
-              <VerifyItem status={phashCheck.status} label={t("tech.phash.match")} detail={phashCheck.detail} />
+            const pdqCheck = verification.nfts.find(n => n.id === "image-pdq")?.specificChecks.find(s => s.label.includes("PDQ") || s.label.includes("pdq"));
+            return pdqCheck ? (
+              <VerifyItem status={pdqCheck.status} label={t("tech.pdq.match")} detail={pdqCheck.detail} />
             ) : (
-              <VerifyItem status="skipped" label={t("tech.phash.match")} detail={t("tech.phash.matchSkip")} />
+              <VerifyItem status="skipped" label={t("tech.pdq.match")} detail={t("tech.pdq.matchSkip")} />
             );
           })()}
           <VerifyItem
@@ -598,11 +599,11 @@ function ExtensionBlock({
           />
         </div>
 
-        {/* pHash data */}
+        {/* PDQ data */}
         {extPayload && (
           <div className={styles.dataBlock}>
-            {(extPayload as ExtensionPayload & { phash?: string }).phash && (
-              <DataField label={t("tech.phash.onchain")} value={(extPayload as ExtensionPayload & { phash?: string }).phash!} mono />
+            {(extPayload as ExtensionPayload & { pdqhash?: string }).pdqhash && (
+              <DataField label={t("tech.pdq.onchain")} value={(extPayload as ExtensionPayload & { pdqhash?: string }).pdqhash!} mono />
             )}
             {extPayload.wasm_hash && (
               <DataField label="wasm_hash" value={truncate(extPayload.wasm_hash, 12)} full={extPayload.wasm_hash} mono />
@@ -889,7 +890,7 @@ function downloadVerificationData(data: {
       }
     }
   }
-  add("pHash Threshold", "PHASH_THRESHOLD (client constant)", String(PHASH_THRESHOLD));
+  add("PDQ Threshold", "PDQ_THRESHOLD (client constant)", String(PDQ_THRESHOLD));
 
   // --- Content ---
   rows.push(["# Content", "", ""]);

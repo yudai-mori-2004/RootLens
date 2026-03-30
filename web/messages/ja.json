@@ -285,15 +285,15 @@
         "dataTitle": "データ"
       },
 
-      "phash": {
-        "title": "image-phash — 画像の同一性検証",
-        "desc": "知覚ハッシュ（pHash）は画像の見た目を数値化した指紋です。TEE内のWASMモジュールが元画像から算出し、ブロックチェーンに記録します。閲覧者のブラウザは、表示中の画像からTEEと同一のWASMバイナリでpHashを再計算し、オンチェーンの値と比較します。両者のハミング距離（ビット単位の差異）が閾値以下なら、同一画像と判定されます。",
-        "match": "pHash照合",
+      "pdq": {
+        "title": "image-pdq — 画像の同一性検証",
+        "desc": "PDQ（Meta開発の知覚ハッシュ）は画像の見た目を256ビットの数値に変換した指紋です。TEE内のWASMモジュールが元画像から算出し、ブロックチェーンに記録します。閲覧者のブラウザは、表示中の画像からTEEと同一のWASMバイナリとJaroszダウンサンプリングでPDQハッシュを再計算し、オンチェーンの値と比較します。両者のハミング距離（ビット単位の差異）が閾値以下なら、同一画像と判定されます。",
+        "match": "PDQ照合",
         "matchPass": "ハミング距離: {distance} (閾値: {threshold}以下で合格)",
         "matchFail": "ハミング距離: {distance} (閾値: {threshold}を超過)",
-        "matchSkip": "pHashデータが見つかりませんでした",
-        "onchain": "オンチェーンpHash",
-        "computed": "再計算pHash (ブラウザ算出)"
+        "matchSkip": "PDQデータが見つかりませんでした",
+        "onchain": "オンチェーンPDQハッシュ",
+        "computed": "再計算PDQハッシュ (ブラウザ算出)"
       },
 
       "hardware": {
@@ -327,7 +327,7 @@
         "tsaCertified": "撮影時刻は {provider} により {time} に証明されています (RFC 3161)。",
         "ownerSame": "登録者: {wallet} (現在の所有者、譲渡なし)。",
         "ownerTransferred": "登録者: {creator}。現在の所有者: {owner}。",
-        "phashResult": "オンチェーンpHash: {hash}。{detail}。WASM: {wasmHash}",
+        "pdqResult": "オンチェーンPDQ: {hash}。{detail}。WASM: {wasmHash}",
         "teeSigResult": "このコンテンツ: TEE署名 {pubkey} — {result}",
         "teeSigValid": "有効 ✓",
         "teeSigPending": "検証中",
@@ -366,7 +366,7 @@
     "tee_pubkey": "TEE公開鍵",
     "tee_signature": "TEE署名",
     "tee_attestation": "TEEアテステーション",
-    "phash": "知覚ハッシュ",
+    "pdqhash": "PDQハッシュ (256bit)",
     "collection": "コレクション",
     "owner": "所有者",
     "currentOwner": "現在の所有者",
@@ -380,7 +380,7 @@
     "trustedWasmModules": "信頼済みWASMモジュール",
     "network": "ネットワーク",
     "none": "（なし）",
-    "phashThreshold": "pHash閾値",
+    "pdqThreshold": "PDQ閾値",
     "c2paSigning": "C2PA署名方式",
     "teeSigning": "TEE署名方式",
     "dimensions": "解像度",
@@ -406,11 +406,11 @@
     "wasm_hash_fail": "オフチェーンデータ内のWASMハッシュが、GlobalConfigの信頼済みWASMモジュールリストに含まれていません。未知または改変されたWASMモジュールが使用された可能性があります",
     "wasm_hash_skip": "GlobalConfigの信頼済みWASMモジュールリストが空のため、比較をスキップ（devnetでは未設定の場合があります）",
     "wasm_hash_missing": "オフチェーンデータにWASMハッシュが含まれていません。Extension NFTとしてのデータが不完全です",
-    "phash_identity": "pHash同一性検証",
-    "phash_identity_pass": "オンチェーンpHash（TEEがWASMで原画像から算出した64bit DCTハッシュ）と、ブラウザが表示画像から同一WASMで再計算したpHashのハミング距離: {distance}。{threshold}以下で同一画像と判定（0が完全一致、距離が小さいほど類似）",
-    "phash_identity_fail": "オンチェーンpHash（TEEがWASMで原画像から算出した64bit DCTハッシュ）と、ブラウザが表示画像から再計算したpHashのハミング距離: {distance}。閾値{threshold}を超過（0が完全一致、距離が大きいほど差異が大きい）",
-    "phash_identity_skip": "Extension NFTにpHashデータが含まれていません",
-    "phash_identity_error": "表示画像の読み込みに失敗したため、ブラウザ側のpHash再計算ができませんでした ({reason})",
+    "pdq_identity": "PDQ同一性検証",
+    "pdq_identity_pass": "オンチェーンPDQ（TEEがWASMで原画像から算出した256bit知覚ハッシュ）と、ブラウザが表示画像から同一WASM + Jaroszダウンサンプリングで再計算したPDQのハミング距離: {distance}。{threshold}以下で同一画像と判定（0が完全一致、距離が小さいほど類似）",
+    "pdq_identity_fail": "オンチェーンPDQ（TEEがWASMで原画像から算出した256bitハッシュ）と、ブラウザが表示画像から再計算したPDQのハミング距離: {distance}。閾値{threshold}を超過（0が完全一致、距離が大きいほど差異が大きい）",
+    "pdq_identity_skip": "Extension NFTにPDQデータが含まれていません",
+    "pdq_identity_error": "表示画像の読み込みに失敗したため、ブラウザ側のPDQ再計算ができませんでした ({reason})",
     "hardware_signing": "ハードウェア撮影証明",
     "hardware_signing_pass": "C2PA署名チェーン内にハードウェアセキュアエレメント ({id}) の署名を検出。デバイスの物理的な撮影であることが証明されている",
     "hardware_signing_fail": "ハードウェア署名の検証に失敗しました"

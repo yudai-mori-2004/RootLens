@@ -16,8 +16,8 @@ export type { CheckTranslator, PerceptualInputs } from "./verify-content";
 export { contentResolver } from "./content-resolver";
 export type { ContentResolver, ResolvedContent, ExtensionNft } from "./content-resolver";
 
-// pHash 計算 (WASM)
-export { computePHashWasm } from "./phash-wasm";
+// PDQ 計算 (WASM)
+export { computePdqWasm } from "./pdq-wasm";
 
 // オンチェーン設定 (GlobalConfig)
 export {
@@ -26,6 +26,6 @@ export {
   getCollectionMints,
   findWasmVersionByHash,
   DAS_RPC_URL,
-  PHASH_THRESHOLD,
+  PDQ_THRESHOLD,
 } from "./config";
 export type { GlobalConfigData } from "./config";
