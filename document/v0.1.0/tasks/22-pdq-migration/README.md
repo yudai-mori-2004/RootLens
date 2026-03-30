@@ -92,13 +92,15 @@ TP更新時にRootLens側で追従が必要なもの:
 
 ## 完了条件
 
-- [ ] `native/jarosz-wasm/` クレート作成、WASMビルド成功
-- [ ] `web/lib/verify/pdq-wasm.ts` が image-pdq.wasm + jarosz.wasm で256bit PDQを計算
-- [ ] アプリの processor_ids が `image-pdq`, `cert-rootlens` を含む
-- [ ] 公開ページで PDQ ハミング距離が正しく表示される
-- [ ] cert-rootlens 検証結果が表示される
-- [ ] ガバナンスAPIが更新されている
-- [ ] コンソールログ・i18n が PDQ 用語に更新
-- [ ] `web/public/wasm/README.md` が管理情報を記載
-- [ ] 仕様書が PDQ に更新されている
-- [ ] TypeScript ビルド成功
+- [x] `native/jarosz-wasm/` クレート作成、WASMビルド成功
+- [x] `web/lib/verify/pdq-wasm.ts` が image-pdq.wasm + jarosz.wasm で256bit PDQを計算
+- [x] アプリの processor_ids を C2PA signer_org + media type から動的構築
+- [x] 公開ページで PDQ ハミング距離が正しく表示される
+- [x] cert-* Extension の検証結果が既存の NftVerification ループで表示される
+- [x] ガバナンスAPIが統一 Extension アーキテクチャに更新（core / certificate / perceptual_hash）
+- [x] コンソールログ・i18n が PDQ 用語に更新（en/ja）
+- [x] `web/public/wasm/README.md` が管理情報を記載
+- [x] 仕様書 §6.3 が PDQ + cert Extension に全面書き換え
+- [x] COVERAGE.md が更新されている
+- [x] TypeScript ビルド成功
+- [x] 旧 phash-wasm.ts 削除

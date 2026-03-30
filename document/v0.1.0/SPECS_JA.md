@@ -812,7 +812,7 @@ pHash Extensionの技術仕様は「6.3 pHash Extension仕様」を参照。
 | cNFT | 役割 | 対応するTitle Protocolの仕組み |
 | --- | --- | --- |
 | Core cNFT | C2PA来歴検証結果・来歴グラフの記録 | Core（`core-c2pa`） |
-| Extension cNFT | コンテンツが何によって本物証明を得ているか、およびpHash等の検証結果の記録 | Extension（`hardware-google`、`rootlens-app`、`phash-image`、`phash-video`等） |
+| Extension cNFT | コンテンツが何によって本物証明を得ているか、およびPDQ等の検証結果の記録 | Extension（`cert-rootlens`、`cert-google`、`image-pdq`、`video-vpdq`等） |
 
 複数コンテンツを一括公開した場合、コンテンツごとにCore + Extensionの組が発行される。
 
@@ -847,83 +847,101 @@ R2にはバイナリデータのみを保存する。構造化されたメタデ
 
 テーブル設計の詳細は「10.4 データベース設計」を参照。
 
-## 6.3 pHash Extension仕様
+## 6.3 Extension仕様
 
-RootLensが使用するpHash Extensionの技術仕様を以下に定める。これらのExtensionはTitle Protocolノードに実装され、TEE内でトラストレスに実行される。RootLensはこれらのExtensionが利用可能であることを前提とし、Title Protocol登録時に要求する。
+RootLensが使用するTitle Protocol Extensionの技術仕様を以下に定める。Extensionは3カテゴリに分類され、アプリがコンテンツの特性に基づいて各カテゴリから適切なExtensionを選択し、`processor_ids` としてTitle Protocolに送信する。
 
-### 6.3.1 `phash-image`（画像用）
+### Extensionカテゴリ
 
-画像コンテンツの知覚的ハッシュを算出するExtension。
+| カテゴリ | 選択基準 | Extension ID |
+| --- | --- | --- |
+| Core | 常に含める | `core-c2pa` |
+| 証明書検証 | C2PA署名者（signer_org）から判定 | `cert-rootlens`, `cert-google`, `cert-sony`, `cert-leica` |
+| 知覚ハッシュ | メディア種別から判定 | `image-pdq`（画像）, `video-vpdq`（動画） |
 
-**入力：** C2PA検証済みの画像バイナリ（JPEG / PNG / WebP）
+アプリは公開前にC2PAマニフェストを読み取り（`readManifest()`）、`signer_org` をガバナンスAPIの `extensions.certificate` 定義とマッチングして適用可能な証明書検証Extensionを判定する。メディア種別に応じて知覚ハッシュExtensionを選択する。
 
-**TEE内処理ロジック：**
+### 6.3.1 `cert-rootlens` / `cert-google` 等（証明書検証）
 
-1. 画像をデコードし、32×32ピクセルにリサイズする
-2. グレースケールに変換する
-3. 32×32のDCT（離散コサイン変換）を適用する
-4. 左上8×8の低周波係数を取り出す
-5. 64係数の中央値を算出し、各係数が中央値以上なら1、未満なら0として64ビットハッシュを生成する
+C2PAアクティブマニフェストの署名証明書チェーンを、特定のRoot CAに対して暗号的に検証するExtension。
 
-**出力（Arweaveオフチェーンデータに含まれるフィールド）：**
+**TEE内処理:**
+1. コンテンツからJUMBFを抽出
+2. アクティブマニフェストのCOSE_Sign1からx5chain（DER証明書チェーン）を抽出
+3. 証明書チェーンを暗号的に検証（各証明書の署名を親の公開鍵で検証）
+4. チェーン末端がWASMに埋め込まれたRoot CA公開鍵（SPKI）と一致するか確認
 
-```json
-{
-  "extension_id": "phash-image",
-  "version": "1.0",
-  "result": {
-    "hash": "a4c3f2e1b5d6c7a8",
-    "algorithm": "dct-64bit",
-    "source_dimensions": { "width": 4032, "height": 3024 }
-  }
-}
-```
+**出力:** `{"verified": true/false, "chain": [...], "root_ca": "RootLens Root CA"}`
 
-`source_dimensions` は、TEEが検証した元コンテンツの解像度である。閲覧者が「表示画像は縮小版である」ことを確認する補助情報となる。
+各cert WASMモジュールにはそれぞれのRoot CA公開鍵が埋め込まれており、WASMバイナリのSHA-256ハッシュがGlobalConfigに登録されている。
 
-### 6.3.2 `phash-video`（動画用）
+### 6.3.2 `image-pdq`（画像用知覚ハッシュ）
 
-動画コンテンツの知覚的ハッシュを算出するExtension。
+画像コンテンツの256ビット知覚ハッシュをPDQアルゴリズム（Meta ThreatExchange互換）で算出するExtension。
 
-**入力：** C2PA検証済みの動画バイナリ（MOV / MP4）
+**入力：** C2PA検証済みの画像バイナリ（JPEG / PNG / WebP / TIFF / HEIC / カメラRAW等）
 
 **TEE内処理ロジック：**
 
-1. 動画のデュレーションを取得する
-2. 等間隔で最大16フレームをサンプリングする（30秒未満の場合は2秒間隔、30秒以上の場合は `duration / 16` 間隔）
-3. 各フレームに対して `phash-image` と同一のDCT 64ビットハッシュを計算する
-4. サンプリングしたフレームのタイムスタンプとハッシュの配列を出力する
+1. 画像をデコードし、Jaroszフィルタで64×64ピクセルにダウンサンプリングする
+2. BT.601係数（Y = 0.299R + 0.587G + 0.114B）でグレースケールに変換する
+3. 64×64の2D DCTを適用し、16×16の低周波係数（DC成分を除く）を取り出す
+4. 256係数のTorben中央値を算出し、各係数が中央値超なら1、以下なら0として256ビットハッシュを生成する
+5. 勾配エネルギーから品質メトリクス（0-100）を計算する
 
-**出力（Arweaveオフチェーンデータに含まれるフィールド）：**
+**出力：**
 
 ```json
 {
-  "extension_id": "phash-video",
-  "version": "1.0",
-  "result": {
-    "frame_hashes": [
-      { "timestamp_ms": 0, "hash": "a4c3f2e1b5d6c7a8" },
-      { "timestamp_ms": 2000, "hash": "a4c3f2e1b5d6c7a9" },
-      { "timestamp_ms": 4000, "hash": "b3d2e1f0a5c6b7a8" }
-    ],
-    "algorithm": "dct-64bit",
-    "duration_ms": 15000,
-    "source_dimensions": { "width": 1920, "height": 1080 }
-  }
+  "pdqhash": "a4c3f2e1b5d6c7a8...(64文字hex, 256bit)",
+  "quality": 85,
+  "algorithm": "pdq",
+  "bits": 256
 }
 ```
 
-### 6.3.3 pHashの特性と選定理由
+**互換性:** Meta ThreatExchange PDQリファレンス実装（C++ BSD）と同一のDCT行列、Torben中央値、品質メトリクス、ビットレイアウト。`pdqhash` Pythonパッケージと同一のhex出力バイトオーダー。
 
-pHash（Perceptual Hash）はDCT（離散コサイン変換）の低周波成分に基づく知覚的ハッシュであり、以下の特性からRootLensのコンテンツ同一性検証に適している。
+### 6.3.3 `video-vpdq`（動画用知覚ハッシュ）
 
-**解像度ロバスト性：** Title Protocolに登録されるコンテンツと、公開ページで表示されるコンテンツは同一の編集状態だが、表示用に解像度が異なる場合がある。pHashはDCTの低周波成分のみを使用するため、解像度の変化に対してロバストである。
+動画コンテンツのフレーム単位PDQハッシュ列を算出するExtension。
 
-**ブラウザ内での再計算可能性：** pHashのDCT計算にはTitle Protocolノード内のTEEと同一のWASMバイナリを使用する。GlobalConfigの `trusted_wasm_modules` から動的に取得し、SHA-256ハッシュをオンチェーンの `wasm_hash` と照合してから実行する。これにより、TEEとブラウザで浮動小数点演算の精度差によるpHash不一致が発生しないことを保証する。Canvas APIによるリサイズ・グレースケール変換はホスト関数としてJS側で実行し、DCT計算のみWASMが担う。
+**入力：** C2PA検証済みの動画バイナリ（MOV / MP4 / WebM / AVI）
 
-**十分な識別力：** 64ビットのハッシュ空間は約1.8×10^19通りの値を持つ。RootLensの事業目標である月間10万枚規模のコンテンツに対し、誕生日パラドックスを考慮しても完全一致の衝突確率は無視できる水準である。
+**TEE内処理ロジック：**
 
-**照合に使用する閾値：** 公開ページでのpHash照合では、ハミング距離を使用する。表示画像からの再計算値とオンチェーンの値のハミング距離が閾値以内であれば同一コンテンツと判定する。具体的な閾値は、実際の配信パイプライン（R2からの配信時の再エンコード等）でのビット変動をテストした上で決定する。目安としてハミング距離5以内を初期値とする。
+1. 1fpsでフレームをサンプリングする
+2. 各フレームに対してimage-pdqと同一のPDQ 256ビットハッシュを計算する
+3. 品質50未満のフレームをフィルタする
+4. ハッシュが同一の連続フレームを重複排除する
+
+**出力：**
+
+```json
+{
+  "frames": [
+    { "pdqhash": "...", "quality": 85, "timestamp": 0.0 },
+    { "pdqhash": "...", "quality": 78, "timestamp": 1.0 }
+  ],
+  "frame_count": 15,
+  "algorithm": "vpdq",
+  "sampling_fps": 1
+}
+```
+
+### 6.3.4 PDQの特性と選定理由
+
+PDQ（Perceptual hash by Meta）は256ビットの知覚ハッシュであり、以下の特性からRootLensのコンテンツ同一性検証に採用した。
+
+**解像度ロバスト性：** JaroszフィルタによるアンチエイリアスダウンサンプリングとDCTの低周波成分のみの使用により、解像度の変化に対してロバストである。
+
+**ブラウザ内での再計算可能性：** DCT計算にはGlobalConfigの `trusted_wasm_modules` から動的に取得したWASMバイナリ（SHA-256照合済み、TEEと同一バイナリ）を使用する。ダウンサンプリングにはTitle Protocolの `jarosz.rs` と同一のRustソースからビルドした `jarosz.wasm` をブラウザで実行し、TEEとのbit-identical一致を保証する。
+
+**十分な識別力：** 256ビットのハッシュ空間はRootLensの事業規模に対して十分な衝突耐性を持つ。Metaの大規模コンテンツモデレーション（数十億規模）で実績がある。
+
+**業界標準との互換性：** Meta ThreatExchange PDQリファレンス実装と互換のため、外部ツールとの相互運用が可能。
+
+**照合に使用する閾値：** 公開ページでのPDQ照合では、256ビット空間のハミング距離を使用する。Metaの推奨閾値31を初期値とする。同一コンテンツの再エンコード差のみを許容する用途のため、将来より厳しい閾値に調整する可能性がある。
 
 ## 6.4 公開ページ生成・リンク発行
 

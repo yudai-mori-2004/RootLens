@@ -91,7 +91,7 @@
 |-----------|------------------|------|
 | §6.1 パイプラインA: Title Protocol登録 | App (Title Protocol SDK) | 未着手 |
 | §6.2 パイプラインB: データ保存 (R2 + Supabase) | App / Server | 未着手 |
-| §6.3 pHash Extension仕様 | Title Protocol側 | 対象外 |
+| §6.3 Extension仕様 (PDQ / cert) | App / Public Page / TP | 実装済み（image-pdq + cert-rootlens。アプリがsigner_orgからcert extensionを動的選択。ブラウザPDQ再計算: jarosz.wasm + image-pdq.wasm） |
 | §6.4 公開ページ生成・リンク発行 | Server | 未着手 |
 | §6.5 再登録 | App / Server | 未着手 |
 
@@ -104,7 +104,7 @@
 | §7.1 URL構造 | Public Page | 一部実装（短縮URL `/p/[shortId]` のみ。正規URL `/{walletAddress}/{pageId}` およびクリエイターページ `/@{username}` は未実装） |
 | §7.2 コンテンツページの表示内容 | Public Page | 実装済み（Trust row + NFTトグル + GlobalConfig全フィールド + CSVダウンロード） |
 | §7.3 OGP | Public Page | 実装済み（generateMetadata でOGタグ + Twitterカード設定） |
-| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 実装済み（DAS API → Arweave → Ed25519署名検証 → pHash再計算。GlobalConfig/コレクション/TEE署名/Content Hash一致/重複解決/WASMハッシュ/pHash同一性）。ただし §7.4.4 のDevToolsコンソールログ形式は未達（簡略化されたログのみ） |
+| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 実装済み（DAS API → Arweave → Ed25519署名検証 → PDQ再計算。GlobalConfig/コレクション/TEE署名/Content Hash一致/重複解決/WASMハッシュ/PDQ同一性/cert検証結果表示。§7.4.4 コンソールログ: %c CSSスタイリング + groupCollapsed） |
 | §7.5 データの削除・非公開 | App / Server | 未着手 |
 
 ---
