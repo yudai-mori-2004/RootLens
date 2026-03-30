@@ -112,14 +112,15 @@ async function dasCall<T>(method: string, params: unknown): Promise<T> {
 
 async function searchAssetsByCollection(
   collectionMint: string,
+  sortDirection: "asc" | "desc" = "asc",
   page: number = 1,
-  limit: number = 100
+  limit: number = 100,
 ): Promise<DasSearchAssetsResponse["result"]> {
   const resp = await dasCall<DasSearchAssetsResponse>("searchAssets", {
     grouping: ["collection", collectionMint],
     page,
     limit,
-    sortBy: { sortBy: "id", sortDirection: "asc" },
+    sortBy: { sortBy: "id", sortDirection },
   });
   return resp.result;
 }
@@ -178,10 +179,11 @@ export class DasContentResolver implements ContentResolver {
     try {
       const collections = await getCollectionMints();
 
-      // core と ext の両方を並列検索
+      // core: asc (最古 = オリジナルの権利帰属)
+      // ext: desc (最新 = 最新WASMによる客観属性)
       const [coreResult, extResult] = await Promise.all([
-        searchAssetsByCollection(collections.core),
-        searchAssetsByCollection(collections.ext),
+        searchAssetsByCollection(collections.core, "asc"),
+        searchAssetsByCollection(collections.ext, "desc"),
       ]);
 
       // core collection から content_hash 一致を探す
@@ -191,10 +193,17 @@ export class DasContentResolver implements ContentResolver {
 
       if (!coreAsset) return null;
 
-      // ext collection から同じ content_hash のものを全て取得
-      const extAssets = extResult.items.filter(
+      // ext collection: desc なので先頭が最新。extension_id ごとに最初に見つかった1つを採用
+      const allExtAssets = extResult.items.filter(
         (item) => getAttribute(item, "content_hash") === contentHash
       );
+      const seenExtIds = new Set<string>();
+      const extAssets = allExtAssets.filter((asset) => {
+        const extId = getAttribute(asset, "extension_id") || getAttribute(asset, "processor_id") || "unknown";
+        if (seenExtIds.has(extId)) return false;
+        seenExtIds.add(extId);
+        return true;
+      });
 
       // Arweave signed_json を並列取得
       const [coreResult2, ...extResults] = await Promise.all([
