@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList, MediaItem } from '../navigation/types';
-import { useC2paCache, isTrustedAsset } from '../hooks/useC2paCache';
+import { useC2paCache, isTrustedAsset, getSignerLabel } from '../hooks/useC2paCache';
 import { colors, typography, spacing, radii, shadows } from '../theme';
 import { t } from '../i18n';
 
@@ -165,6 +165,7 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
           const trusted = isTrustedAsset(c2paStatus, item.id);
           const selectable = trusted === true;
           const checking = trusted === null;
+          const signerLabel = selectable ? getSignerLabel(c2paStatus, item.id) : null;
 
           return (
             <TouchableOpacity
@@ -195,10 +196,11 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
                   <ActivityIndicator size="small" color={colors.white} />
                 </View>
               )}
-              {/* 本物証明バッジ（§3.1.2: C2PA → 本物証明） */}
+              {/* 本物証明バッジ（§3.1.2: C2PA → 本物証明） + 署名者ラベル */}
               {selectable && (
                 <View style={styles.c2paBadge}>
                   <Ionicons name="checkmark-circle" size={14} color={colors.white} />
+                  {signerLabel && <Text style={styles.c2paBadgeText}>{signerLabel}</Text>}
                 </View>
               )}
               {/* 選択インジケーター */}
@@ -335,10 +337,16 @@ const styles = StyleSheet.create({
     left: 4,
     backgroundColor: colors.accent,
     borderRadius: radii.md,
-    width: 22,
-    height: 22,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 3,
+  },
+  c2paBadgeText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: '700',
   },
   permissionText: {
     ...typography.body,
