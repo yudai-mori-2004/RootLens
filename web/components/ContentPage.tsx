@@ -141,9 +141,10 @@ export default function ContentPage({ page }: Props) {
             controls
             playsInline
             className={styles.heroImage}
+            crossOrigin="anonymous"
           />
         ) : (
-          <img src={currentContent?.thumbnailUrl} alt="" className={styles.heroImage} />
+          <img src={currentContent?.thumbnailUrl} alt="" className={styles.heroImage} crossOrigin="anonymous" />
         )}
         {page.contents.length > 1 && (
           <>
