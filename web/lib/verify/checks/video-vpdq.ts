@@ -113,28 +113,29 @@ async function checkVpdqMatch(
 
     let matchedCount = 0;
     let maxDistance = 0;
+    const perFrame: string[] = [];
 
     for (let i = 0; i < payload.frames.length; i++) {
       const onchain = payload.frames[i];
       const recomputed = computed[i];
-      if (!recomputed) continue;
+      if (!recomputed) {
+        perFrame.push(`f${i}@${onchain.timestamp}s:skip`);
+        continue;
+      }
 
       const dist = hammingDistance(onchain.pdqhash, recomputed.pdqhash);
-      if (dist <= PDQ_THRESHOLD) {
-        matchedCount++;
-      }
+      if (dist <= PDQ_THRESHOLD) matchedCount++;
       if (dist > maxDistance) maxDistance = dist;
+      perFrame.push(`f${i}@${onchain.timestamp}s:${dist}`);
     }
 
     const totalOnchain = payload.frames.length;
-    const ratio = matchedCount / totalOnchain;
-
-    const ok = ratio >= 0.8;
+    const ok = matchedCount / totalOnchain >= 0.8;
 
     return {
       id: "vpdq_match",
       status: ok ? "verified" : "failed",
-      detail: `${matchedCount}/${totalOnchain} frames matched (max distance: ${maxDistance}, threshold: ${PDQ_THRESHOLD})`,
+      detail: `${matchedCount}/${totalOnchain} frames matched [${perFrame.join(", ")}] (threshold: ${PDQ_THRESHOLD})`,
     };
   } catch (e) {
     return {
