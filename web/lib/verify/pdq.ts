@@ -271,6 +271,14 @@ async function demuxMp4(
     };
 
     mp4.onSamples = (_id: number, _user: any, samples: any[]) => {
+      if (chunks.length === 0 && samples.length > 0) {
+        const s = samples[0];
+        console.log(`[vPDQ] first chunk: cts=${s.cts}, dts=${s.dts}, timescale=${s.timescale}, is_sync=${s.is_sync}, cts_sec=${(s.cts/s.timescale).toFixed(4)}, dts_sec=${(s.dts/s.timescale).toFixed(4)}`);
+        if (samples.length > 1) {
+          const s1 = samples[1];
+          console.log(`[vPDQ] 2nd chunk: cts=${s1.cts}, dts=${s1.dts}, cts_sec=${(s1.cts/s1.timescale).toFixed(4)}`);
+        }
+      }
       for (const sample of samples) {
         chunks.push(new EncodedVideoChunk({
           type: sample.is_sync ? "key" : "delta",
