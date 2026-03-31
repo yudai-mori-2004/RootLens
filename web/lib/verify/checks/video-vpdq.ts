@@ -5,15 +5,8 @@
  * TEE が WASM 内で各フレームの PDQ ハッシュを計算した結果を、
  * ブラウザ側で純粋 TypeScript により再計算し、フレームごとに照合する。
  *
- * 共通チェック (4):
- *   1. Collection  — ext_collection_mint に所属
- *   2. TEE Signature — Ed25519 署名 valid
- *   3. TEE Identity  — tee_pubkey が trusted_tee_nodes に存在
- *   4. Content Binding — payload.content_hash == query
- *
- * 固有チェック (2):
- *   5. WASM Trusted  — payload.wasm_hash が GlobalConfig に登録済み
- *   6. vPDQ Match    — フレーム別ハッシュ照合 (ハミング距離 ≤ 閾値)
+ * 共通チェック (3): collection, tee_signature, content_binding
+ * 固有チェック (2): wasm_trusted, vpdq_match
  */
 
 import type { SignedJson, ExtensionPayload, WasmModuleInfo } from "@title-protocol/sdk";
@@ -111,22 +104,22 @@ async function checkVpdqMatch(
   }
 
   try {
-    const computed = await computeVpdq(videoUrl);
+    const timestamps = payload.frames.map(f => f.timestamp);
+    const computed = await computeVpdq(videoUrl, timestamps);
 
     if (computed.length === 0) {
       return { id: "vpdq_match", status: "failed", detail: "No frames extracted from video" };
     }
 
-    // フレーム照合: オンチェーンの各フレームに対して、
-    // 再計算フレームから最もtimestampが近いものを探してハミング距離を比較
     let matchedCount = 0;
     let maxDistance = 0;
 
-    for (const onchain of payload.frames) {
-      const closest = findClosestFrame(computed, onchain.timestamp);
-      if (!closest) continue;
+    for (let i = 0; i < payload.frames.length; i++) {
+      const onchain = payload.frames[i];
+      const recomputed = computed[i];
+      if (!recomputed) continue;
 
-      const dist = hammingDistance(onchain.pdqhash, closest.pdqhash);
+      const dist = hammingDistance(onchain.pdqhash, recomputed.pdqhash);
       if (dist <= PDQ_THRESHOLD) {
         matchedCount++;
       }
@@ -136,8 +129,6 @@ async function checkVpdqMatch(
     const totalOnchain = payload.frames.length;
     const ratio = matchedCount / totalOnchain;
 
-    // 80% 以上のフレームがマッチすれば verified
-    // (デコーダ差異でフレーム抽出タイミングがずれる可能性を許容)
     const ok = ratio >= 0.8;
 
     return {
@@ -152,21 +143,4 @@ async function checkVpdqMatch(
       detail: `vPDQ recomputation failed: ${e instanceof Error ? e.message : String(e)}`,
     };
   }
-}
-
-/** timestamp が最も近いフレームを返す (±0.5秒以内) */
-function findClosestFrame(frames: VpdqFrame[], timestamp: number): VpdqFrame | null {
-  let best: VpdqFrame | null = null;
-  let bestDelta = Infinity;
-
-  for (const f of frames) {
-    const delta = Math.abs(f.timestamp - timestamp);
-    if (delta < bestDelta) {
-      bestDelta = delta;
-      best = f;
-    }
-  }
-
-  // 0.5秒以上ずれていたらマッチなし
-  return bestDelta <= 0.5 ? best : null;
 }

@@ -179,17 +179,18 @@ export async function generateDeviceCredentials(): Promise<DeviceCredentials> {
 }
 
 /**
- * サーバーから返却されたDevice Certificate + Root CA Certificateを保存
- * 仕様書 §4.4.1 ステップ7
+ * サーバーから返却されたDevice Certificate + Intermediate CA + Root CA Certificateを保存
+ * 仕様書 §4.4.1 ステップ7 (3-layer PKI: Root CA → Intermediate CA → Device)
  */
 export async function storeDeviceCertificate(
   deviceCertBase64: string,
+  intermediateCaCertBase64: string,
   rootCaCertBase64: string,
 ): Promise<boolean> {
   if (!C2paBridge) {
     throw new Error(`C2paBridge native module is not available on ${Platform.OS}`);
   }
-  return C2paBridge.storeDeviceCertificate(deviceCertBase64, rootCaCertBase64);
+  return C2paBridge.storeDeviceCertificate(deviceCertBase64, intermediateCaCertBase64, rootCaCertBase64);
 }
 
 /**

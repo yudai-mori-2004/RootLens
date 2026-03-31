@@ -50,41 +50,43 @@ export interface VpdqFrame {
   timestamp: number;
 }
 
-/**
- * 動画URLからフレーム別PDQハッシュを計算する。
- * 1fps でサンプリングし、quality ≥ 50 のフレームのみ返す。
- */
-export async function computeVpdq(videoUrl: string): Promise<VpdqFrame[]> {
+/** 指定タイムスタンプ配列の各時刻でシーク＆PDQ計算する */
+export async function computeVpdq(
+  videoUrl: string,
+  timestamps: number[],
+): Promise<VpdqFrame[]> {
   const video = await loadVideo(videoUrl);
-  const duration = video.duration;
-  const fps = 1;
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
 
   const frames: VpdqFrame[] = [];
-  const seenHashes = new Set<string>();
-
-  for (let t = 0; t < duration; t += 1 / fps) {
-    const rgba = await seekAndCapture(video, canvas, ctx, t);
-    const gray = rgbaToGray(rgba, canvas.width, canvas.height);
-    const gray64 = jaroszDownsample(gray, canvas.width, canvas.height, SIZE, SIZE);
-    const quality = computeQuality(gray64);
-
-    if (quality < VPDQ_QUALITY_THRESHOLD) continue;
-
-    const hash = pdqHash256(gray64);
-
-    // Deduplicate identical hashes (same as TEE behavior)
-    if (seenHashes.has(hash)) continue;
-    seenHashes.add(hash);
-
-    frames.push({ pdqhash: hash, quality, timestamp: Math.round(t * 100) / 100 });
+  for (const t of timestamps) {
+    const frame = await computeFrameAt(video, canvas, ctx, t);
+    if (frame) frames.push(frame);
   }
 
   video.remove();
   return frames;
+}
+
+/** 指定タイムスタンプのフレームをPDQ計算。quality < 50 は null */
+async function computeFrameAt(
+  video: HTMLVideoElement,
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  t: number,
+): Promise<VpdqFrame | null> {
+  const rgba = await seekAndCapture(video, canvas, ctx, t);
+  const gray = rgbaToGray(rgba, canvas.width, canvas.height);
+  const gray64 = jaroszDownsample(gray, canvas.width, canvas.height, SIZE, SIZE);
+  const quality = computeQuality(gray64);
+
+  if (quality < VPDQ_QUALITY_THRESHOLD) return null;
+
+  const hash = pdqHash256(gray64);
+  return { pdqhash: hash, quality, timestamp: Math.round(t * 1000) / 1000 };
 }
 
 // ---------------------------------------------------------------------------
