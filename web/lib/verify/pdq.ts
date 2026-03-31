@@ -183,20 +183,20 @@ async function videoFrameToRgba(
 
   console.log(`[vPDQ] frame format=${fmt}, colorSpace=${JSON.stringify(frame.colorSpace)}, ${w}x${h}`);
 
-  // I420/NV12: Y プレーンのみ使用（輝度 = グレースケール、色マトリクス非依存）
+  // I420/NV12: Y プレーンのみ使用
   if (fmt === "I420" || fmt === "NV12") {
+    // close 前に colorSpace を読む（close 後はプロパティが無効になりうる）
+    const isLimitedRange = !frame.colorSpace?.fullRange;
+
     const allocSize = frame.allocationSize();
     const buf = new Uint8Array(allocSize);
     const layout = await frame.copyTo(buf);
     frame.close();
 
-    // Y プレーンは layout[0]。stride が codedWidth と異なる場合がある
     const yOffset = layout[0].offset;
     const yStride = layout[0].stride;
+    console.log(`[vPDQ] Y-plane: isLimitedRange=${isLimitedRange}, yOffset=${yOffset}, yStride=${yStride}, raw Y[0..3]=[${buf[yOffset]},${buf[yOffset+1]},${buf[yOffset+2]},${buf[yOffset+3]}]`);
 
-    // limited range (16-235) → full range (0-255) に変換して RGBA に詰める
-    // ffmpeg の swscale と同じ: Y_full = clamp((Y - 16) * 255 / 219, 0, 255)
-    const isLimitedRange = !frame.colorSpace.fullRange;
     const rgba = new Uint8Array(w * h * 4);
     for (let row = 0; row < h; row++) {
       for (let col = 0; col < w; col++) {
