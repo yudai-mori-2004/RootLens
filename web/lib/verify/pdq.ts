@@ -98,11 +98,14 @@ async function getFFmpeg(): Promise<any> {
 
   const ffmpeg = new FFmpeg();
 
-  // WASM をCDNからロード
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  const coreBaseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
   await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    classWorkerURL: await toBlobURL(
+      "https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js",
+      "text/javascript",
+    ),
+    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, "application/wasm"),
   });
 
   ffmpegInstance = ffmpeg;
