@@ -61,6 +61,8 @@ export async function computeVpdq(
     const gray = rgbaToGray(rf.rgba, rf.width, rf.height);
     const gray64 = jaroszDownsample(gray, rf.width, rf.height, SIZE, SIZE);
     const quality = computeQuality(gray64);
+    // DEBUG: 全フレームの gray64 先頭値と RGBA 先頭値をログ
+    console.log(`[vPDQ] f${i}@${timestamps[i]}s: RGBA[0..5]=[${rf.rgba[0]},${rf.rgba[1]},${rf.rgba[2]},${rf.rgba[4]},${rf.rgba[5]},${rf.rgba[6]}] gray64[0..7]=[${Array.from(gray64.slice(0,8)).map(v=>Math.round(v))}]`);
     if (quality < VPDQ_QUALITY_THRESHOLD) continue;
     const hash = pdqHash256(gray64);
     frames.push({ pdqhash: hash, quality, timestamp: timestamps[i] });
