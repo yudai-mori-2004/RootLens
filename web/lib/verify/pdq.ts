@@ -81,36 +81,10 @@ export async function computeVpdq(
 }
 
 // ---------------------------------------------------------------------------
-// Video frame extraction (ffmpeg.wasm)
-//
-// TEE と同じ ffmpeg でフレーム抽出することで、YUV→RGB 変換・edit list 解釈・
-// タイムスタンプ解釈が完全に一致する。
+// Video frame extraction (WebCodecs)
 // ---------------------------------------------------------------------------
 
 type FrameRgba = { rgba: Uint8Array; width: number; height: number };
-
-let ffmpegInstance: any = null;
-
-async function getFFmpeg(): Promise<any> {
-  if (ffmpegInstance) return ffmpegInstance;
-  const { FFmpeg } = await import("@ffmpeg/ffmpeg");
-  const { toBlobURL } = await import("@ffmpeg/util");
-
-  const ffmpeg = new FFmpeg();
-
-  const coreBaseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-  await ffmpeg.load({
-    classWorkerURL: await toBlobURL(
-      "https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/esm/worker.js",
-      "text/javascript",
-    ),
-    coreURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${coreBaseURL}/ffmpeg-core.wasm`, "application/wasm"),
-  });
-
-  ffmpegInstance = ffmpeg;
-  return ffmpeg;
-}
 
 async function extractFrames(
   videoUrl: string,
@@ -118,67 +92,154 @@ async function extractFrames(
 ): Promise<(FrameRgba | null)[]> {
   const res = await fetch(videoUrl, { mode: "cors" });
   if (!res.ok) throw new Error(`Failed to fetch video: ${res.status}`);
-  const videoData = new Uint8Array(await res.arrayBuffer());
+  const buf = await res.arrayBuffer();
 
-  const ffmpeg = await getFFmpeg();
-  await ffmpeg.writeFile("input.mov", videoData);
+  const { config, chunks } = await demuxMp4(buf);
+  const maxTarget = Math.max(...timestamps);
 
-  // 解像度を取得: 1フレームを BMP で出力し、ヘッダーから読む
-  await ffmpeg.exec([
-    "-ignore_editlist", "1",
-    "-i", "input.mov",
-    "-frames:v", "1",
-    "-y", "probe.bmp",
-  ]);
-  const bmpData = await ffmpeg.readFile("probe.bmp") as Uint8Array;
-  const width = bmpData[18] | (bmpData[19] << 8) | (bmpData[20] << 16) | (bmpData[21] << 24);
-  const height = Math.abs(bmpData[22] | (bmpData[23] << 8) | (bmpData[24] << 16) | (bmpData[25] << 24));
-  await ffmpeg.deleteFile("probe.bmp");
+  // 各ターゲットの最良候補を保持。VideoFrame は即座に RGBA 化して close する。
+  const bestForTarget: (FrameRgba & { delta: number })[] = timestamps.map(() => ({
+    rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
+  }));
 
-  if (width <= 0 || height <= 0) {
-    throw new Error(`Failed to probe video resolution from BMP header`);
-  }
+  return new Promise((resolve, reject) => {
+    const decoder = new VideoDecoder({
+      output: (frame: VideoFrame) => {
+        const frameSec = (frame.timestamp ?? 0) / 1_000_000;
 
-  const results: (FrameRgba | null)[] = [];
-  const expectedBytes = width * height * 3;
+        let needed = false;
+        for (let i = 0; i < timestamps.length; i++) {
+          if (Math.abs(frameSec - timestamps[i]) < bestForTarget[i].delta) {
+            needed = true;
+            break;
+          }
+        }
 
-  for (const t of timestamps) {
-    const ts = t.toFixed(4);
-    const outFile = `frame.raw`;
+        if (!needed) {
+          frame.close();
+          return;
+        }
 
-    // TEE と同じコマンド構造
-    await ffmpeg.exec([
-      "-ignore_editlist", "1",
-      "-ss", ts,
-      "-i", "input.mov",
-      "-frames:v", "1",
-      "-pix_fmt", "rgb24",
-      "-f", "rawvideo",
-      "-y", outFile,
-    ]);
+        const result = videoFrameToRgba(frame);
+        for (let i = 0; i < timestamps.length; i++) {
+          const delta = Math.abs(frameSec - timestamps[i]);
+          if (delta < bestForTarget[i].delta) {
+            bestForTarget[i] = { ...result, delta };
+          }
+        }
+      },
+      error: (e: DOMException) => reject(e),
+    });
 
-    const raw = await ffmpeg.readFile(outFile) as Uint8Array;
-    await ffmpeg.deleteFile(outFile);
+    decoder.configure(config);
 
-    if (raw.length !== expectedBytes) {
-      results.push(null);
-      continue;
+    for (const chunk of chunks) {
+      if (chunk.timestamp / 1_000_000 > maxTarget + 1) break;
+      decoder.decode(chunk);
     }
 
-    // RGB24 → RGBA
-    const rgba = new Uint8Array(width * height * 4);
-    for (let j = 0; j < width * height; j++) {
-      rgba[j * 4] = raw[j * 3];
-      rgba[j * 4 + 1] = raw[j * 3 + 1];
-      rgba[j * 4 + 2] = raw[j * 3 + 2];
-      rgba[j * 4 + 3] = 255;
-    }
+    decoder.flush().then(() => {
+      resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
+    }).catch(reject);
+  });
+}
 
-    results.push({ rgba, width, height });
+/** VideoFrame → full-range RGBA */
+function videoFrameToRgba(
+  frame: VideoFrame,
+): { rgba: Uint8Array; width: number; height: number } {
+  const w = frame.displayWidth;
+  const h = frame.displayHeight;
+  const isLimitedRange = frame.colorSpace?.fullRange === false;
+
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
+  ctx.drawImage(frame, 0, 0);
+  frame.close();
+
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const rgba = new Uint8Array(imageData.data.buffer);
+
+  // ブラウザが limited range RGB をそのまま出力する場合がある。
+  // ffmpeg と合わせるため、limited → full range 変換を適用。
+  if (isLimitedRange) {
+    const scale = 255 / 219;
+    for (let i = 0; i < rgba.length; i += 4) {
+      rgba[i]     = Math.min(255, Math.max(0, Math.round((rgba[i]     - 16) * scale)));
+      rgba[i + 1] = Math.min(255, Math.max(0, Math.round((rgba[i + 1] - 16) * scale)));
+      rgba[i + 2] = Math.min(255, Math.max(0, Math.round((rgba[i + 2] - 16) * scale)));
+    }
   }
 
-  await ffmpeg.deleteFile("input.mov");
-  return results;
+  return { rgba, width: w, height: h };
+}
+
+// ---------------------------------------------------------------------------
+// MP4 demuxer (mp4box.js)
+// ---------------------------------------------------------------------------
+
+async function demuxMp4(
+  buf: ArrayBuffer,
+): Promise<{ config: VideoDecoderConfig; chunks: EncodedVideoChunk[] }> {
+  const mp4box = await import("mp4box");
+
+  return new Promise((resolve, reject) => {
+    const mp4 = mp4box.createFile();
+    let totalSamples = 0;
+    let config: VideoDecoderConfig | null = null;
+    const chunks: EncodedVideoChunk[] = [];
+    let receivedSamples = 0;
+
+    mp4.onReady = (info: any) => {
+      const videoTrack = info.videoTracks[0];
+      if (!videoTrack) {
+        reject(new Error("No video track found"));
+        return;
+      }
+
+      totalSamples = videoTrack.nb_samples;
+
+      const entry = (mp4 as any).getTrackById(videoTrack.id)?.mdia?.minf?.stbl?.stsd?.entries[0];
+      config = {
+        codec: videoTrack.codec,
+        codedWidth: videoTrack.video.width,
+        codedHeight: videoTrack.video.height,
+      };
+
+      const desc = entry?.avcC ?? entry?.hvcC;
+      if (desc) {
+        const stream = new mp4box.DataStream(undefined, 0, (mp4box as any).DataStream.BIG_ENDIAN);
+        desc.write(stream);
+        config.description = new Uint8Array(stream.buffer, 8);
+      }
+
+      mp4.setExtractionOptions(videoTrack.id);
+      mp4.start();
+    };
+
+    mp4.onSamples = (_id: number, _user: any, samples: any[]) => {
+      for (const sample of samples) {
+        chunks.push(new EncodedVideoChunk({
+          type: sample.is_sync ? "key" : "delta",
+          timestamp: (sample.cts / sample.timescale) * 1_000_000,
+          duration: (sample.duration / sample.timescale) * 1_000_000,
+          data: sample.data,
+        }));
+      }
+      receivedSamples += samples.length;
+
+      if (receivedSamples >= totalSamples && config) {
+        resolve({ config, chunks });
+      }
+    };
+
+    mp4.onError = (e: string) => reject(new Error(`MP4 demux error: ${e}`));
+
+    const mp4buf = buf as ArrayBuffer & { fileStart: number };
+    mp4buf.fileStart = 0;
+    mp4.appendBuffer(mp4buf);
+    mp4.flush();
+  });
 }
 
 // ---------------------------------------------------------------------------
