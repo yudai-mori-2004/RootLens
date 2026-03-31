@@ -102,6 +102,8 @@ async function extractFrames(
     rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
   }));
 
+  const pending: Promise<void>[] = [];
+
   return new Promise((resolve, reject) => {
     const decoder = new VideoDecoder({
       output: (frame: VideoFrame) => {
@@ -120,13 +122,15 @@ async function extractFrames(
           return;
         }
 
-        const result = videoFrameToRgba(frame);
-        for (let i = 0; i < timestamps.length; i++) {
-          const delta = Math.abs(frameSec - timestamps[i]);
-          if (delta < bestForTarget[i].delta) {
-            bestForTarget[i] = { ...result, delta };
+        const p = videoFrameToRgba(frame).then((result) => {
+          for (let i = 0; i < timestamps.length; i++) {
+            const delta = Math.abs(frameSec - timestamps[i]);
+            if (delta < bestForTarget[i].delta) {
+              bestForTarget[i] = { ...result, delta };
+            }
           }
-        }
+        });
+        pending.push(p);
       },
       error: (e: DOMException) => reject(e),
     });
@@ -138,24 +142,80 @@ async function extractFrames(
       decoder.decode(chunk);
     }
 
-    decoder.flush().then(() => {
+    decoder.flush().then(async () => {
+      await Promise.all(pending);
       resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
     }).catch(reject);
   });
 }
 
-/** VideoFrame → RGBA via OffscreenCanvas */
-function videoFrameToRgba(
+/**
+ * VideoFrame → RGBA。
+ * NV12/I420: Y,U,Vプレーンを直接読み、BT.601 limited range で RGB 変換。
+ * ffmpeg の swscale デフォルト (SWS_CS_ITU601) と同一の式を使う。
+ * canvas の色変換を一切通さないので、ffmpeg と同じ RGB が得られる。
+ */
+async function videoFrameToRgba(
   frame: VideoFrame,
-): { rgba: Uint8Array; width: number; height: number } {
+): Promise<{ rgba: Uint8Array; width: number; height: number }> {
   const w = frame.displayWidth;
   const h = frame.displayHeight;
+  const fmt = frame.format;
 
+  if (fmt === "NV12" || fmt === "I420") {
+    const allocSize = frame.allocationSize();
+    const buf = new Uint8Array(allocSize);
+    const layout = await frame.copyTo(buf);
+    frame.close();
+
+    const yPlane = { offset: layout[0].offset, stride: layout[0].stride };
+    const uvPlane = { offset: layout[1].offset, stride: layout[1].stride };
+
+    const rgba = new Uint8Array(w * h * 4);
+
+    for (let row = 0; row < h; row++) {
+      for (let col = 0; col < w; col++) {
+        const y = buf[yPlane.offset + row * yPlane.stride + col];
+
+        let u: number, v: number;
+        const uvRow = row >> 1;
+        const uvCol = col >> 1;
+
+        if (fmt === "NV12") {
+          // NV12: UV interleaved, half resolution
+          const uvIdx = uvPlane.offset + uvRow * uvPlane.stride + uvCol * 2;
+          u = buf[uvIdx];
+          v = buf[uvIdx + 1];
+        } else {
+          // I420: U and V in separate planes
+          const uPlane = { offset: layout[1].offset, stride: layout[1].stride };
+          const vPlane = { offset: layout[2].offset, stride: layout[2].stride };
+          u = buf[uPlane.offset + uvRow * uPlane.stride + uvCol];
+          v = buf[vPlane.offset + uvRow * vPlane.stride + uvCol];
+        }
+
+        // BT.601 limited range YUV→RGB (ffmpeg swscale default)
+        const yf = 1.164 * (y - 16);
+        const r = yf + 1.596 * (v - 128);
+        const g = yf - 0.813 * (v - 128) - 0.391 * (u - 128);
+        const b = yf + 2.018 * (u - 128);
+
+        const off = (row * w + col) * 4;
+        rgba[off]     = Math.max(0, Math.min(255, Math.round(r)));
+        rgba[off + 1] = Math.max(0, Math.min(255, Math.round(g)));
+        rgba[off + 2] = Math.max(0, Math.min(255, Math.round(b)));
+        rgba[off + 3] = 255;
+      }
+    }
+
+    return { rgba, width: w, height: h };
+  }
+
+  // フォーマット不明: canvas 経由
   const canvas = new OffscreenCanvas(w, h);
   const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
   ctx.drawImage(frame, 0, 0);
   frame.close();
-
   const imageData = ctx.getImageData(0, 0, w, h);
   return { rgba: new Uint8Array(imageData.data.buffer), width: w, height: h };
 }
