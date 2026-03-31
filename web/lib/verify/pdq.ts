@@ -172,12 +172,16 @@ async function videoFrameToRgba(
     const yOffset = layout[0].offset;
     const yStride = layout[0].stride;
 
-    // Y 値をそのまま RGBA の R=G=B=Y, A=255 として詰める
-    // (後続の rgbaToGray で BT.601 適用すると Y * (0.299+0.587+0.114) = Y になる)
+    // limited range (16-235) → full range (0-255) に変換して RGBA に詰める
+    // ffmpeg の swscale と同じ: Y_full = clamp((Y - 16) * 255 / 219, 0, 255)
+    const isLimitedRange = !frame.colorSpace.fullRange;
     const rgba = new Uint8Array(w * h * 4);
     for (let row = 0; row < h; row++) {
       for (let col = 0; col < w; col++) {
-        const y = buf[yOffset + row * yStride + col];
+        let y = buf[yOffset + row * yStride + col];
+        if (isLimitedRange) {
+          y = Math.max(0, Math.min(255, Math.round((y - 16) * 255 / 219)));
+        }
         const off = (row * w + col) * 4;
         rgba[off] = y;
         rgba[off + 1] = y;
