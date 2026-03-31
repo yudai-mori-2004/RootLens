@@ -97,6 +97,9 @@ async function extractFrames(
     rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
   }));
 
+  // フレーム RGBA 化は copyTo が非同期なので Promise を集める
+  const framePromises: Promise<void>[] = [];
+
   return new Promise((resolve, reject) => {
     const decoder = new VideoDecoder({
       output: (frame: VideoFrame) => {
@@ -115,24 +118,16 @@ async function extractFrames(
           return;
         }
 
-        const w = frame.displayWidth;
-        const h = frame.displayHeight;
-
-        // canvas 経由で RGBA 取得（同期）
-        const canvas = new OffscreenCanvas(w, h);
-        const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
-        ctx.drawImage(frame, 0, 0);
-        frame.close();
-
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const rgba = new Uint8Array(imageData.data.buffer);
-
-        for (let i = 0; i < timestamps.length; i++) {
-          const delta = Math.abs(frameSec - timestamps[i]);
-          if (delta < bestForTarget[i].delta) {
-            bestForTarget[i] = { rgba, width: w, height: h, delta };
+        // VideoFrame から RGBA を取得する Promise を登録
+        const p = videoFrameToRgba(frame).then((result) => {
+          for (let i = 0; i < timestamps.length; i++) {
+            const delta = Math.abs(frameSec - timestamps[i]);
+            if (delta < bestForTarget[i].delta) {
+              bestForTarget[i] = { ...result, delta };
+            }
           }
-        }
+        });
+        framePromises.push(p);
       },
       error: (e: DOMException) => reject(e),
     });
@@ -144,20 +139,63 @@ async function extractFrames(
       decoder.decode(chunk);
     }
 
-    decoder.flush().then(() => {
-      // Debug: 各フレームの取得状況をログ
-      for (let i = 0; i < timestamps.length; i++) {
-        const b = bestForTarget[i];
-        if (b.delta < Infinity) {
-          const allZero = b.rgba.every(v => v === 0);
-          console.log(`[vPDQ] f${i}@${timestamps[i]}s: ${b.width}x${b.height}, delta=${b.delta.toFixed(3)}s, RGBA[0..3]=[${b.rgba[0]},${b.rgba[1]},${b.rgba[2]},${b.rgba[3]}], allZero=${allZero}`);
-        } else {
-          console.log(`[vPDQ] f${i}@${timestamps[i]}s: no frame matched`);
-        }
-      }
+    decoder.flush().then(async () => {
+      await Promise.all(framePromises);
       resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
     }).catch(reject);
   });
+}
+
+/**
+ * VideoFrame → RGBA Uint8Array。
+ * I420/NV12 の場合は Y プレーンから直接グレースケール→疑似 RGBA に変換し、
+ * ブラウザの色マトリクス変換をバイパスする。
+ * それ以外のフォーマットは copyTo RGBA を使う。
+ */
+async function videoFrameToRgba(
+  frame: VideoFrame,
+): Promise<{ rgba: Uint8Array; width: number; height: number }> {
+  const w = frame.displayWidth;
+  const h = frame.displayHeight;
+  const fmt = frame.format;
+
+  console.log(`[vPDQ] frame format=${fmt}, colorSpace=${JSON.stringify(frame.colorSpace)}, ${w}x${h}`);
+
+  // I420/NV12: Y プレーンのみ使用（輝度 = グレースケール、色マトリクス非依存）
+  if (fmt === "I420" || fmt === "NV12") {
+    const allocSize = frame.allocationSize();
+    const buf = new Uint8Array(allocSize);
+    const layout = await frame.copyTo(buf);
+    frame.close();
+
+    // Y プレーンは layout[0]。stride が codedWidth と異なる場合がある
+    const yOffset = layout[0].offset;
+    const yStride = layout[0].stride;
+
+    // Y 値をそのまま RGBA の R=G=B=Y, A=255 として詰める
+    // (後続の rgbaToGray で BT.601 適用すると Y * (0.299+0.587+0.114) = Y になる)
+    const rgba = new Uint8Array(w * h * 4);
+    for (let row = 0; row < h; row++) {
+      for (let col = 0; col < w; col++) {
+        const y = buf[yOffset + row * yStride + col];
+        const off = (row * w + col) * 4;
+        rgba[off] = y;
+        rgba[off + 1] = y;
+        rgba[off + 2] = y;
+        rgba[off + 3] = 255;
+      }
+    }
+
+    return { rgba, width: w, height: h };
+  }
+
+  // その他: copyTo RGBA
+  const rgbaSize = w * h * 4;
+  const rgba = new Uint8Array(rgbaSize);
+  await frame.copyTo(rgba, { format: "RGBA" } as any);
+  frame.close();
+
+  return { rgba, width: w, height: h };
 }
 
 // ---------------------------------------------------------------------------
