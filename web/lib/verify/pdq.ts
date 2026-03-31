@@ -120,7 +120,7 @@ async function extractFrames(
 
         // canvas 経由で RGBA 取得（同期）
         const canvas = new OffscreenCanvas(w, h);
-        const ctx = canvas.getContext("2d")!;
+        const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
         ctx.drawImage(frame, 0, 0);
         frame.close();
 
