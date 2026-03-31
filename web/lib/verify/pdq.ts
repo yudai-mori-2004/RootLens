@@ -144,13 +144,12 @@ async function extractFrames(
   });
 }
 
-/** VideoFrame → full-range RGBA */
+/** VideoFrame → RGBA via OffscreenCanvas */
 function videoFrameToRgba(
   frame: VideoFrame,
 ): { rgba: Uint8Array; width: number; height: number } {
   const w = frame.displayWidth;
   const h = frame.displayHeight;
-  const isLimitedRange = frame.colorSpace?.fullRange === false;
 
   const canvas = new OffscreenCanvas(w, h);
   const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
@@ -158,20 +157,7 @@ function videoFrameToRgba(
   frame.close();
 
   const imageData = ctx.getImageData(0, 0, w, h);
-  const rgba = new Uint8Array(imageData.data.buffer);
-
-  // ブラウザが limited range RGB をそのまま出力する場合がある。
-  // ffmpeg と合わせるため、limited → full range 変換を適用。
-  if (isLimitedRange) {
-    const scale = 255 / 219;
-    for (let i = 0; i < rgba.length; i += 4) {
-      rgba[i]     = Math.min(255, Math.max(0, Math.round((rgba[i]     - 16) * scale)));
-      rgba[i + 1] = Math.min(255, Math.max(0, Math.round((rgba[i + 1] - 16) * scale)));
-      rgba[i + 2] = Math.min(255, Math.max(0, Math.round((rgba[i + 2] - 16) * scale)));
-    }
-  }
-
-  return { rgba, width: w, height: h };
+  return { rgba: new Uint8Array(imageData.data.buffer), width: w, height: h };
 }
 
 // ---------------------------------------------------------------------------
