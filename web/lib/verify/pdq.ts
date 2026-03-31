@@ -11,7 +11,7 @@
  *   5. Torben median → 256bit 量子化
  *
  * 画像: computePdq(imageUrl) → 1つのhash
- * 動画: computeVpdq(videoUrl) → フレーム別hash配列
+ * 動画: computeVpdq(videoUrl, timestamps) → フレーム別hash配列
  *
  * 参照実装:
  *   - title-protocol/wasm/image-pdq/src/lib.rs (DCT + hash)
@@ -50,75 +50,169 @@ export interface VpdqFrame {
   timestamp: number;
 }
 
-/** 指定タイムスタンプ配列の各時刻でシーク＆PDQ計算する */
+/**
+ * 指定タイムスタンプ配列の各時刻のフレームをデコードし PDQ 計算する。
+ * WebCodecs (VideoDecoder) でフレーム単位の正確なデコードを行う。
+ */
 export async function computeVpdq(
   videoUrl: string,
   timestamps: number[],
 ): Promise<VpdqFrame[]> {
-  const video = await loadVideo(videoUrl);
-  const canvas = document.createElement("canvas");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
+  const rawFrames = await extractFrames(videoUrl, timestamps);
 
   const frames: VpdqFrame[] = [];
-  for (const t of timestamps) {
-    const frame = await computeFrameAt(video, canvas, ctx, t);
-    if (frame) frames.push(frame);
+  for (let i = 0; i < rawFrames.length; i++) {
+    const rf = rawFrames[i];
+    if (!rf) continue;
+    const gray = rgbaToGray(rf.rgba, rf.width, rf.height);
+    const gray64 = jaroszDownsample(gray, rf.width, rf.height, SIZE, SIZE);
+    const quality = computeQuality(gray64);
+    if (quality < VPDQ_QUALITY_THRESHOLD) continue;
+    const hash = pdqHash256(gray64);
+    frames.push({ pdqhash: hash, quality, timestamp: timestamps[i] });
   }
 
-  video.remove();
   return frames;
 }
 
-/** 指定タイムスタンプのフレームをPDQ計算。quality < 50 は null */
-async function computeFrameAt(
-  video: HTMLVideoElement,
-  canvas: HTMLCanvasElement,
-  ctx: CanvasRenderingContext2D,
-  t: number,
-): Promise<VpdqFrame | null> {
-  const rgba = await seekAndCapture(video, canvas, ctx, t);
-  const gray = rgbaToGray(rgba, canvas.width, canvas.height);
-  const gray64 = jaroszDownsample(gray, canvas.width, canvas.height, SIZE, SIZE);
-  const quality = computeQuality(gray64);
-
-  if (quality < VPDQ_QUALITY_THRESHOLD) return null;
-
-  const hash = pdqHash256(gray64);
-  return { pdqhash: hash, quality, timestamp: Math.round(t * 1000) / 1000 };
-}
-
 // ---------------------------------------------------------------------------
-// Video loading
+// Video frame extraction (WebCodecs)
 // ---------------------------------------------------------------------------
 
-async function loadVideo(url: string): Promise<HTMLVideoElement> {
-  return new Promise<HTMLVideoElement>((resolve, reject) => {
-    const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
-    video.preload = "auto";
-    video.muted = true;
-    video.playsInline = true;
-    video.onloadedmetadata = () => resolve(video);
-    video.onerror = () => reject(new Error(`Failed to load video: ${url}`));
-    video.src = url;
+type FrameRgba = { rgba: Uint8Array; width: number; height: number };
+
+async function extractFrames(
+  videoUrl: string,
+  timestamps: number[],
+): Promise<(FrameRgba | null)[]> {
+  const res = await fetch(videoUrl, { mode: "cors" });
+  if (!res.ok) throw new Error(`Failed to fetch video: ${res.status}`);
+  const buf = await res.arrayBuffer();
+
+  const { config, chunks } = await demuxMp4(buf);
+  const maxTarget = Math.max(...timestamps);
+
+  // 各ターゲットの最良候補を保持。VideoFrame は即座に RGBA 化して close する。
+  const bestForTarget: (FrameRgba & { delta: number })[] = timestamps.map(() => ({
+    rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
+  }));
+
+  const canvas = new OffscreenCanvas(config.codedWidth ?? 1, config.codedHeight ?? 1);
+  const ctx = canvas.getContext("2d")!;
+
+  return new Promise((resolve, reject) => {
+    const decoder = new VideoDecoder({
+      output: (frame: VideoFrame) => {
+        const frameSec = (frame.timestamp ?? 0) / 1_000_000;
+
+        // このフレームが各ターゲットの最良候補かチェック
+        let needed = false;
+        for (let i = 0; i < timestamps.length; i++) {
+          const delta = Math.abs(frameSec - timestamps[i]);
+          if (delta < bestForTarget[i].delta) {
+            needed = true;
+          }
+        }
+
+        if (needed) {
+          canvas.width = frame.displayWidth;
+          canvas.height = frame.displayHeight;
+          ctx.drawImage(frame, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const rgba = new Uint8Array(imageData.data.buffer);
+
+          for (let i = 0; i < timestamps.length; i++) {
+            const delta = Math.abs(frameSec - timestamps[i]);
+            if (delta < bestForTarget[i].delta) {
+              bestForTarget[i] = { rgba, width: canvas.width, height: canvas.height, delta };
+            }
+          }
+        }
+
+        frame.close();
+      },
+      error: (e: DOMException) => reject(e),
+    });
+
+    decoder.configure(config);
+
+    for (const chunk of chunks) {
+      if (chunk.timestamp / 1_000_000 > maxTarget + 1) break;
+      decoder.decode(chunk);
+    }
+
+    decoder.flush().then(() => {
+      resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
+    }).catch(reject);
   });
 }
 
-async function seekAndCapture(
-  video: HTMLVideoElement,
-  canvas: HTMLCanvasElement,
-  ctx: CanvasRenderingContext2D,
-  time: number,
-): Promise<Uint8Array> {
-  await new Promise<void>((resolve) => {
-    video.onseeked = () => resolve();
-    video.currentTime = time;
+// ---------------------------------------------------------------------------
+// MP4 demuxer (mp4box.js)
+// ---------------------------------------------------------------------------
+
+async function demuxMp4(
+  buf: ArrayBuffer,
+): Promise<{ config: VideoDecoderConfig; chunks: EncodedVideoChunk[] }> {
+  const mp4box = await import("mp4box");
+
+  return new Promise((resolve, reject) => {
+    const mp4 = mp4box.createFile();
+    let totalSamples = 0;
+    let config: VideoDecoderConfig | null = null;
+    const chunks: EncodedVideoChunk[] = [];
+    let receivedSamples = 0;
+
+    mp4.onReady = (info: any) => {
+      const videoTrack = info.videoTracks[0];
+      if (!videoTrack) {
+        reject(new Error("No video track found"));
+        return;
+      }
+
+      totalSamples = videoTrack.nb_samples;
+
+      const entry = (mp4 as any).getTrackById(videoTrack.id)?.mdia?.minf?.stbl?.stsd?.entries[0];
+      config = {
+        codec: videoTrack.codec,
+        codedWidth: videoTrack.video.width,
+        codedHeight: videoTrack.video.height,
+      };
+
+      const desc = entry?.avcC ?? entry?.hvcC;
+      if (desc) {
+        const stream = new mp4box.DataStream(undefined, 0, (mp4box as any).DataStream.BIG_ENDIAN);
+        desc.write(stream);
+        config.description = new Uint8Array(stream.buffer, 8);
+      }
+
+      mp4.setExtractionOptions(videoTrack.id);
+      mp4.start();
+    };
+
+    mp4.onSamples = (_id: number, _user: any, samples: any[]) => {
+      for (const sample of samples) {
+        chunks.push(new EncodedVideoChunk({
+          type: sample.is_sync ? "key" : "delta",
+          timestamp: (sample.cts / sample.timescale) * 1_000_000,
+          duration: (sample.duration / sample.timescale) * 1_000_000,
+          data: sample.data,
+        }));
+      }
+      receivedSamples += samples.length;
+
+      if (receivedSamples >= totalSamples && config) {
+        resolve({ config, chunks });
+      }
+    };
+
+    mp4.onError = (e: string) => reject(new Error(`MP4 demux error: ${e}`));
+
+    const mp4buf = buf as ArrayBuffer & { fileStart: number };
+    mp4buf.fileStart = 0;
+    mp4.appendBuffer(mp4buf);
+    mp4.flush();
   });
-  ctx.drawImage(video, 0, 0);
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  return new Uint8Array(imageData.data.buffer);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,12 +280,10 @@ function box1d(
     let sum = 0;
     let outIdx = 0;
 
-    // Phase 1: growing accumulation, no output
     for (let j = 0; j < halfWindow && j < lineLen; j++) {
       sum += input[base + j * stride];
     }
 
-    // Phase 2: growing window with output
     let windowLen = halfWindow;
     for (let j = 0; j < halfWindow + 1 && j < lineLen; j++) {
       if (j + halfWindow < lineLen) {
@@ -202,7 +294,6 @@ function box1d(
       outIdx++;
     }
 
-    // Phase 3: sliding full window
     const fullLen = windowLen;
     for (let j = halfWindow + 1; j + halfWindow < lineLen; j++) {
       sum += input[base + (j + halfWindow) * stride];
@@ -211,7 +302,6 @@ function box1d(
       outIdx++;
     }
 
-    // Phase 4: shrinking window
     for (let j = Math.max(0, lineLen - halfWindow); j < lineLen; j++) {
       if (j > halfWindow + 1) {
         sum -= input[base + (j - halfWindow - 1) * stride];
@@ -244,13 +334,11 @@ function jaroszDownsample(
   const buf1 = new Float32Array(gray);
   const buf2 = new Float32Array(inW * inH);
 
-  // 2 reps of (horizontal box + vertical box) = tent filter
   for (let i = 0; i < 2; i++) {
     boxAlongRows(buf1, buf2, inH, inW, windowR);
     boxAlongCols(buf2, buf1, inH, inW, windowC);
   }
 
-  // Center-pixel decimation
   const output = new Float32Array(outW * outH);
   for (let oi = 0; oi < outH; oi++) {
     const ini = Math.floor((oi + 0.5) * inH / outH);
@@ -369,7 +457,6 @@ function torbenMedian(values: Float64Array): number {
 function computeQuality(gray64: Float32Array): number {
   let gradientSum = 0;
 
-  // Vertical gradients
   for (let i = 0; i < SIZE - 1; i++) {
     for (let j = 0; j < SIZE; j++) {
       const d = Math.abs((gray64[i * SIZE + j] - gray64[(i + 1) * SIZE + j]) * 100 / 255);
@@ -377,7 +464,6 @@ function computeQuality(gray64: Float32Array): number {
     }
   }
 
-  // Horizontal gradients
   for (let i = 0; i < SIZE; i++) {
     for (let j = 0; j < SIZE - 1; j++) {
       const d = Math.abs((gray64[i * SIZE + j] - gray64[i * SIZE + j + 1]) * 100 / 255);
@@ -404,7 +490,6 @@ function pdqHash256(gray64: Float32Array): string {
     }
   }
 
-  // MSB-first (Meta convention)
   let hex = "";
   for (let i = HASH_BYTES - 1; i >= 0; i--) {
     hex += hash[i].toString(16).padStart(2, "0");
