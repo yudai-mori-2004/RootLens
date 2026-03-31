@@ -11,7 +11,7 @@
  *   5. Torben median → 256bit 量子化
  *
  * 画像: computePdq(imageUrl) → Canvas → RGBA → PDQ
- * 動画: computeVpdq(videoUrl, timestamps) → WebCodecs + mp4box.js → NV12 → BT.601 RGB → PDQ
+ * 動画: computeVpdq(videoUrl, timestamps) → WebCodecs + mp4box.js → Canvas → RGBA → PDQ
  *
  * 参照実装:
  *   - title-protocol/wasm/image-pdq/src/lib.rs
