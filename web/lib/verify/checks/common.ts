@@ -1,16 +1,18 @@
 /**
  * 仕様書 §7.4 クライアントサイド検証
  *
- * 全 processor_id 共通の4チェック:
+ * 全 processor_id 共通の3チェック:
  *   1. Collection  — cNFT が期待する Solana コレクションに所属するか
  *   2. TEE Signature — Ed25519 署名が JCS({payload, attributes}) に対して valid か
- *   3. TEE Identity  — tee_pubkey が GlobalConfig.trusted_tee_nodes に存在するか
- *   4. Content Binding — payload.content_hash が検索した content_hash と一致するか
+ *   3. Content Binding — payload.content_hash が検索した content_hash と一致するか
+ *
+ * TEE Identity (pubkey が現在の GlobalConfig.trusted_tee_nodes に存在するか) は
+ * 意図的に含めない。TEE ノードがローテーションで GlobalConfig から外されても、
+ * cNFT がコレクションに存在する = ミント時に authority が承認した、で十分。
  */
 
 import type { SignedJson } from "@title-protocol/sdk";
 import type { CheckResult } from "./types";
-import type { TrustedTeeNode } from "../config";
 
 // ---------------------------------------------------------------------------
 // 1. Collection
@@ -80,25 +82,7 @@ export async function checkTeeSignature(
 }
 
 // ---------------------------------------------------------------------------
-// 3. TEE Identity
-// ---------------------------------------------------------------------------
-
-export function checkTeeIdentity(
-  teePubkey: string,
-  trustedNodes: TrustedTeeNode[],
-): CheckResult {
-  const found = trustedNodes.some((n) => n.signing_pubkey === teePubkey);
-  return {
-    id: "tee_identity",
-    status: found ? "verified" : "failed",
-    detail: found
-      ? `TEE pubkey ${teePubkey.slice(0, 8)}... is in GlobalConfig.trusted_tee_nodes`
-      : `TEE pubkey ${teePubkey.slice(0, 8)}... not found in trusted nodes`,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// 4. Content Binding
+// 3. Content Binding
 // ---------------------------------------------------------------------------
 
 export function checkContentBinding(
@@ -116,7 +100,7 @@ export function checkContentBinding(
 }
 
 // ---------------------------------------------------------------------------
-// 共通4チェックをまとめて実行
+// 共通3チェックをまとめて実行
 // ---------------------------------------------------------------------------
 
 export interface CommonInput {
@@ -124,19 +108,17 @@ export interface CommonInput {
   collectionAddress: string;
   expectedCollection: string;
   queryContentHash: string;
-  trustedTeeNodes: TrustedTeeNode[];
 }
 
 export async function runCommonChecks(
   input: CommonInput,
-): Promise<[CheckResult, CheckResult, CheckResult, CheckResult]> {
-  const { signedJson, collectionAddress, expectedCollection, queryContentHash, trustedTeeNodes } = input;
+): Promise<[CheckResult, CheckResult, CheckResult]> {
+  const { signedJson, collectionAddress, expectedCollection, queryContentHash } = input;
   const payload = signedJson.payload as { content_hash: string };
 
   return [
     checkCollection(collectionAddress, expectedCollection),
     await checkTeeSignature(signedJson),
-    checkTeeIdentity(signedJson.tee_pubkey, trustedTeeNodes),
     checkContentBinding(payload.content_hash, queryContentHash),
   ];
 }

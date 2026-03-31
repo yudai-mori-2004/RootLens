@@ -57,7 +57,6 @@ export async function verifyAll(input: VerifyInput): Promise<VerificationResult>
       collectionAddress: resolved.collectionAddress,
       expectedCollection: globalConfig.core,
       queryContentHash,
-      trustedTeeNodes: globalConfig.trustedTeeNodes,
       assetId: resolved.assetId,
       allCoreAssetIds,
     });
@@ -73,7 +72,6 @@ export async function verifyAll(input: VerifyInput): Promise<VerificationResult>
       collectionAddress: ext.collectionAddress,
       expectedCollection: globalConfig.ext,
       queryContentHash,
-      trustedTeeNodes: globalConfig.trustedTeeNodes,
       trustedWasmModules: globalConfig.trustedWasmModules,
     };
 
@@ -115,7 +113,6 @@ async function verifyUnknownExtension(
     collectionAddress: string;
     expectedCollection: string;
     queryContentHash: string;
-    trustedTeeNodes: import("./config").TrustedTeeNode[];
   },
 ): Promise<ProcessorVerification> {
   const { runCommonChecks } = await import("./checks/common");

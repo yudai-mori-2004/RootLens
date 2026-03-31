@@ -25,8 +25,8 @@ export interface CheckResult {
 export interface ProcessorVerification {
   /** processor_id (例: "core-c2pa", "image-pdq", "cert-google") */
   processorId: string;
-  /** 共通4チェック: collection, tee_signature, tee_identity, content_binding */
-  common: [CheckResult, CheckResult, CheckResult, CheckResult];
+  /** 共通3チェック: collection, tee_signature, content_binding */
+  common: [CheckResult, CheckResult, CheckResult];
   /** processor 固有チェック (0個以上) */
   specific: CheckResult[];
 }

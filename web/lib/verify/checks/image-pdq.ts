@@ -18,7 +18,6 @@
 
 import type { SignedJson, ExtensionPayload, WasmModuleInfo } from "@title-protocol/sdk";
 import type { ProcessorVerification, CheckResult } from "./types";
-import type { TrustedTeeNode } from "../config";
 import { findWasmVersionByHash, PDQ_THRESHOLD } from "../config";
 import { runCommonChecks } from "./common";
 import { computePdq } from "../pdq";
@@ -32,7 +31,6 @@ export interface ImagePdqInput {
   collectionAddress: string;
   expectedCollection: string;
   queryContentHash: string;
-  trustedTeeNodes: TrustedTeeNode[];
   trustedWasmModules: WasmModuleInfo[];
   /** 表示中の画像URL (PerceptualInputs)。無ければ PDQ Match は failed */
   imageUrl?: string;
@@ -48,7 +46,6 @@ export async function verify(input: ImagePdqInput): Promise<ProcessorVerificatio
     collectionAddress: input.collectionAddress,
     expectedCollection: input.expectedCollection,
     queryContentHash: input.queryContentHash,
-    trustedTeeNodes: input.trustedTeeNodes,
   });
 
   const payload = input.signedJson.payload as ExtensionPayload & { pdqhash?: string };

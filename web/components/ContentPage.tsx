@@ -345,9 +345,12 @@ export default function ContentPage({ page }: Props) {
                       </>
                     )}
                     {/* Extension payload fields */}
-                    {!isCore && payloadEntries.map(([k, v]) => (
-                      <DataField key={k} label={k} value={typeof v === "string" ? truncate(String(v), 20) : String(v)} full={typeof v === "string" && String(v).length > 20 ? String(v) : undefined} />
-                    ))}
+                    {!isCore && payloadEntries.map(([k, v]) => {
+                      const display = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v);
+                      return (
+                        <DataField key={k} label={k} value={truncate(display, 20)} full={display.length > 40 ? display : undefined} />
+                      );
+                    })}
                   </div>
                 </NftToggle>
               );
@@ -846,7 +849,7 @@ function downloadVerificationData(data: {
       add("Extension ID", "signed_json.payload.extension_id", extId);
       for (const [k, v] of Object.entries(p)) {
         if (!["extension_id", "content_hash", "protocol", "creator_wallet"].includes(k)) {
-          add(k, `signed_json.payload.${k}`, String(v));
+          add(k, `signed_json.payload.${k}`, typeof v === "object" && v !== null ? JSON.stringify(v) : String(v));
         }
       }
     }

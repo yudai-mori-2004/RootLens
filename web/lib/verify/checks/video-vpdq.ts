@@ -18,7 +18,6 @@
 
 import type { SignedJson, ExtensionPayload, WasmModuleInfo } from "@title-protocol/sdk";
 import type { ProcessorVerification, CheckResult } from "./types";
-import type { TrustedTeeNode } from "../config";
 import { findWasmVersionByHash, PDQ_THRESHOLD } from "../config";
 import { runCommonChecks } from "./common";
 import { computeVpdq, type VpdqFrame } from "../pdq";
@@ -44,7 +43,6 @@ export interface VideoPdqInput {
   collectionAddress: string;
   expectedCollection: string;
   queryContentHash: string;
-  trustedTeeNodes: TrustedTeeNode[];
   trustedWasmModules: WasmModuleInfo[];
   /** 表示中の動画URL */
   videoUrl?: string;
@@ -60,7 +58,6 @@ export async function verify(input: VideoPdqInput): Promise<ProcessorVerificatio
     collectionAddress: input.collectionAddress,
     expectedCollection: input.expectedCollection,
     queryContentHash: input.queryContentHash,
-    trustedTeeNodes: input.trustedTeeNodes,
   });
 
   const payload = input.signedJson.payload as VpdqPayload;

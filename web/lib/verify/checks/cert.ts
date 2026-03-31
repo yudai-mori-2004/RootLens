@@ -18,7 +18,6 @@
 
 import type { SignedJson, ExtensionPayload, WasmModuleInfo } from "@title-protocol/sdk";
 import type { ProcessorVerification, CheckResult } from "./types";
-import type { TrustedTeeNode } from "../config";
 import { findWasmVersionByHash } from "../config";
 import { runCommonChecks } from "./common";
 
@@ -43,7 +42,6 @@ export interface CertInput {
   collectionAddress: string;
   expectedCollection: string;
   queryContentHash: string;
-  trustedTeeNodes: TrustedTeeNode[];
   trustedWasmModules: WasmModuleInfo[];
 }
 
@@ -57,7 +55,6 @@ export async function verify(input: CertInput): Promise<ProcessorVerification> {
     collectionAddress: input.collectionAddress,
     expectedCollection: input.expectedCollection,
     queryContentHash: input.queryContentHash,
-    trustedTeeNodes: input.trustedTeeNodes,
   });
 
   const payload = input.signedJson.payload as CertPayload;

@@ -16,7 +16,6 @@
 
 import type { SignedJson, CorePayload } from "@title-protocol/sdk";
 import type { ProcessorVerification, CheckResult } from "./types";
-import type { TrustedTeeNode } from "../config";
 import { runCommonChecks } from "./common";
 
 // ---------------------------------------------------------------------------
@@ -28,7 +27,6 @@ export interface CoreC2paInput {
   collectionAddress: string;
   expectedCollection: string;
   queryContentHash: string;
-  trustedTeeNodes: TrustedTeeNode[];
   assetId: string;
   /** 同一 content_hash の全 Core cNFT の assetId 配列 (leaf_id asc)。DAS取得失敗時は null */
   allCoreAssetIds: string[] | null;
@@ -44,7 +42,6 @@ export async function verify(input: CoreC2paInput): Promise<ProcessorVerificatio
     collectionAddress: input.collectionAddress,
     expectedCollection: input.expectedCollection,
     queryContentHash: input.queryContentHash,
-    trustedTeeNodes: input.trustedTeeNodes,
   });
 
   const payload = input.signedJson.payload as CorePayload;
