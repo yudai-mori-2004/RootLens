@@ -171,6 +171,13 @@ async function videoFrameToRgba(
     const yPlane = { offset: layout[0].offset, stride: layout[0].stride };
     const uvPlane = { offset: layout[1].offset, stride: layout[1].stride };
 
+    // DEBUG: raw YUV values
+    const y0 = buf[yPlane.offset];
+    const u0 = buf[uvPlane.offset];
+    const v0 = buf[uvPlane.offset + 1];
+    const r0 = Math.max(0, Math.min(255, Math.round(1.164*(y0-16) + 1.596*(v0-128))));
+    console.log(`[vPDQ] RAW fmt=${fmt} Y[0]=${y0} U[0]=${u0} V[0]=${v0} → R=${r0}, allocSize=${allocSize}, layout=[${layout.map((l: any) => `off=${l.offset},stride=${l.stride}`).join("; ")}]`);
+
     const rgba = new Uint8Array(w * h * 4);
 
     for (let row = 0; row < h; row++) {
