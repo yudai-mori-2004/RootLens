@@ -97,39 +97,42 @@ async function extractFrames(
     rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
   }));
 
-  const canvas = new OffscreenCanvas(config.codedWidth ?? 1, config.codedHeight ?? 1);
-  const ctx = canvas.getContext("2d")!;
-
   return new Promise((resolve, reject) => {
     const decoder = new VideoDecoder({
       output: (frame: VideoFrame) => {
         const frameSec = (frame.timestamp ?? 0) / 1_000_000;
 
-        // このフレームが各ターゲットの最良候補かチェック
         let needed = false;
+        for (let i = 0; i < timestamps.length; i++) {
+          if (Math.abs(frameSec - timestamps[i]) < bestForTarget[i].delta) {
+            needed = true;
+            break;
+          }
+        }
+
+        if (!needed) {
+          frame.close();
+          return;
+        }
+
+        const w = frame.displayWidth;
+        const h = frame.displayHeight;
+
+        // canvas 経由で RGBA 取得（同期）
+        const canvas = new OffscreenCanvas(w, h);
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(frame, 0, 0);
+        frame.close();
+
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const rgba = new Uint8Array(imageData.data.buffer);
+
         for (let i = 0; i < timestamps.length; i++) {
           const delta = Math.abs(frameSec - timestamps[i]);
           if (delta < bestForTarget[i].delta) {
-            needed = true;
+            bestForTarget[i] = { rgba, width: w, height: h, delta };
           }
         }
-
-        if (needed) {
-          canvas.width = frame.displayWidth;
-          canvas.height = frame.displayHeight;
-          ctx.drawImage(frame, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const rgba = new Uint8Array(imageData.data.buffer);
-
-          for (let i = 0; i < timestamps.length; i++) {
-            const delta = Math.abs(frameSec - timestamps[i]);
-            if (delta < bestForTarget[i].delta) {
-              bestForTarget[i] = { rgba, width: canvas.width, height: canvas.height, delta };
-            }
-          }
-        }
-
-        frame.close();
       },
       error: (e: DOMException) => reject(e),
     });
@@ -142,6 +145,16 @@ async function extractFrames(
     }
 
     decoder.flush().then(() => {
+      // Debug: 各フレームの取得状況をログ
+      for (let i = 0; i < timestamps.length; i++) {
+        const b = bestForTarget[i];
+        if (b.delta < Infinity) {
+          const allZero = b.rgba.every(v => v === 0);
+          console.log(`[vPDQ] f${i}@${timestamps[i]}s: ${b.width}x${b.height}, delta=${b.delta.toFixed(3)}s, RGBA[0..3]=[${b.rgba[0]},${b.rgba[1]},${b.rgba[2]},${b.rgba[3]}], allZero=${allZero}`);
+        } else {
+          console.log(`[vPDQ] f${i}@${timestamps[i]}s: no frame matched`);
+        }
+      }
       resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
     }).catch(reject);
   });
