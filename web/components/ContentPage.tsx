@@ -5,10 +5,8 @@ import { useTranslations } from "next-intl";
 import type {
   PageMeta,
   ContentRecord,
-  VerificationResult,
-  VerifyStepStatus,
-  ExtensionVerification,
 } from "@/lib/types";
+import type { VerificationResult, ProcessorVerification, CheckResult } from "@/lib/verify/checks/types";
 import type { ResolvedContent, ExtensionNft } from "@/lib/verify/content-resolver";
 import type { CorePayload, ExtensionPayload, GraphNode, SignedJson } from "@title-protocol/sdk";
 import { fetchContentRecord, verifyContent } from "@/lib/data";
@@ -22,7 +20,6 @@ interface Props {
 export default function ContentPage({ page }: Props) {
   const t = useTranslations("content");
   const tField = useTranslations("field");
-  const tCheck = useTranslations("check");
   const tFooter = useTranslations("footer");
   const [activeIndex, setActiveIndex] = useState(0);
   const [records, setRecords] = useState<(ContentRecord | null)[]>([]);
@@ -39,7 +36,7 @@ export default function ContentPage({ page }: Props) {
   useEffect(() => {
     const n = page.contents.length;
 
-    // ヘッダー
+    // ヘッダー (コンテンツ別の詳細ログは verify.ts 内で出力)
     console.log(
       "%c RootLens Verification ",
       "background:#1E3A5F;color:#fff;padding:8px 16px;font-size:16px;font-weight:bold;border-radius:4px;",
@@ -49,13 +46,19 @@ export default function ContentPage({ page }: Props) {
       "color:#888;font-style:italic;",
     );
 
-    // 全コンテンツを並列取得・検証（各コンテンツは console.groupCollapsed 内にログ）
+    // 全コンテンツを並列取得・検証
     Promise.all(
       page.contents.map(async (c) => {
         const { record: r, resolved: res } = await fetchContentRecord(c.contentHash);
-        const tc = (key: string, params?: Record<string, string | number>) =>
-          tCheck.has(key) ? tCheck(key, params) : key;
-        const v = await verifyContent(c.contentHash, { imageUrl: c.thumbnailUrl }, res, tc);
+        const isVideo = c.mediaType === "video";
+        const v = await verifyContent(
+          c.contentHash,
+          {
+            imageUrl: isVideo ? undefined : c.thumbnailUrl,
+            videoUrl: isVideo ? c.mediaUrl : undefined,
+          },
+          res,
+        );
         return { record: r, resolved: res, verification: v };
       })
     ).then((results) => {
@@ -80,7 +83,7 @@ export default function ContentPage({ page }: Props) {
   const record = records[activeIndex] ?? null;
   const resolved = resolvedList[activeIndex] ?? null;
   const verification = verifications[activeIndex] ?? {
-    nfts: [],
+    processors: [],
     overall: "pending" as const,
   };
 
@@ -94,19 +97,14 @@ export default function ContentPage({ page }: Props) {
     ? formatTimestamp(corePayload!.tsa_timestamp!)
     : record?.capturedAt ? formatDate(record.capturedAt) : null;
 
-  // NFT検証結果のヘルパー
-  const coreVerif = verification.nfts.find(n => n.id === "c2pa");
-  const findExtVerif = (id: string) => verification.nfts.find(n => n.id === id);
+  // ヘルパー
+  const findProc = (id: string) => verification.processors.find(p => p.processorId === id);
+  const coreProc = findProc("core-c2pa");
 
-  // スコア — 全NFTの全検証ステップから算出
-  const allChecks: VerifyStepStatus[] = [];
-  for (const nft of verification.nfts) {
-    allChecks.push(nft.collectionVerified, nft.teeSignatureVerified);
-    for (const sc of nft.specificChecks) allChecks.push(sc.status);
-  }
-  const active = allChecks.filter(s => s !== "skipped" && s !== "pending");
-  const passed = active.filter(s => s === "verified").length;
-  const total = active.length;
+  // スコア — 全 processor の全チェックから算出
+  const allChecks: CheckResult[] = verification.processors.flatMap(p => [...p.common, ...p.specific]);
+  const passed = allChecks.filter(c => c.status === "verified").length;
+  const total = allChecks.length;
 
   const deviceLabel = record?.deviceName
     ? t("shotOn", { device: record.deviceName })
@@ -276,51 +274,43 @@ export default function ContentPage({ page }: Props) {
               )}
             </div>
 
-            {/* NFT toggles */}
-            {/* NFT toggles — unified structure for Core and Extensions */}
-            {verification.nfts.map((nftVerif, nftIdx) => {
-              const isCore = nftVerif.id === "c2pa";
-              const label = isCore ? `Core: C2PA` : `Extension: ${nftVerif.id}`;
+            {/* Processor toggles — unified structure for Core and Extensions */}
+            {verification.processors.map((proc, procIdx) => {
+              const isCore = proc.processorId === "core-c2pa";
+              const label = isCore ? `Core: C2PA` : `Extension: ${proc.processorId}`;
 
               // Resolve the NFT data source
               const sj = isCore
                 ? resolved?.coreSignedJson
                 : resolved?.extensionNfts.find(n => {
                     const p = n.signedJson.payload as Record<string, unknown>;
-                    return p.extension_id === nftVerif.id;
+                    return p.extension_id === proc.processorId;
                   })?.signedJson;
-              const nftData = isCore ? resolved : resolved?.extensionNfts.find(n => {
+              const extNft = !isCore ? resolved?.extensionNfts.find(n => {
                 const p = n.signedJson.payload as Record<string, unknown>;
-                return p.extension_id === nftVerif.id;
-              });
-              const nftAssetId = isCore ? resolved?.assetId : (nftData as ExtensionNft | undefined)?.assetId;
-              const nftArweaveUri = isCore ? resolved?.arweaveUri : (nftData as ExtensionNft | undefined)?.arweaveUri;
-              const nftCollection = isCore ? resolved?.collectionAddress : (nftData as ExtensionNft | undefined)?.collectionAddress;
-              const nftOwner = isCore ? resolved?.ownerWallet : (nftData as ExtensionNft | undefined)?.ownerWallet;
+                return p.extension_id === proc.processorId;
+              }) : undefined;
+              const nftAssetId = isCore ? resolved?.assetId : extNft?.assetId;
+              const nftArweaveUri = isCore ? resolved?.arweaveUri : extNft?.arweaveUri;
+              const nftCollection = isCore ? resolved?.collectionAddress : extNft?.collectionAddress;
+              const nftOwner = isCore ? resolved?.ownerWallet : extNft?.ownerWallet;
               const payloadEntries = !isCore && sj
                 ? Object.entries(sj.payload as Record<string, unknown>)
                 : [];
 
+              // All checks flat: common 4 + specific N
+              const checks = [...proc.common, ...proc.specific];
+
               return (
-                <NftToggle key={nftVerif.id + nftIdx} label={label} defaultOpen={isCore}>
-                  {/* Verification: common 2 steps + specific checks */}
+                <NftToggle key={proc.processorId + procIdx} label={label} defaultOpen={isCore}>
                   <div className={styles.verifyList}>
-                    <VerifyItem
-                      status={nftVerif.collectionVerified}
-                      label={t("tech.core.collection")}
-                      detail={nftVerif.collectionVerified === "verified"
-                        ? (isCore ? t("tech.core.collectionPass") : t("tech.ext.collectionPass"))
-                        : (isCore ? t("tech.core.collectionFail") : t("tech.ext.collectionFail"))}
-                    />
-                    <VerifyItem
-                      status={nftVerif.teeSignatureVerified}
-                      label={t("tech.core.teeSig")}
-                      detail={nftVerif.teeSignatureVerified === "verified"
-                        ? (isCore ? t("tech.core.teeSigPass") : t("tech.ext.teeSigPass"))
-                        : (isCore ? t("tech.core.teeSigFail") : t("tech.ext.teeSigFail"))}
-                    />
-                    {nftVerif.specificChecks.map((sc, scIdx) => (
-                      <VerifyItem key={scIdx} status={sc.status} label={sc.label} detail={sc.detail} />
+                    {checks.map((check, checkIdx) => (
+                      <VerifyItem
+                        key={checkIdx}
+                        status={check.status}
+                        label={check.id}
+                        detail={check.detail || ""}
+                      />
                     ))}
                   </div>
 
@@ -446,8 +436,8 @@ export default function ContentPage({ page }: Props) {
                   const p = n.signedJson.payload as Record<string, unknown>;
                   return p.extension_id === "image-pdq";
                 });
-                const pdqVerif = verification.nfts.find(n => n.id === "image-pdq");
-                const pdqCheck = pdqVerif?.specificChecks.find(s => s.label === tCheck("pdq_identity"));
+                const pdqProc = findProc("image-pdq");
+                const pdqCheck = pdqProc?.specific.find(s => s.id === "pdq_match");
                 const pdqPayload = pdqNft?.signedJson.payload as Record<string, unknown> | undefined;
 
                 return pdqNft ? (
@@ -467,20 +457,23 @@ export default function ContentPage({ page }: Props) {
                 ) : null;
               })()}
 
-              {/* Hardware */}
+              {/* Cert extensions */}
               {(() => {
-                const hwVerif = verification.nfts.find(n => n.id.startsWith("hardware-"));
-                return (
+                const certProc = verification.processors.find(p => p.processorId.startsWith("cert-"));
+                const certCheck = certProc?.specific.find(s => s.id === "cert_verified");
+                return certProc ? (
                   <div className={styles.extBlock}>
                     <h5 className={styles.extTitle}>{t("tech.hardware.titleDefault")}</h5>
                     <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
-                    {hwVerif ? (
-                      <p className={styles.techDesc}>
-                        {hwVerif.specificChecks.find(s => true)?.detail ?? ""}
-                      </p>
-                    ) : (
-                      <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
-                    )}
+                    <p className={styles.techDesc}>
+                      {certCheck?.detail ?? ""}
+                    </p>
+                  </div>
+                ) : (
+                  <div className={styles.extBlock}>
+                    <h5 className={styles.extTitle}>{t("tech.hardware.titleDefault")}</h5>
+                    <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
+                    <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
                   </div>
                 );
               })()}
@@ -497,7 +490,7 @@ export default function ContentPage({ page }: Props) {
                   <p className={styles.techDescSmall}>
                     {t("tech.dyn.teeSigResult", {
                       pubkey: truncate(coreSj.tee_pubkey, 8),
-                      result: (coreVerif?.teeSignatureVerified ?? "pending") === "verified" ? t("tech.dyn.teeSigValid") : t("tech.dyn.teeSigPending"),
+                      result: (coreProc?.common[1].status ?? "pending") === "verified" ? t("tech.dyn.teeSigValid") : t("tech.dyn.teeSigPending"),
                     })}
                   </p>
                 )}
@@ -553,104 +546,11 @@ export default function ContentPage({ page }: Props) {
   );
 }
 
-// --- Extension Block (動的レンダリング) ---
-
-function ExtensionBlock({
-  ext,
-  verification,
-  resolved,
-  t,
-}: {
-  ext: ExtensionVerification;
-  verification: VerificationResult;
-  resolved: ResolvedContent | null;
-  t: ReturnType<typeof useTranslations>;
-}) {
-  const isPdq = ext.id === "image-pdq";
-  const isHardware = ext.id.startsWith("hardware-");
-  const isCert = ext.id.startsWith("cert-");
-
-  // 対応する extension NFT を検索
-  const extNft = resolved?.extensionNfts.find(n => {
-    const p = n.signedJson.payload as ExtensionPayload;
-    return p.extension_id === ext.id;
-  });
-  const extSj = extNft?.signedJson;
-  const extPayload = extSj?.payload as ExtensionPayload | undefined;
-
-  if (isPdq) {
-    return (
-      <div className={styles.extBlock}>
-        <h5 className={styles.extTitle}>{t("tech.pdq.title")}</h5>
-        <p className={styles.techDescSmall}>{t("tech.pdq.desc")}</p>
-
-        <div className={styles.verifyList}>
-          {(() => {
-            const pdqCheck = verification.nfts.find(n => n.id === "image-pdq")?.specificChecks.find(s => s.label.includes("PDQ") || s.label.includes("pdq"));
-            return pdqCheck ? (
-              <VerifyItem status={pdqCheck.status} label={t("tech.pdq.match")} detail={pdqCheck.detail} />
-            ) : (
-              <VerifyItem status="skipped" label={t("tech.pdq.match")} detail={t("tech.pdq.matchSkip")} />
-            );
-          })()}
-          <VerifyItem
-            status={ext.teeSignatureVerified}
-            label={t("tech.ext.teeSig")}
-            detail={ext.teeSignatureVerified === "verified" ? t("tech.ext.teeSigPass") : t("tech.ext.teeSigFail")}
-          />
-        </div>
-
-        {/* PDQ data */}
-        {extPayload && (
-          <div className={styles.dataBlock}>
-            {(extPayload as ExtensionPayload & { pdqhash?: string }).pdqhash && (
-              <DataField label={t("tech.pdq.onchain")} value={(extPayload as ExtensionPayload & { pdqhash?: string }).pdqhash!} mono />
-            )}
-            {extPayload.wasm_hash && (
-              <DataField label="wasm_hash" value={truncate(extPayload.wasm_hash, 12)} full={extPayload.wasm_hash} mono />
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (isHardware) {
-    return (
-      <div className={styles.extBlock}>
-        <h5 className={styles.extTitle}>{t("tech.hardware.title", { id: ext.id })}</h5>
-        <p className={styles.techDescSmall}>{t("tech.hardware.desc")}</p>
-        <div className={styles.wipBadge}>{t("tech.hardware.wip")}</div>
-      </div>
-    );
-  }
-
-  // Generic extension
-  return (
-    <div className={styles.extBlock}>
-      <h5 className={styles.extTitle}>{ext.id}</h5>
-      <div className={styles.verifyList}>
-        <VerifyItem
-          status={ext.teeSignatureVerified}
-          label={t("tech.ext.teeSig")}
-          detail={ext.teeSignatureVerified === "verified" ? t("tech.ext.teeSigPass") : t("tech.ext.teeSigFail")}
-        />
-      </div>
-      {extPayload && (
-        <div className={styles.dataBlock}>
-          <DataField label="extension_id" value={ext.id} />
-          {extPayload.wasm_hash && (
-            <DataField label="wasm_hash" value={truncate(extPayload.wasm_hash, 12)} full={extPayload.wasm_hash} mono />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // --- Sub-components ---
 
-function VerifyItem({ status, label, detail }: { status: VerifyStepStatus; label: string; detail: string }) {
+type VerifyStatus = "verified" | "failed" | "pending";
+
+function VerifyItem({ status, label, detail }: { status: VerifyStatus; label: string; detail: string }) {
   return (
     <div className={styles.verifyItem}>
       <div className={styles.verifyItemHeader}>
@@ -725,7 +625,7 @@ function RefRow({ label, sub, value, mono, link, linkLabel }: {
   );
 }
 
-function StatusIcon({ status, size = 16 }: { status: VerifyStepStatus; size?: number }) {
+function StatusIcon({ status, size = 16 }: { status: VerifyStatus; size?: number }) {
   if (status === "pending") return (
     <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconPending}>
       <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="12 26">
@@ -736,11 +636,6 @@ function StatusIcon({ status, size = 16 }: { status: VerifyStepStatus; size?: nu
   if (status === "verified") return (
     <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconVerified}>
       <path d="M3.5 8.5l3 3 6-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-  if (status === "skipped") return (
-    <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconSkipped}>
-      <path d="M4 8h8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
   return (
@@ -759,16 +654,6 @@ function NftToggle({ label, defaultOpen, children }: { label: string; defaultOpe
         <ChevronIcon open={open} />
       </button>
       {open && <div className={styles.nftToggleContent}>{children}</div>}
-    </div>
-  );
-}
-
-function VerifySummaryRow({ label, status }: { label: string; status: VerifyStepStatus }) {
-  if (status === "skipped") return null;
-  return (
-    <div className={styles.summaryRow}>
-      <StatusIcon status={status} size={14} />
-      <span className={styles.summaryLabel}>{label}</span>
     </div>
   );
 }
@@ -908,12 +793,10 @@ function downloadVerificationData(data: {
   // --- Verification Results ---
   rows.push(["# Verification Results", "", ""]);
   add("Overall", "§7.4 all steps aggregated", data.verification.overall);
-  for (const nft of data.verification.nfts) {
-    rows.push([`## ${nft.id}`, "", ""]);
-    add("Collection Membership", "§7.4 Step 2: cNFT.collection.address == GlobalConfig.*_collection_mint", nft.collectionVerified);
-    add("TEE Signature (Ed25519)", "§7.4 Step 4: verify(tee_pubkey, tee_signature, serialize(payload, attributes))", nft.teeSignatureVerified);
-    for (const sc of nft.specificChecks) {
-      add(sc.label, `§7.4 Step ${sc.label.includes("Content Hash") ? "5" : sc.label.includes("重複") || sc.label.includes("Duplicate") ? "6" : "ext"}`, `${sc.status} — ${sc.detail}`);
+  for (const proc of data.verification.processors) {
+    rows.push([`## ${proc.processorId}`, "", ""]);
+    for (const check of [...proc.common, ...proc.specific]) {
+      add(check.id, "§7.4", `${check.status}${check.detail ? ` — ${check.detail}` : ""}`);
     }
   }
 

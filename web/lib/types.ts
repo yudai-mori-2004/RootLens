@@ -3,6 +3,8 @@
  *
  * content_hash とサムネイルURLのみ RootLens サーバーから取得。
  * それ以外は Title Protocol (Solana cNFT + Arweave) からクライアントサイドで取得する。
+ *
+ * 検証結果の型は lib/verify/checks/types.ts で定義。
  */
 
 // --- サーバーから取得するデータ（最小限） ---
@@ -33,9 +35,6 @@ export interface PageMeta {
 }
 
 // --- Title Protocol (Solana / Arweave) から取得するデータ ---
-
-/** 検証ステップの状態 */
-export type VerifyStepStatus = "pending" | "verified" | "failed" | "skipped";
 
 /** cNFT + Extension から取得できるコンテンツ情報 */
 export interface ContentRecord {
@@ -69,47 +68,4 @@ export interface ContentRecord {
 export interface EditOperation {
   type: "crop" | "mask" | "resize" | "trim";
   label: string;
-}
-
-/** NFT固有の検証ステップ（共通2ステップ以外） */
-export interface SpecificCheck {
-  /** キー名（check.* で翻訳、フォールバックはそのまま表示） */
-  label: string;
-  status: VerifyStepStatus;
-  /** 英語の詳細文（表示側で check.{label}_pass/fail で翻訳を試みる） */
-  detail: string;
-}
-
-/** 1つのNFT（CoreでもExtensionでも）の検証結果 */
-export interface NftVerification {
-  /** NFTの種別ラベル（"c2pa", "image-phash", "hardware-google" など） */
-  id: string;
-  /** コレクション所属（共通ステップ1） */
-  collectionVerified: VerifyStepStatus;
-  /** TEE署名（共通ステップ2） */
-  teeSignatureVerified: VerifyStepStatus;
-  /** このNFT固有の検証ステップ */
-  specificChecks: SpecificCheck[];
-}
-
-/** @deprecated 後方互換。NftVerification を使用 */
-export type ExtensionVerification = NftVerification;
-
-/** クライアントサイド検証の全体結果 */
-export interface VerificationResult {
-  /** 全NFTの検証結果（Core + Extension） */
-  nfts: NftVerification[];
-  /** 全体判定 */
-  overall: VerifyStepStatus;
-  /** Core cNFT Asset ID */
-  assetId?: string;
-  /** Core Arweave URI */
-  arweaveUri?: string;
-}
-
-/** ContentPage に渡す全データ */
-export interface ContentPageData {
-  page: PageMeta;
-  record: ContentRecord | null;
-  verification: VerificationResult;
 }

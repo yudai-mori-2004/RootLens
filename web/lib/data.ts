@@ -5,14 +5,15 @@
  *  1. サーバー: shortId → { contentHash, thumbnailUrl, ogpImageUrl }
  *  2. DAS API: content_hash trait → cNFT メタデータ
  *  3. Arweave: json_uri → オフチェーン signed_json
- *  4. ブラウザ内検証: Ed25519 + pHash (サーバー関与なし)
+ *  4. ブラウザ内検証: Ed25519 + PDQ (サーバー関与なし)
  */
 
-import type { PageMeta, ContentRecord, VerificationResult } from "./types";
+import type { PageMeta, ContentRecord } from "./types";
 import type { ResolvedContent } from "./verify/content-resolver";
+import type { VerificationResult } from "./verify/checks/types";
 import type { CorePayload } from "@title-protocol/sdk";
 import { contentResolver } from "./verify/content-resolver";
-import { verifyContentOnChain, type PerceptualInputs } from "./verify/verify-content";
+import { verifyAll } from "./verify/verify";
 import { supabase } from "./supabase";
 
 // ---------------------------------------------------------------------------
@@ -164,16 +165,16 @@ export async function fetchContentRecord(
  */
 export async function verifyContent(
   contentHash: string,
-  perceptual: PerceptualInputs,
+  perceptual: { imageUrl?: string; videoUrl?: string },
   resolved: ResolvedContent | null,
-  tc: (key: string, params?: Record<string, string | number>) => string,
 ): Promise<VerificationResult> {
   if (!resolved) {
-    return {
-      nfts: [],
-      overall: "failed",
-    };
+    return { processors: [], overall: "failed" };
   }
 
-  return verifyContentOnChain(resolved, perceptual, contentHash, tc);
+  return verifyAll({
+    resolved,
+    queryContentHash: contentHash,
+    perceptual,
+  });
 }

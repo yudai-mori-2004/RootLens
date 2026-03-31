@@ -1,5 +1,5 @@
 import { contentResolver } from '../lib/verify/content-resolver';
-import { verifyContentOnChain, type CheckTranslator } from '../lib/verify/verify-content';
+import { verifyAll } from '../lib/verify/verify';
 
 const contentHash = '0xa1476d7705cdc9cf2903d0aef5d7897e207715683aa3dc6375b59da76712d2d3';
 const thumbnailUrl = 'https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev/content/97a7a73e-e220-4a32-8f5c-84f60fae0d93.jpg';
@@ -21,16 +21,15 @@ async function main() {
 
   for (const ext of resolved.extensionNfts) {
     const p = ext.signedJson.payload as Record<string, unknown>;
-    console.log(`  extension: ${p.extension_id}, phash: ${p.phash}`);
+    console.log(`  extension: ${p.extension_id}, pdqhash: ${p.pdqhash}`);
   }
 
   console.log('\n=== Verification ===');
-  const tc: CheckTranslator = (key, params) => {
-    let s = key;
-    if (params) for (const [k, v] of Object.entries(params)) s += ` ${k}=${v}`;
-    return s;
-  };
-  const result = await verifyContentOnChain(resolved, { imageUrl: thumbnailUrl }, contentHash, tc);
+  const result = await verifyAll({
+    resolved,
+    queryContentHash: contentHash,
+    perceptual: { imageUrl: thumbnailUrl },
+  });
   console.log('\n=== Result ===');
   console.log(JSON.stringify(result, null, 2));
 }
