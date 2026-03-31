@@ -4,19 +4,19 @@
  * Meta ThreatExchange 互換 256bit PDQ ハッシュをブラウザ内で計算する。
  * WASM 依存なし。Title Protocol の WASM と同一アルゴリズム:
  *
- *   1. Canvas → RGBA → BT.601 grayscale
+ *   1. RGBA → BT.601 grayscale
  *   2. Jarosz filter (box×2 = tent) で平滑化
  *   3. Center-pixel decimation → 64×64
  *   4. 2D DCT → 16×16 低周波係数 (DC skip)
  *   5. Torben median → 256bit 量子化
  *
- * 画像: computePdq(imageUrl) → 1つのhash
- * 動画: computeVpdq(videoUrl, timestamps) → フレーム別hash配列
+ * 画像: computePdq(imageUrl) → Canvas → RGBA → PDQ
+ * 動画: computeVpdq(videoUrl, timestamps) → WebCodecs + mp4box.js → NV12 → BT.601 RGB → PDQ
  *
  * 参照実装:
- *   - title-protocol/wasm/image-pdq/src/lib.rs (DCT + hash)
- *   - title-protocol/wasm/video-vpdq/src/lib.rs (frame sampling)
- *   - title-protocol/crates/wasm-host/src/jarosz.rs (downsampling)
+ *   - title-protocol/wasm/image-pdq/src/lib.rs
+ *   - title-protocol/wasm/video-vpdq/src/lib.rs
+ *   - title-protocol/crates/wasm-host/src/jarosz.rs
  */
 
 const SIZE = 64;
@@ -29,10 +29,7 @@ const VPDQ_QUALITY_THRESHOLD = 50;
 // Public API — Image
 // ---------------------------------------------------------------------------
 
-/**
- * 画像URLから256bit PDQハッシュを計算する。
- * @returns 64文字のhex文字列 (256bit, MSB-first)
- */
+/** 画像URLから256bit PDQハッシュを計算する */
 export async function computePdq(imageUrl: string): Promise<string> {
   const { data, width, height } = await loadImageRgba(imageUrl);
   const gray = rgbaToGray(data, width, height);
@@ -50,10 +47,7 @@ export interface VpdqFrame {
   timestamp: number;
 }
 
-/**
- * 指定タイムスタンプ配列の各時刻のフレームをデコードし PDQ 計算する。
- * WebCodecs (VideoDecoder) でフレーム単位の正確なデコードを行う。
- */
+/** 指定タイムスタンプのフレームをデコードし PDQ 計算する */
 export async function computeVpdq(
   videoUrl: string,
   timestamps: number[],
@@ -67,11 +61,6 @@ export async function computeVpdq(
     const gray = rgbaToGray(rf.rgba, rf.width, rf.height);
     const gray64 = jaroszDownsample(gray, rf.width, rf.height, SIZE, SIZE);
     const quality = computeQuality(gray64);
-    if (i === 0) {
-      console.log(`[vPDQ] f0 RGBA[0..11]: [${rf.rgba[0]},${rf.rgba[1]},${rf.rgba[2]},${rf.rgba[3]},${rf.rgba[4]},${rf.rgba[5]},${rf.rgba[6]},${rf.rgba[7]},${rf.rgba[8]},${rf.rgba[9]},${rf.rgba[10]},${rf.rgba[11]}]`);
-      console.log(`[vPDQ] f0 gray64[0..7]: [${Array.from(gray64.slice(0, 8)).map(v => v.toFixed(1)).join(",")}]`);
-      console.log(`[vPDQ] f0 gray64 ALL: ${JSON.stringify(Array.from(gray64).map(v => Math.round(v)))}`);
-    }
     if (quality < VPDQ_QUALITY_THRESHOLD) continue;
     const hash = pdqHash256(gray64);
     frames.push({ pdqhash: hash, quality, timestamp: timestamps[i] });
@@ -81,7 +70,7 @@ export async function computeVpdq(
 }
 
 // ---------------------------------------------------------------------------
-// Video frame extraction (WebCodecs)
+// Video frame extraction (WebCodecs + mp4box.js)
 // ---------------------------------------------------------------------------
 
 type FrameRgba = { rgba: Uint8Array; width: number; height: number };
@@ -97,12 +86,9 @@ async function extractFrames(
   const { config, chunks } = await demuxMp4(buf);
   const maxTarget = Math.max(...timestamps);
 
-  // 各ターゲットの最良候補を保持。VideoFrame は即座に RGBA 化して close する。
   const bestForTarget: (FrameRgba & { delta: number })[] = timestamps.map(() => ({
     rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
   }));
-
-  const pending: Promise<void>[] = [];
 
   return new Promise((resolve, reject) => {
     const decoder = new VideoDecoder({
@@ -122,15 +108,13 @@ async function extractFrames(
           return;
         }
 
-        const p = videoFrameToRgba(frame).then((result) => {
-          for (let i = 0; i < timestamps.length; i++) {
-            const delta = Math.abs(frameSec - timestamps[i]);
-            if (delta < bestForTarget[i].delta) {
-              bestForTarget[i] = { ...result, delta };
-            }
+        const result = videoFrameToRgba(frame);
+        for (let i = 0; i < timestamps.length; i++) {
+          const delta = Math.abs(frameSec - timestamps[i]);
+          if (delta < bestForTarget[i].delta) {
+            bestForTarget[i] = { ...result, delta };
           }
-        });
-        pending.push(p);
+        }
       },
       error: (e: DOMException) => reject(e),
     });
@@ -142,83 +126,16 @@ async function extractFrames(
       decoder.decode(chunk);
     }
 
-    decoder.flush().then(async () => {
-      await Promise.all(pending);
+    decoder.flush().then(() => {
       resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
     }).catch(reject);
   });
 }
 
-/**
- * VideoFrame → RGBA。
- * NV12/I420: Y,U,Vプレーンを直接読み、BT.601 limited range で RGB 変換。
- * ffmpeg の swscale デフォルト (SWS_CS_ITU601) と同一の式を使う。
- * canvas の色変換を一切通さないので、ffmpeg と同じ RGB が得られる。
- */
-async function videoFrameToRgba(
-  frame: VideoFrame,
-): Promise<{ rgba: Uint8Array; width: number; height: number }> {
+/** VideoFrame → RGBA via OffscreenCanvas */
+function videoFrameToRgba(frame: VideoFrame): FrameRgba {
   const w = frame.displayWidth;
   const h = frame.displayHeight;
-  const fmt = frame.format;
-
-  if (fmt === "NV12" || fmt === "I420") {
-    const allocSize = frame.allocationSize();
-    const buf = new Uint8Array(allocSize);
-    const layout = await frame.copyTo(buf);
-    frame.close();
-
-    const yPlane = { offset: layout[0].offset, stride: layout[0].stride };
-    const uvPlane = { offset: layout[1].offset, stride: layout[1].stride };
-
-    // DEBUG: raw YUV values
-    const y0 = buf[yPlane.offset];
-    const u0 = buf[uvPlane.offset];
-    const v0 = buf[uvPlane.offset + 1];
-    const r0 = Math.max(0, Math.min(255, Math.round(1.164*(y0-16) + 1.596*(v0-128))));
-    console.log(`[vPDQ] RAW fmt=${fmt} Y[0]=${y0} U[0]=${u0} V[0]=${v0} → R=${r0}, allocSize=${allocSize}, layout=[${layout.map((l: any) => `off=${l.offset},stride=${l.stride}`).join("; ")}]`);
-
-    const rgba = new Uint8Array(w * h * 4);
-
-    for (let row = 0; row < h; row++) {
-      for (let col = 0; col < w; col++) {
-        const y = buf[yPlane.offset + row * yPlane.stride + col];
-
-        let u: number, v: number;
-        const uvRow = row >> 1;
-        const uvCol = col >> 1;
-
-        if (fmt === "NV12") {
-          // NV12: UV interleaved, half resolution
-          const uvIdx = uvPlane.offset + uvRow * uvPlane.stride + uvCol * 2;
-          u = buf[uvIdx];
-          v = buf[uvIdx + 1];
-        } else {
-          // I420: U and V in separate planes
-          const uPlane = { offset: layout[1].offset, stride: layout[1].stride };
-          const vPlane = { offset: layout[2].offset, stride: layout[2].stride };
-          u = buf[uPlane.offset + uvRow * uPlane.stride + uvCol];
-          v = buf[vPlane.offset + uvRow * vPlane.stride + uvCol];
-        }
-
-        // BT.601 limited range YUV→RGB (ffmpeg swscale default)
-        const yf = 1.164 * (y - 16);
-        const r = yf + 1.596 * (v - 128);
-        const g = yf - 0.813 * (v - 128) - 0.391 * (u - 128);
-        const b = yf + 2.018 * (u - 128);
-
-        const off = (row * w + col) * 4;
-        rgba[off]     = Math.max(0, Math.min(255, Math.round(r)));
-        rgba[off + 1] = Math.max(0, Math.min(255, Math.round(g)));
-        rgba[off + 2] = Math.max(0, Math.min(255, Math.round(b)));
-        rgba[off + 3] = 255;
-      }
-    }
-
-    return { rgba, width: w, height: h };
-  }
-
-  // フォーマット不明: canvas 経由
   const canvas = new OffscreenCanvas(w, h);
   const ctx = canvas.getContext("2d", { colorSpace: "srgb" })!;
   ctx.drawImage(frame, 0, 0);
@@ -271,14 +188,6 @@ async function demuxMp4(
     };
 
     mp4.onSamples = (_id: number, _user: any, samples: any[]) => {
-      if (chunks.length === 0 && samples.length > 0) {
-        const s = samples[0];
-        console.log(`[vPDQ] first chunk: cts=${s.cts}, dts=${s.dts}, timescale=${s.timescale}, is_sync=${s.is_sync}, cts_sec=${(s.cts/s.timescale).toFixed(4)}, dts_sec=${(s.dts/s.timescale).toFixed(4)}`);
-        if (samples.length > 1) {
-          const s1 = samples[1];
-          console.log(`[vPDQ] 2nd chunk: cts=${s1.cts}, dts=${s1.dts}, cts_sec=${(s1.cts/s1.timescale).toFixed(4)}`);
-        }
-      }
       for (const sample of samples) {
         chunks.push(new EncodedVideoChunk({
           type: sample.is_sync ? "key" : "delta",
