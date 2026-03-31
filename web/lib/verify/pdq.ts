@@ -67,6 +67,10 @@ export async function computeVpdq(
     const gray = rgbaToGray(rf.rgba, rf.width, rf.height);
     const gray64 = jaroszDownsample(gray, rf.width, rf.height, SIZE, SIZE);
     const quality = computeQuality(gray64);
+    if (i === 0) {
+      console.log(`[vPDQ] f0 gray64[0..7]: [${Array.from(gray64.slice(0, 8)).map(v => v.toFixed(1)).join(",")}], quality=${quality}`);
+      console.log(`[vPDQ] f0 input: ${rf.width}x${rf.height}, grayLen=${gray.length}, gray[0..3]=[${Array.from(gray.slice(0, 4)).map(v => v.toFixed(1)).join(",")}]`);
+    }
     if (quality < VPDQ_QUALITY_THRESHOLD) continue;
     const hash = pdqHash256(gray64);
     frames.push({ pdqhash: hash, quality, timestamp: timestamps[i] });
