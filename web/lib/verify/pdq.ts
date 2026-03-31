@@ -70,6 +70,24 @@ export async function computeVpdq(
     if (i === 0) {
       console.log(`[vPDQ] f0 gray64[0..7]: [${Array.from(gray64.slice(0, 8)).map(v => v.toFixed(1)).join(",")}], quality=${quality}`);
       console.log(`[vPDQ] f0 input: ${rf.width}x${rf.height}, grayLen=${gray.length}, gray[0..3]=[${Array.from(gray.slice(0, 4)).map(v => v.toFixed(1)).join(",")}]`);
+      // DEBUG: f0 のフレームをPNG化してダウンロードリンクを生成
+      try {
+        const dbgCanvas = document.createElement("canvas");
+        dbgCanvas.width = rf.width;
+        dbgCanvas.height = rf.height;
+        const dbgCtx = dbgCanvas.getContext("2d")!;
+        const imgData = dbgCtx.createImageData(rf.width, rf.height);
+        imgData.data.set(rf.rgba);
+        dbgCtx.putImageData(imgData, 0, 0);
+        dbgCanvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            console.log(`[vPDQ] DEBUG: f0 frame PNG → ${url}`);
+          }
+        });
+      } catch (e) { console.warn("[vPDQ] debug PNG failed:", e); }
+      // DEBUG: 64x64 全値ダンプ (JSON)
+      console.log(`[vPDQ] f0 gray64 ALL: ${JSON.stringify(Array.from(gray64).map(v => Math.round(v)))}`);
     }
     if (quality < VPDQ_QUALITY_THRESHOLD) continue;
     const hash = pdqHash256(gray64);
