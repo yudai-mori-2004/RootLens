@@ -52,7 +52,7 @@ export async function computeVpdq(
   videoUrl: string,
   timestamps: number[],
 ): Promise<VpdqFrame[]> {
-  const { frames: rawFrames, editListOffsetSec } = await extractFrames(videoUrl, timestamps);
+  const rawFrames = await extractFrames(videoUrl, timestamps);
 
   const frames: VpdqFrame[] = [];
   for (let i = 0; i < rawFrames.length; i++) {
@@ -61,9 +61,7 @@ export async function computeVpdq(
     const gray = rgbaToGray(rf.rgba, rf.width, rf.height);
     const gray64 = jaroszDownsample(gray, rf.width, rf.height, SIZE, SIZE);
     const quality = computeQuality(gray64);
-    // DEBUG: フレーム値をログ（edit list offset適用済み）
-    const display = timestamps[i] - editListOffsetSec;
-    console.log(`[vPDQ] f${i}@${timestamps[i]}s (display=${display.toFixed(3)}s, elst=${editListOffsetSec.toFixed(4)}s): RGBA[0..5]=[${rf.rgba[0]},${rf.rgba[1]},${rf.rgba[2]},${rf.rgba[4]},${rf.rgba[5]},${rf.rgba[6]}] gray64[0..7]=[${Array.from(gray64.slice(0,8)).map(v=>Math.round(v))}]`);
+    console.log(`[vPDQ] f${i}@${timestamps[i]}s: RGBA[0..5]=[${rf.rgba[0]},${rf.rgba[1]},${rf.rgba[2]},${rf.rgba[4]},${rf.rgba[5]},${rf.rgba[6]}] gray64[0..7]=[${Array.from(gray64.slice(0,8)).map(v=>Math.round(v))}]`);
     if (quality < VPDQ_QUALITY_THRESHOLD) continue;
     const hash = pdqHash256(gray64);
     frames.push({ pdqhash: hash, quality, timestamp: timestamps[i] });
@@ -81,20 +79,17 @@ type FrameRgba = { rgba: Uint8Array; width: number; height: number };
 async function extractFrames(
   videoUrl: string,
   timestamps: number[],
-): Promise<{ frames: (FrameRgba | null)[]; editListOffsetSec: number }> {
+): Promise<(FrameRgba | null)[]> {
   const res = await fetch(videoUrl, { mode: "cors" });
   if (!res.ok) throw new Error(`Failed to fetch video: ${res.status}`);
   const buf = await res.arrayBuffer();
 
-  const { config, chunks, editListOffsetSec } = await demuxMp4(buf);
+  const { config, chunks } = await demuxMp4(buf);
+  const maxTarget = Math.max(...timestamps);
 
-  // TEE's ffmpeg uses raw stream PTS for seeking; mp4box applies edit list
-  // to chunk timestamps (display time). Subtract the offset so we match
-  // the same frames the TEE extracted.
-  const displayTimestamps = timestamps.map(t => t - editListOffsetSec);
-  const maxTarget = Math.max(...displayTimestamps);
-
-  const bestForTarget: (FrameRgba & { delta: number })[] = displayTimestamps.map(() => ({
+  // Both TEE's ffmpeg (-ss) and mp4box.js operate in edit-list-applied
+  // display time. No offset adjustment needed — use timestamps directly.
+  const bestForTarget: (FrameRgba & { delta: number })[] = timestamps.map(() => ({
     rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
   }));
 
@@ -104,8 +99,8 @@ async function extractFrames(
         const frameSec = (frame.timestamp ?? 0) / 1_000_000;
 
         let needed = false;
-        for (let i = 0; i < displayTimestamps.length; i++) {
-          if (Math.abs(frameSec - displayTimestamps[i]) < bestForTarget[i].delta) {
+        for (let i = 0; i < timestamps.length; i++) {
+          if (Math.abs(frameSec - timestamps[i]) < bestForTarget[i].delta) {
             needed = true;
             break;
           }
@@ -117,8 +112,8 @@ async function extractFrames(
         }
 
         const result = videoFrameToRgba(frame);
-        for (let i = 0; i < displayTimestamps.length; i++) {
-          const delta = Math.abs(frameSec - displayTimestamps[i]);
+        for (let i = 0; i < timestamps.length; i++) {
+          const delta = Math.abs(frameSec - timestamps[i]);
           if (delta < bestForTarget[i].delta) {
             bestForTarget[i] = { ...result, delta };
           }
@@ -135,10 +130,7 @@ async function extractFrames(
     }
 
     decoder.flush().then(() => {
-      resolve({
-        frames: bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }),
-        editListOffsetSec,
-      });
+      resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
     }).catch(reject);
   });
 }
@@ -161,7 +153,7 @@ function videoFrameToRgba(frame: VideoFrame): FrameRgba {
 
 async function demuxMp4(
   buf: ArrayBuffer,
-): Promise<{ config: VideoDecoderConfig; chunks: EncodedVideoChunk[]; editListOffsetSec: number }> {
+): Promise<{ config: VideoDecoderConfig; chunks: EncodedVideoChunk[] }> {
   const mp4box = await import("mp4box");
 
   return new Promise((resolve, reject) => {
@@ -170,8 +162,6 @@ async function demuxMp4(
     let config: VideoDecoderConfig | null = null;
     const chunks: EncodedVideoChunk[] = [];
     let receivedSamples = 0;
-    let editListOffsetSec = 0;
-
     mp4.onReady = (info: any) => {
       const videoTrack = info.videoTracks[0];
       if (!videoTrack) {
@@ -188,24 +178,6 @@ async function demuxMp4(
         codedWidth: videoTrack.video.width,
         codedHeight: videoTrack.video.height,
       };
-
-      // edit list offset: mp4box applies edit list to sample CTS,
-      // but TEE's ffmpeg uses raw stream PTS for seeking.
-      // Subtract this offset from TEE timestamps to align with display time.
-      //
-      // Two common patterns:
-      //   A) entry[0].media_time > 0 → direct offset in track timescale
-      //   B) entry[0].media_time == -1 (empty edit) → padding of
-      //      segment_duration / movie_timescale before content starts
-      const elstEntries = track?.edts?.elst?.entries;
-      if (elstEntries && elstEntries.length > 0) {
-        const first = elstEntries[0];
-        if (first.media_time > 0 && videoTrack.timescale > 0) {
-          editListOffsetSec = first.media_time / videoTrack.timescale;
-        } else if (first.media_time === -1 && first.segment_duration > 0 && info.timescale > 0) {
-          editListOffsetSec = first.segment_duration / info.timescale;
-        }
-      }
 
       const desc = entry?.avcC ?? entry?.hvcC;
       if (desc) {
@@ -230,7 +202,7 @@ async function demuxMp4(
       receivedSamples += samples.length;
 
       if (receivedSamples >= totalSamples && config) {
-        resolve({ config, chunks, editListOffsetSec });
+        resolve({ config, chunks });
       }
     };
 
