@@ -61,7 +61,6 @@ export async function computeVpdq(
     const gray = rgbaToGray(rf.rgba, rf.width, rf.height);
     const gray64 = jaroszDownsample(gray, rf.width, rf.height, SIZE, SIZE);
     const quality = computeQuality(gray64);
-    console.log(`[vPDQ] f${i}@${timestamps[i]}s: RGBA[0..5]=[${rf.rgba[0]},${rf.rgba[1]},${rf.rgba[2]},${rf.rgba[4]},${rf.rgba[5]},${rf.rgba[6]}] gray64[0..7]=[${Array.from(gray64.slice(0,8)).map(v=>Math.round(v))}]`);
     if (quality < VPDQ_QUALITY_THRESHOLD) continue;
     const hash = pdqHash256(gray64);
     frames.push({ pdqhash: hash, quality, timestamp: timestamps[i] });
@@ -87,14 +86,11 @@ async function extractFrames(
   const { config, chunks } = await demuxMp4(buf);
   const maxTarget = Math.max(...timestamps);
 
-  // Both TEE's ffmpeg (-ss) and mp4box.js operate in edit-list-applied
-  // display time. No offset adjustment needed — use timestamps directly.
-  //
-  // Frame selection: ffmpeg input seeking (-ss before -i) returns the first
-  // frame with PTS >= target. Match this by picking the first decoded frame
-  // at or after each target timestamp, not the closest frame.
-  const firstAtOrAfter: (FrameRgba | null)[] = timestamps.map(() => null);
-  const firstAtOrAfterPts: number[] = timestamps.map(() => Infinity);
+  // ffmpeg input seeking (-ss before -i) emits the first frame with
+  // PTS >= the seek target. Replicate this by selecting the earliest
+  // decoded frame at or after each requested timestamp.
+  const matched: (FrameRgba | null)[] = timestamps.map(() => null);
+  const matchedPts: number[] = timestamps.map(() => Infinity);
 
   return new Promise((resolve, reject) => {
     const decoder = new VideoDecoder({
@@ -103,8 +99,7 @@ async function extractFrames(
 
         let needed = false;
         for (let i = 0; i < timestamps.length; i++) {
-          // Accept first frame at or after target that is closer than current best
-          if (frameSec >= timestamps[i] && frameSec < firstAtOrAfterPts[i]) {
+          if (frameSec >= timestamps[i] && frameSec < matchedPts[i]) {
             needed = true;
             break;
           }
@@ -117,9 +112,9 @@ async function extractFrames(
 
         const result = videoFrameToRgba(frame);
         for (let i = 0; i < timestamps.length; i++) {
-          if (frameSec >= timestamps[i] && frameSec < firstAtOrAfterPts[i]) {
-            firstAtOrAfter[i] = result;
-            firstAtOrAfterPts[i] = frameSec;
+          if (frameSec >= timestamps[i] && frameSec < matchedPts[i]) {
+            matched[i] = result;
+            matchedPts[i] = frameSec;
           }
         }
       },
@@ -134,7 +129,7 @@ async function extractFrames(
     }
 
     decoder.flush().then(() => {
-      resolve(firstAtOrAfter);
+      resolve(matched);
     }).catch(reject);
   });
 }
