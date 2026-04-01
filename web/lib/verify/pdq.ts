@@ -89,9 +89,12 @@ async function extractFrames(
 
   // Both TEE's ffmpeg (-ss) and mp4box.js operate in edit-list-applied
   // display time. No offset adjustment needed — use timestamps directly.
-  const bestForTarget: (FrameRgba & { delta: number })[] = timestamps.map(() => ({
-    rgba: new Uint8Array(0), width: 0, height: 0, delta: Infinity,
-  }));
+  //
+  // Frame selection: ffmpeg input seeking (-ss before -i) returns the first
+  // frame with PTS >= target. Match this by picking the first decoded frame
+  // at or after each target timestamp, not the closest frame.
+  const firstAtOrAfter: (FrameRgba | null)[] = timestamps.map(() => null);
+  const firstAtOrAfterPts: number[] = timestamps.map(() => Infinity);
 
   return new Promise((resolve, reject) => {
     const decoder = new VideoDecoder({
@@ -100,7 +103,8 @@ async function extractFrames(
 
         let needed = false;
         for (let i = 0; i < timestamps.length; i++) {
-          if (Math.abs(frameSec - timestamps[i]) < bestForTarget[i].delta) {
+          // Accept first frame at or after target that is closer than current best
+          if (frameSec >= timestamps[i] && frameSec < firstAtOrAfterPts[i]) {
             needed = true;
             break;
           }
@@ -113,9 +117,9 @@ async function extractFrames(
 
         const result = videoFrameToRgba(frame);
         for (let i = 0; i < timestamps.length; i++) {
-          const delta = Math.abs(frameSec - timestamps[i]);
-          if (delta < bestForTarget[i].delta) {
-            bestForTarget[i] = { ...result, delta };
+          if (frameSec >= timestamps[i] && frameSec < firstAtOrAfterPts[i]) {
+            firstAtOrAfter[i] = result;
+            firstAtOrAfterPts[i] = frameSec;
           }
         }
       },
@@ -130,7 +134,7 @@ async function extractFrames(
     }
 
     decoder.flush().then(() => {
-      resolve(bestForTarget.map(b => b.delta === Infinity ? null : { rgba: b.rgba, width: b.width, height: b.height }));
+      resolve(firstAtOrAfter);
     }).catch(reject);
   });
 }
