@@ -192,12 +192,18 @@ async function demuxMp4(
       // edit list offset: mp4box applies edit list to sample CTS,
       // but TEE's ffmpeg uses raw stream PTS for seeking.
       // Subtract this offset from TEE timestamps to align with display time.
+      //
+      // Two common patterns:
+      //   A) entry[0].media_time > 0 → direct offset in track timescale
+      //   B) entry[0].media_time == -1 (empty edit) → padding of
+      //      segment_duration / movie_timescale before content starts
       const elstEntries = track?.edts?.elst?.entries;
       if (elstEntries && elstEntries.length > 0) {
-        const mediaTime = elstEntries[0].media_time;
-        const timescale = videoTrack.timescale;
-        if (mediaTime > 0 && timescale > 0) {
-          editListOffsetSec = mediaTime / timescale;
+        const first = elstEntries[0];
+        if (first.media_time > 0 && videoTrack.timescale > 0) {
+          editListOffsetSec = first.media_time / videoTrack.timescale;
+        } else if (first.media_time === -1 && first.segment_duration > 0 && info.timescale > 0) {
+          editListOffsetSec = first.segment_duration / info.timescale;
         }
       }
 
