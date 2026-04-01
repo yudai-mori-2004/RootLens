@@ -44,26 +44,24 @@ export async function computePdq(imageUrl: string): Promise<string> {
 export interface VpdqFrame {
   pdqhash: string;
   quality: number;
-  timestamp: number;
+  keyframe: number;
 }
 
-/** 指定タイムスタンプのフレームをデコードし PDQ 計算する */
-export async function computeVpdq(
+/** 動画のキーフレームのみをデコードし PDQ 計算する */
+export async function computeVpdqKeyframes(
   videoUrl: string,
-  timestamps: number[],
 ): Promise<VpdqFrame[]> {
-  const rawFrames = await extractFrames(videoUrl, timestamps);
+  const rawFrames = await extractKeyframes(videoUrl);
 
   const frames: VpdqFrame[] = [];
   for (let i = 0; i < rawFrames.length; i++) {
     const rf = rawFrames[i];
-    if (!rf) continue;
     const gray = rgbaToGray(rf.rgba, rf.width, rf.height);
     const gray64 = jaroszDownsample(gray, rf.width, rf.height, SIZE, SIZE);
     const quality = computeQuality(gray64);
     if (quality < VPDQ_QUALITY_THRESHOLD) continue;
     const hash = pdqHash256(gray64);
-    frames.push({ pdqhash: hash, quality, timestamp: timestamps[i] });
+    frames.push({ pdqhash: hash, quality, keyframe: rf.keyframeIndex });
   }
 
   return frames;
@@ -73,69 +71,44 @@ export async function computeVpdq(
 // Video frame extraction (WebCodecs + mp4box.js)
 // ---------------------------------------------------------------------------
 
-type FrameRgba = { rgba: Uint8Array; width: number; height: number };
+type RawFrameRgba = { rgba: Uint8Array; width: number; height: number };
+type FrameRgba = RawFrameRgba & { keyframeIndex: number };
 
-async function extractFrames(
-  videoUrl: string,
-  timestamps: number[],
-): Promise<(FrameRgba | null)[]> {
+/** キーフレーム（Iフレーム）のみをデコードし RGBA で返す */
+async function extractKeyframes(videoUrl: string): Promise<FrameRgba[]> {
   const res = await fetch(videoUrl, { mode: "cors" });
   if (!res.ok) throw new Error(`Failed to fetch video: ${res.status}`);
   const buf = await res.arrayBuffer();
 
   const { config, chunks } = await demuxMp4(buf);
-  const maxTarget = Math.max(...timestamps);
 
-  // ffmpeg input seeking (-ss before -i) emits the first frame with
-  // PTS >= the seek target. Replicate this by selecting the earliest
-  // decoded frame at or after each requested timestamp.
-  const matched: (FrameRgba | null)[] = timestamps.map(() => null);
-  const matchedPts: number[] = timestamps.map(() => Infinity);
+  // キーフレームチャンクのみ抽出（mp4box.js の is_sync → chunk.type === "key"）
+  const keyChunks = chunks.filter(c => c.type === "key");
+
+  const results: FrameRgba[] = [];
+  let kfIndex = 0;
 
   return new Promise((resolve, reject) => {
     const decoder = new VideoDecoder({
       output: (frame: VideoFrame) => {
-        const frameSec = (frame.timestamp ?? 0) / 1_000_000;
-
-        let needed = false;
-        for (let i = 0; i < timestamps.length; i++) {
-          if (frameSec >= timestamps[i] && frameSec < matchedPts[i]) {
-            needed = true;
-            break;
-          }
-        }
-
-        if (!needed) {
-          frame.close();
-          return;
-        }
-
         const result = videoFrameToRgba(frame);
-        for (let i = 0; i < timestamps.length; i++) {
-          if (frameSec >= timestamps[i] && frameSec < matchedPts[i]) {
-            matched[i] = result;
-            matchedPts[i] = frameSec;
-          }
-        }
+        results.push({ ...result, keyframeIndex: kfIndex++ });
       },
       error: (e: DOMException) => reject(e),
     });
 
     decoder.configure(config);
 
-    for (const chunk of chunks) {
-      if (chunk.timestamp / 1_000_000 > maxTarget + 1) break;
+    for (const chunk of keyChunks) {
       decoder.decode(chunk);
     }
 
-    decoder.flush().then(() => {
-      resolve(matched);
-    }).catch(reject);
+    decoder.flush().then(() => resolve(results)).catch(reject);
   });
 }
 
 /** VideoFrame → RGBA via OffscreenCanvas */
-function videoFrameToRgba(frame: VideoFrame): FrameRgba {
+function videoFrameToRgba(frame: VideoFrame): RawFrameRgba {
   const w = frame.displayWidth;
   const h = frame.displayHeight;
   const canvas = new OffscreenCanvas(w, h);

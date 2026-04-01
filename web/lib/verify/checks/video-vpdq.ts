@@ -13,7 +13,7 @@ import type { SignedJson, ExtensionPayload, WasmModuleInfo } from "@title-protoc
 import type { ProcessorVerification, CheckResult } from "./types";
 import { findWasmVersionByHash, PDQ_THRESHOLD } from "../config";
 import { runCommonChecks } from "./common";
-import { computeVpdq, type VpdqFrame } from "../pdq";
+import { computeVpdqKeyframes, type VpdqFrame } from "../pdq";
 import { hammingDistance } from "./image-pdq";
 
 // ---------------------------------------------------------------------------
@@ -21,10 +21,9 @@ import { hammingDistance } from "./image-pdq";
 // ---------------------------------------------------------------------------
 
 interface VpdqPayload extends ExtensionPayload {
-  frames?: { pdqhash: string; quality: number; timestamp: number }[];
+  frames?: { pdqhash: string; quality: number; keyframe?: number; timestamp?: number }[];
   frame_count?: number;
   algorithm?: string;
-  sampling_fps?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,29 +103,29 @@ async function checkVpdqMatch(
   }
 
   try {
-    const timestamps = payload.frames.map(f => f.timestamp);
-    const computed = await computeVpdq(videoUrl, timestamps);
+    const computed = await computeVpdqKeyframes(videoUrl);
 
     if (computed.length === 0) {
-      return { id: "vpdq_match", status: "failed", detail: "No frames extracted from video" };
+      return { id: "vpdq_match", status: "failed", detail: "No keyframes extracted from video" };
     }
 
+    // Per-index matching by keyframe index.
+    // TEE and browser both select keyframes by container metadata (sync flag),
+    // so the same file deterministically produces the same keyframe sequence.
     let matchedCount = 0;
-    let maxDistance = 0;
     const perFrame: string[] = [];
 
-    for (let i = 0; i < payload.frames.length; i++) {
-      const onchain = payload.frames[i];
-      const recomputed = computed[i];
+    for (const onchain of payload.frames) {
+      const kfIdx = onchain.keyframe ?? -1;
+      const recomputed = computed.find(c => c.keyframe === kfIdx);
       if (!recomputed) {
-        perFrame.push(`f${i}@${onchain.timestamp}s:skip`);
+        perFrame.push(`kf${kfIdx}:skip`);
         continue;
       }
 
       const dist = hammingDistance(onchain.pdqhash, recomputed.pdqhash);
       if (dist <= PDQ_THRESHOLD) matchedCount++;
-      if (dist > maxDistance) maxDistance = dist;
-      perFrame.push(`f${i}@${onchain.timestamp}s:${dist}`);
+      perFrame.push(`kf${kfIdx}:${dist}`);
     }
 
     const totalOnchain = payload.frames.length;
@@ -135,7 +134,7 @@ async function checkVpdqMatch(
     return {
       id: "vpdq_match",
       status: ok ? "verified" : "failed",
-      detail: `${matchedCount}/${totalOnchain} frames matched [${perFrame.join(", ")}] (threshold: ${PDQ_THRESHOLD})`,
+      detail: `${matchedCount}/${totalOnchain} keyframes matched [${perFrame.join(", ")}] (threshold: ${PDQ_THRESHOLD})`,
     };
   } catch (e) {
     return {

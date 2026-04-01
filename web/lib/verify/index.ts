@@ -20,7 +20,7 @@ export { contentResolver } from "./content-resolver";
 export type { ContentResolver, ResolvedContent, ExtensionNft } from "./content-resolver";
 
 // PDQ / vPDQ 計算 (純粋 TypeScript)
-export { computePdq, computeVpdq } from "./pdq";
+export { computePdq, computeVpdqKeyframes } from "./pdq";
 export type { VpdqFrame } from "./pdq";
 
 // Hamming distance
