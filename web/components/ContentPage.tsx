@@ -165,16 +165,23 @@ export default function ContentPage({ page }: Props) {
           <span className={styles.creatorName}>
             {page.user.displayName || truncate(page.user.address, 4)}
           </span>
-          {capturedDate && (
-            <span className={styles.creatorMeta}>
-              <time className={styles.dateTime} dateTime={record?.capturedAt || undefined}>
-                {capturedDate}
-              </time>
-              <span className={hasTsa ? styles.chipShot : styles.chipRegistered}>
-                {hasTsa ? t("chip.shot") : t("chip.registered")}
+          <span className={styles.creatorMeta}>
+            {capturedDate ? (
+              <span className={styles.creatorMetaReady}>
+                <time className={styles.dateTime} dateTime={record?.capturedAt || undefined}>
+                  {capturedDate}
+                </time>
+                <span className={hasTsa ? styles.chipShot : styles.chipRegistered}>
+                  {hasTsa ? t("chip.shot") : t("chip.registered")}
+                </span>
               </span>
-            </span>
-          )}
+            ) : (
+              <span className={styles.creatorMetaSkeleton}>
+                <span className={styles.chipSkeleton} style={{ width: 60 }} />
+                <span className={styles.chipSkeleton} style={{ width: 40 }} />
+              </span>
+            )}
+          </span>
         </a>
       ) : capturedDate ? (
         <div className={styles.dateRow}>
