@@ -106,30 +106,13 @@ export default function ContentPage({ page }: Props) {
   const passed = allChecks.filter(c => c.status === "verified").length;
   const total = allChecks.length;
 
-  const deviceLabel = record?.deviceName
-    ? t("shotOn", { device: record.deviceName })
-    : record ? t("shotOnDefault") : null;
+  // クリエイターページURL
+  const creatorHref = page.user
+    ? page.user.username ? `/@${page.user.username}` : `/${page.user.address}`
+    : null;
 
   return (
     <div className={styles.container}>
-      {/* User header — page creator (Supabase metadata, not on-chain owner) */}
-      {page.user?.displayName && (
-        <div className={styles.userHeader}>
-          {page.user?.avatarUrl ? (
-            <img src={page.user.avatarUrl} alt="" className={styles.userAvatar} />
-          ) : (
-            <div className={styles.userAvatarPlaceholder}>
-              {page.user.displayName.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className={styles.userInfo}>
-            <div className={styles.userNameRow}>
-              <span className={styles.userName}>{page.user.displayName}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Image */}
       <div className={styles.imageWrapper}>
         {currentContent?.mediaType === 'video' && currentContent.mediaUrl ? (
@@ -168,8 +151,52 @@ export default function ContentPage({ page }: Props) {
       </div>
 
       {/* ===== Below image ===== */}
-      <div className={styles.infoSection}>
-        {/* Trust status — the primary message */}
+
+      {/* 1. Date/time + chip */}
+      <div className={styles.dateRow}>
+        {capturedDate ? (
+          <>
+            <time className={styles.dateTime} dateTime={record?.capturedAt || undefined}>
+              {capturedDate}
+            </time>
+            <span className={hasTsa ? styles.chipRegistered : styles.chipShot}>
+              {hasTsa ? t("chip.registered") : t("chip.shot")}
+            </span>
+          </>
+        ) : (
+          <div className={styles.infoSkeleton}>
+            <div className={styles.skeletonLine} style={{ width: "40%", height: 13 }} />
+          </div>
+        )}
+      </div>
+
+      {/* 2. Caption */}
+      {page.caption && (
+        <CaptionBlock
+          caption={page.caption}
+          seeMore={t("caption.seeMore")}
+          seeLess={t("caption.seeLess")}
+        />
+      )}
+
+      {/* 3. Creator */}
+      {page.user && creatorHref && (
+        <a href={creatorHref} className={styles.creatorRow}>
+          {page.user.avatarUrl ? (
+            <img src={page.user.avatarUrl} alt="" className={styles.creatorAvatar} />
+          ) : (
+            <div className={styles.creatorAvatarPlaceholder}>
+              {page.user.displayName ? page.user.displayName.charAt(0).toUpperCase() : "?"}
+            </div>
+          )}
+          <span className={styles.creatorName}>
+            {page.user.displayName || truncate(page.user.address, 4)}
+          </span>
+        </a>
+      )}
+
+      {/* 4. Trust row */}
+      <div className={styles.trustSection}>
         <div className={styles.trustRow}>
           {verification.overall === "pending" ? (
             <>
@@ -180,47 +207,22 @@ export default function ContentPage({ page }: Props) {
             <>
               <ShieldIcon verified />
               <span className={styles.trustVerified}>{t("trust.verified")}</span>
-              <span className={styles.trustScore}>{passed}/{total}</span>
+              <span className={styles.trustScore}>
+                <span className={styles.trustScoreFrac}>{passed}/{total}</span>
+                <span className={styles.trustScoreLabel}>{t("trust.checks")}</span>
+              </span>
             </>
           ) : (
             <>
               <ShieldIcon verified={false} />
               <span className={styles.trustFailed}>{t("trust.failed")}</span>
-              <span className={styles.trustScore}>{passed}/{total}</span>
+              <span className={styles.trustScore}>
+                <span className={styles.trustScoreFrac}>{passed}/{total}</span>
+                <span className={styles.trustScoreLabel}>{t("trust.checks")}</span>
+              </span>
             </>
           )}
         </div>
-
-        {/* Device + date + owner metadata */}
-        {record ? (
-          <>
-            {deviceLabel && <p className={styles.deviceLine}>{deviceLabel}</p>}
-            {capturedDate && (
-              <div className={styles.meta}>
-                <time className={styles.timestamp} dateTime={record.capturedAt || undefined}>{capturedDate}</time>
-                {hasTsa && <span className={styles.metaBadge}>{t("dateTsa")}</span>}
-              </div>
-            )}
-            {resolved?.ownerWallet && (
-              <div className={styles.meta}>
-                <span className={styles.ownerLabel}>{t("owner")}</span>
-                <button
-                  className={styles.walletCopy}
-                  onClick={() => { navigator.clipboard.writeText(resolved.ownerWallet); }}
-                  title={resolved.ownerWallet}
-                >
-                  <span className={styles.walletAddr}>{truncate(resolved.ownerWallet, 4)}</span>
-                  <CopyIcon />
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className={styles.infoSkeleton}>
-            <div className={styles.skeletonLine} style={{ width: "60%" }} />
-            <div className={styles.skeletonLine} style={{ width: "40%", height: 14 }} />
-          </div>
-        )}
       </div>
 
       {/* ===== 技術者向け詳細 ===== */}
@@ -645,6 +647,24 @@ function StatusIcon({ status, size = 16 }: { status: VerifyStatus; size?: number
     <svg width={size} height={size} viewBox="0 0 16 16" className={styles.iconFailed}>
       <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function CaptionBlock({ caption, seeMore, seeLess }: { caption: string; seeMore: string; seeLess: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const LIMIT = 100;
+  const isLong = caption.length > LIMIT;
+  const text = !isLong || expanded ? caption : caption.slice(0, LIMIT) + "…";
+
+  return (
+    <div className={styles.captionBlock}>
+      <span className={styles.captionText}>{text}</span>
+      {isLong && (
+        <button className={styles.captionToggle} onClick={() => setExpanded(!expanded)}>
+          {expanded ? seeLess : seeMore}
+        </button>
+      )}
+    </div>
   );
 }
 

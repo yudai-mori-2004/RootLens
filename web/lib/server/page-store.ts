@@ -227,6 +227,15 @@ export async function softDeletePage(shortId: string): Promise<void> {
   if (error) throw new Error(`delete failed: ${error.message}`);
 }
 
+export async function updatePageCaption(shortId: string, caption: string): Promise<void> {
+  const { error } = await supabase
+    .from("pages")
+    .update({ caption: caption || null })
+    .eq("short_id", shortId);
+
+  if (error) throw new Error(`caption update failed: ${error.message}`);
+}
+
 // ---------------------------------------------------------------------------
 // クリエイターページ用クエリ (§7.1)
 // ---------------------------------------------------------------------------

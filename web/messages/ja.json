@@ -231,10 +231,21 @@
     "dateRegistration": "登録時刻",
     "owner": "所有者",
 
+    "chip": {
+      "registered": "登録時刻",
+      "shot": "撮影時刻"
+    },
+
+    "caption": {
+      "seeMore": "続きを読む",
+      "seeLess": "閉じる"
+    },
+
     "trust": {
       "verifying": "検証中...",
       "verified": "本物のコンテンツです",
-      "failed": "確認できない項目があります"
+      "failed": "確認できない項目があります",
+      "checks": "項目"
     },
 
     "tech": {

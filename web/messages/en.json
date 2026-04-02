@@ -231,10 +231,21 @@
     "dateRegistration": "Registration time",
     "owner": "Owner",
 
+    "chip": {
+      "registered": "Registration time",
+      "shot": "Shot time"
+    },
+
+    "caption": {
+      "seeMore": "more",
+      "seeLess": "less"
+    },
+
     "trust": {
       "verifying": "Verifying...",
       "verified": "Verified authentic content",
-      "failed": "Some checks could not be confirmed"
+      "failed": "Some checks could not be confirmed",
+      "checks": "checks"
     },
 
     "tech": {

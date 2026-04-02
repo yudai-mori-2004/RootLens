@@ -28,7 +28,10 @@ export async function resolvePageMeta(
     .select(
       `
       short_id,
+      caption,
       users (
+        address,
+        username,
         display_name,
         bio,
         avatar_url
@@ -59,13 +62,18 @@ export async function resolvePageMeta(
   if (rawContents.length === 0) return null;
 
   const rawUser = data.users as unknown as {
+    address: string;
+    username: string | null;
     display_name: string;
     bio: string;
     avatar_url: string | null;
   } | null;
 
+  const rawData = data as unknown as { caption?: string | null };
+
   return {
     shortId,
+    caption: rawData.caption ?? null,
     contents: rawContents.map((c) => ({
       contentHash: c.content_hash,
       thumbnailUrl: c.thumbnail_url || "",
@@ -74,6 +82,8 @@ export async function resolvePageMeta(
       mediaType: c.content_type || "image",
     })),
     user: rawUser ? {
+      address: rawUser.address,
+      username: rawUser.username ?? null,
       displayName: rawUser.display_name,
       bio: rawUser.bio,
       avatarUrl: rawUser.avatar_url,

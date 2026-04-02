@@ -25,6 +25,8 @@ export interface UserProfile {
   displayName: string;
   bio: string;
   avatarUrl: string | null;
+  address: string;
+  username: string | null;
 }
 
 /** サーバーが shortId から解決するページ情報 */
@@ -32,6 +34,8 @@ export interface PageMeta {
   shortId: string;
   contents: ContentMeta[];
   user: UserProfile | null;
+  /** 投稿者が自由に記述したキャプション（未設定は null） */
+  caption: string | null;
 }
 
 // --- Title Protocol (Solana / Arweave) から取得するデータ ---

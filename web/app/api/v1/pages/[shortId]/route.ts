@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { findByShortId, updatePageContent, softDeletePage } from "@/lib/server/page-store";
+import { findByShortId, updatePageContent, updatePageCaption, softDeletePage } from "@/lib/server/page-store";
 
 export async function GET(
   _req: NextRequest,
@@ -34,8 +34,14 @@ export async function PATCH(
 ) {
   try {
     const { shortId } = await params;
-    const { contentHash, assetId } = await req.json();
+    const body = await req.json();
 
+    if ("caption" in body) {
+      await updatePageCaption(shortId, body.caption ?? "");
+      return NextResponse.json({ ok: true });
+    }
+
+    const { contentHash, assetId } = body;
     if (!contentHash) {
       return NextResponse.json({ error: "contentHash is required" }, { status: 400 });
     }
