@@ -152,35 +152,8 @@ export default function ContentPage({ page }: Props) {
 
       {/* ===== Below image ===== */}
 
-      {/* 1. Date/time + chip */}
-      <div className={styles.dateRow}>
-        {capturedDate ? (
-          <>
-            <time className={styles.dateTime} dateTime={record?.capturedAt || undefined}>
-              {capturedDate}
-            </time>
-            <span className={hasTsa ? styles.chipRegistered : styles.chipShot}>
-              {hasTsa ? t("chip.registered") : t("chip.shot")}
-            </span>
-          </>
-        ) : (
-          <div className={styles.infoSkeleton}>
-            <div className={styles.skeletonLine} style={{ width: "40%", height: 13 }} />
-          </div>
-        )}
-      </div>
-
-      {/* 2. Caption */}
-      {page.caption && (
-        <CaptionBlock
-          caption={page.caption}
-          seeMore={t("caption.seeMore")}
-          seeLess={t("caption.seeLess")}
-        />
-      )}
-
-      {/* 3. Creator */}
-      {page.user && creatorHref && (
+      {/* 1. Creator row — avatar + name (left) / date + chip (right) */}
+      {page.user && creatorHref ? (
         <a href={creatorHref} className={styles.creatorRow}>
           {page.user.avatarUrl ? (
             <img src={page.user.avatarUrl} alt="" className={styles.creatorAvatar} />
@@ -192,7 +165,41 @@ export default function ContentPage({ page }: Props) {
           <span className={styles.creatorName}>
             {page.user.displayName || truncate(page.user.address, 4)}
           </span>
+          {capturedDate && (
+            <span className={styles.creatorMeta}>
+              <time className={styles.dateTime} dateTime={record?.capturedAt || undefined}>
+                {capturedDate}
+              </time>
+              <span className={hasTsa ? styles.chipShot : styles.chipRegistered}>
+                {hasTsa ? t("chip.shot") : t("chip.registered")}
+              </span>
+            </span>
+          )}
         </a>
+      ) : capturedDate ? (
+        <div className={styles.dateRow}>
+          <time className={styles.dateTime} dateTime={record?.capturedAt || undefined}>
+            {capturedDate}
+          </time>
+          <span className={hasTsa ? styles.chipShot : styles.chipRegistered}>
+            {hasTsa ? t("chip.shot") : t("chip.registered")}
+          </span>
+        </div>
+      ) : (
+        <div className={styles.dateRow}>
+          <div className={styles.infoSkeleton}>
+            <div className={styles.skeletonLine} style={{ width: "40%", height: 13 }} />
+          </div>
+        </div>
+      )}
+
+      {/* 2. Caption */}
+      {page.caption && (
+        <CaptionBlock
+          caption={page.caption}
+          seeMore={t("caption.seeMore")}
+          seeLess={t("caption.seeLess")}
+        />
       )}
 
       {/* 4. Trust row */}

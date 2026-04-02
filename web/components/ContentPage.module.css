@@ -10,6 +10,7 @@
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
+  overflow-x: hidden;
 }
 
 /* --- Hero Image --- */
@@ -192,6 +193,14 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.creatorMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* --- Trust section --- */
@@ -611,6 +620,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .dataLink {
