@@ -70,7 +70,27 @@
   line-height: 1.7;
 }
 
+.subsectionTitle {
+  font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 32px;
+  margin-bottom: 12px;
+  color: var(--lp-text);
+}
+
 /* ---- Typography ---- */
+.link {
+  color: var(--lp-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  color: var(--lp-accent-light);
+}
+
 .prose {
   font-size: 1rem;
   line-height: 1.72;

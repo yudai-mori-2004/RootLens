@@ -44,6 +44,14 @@ export interface VideoProcessOptions {
 export interface DeviceCredentials {
   csr: string; // Base64 DER
   platform: 'android' | 'ios';
+  attestation?: {
+    // Android Key Attestation
+    key_attestation_chain?: string[];  // DER Base64配列
+    play_integrity_token?: string;
+    // iOS App Attest
+    app_attest_object?: string;
+    app_attest_key_id?: string;
+  };
 }
 
 interface C2paBridgeInterface {
@@ -57,6 +65,8 @@ interface C2paBridgeInterface {
   storeDeviceCertificate(deviceCertBase64: string, intermediateCaCertBase64: string, rootCaCertBase64: string): Promise<boolean>;
   hasDeviceCertificate(): Promise<boolean>;
   getDeviceCertificateExpiry(): Promise<string | null>;
+  verifyStoredCertChain(): Promise<boolean>;
+  clearStoredCertificates(): Promise<void>;
 }
 
 // Expo Modules API (iOS) or legacy NativeModules (Android)
@@ -212,4 +222,26 @@ export async function getDeviceCertificateExpiry(): Promise<string | null> {
     return null;
   }
   return C2paBridge.getDeviceCertificateExpiry();
+}
+
+/**
+ * 保存済み証明書チェーンの整合性を検証
+ * Device CertがIntermediate CAで署名されているか確認する。
+ * PKIローテーション（ICA再生成）を検出するための軽量チェック。
+ */
+export async function verifyStoredCertChain(): Promise<boolean> {
+  if (!C2paBridge) {
+    return false;
+  }
+  return C2paBridge.verifyStoredCertChain();
+}
+
+/**
+ * 保存済み証明書を全削除（re-provisioning前に使用）
+ */
+export async function clearStoredCertificates(): Promise<void> {
+  if (!C2paBridge) {
+    return;
+  }
+  return C2paBridge.clearStoredCertificates();
 }

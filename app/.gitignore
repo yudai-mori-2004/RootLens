@@ -29,6 +29,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# Google Service Account key
+*.gserviceaccount.*.json
+rootlens-*.json
+
 # local env files
 .env*.local
 

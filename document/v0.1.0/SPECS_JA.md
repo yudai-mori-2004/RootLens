@@ -437,15 +437,21 @@ Root CA証明書はRootLensの運用開始時に一度だけ生成する。手�
     - Android: `KeyGenParameterSpec` に `setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))` を指定。`setIsStrongBoxBacked(true)` をStrongBox対応端末で設定（非対応の場合はTEEにフォールバック）
     - iOS: `kSecAttrKeyTypeECSECPrimeRandom` + `kSecAttrKeySizeInBits: 256` + `kSecAttrTokenIDSecureEnclave` を指定
 2. アプリがCSR（Certificate Signing Request、PKCS#10形式）を作成する。CSRにはTEE内で生成された公開鍵が含まれ、TEE内の秘密鍵で自己署名される（Proof of Possession）
-3. 端末がPlatform Attestationを実行する。challengeには **CSRのSHA-256ハッシュ** を使用する
-    - Android: Key Attestation（`setAttestationChallenge(SHA256(csrDer))`）+ Play Integrity API（nonceにSHA-256(csrDer)を設定）
-    - iOS: App Attest（`DCAppAttestService.attestKey` の `clientDataHash` に `SHA256(csrDer)` を渡す）
+3. 端末がPlatform Attestationを実行する
+    - Android: Key Attestation chainはステップ1の鍵生成時に確定する（`setAttestationChallenge` は鍵生成時にのみ設定可能なため、ランダム値を使用）。CSRとの紐づけは**attestation cert[0]の公開鍵とCSRの公開鍵の一致**で検証する。Play Integrity API（nonceにSHA-256(csrDer)を設定）は鍵生成後に実行可能
+    - iOS: App Attest（`DCAppAttestService.attestKey` の `clientDataHash` に `SHA256(csrDer)` を渡す）はC2PA署名鍵とは独立した仕組みのため、CSR作成後に実行可能
 4. CSR + Attestation証拠をRootLensサーバーの証明書発行エンドポイントに送信する
 5. サーバーが検証する（詳細は「4.4.2 証明書発行API」参照）
 6. 検証に通過したら、AWS KMS Sign APIを使用してDevice Certificateに署名して発行する
 7. 端末にDevice Certificateおよび Root CA証明書を返却する。端末はTEE内の秘密鍵とペアで保持する
 
-**challengeにCSRハッシュを使用する理由：** Attestation証拠とCSRの紐づけは、Android Key Attestationではattestation証明書の公開鍵とCSRの公開鍵の一致で保証される。iOS App AttestではC2PA署名鍵と独立しているため、`clientDataHash` にCSRハッシュを埋め込むことで紐づけを実現する。CSRに含まれる公開鍵はTEE内で新規生成されるたびに一意であるため、CSRハッシュも一意となり、専用のchallenge発行エンドポイントとサーバー側のnonce管理が不要になる。ネットワーク往復も1回削減される。
+**Attestation証拠とCSRの紐づけ方式：**
+
+- **Android Key Attestation**: `setAttestationChallenge()` は `KeyGenParameterSpec` でのみ設定でき、鍵生成後に変更できない。CSRは鍵生成後にしか作成できないため、`challenge = SHA-256(CSR)` は循環依存となり不可能。代わりに、attestation cert[0]の公開鍵とCSRの公開鍵の**暗号的一致**で紐づけを保証する。Google Root CAで署名されたattestation certの公開鍵を偽造することは不可能であり、公開鍵一致の検証はchallengeベースの紐づけと同等の安全性を持つ
+- **Android Play Integrity**: 鍵生成後に呼び出し可能。`nonce = Base64(SHA-256(CSR))` を設定し、サーバーで一致を検証
+- **iOS App Attest**: C2PA署名鍵（Secure Enclave）とは独立した仕組みのため、鍵生成後にCSRを作成してから `clientDataHash = SHA-256(CSR)` で呼び出し可能。CSRハッシュによる紐づけが成立する
+
+CSRに含まれる公開鍵はTEE内で新規生成されるたびに一意であるため、専用のchallenge発行エンドポイントとサーバー側のnonce管理が不要。ネットワーク往復も1回で完結する。
 
 **ハードウェアバックされていない鍵への対応：** Attestation SecurityLevelがSOFTWARE（Android）である場合、またはSecure Enclaveが利用できない場合（iOS、実質的に存在しない）は、Device Certificateの発行を拒否する。RootLens署名の信頼の根拠であるPlatform Attestationの前提が満たされないためである。
 
@@ -503,7 +509,7 @@ Content-Type: application/json
 }
 ```
 
-専用のchallenge発行エンドポイントは設けない。Attestation実行時のchallengeには `SHA-256(CSR)` を使用し、サーバーは受け取ったCSRから同じハッシュを再計算して検証する。これにより、CSRとAttestation証拠の紐づけをサーバー側のnonce管理なしで保証する。
+専用のchallenge発行エンドポイントは設けない。AndroidではKey Attestation certの公開鍵とCSRの公開鍵の一致で紐づけを検証する。iOS App AttestとPlay Integrity APIではCSRハッシュをchallenge/nonceとして使用する。サーバー側のnonce管理は不要。
 
 ### CSRフォーマット（PKCS#10）
 
@@ -517,14 +523,14 @@ CSRには以下が含まれる。
 
 1. CSRの署名を検証（公開鍵がCSR自身に署名していることを確認）
 2. Key Attestation チェーンの検証
-    1. `key_attestation_chain[0]` の公開鍵がCSRの公開鍵と一致することを確認
-    2. チェーンをGoogle Hardware Attestation Root CAまで検証（Root CA証明書はGoogleが公開しているものをpin留め）
+    1. `key_attestation_chain[0]` の公開鍵がCSRの公開鍵と一致することを確認（暗号的紐づけ）
+    2. チェーンをGoogle Hardware Attestation Root CAまで検証（Root CA証明書はGoogleが公開しているものをpin留め。RSA/ECC両方の世代を信頼）
     3. Attestation Extension（OID: `1.3.6.1.4.1.11129.2.1.17`）を解析し、以下を確認:
         - `attestationSecurityLevel` が `TRUSTED_ENVIRONMENT(1)` または `STRONGBOX(2)` であること。`SOFTWARE(0)` の場合は拒否
         - `purpose` に `SIGN(2)` が含まれること
         - `algorithm` が EC であること
         - `attestationApplicationId.packageInfos` にRootLensの正規パッケージ名が含まれること
-        - `attestationChallenge` が `SHA-256(CSR)` と一致すること
+        - `attestationChallenge` はランダム値（鍵生成時に設定）。CSRとの紐づけは公開鍵一致で保証されるため、challenge値の検証は不要
 3. Play Integrity Token の検証
     1. Google Play Integrity APIでトークンをデコード
     2. 以下を確認:

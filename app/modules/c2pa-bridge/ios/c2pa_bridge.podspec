@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
     'LIBRARY_SEARCH_PATHS' => '"${PODS_TARGET_SRCROOT}/lib"',
   }
 
-  s.vendored_libraries = 'lib/libc2pa_bridge_sim.a'
+  s.vendored_libraries = 'lib/libc2pa_rs.a'
   s.frameworks = 'Photos'
 
   s.dependency 'ExpoModulesCore'

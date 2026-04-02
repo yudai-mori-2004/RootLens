@@ -1,4 +1,4 @@
-# Task 22: pHash → PDQ マイグレーション + cert-rootlens 対応
+# Task 23: pHash → PDQ マイグレーション + cert-rootlens 対応
 
 ## 目的
 

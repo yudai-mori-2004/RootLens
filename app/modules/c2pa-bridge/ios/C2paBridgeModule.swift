@@ -4,6 +4,8 @@ import AVFoundation
 import MobileCoreServices
 import UniformTypeIdentifiers
 import Security
+import DeviceCheck
+import CryptoKit
 import C2paBridgeFFI
 
 // 仕様書 §4.6 C2PA SDK統合
@@ -322,7 +324,7 @@ public class C2paBridgeModule: Module {
 
     // --- TEE鍵管理 (§4.4, §4.6) ---
 
-    // 仕様書 §4.4.1 Secure Enclave内でEC P-256鍵を生成し、CSRを返す
+    // 仕様書 §4.4.1 Secure Enclave内でEC P-256鍵を生成し、CSR + App Attestを返す
     AsyncFunction("generateDeviceCredentials") { (promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         NSLog("[C2paBridge] generateDeviceCredentials called")
@@ -334,10 +336,19 @@ public class C2paBridgeModule: Module {
           }
           let csrBase64 = csrData.base64EncodedString()
           NSLog("[C2paBridge] CSR generated: \(csrData.count) bytes")
-          promise.resolve([
-            "csr": csrBase64,
-            "platform": "ios",
-          ] as [String: String])
+
+          // §4.4.1: App Attest — clientDataHash = SHA-256(CSR)
+          // App AttestはC2PA署名鍵（Secure Enclave）とは独立した仕組み
+          Self.getAppAttestation(csrData: csrData) { attestation in
+            var result: [String: Any] = [
+              "csr": csrBase64,
+              "platform": "ios",
+            ]
+            if let attestation = attestation {
+              result["attestation"] = attestation
+            }
+            promise.resolve(result)
+          }
         } catch {
           NSLog("[C2paBridge] generateDeviceCredentials error: \(error)")
           promise.reject("KEY_ERROR", "TEE鍵生成に失敗しました: \(error.localizedDescription)")
@@ -376,6 +387,41 @@ public class C2paBridgeModule: Module {
       } else {
         promise.resolve(nil as String?)
       }
+    }
+
+    // PKIローテーション検出: Device CertがIntermediate CAで署名されているか検証
+    AsyncFunction("verifyStoredCertChain") { () -> Bool in
+      guard let deviceCertData = UserDefaults.standard.data(forKey: Self.deviceCertKey),
+            let icaCertData = UserDefaults.standard.data(forKey: Self.intermediateCaCertKey) else {
+        return false
+      }
+      guard let deviceCertRef = SecCertificateCreateWithData(nil, deviceCertData as CFData),
+            let icaCertRef = SecCertificateCreateWithData(nil, icaCertData as CFData) else {
+        return false
+      }
+      var trust: SecTrust?
+      let policy = SecPolicyCreateBasicX509()
+      let status = SecTrustCreateWithCertificates([deviceCertRef, icaCertRef] as CFArray, policy, &trust)
+      guard status == errSecSuccess, let trust = trust else {
+        return false
+      }
+      SecTrustSetAnchorCertificates(trust, [icaCertRef] as CFArray)
+      SecTrustSetAnchorCertificatesOnly(trust, true)
+      var error: CFError?
+      let isValid = SecTrustEvaluateWithError(trust, &error)
+      if !isValid {
+        NSLog("[C2paBridge] verifyStoredCertChain failed: \(error?.localizedDescription ?? "unknown")")
+      }
+      return isValid
+    }
+
+    // 保存済み証明書を全削除（re-provisioning前に使用）
+    AsyncFunction("clearStoredCertificates") { () in
+      let defaults = UserDefaults.standard
+      defaults.removeObject(forKey: Self.deviceCertKey)
+      defaults.removeObject(forKey: Self.intermediateCaCertKey)
+      defaults.removeObject(forKey: Self.rootCaCertKey)
+      NSLog("[C2paBridge] Stored certificates cleared for re-provisioning")
     }
   }
 
@@ -451,6 +497,85 @@ public class C2paBridgeModule: Module {
       return (item as! SecKey)
     }
     return nil
+  }
+
+  // MARK: - App Attest (§4.4.1)
+
+  /// App Attest Key IDの保存キー
+  private static let appAttestKeyIdKey = "io.rootlens.c2pa.appAttest.keyId"
+
+  /// App Attest を取得する。clientDataHash = SHA-256(CSR)
+  /// App Attestが利用不可の場合はnilを返す（DEV_MODEではサーバー側でスキップ）。
+  private static func getAppAttestation(csrData: Data, completion: @escaping ([String: String]?) -> Void) {
+    if #available(iOS 14.0, *) {
+      let service = DCAppAttestService.shared
+      guard service.isSupported else {
+        NSLog("[C2paBridge] App Attest not supported on this device")
+        completion(nil)
+        return
+      }
+
+      // App Attest Key の取得または生成
+      getOrCreateAppAttestKeyId(service: service) { keyId in
+        guard let keyId = keyId else {
+          NSLog("[C2paBridge] Failed to get App Attest key")
+          completion(nil)
+          return
+        }
+
+        // clientDataHash = SHA-256(CSR) — 仕様書 §4.4.1
+        let clientDataHash = SHA256.hash(data: csrData)
+        let clientDataHashData = Data(clientDataHash)
+
+        service.attestKey(keyId, clientDataHash: clientDataHashData) { attestObject, error in
+          if let error = error {
+            NSLog("[C2paBridge] App Attest failed: \(error.localizedDescription)")
+            completion(nil)
+            return
+          }
+          guard let attestObject = attestObject else {
+            completion(nil)
+            return
+          }
+
+          NSLog("[C2paBridge] App Attest success: \(attestObject.count) bytes")
+          completion([
+            "app_attest_object": attestObject.base64EncodedString(),
+            "app_attest_key_id": keyId,
+          ])
+        }
+      }
+    } else {
+      completion(nil)
+    }
+  }
+
+  @available(iOS 14.0, *)
+  private static func getOrCreateAppAttestKeyId(
+    service: DCAppAttestService,
+    completion: @escaping (String?) -> Void
+  ) {
+    // 保存済みのApp Attest Key IDがあれば再利用
+    if let savedKeyId = UserDefaults.standard.string(forKey: appAttestKeyIdKey) {
+      completion(savedKeyId)
+      return
+    }
+
+    // 新規生成
+    service.generateKey { keyId, error in
+      if let error = error {
+        NSLog("[C2paBridge] App Attest key generation failed: \(error.localizedDescription)")
+        completion(nil)
+        return
+      }
+      guard let keyId = keyId else {
+        completion(nil)
+        return
+      }
+      UserDefaults.standard.set(keyId, forKey: appAttestKeyIdKey)
+      NSLog("[C2paBridge] App Attest key generated: \(keyId)")
+      completion(keyId)
+    }
   }
 
   private static func hasStoredCertificate() -> Bool {

@@ -26,6 +26,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.security.*
+import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.ECGenParameterSpec
 import kotlin.math.abs
@@ -96,41 +97,18 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             val keyStore = KeyStore.getInstance("AndroidKeyStore")
             keyStore.load(null)
 
-            // 既存の鍵があれば再利用
+            // 鍵が存在しない場合のみ新規生成（TEE鍵は永続的）
+            // §4.4.1: setAttestationChallenge は鍵生成時にのみ設定可能。
+            // 既存鍵の場合はCSRのchallenge検証で紐付ける。
+            // 初回生成時: ダミーchallengeで生成し、CSR作成後にKey Attestation chainを取得。
+            // Note: attestationChallengeはCSR生成前に設定する必要があるが、
+            //       CSRのハッシュはCSR生成後にしか計算できない。
+            //       仕様書 §4.4.1: challenge = SHA-256(CSR) の検証はサーバー側で行う。
+            //       鍵生成時のattestationChallengeには一時的なランダム値を使用し、
+            //       サーバーはKey Attestation chainのリーフ証明書の公開鍵が
+            //       CSRの公開鍵と一致することで紐付けを検証する。
             if (!keyStore.containsAlias(TEE_KEY_ALIAS)) {
-                // §4.2: ES256 (ECDSA P-256)
-                // §4.4.1: setIsStrongBoxBacked(true) → StrongBox対応端末で設定
-                val paramBuilder = KeyGenParameterSpec.Builder(
-                    TEE_KEY_ALIAS,
-                    KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-                )
-                    .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-                    .setDigests(KeyProperties.DIGEST_SHA256)
-
-                // StrongBoxを試み、非対応ならTEEにフォールバック
-                try {
-                    paramBuilder.setIsStrongBoxBacked(true)
-                    val kpg = KeyPairGenerator.getInstance(
-                        KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore"
-                    )
-                    kpg.initialize(paramBuilder.build())
-                    kpg.generateKeyPair()
-                    Log.d(TAG, "TEE key generated (StrongBox)")
-                } catch (e: Exception) {
-                    Log.w(TAG, "StrongBox not available, falling back to TEE", e)
-                    val fallbackBuilder = KeyGenParameterSpec.Builder(
-                        TEE_KEY_ALIAS,
-                        KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-                    )
-                        .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-                        .setDigests(KeyProperties.DIGEST_SHA256)
-                    val kpg = KeyPairGenerator.getInstance(
-                        KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore"
-                    )
-                    kpg.initialize(fallbackBuilder.build())
-                    kpg.generateKeyPair()
-                    Log.d(TAG, "TEE key generated (TEE fallback)")
-                }
+                generateTeeKey(keyStore)
             } else {
                 Log.d(TAG, "TEE key already exists")
             }
@@ -142,41 +120,114 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             val privateKey = entry.privateKey
 
             // PKCS#10 CSR作成（§4.4.1: Subject CN = "RootLens Device"）
-            // AndroidKeyStoreはBouncyCastleのJcaContentSignerBuilderと互換性がないため、
-            // 標準JCA Signatureを使ったカスタムContentSignerでCSRに署名する
-            val subject = X500Name("CN=RootLens Device")
-            val csrBuilder = JcaPKCS10CertificationRequestBuilder(subject, publicKey)
-            val signer = object : org.bouncycastle.operator.ContentSigner {
-                private val stream = java.io.ByteArrayOutputStream()
-                override fun getAlgorithmIdentifier() =
-                    org.bouncycastle.asn1.x509.AlgorithmIdentifier(
-                        org.bouncycastle.asn1.x9.X9ObjectIdentifiers.ecdsa_with_SHA256
-                    )
-                override fun getOutputStream(): java.io.OutputStream = stream
-                override fun getSignature(): ByteArray {
-                    val sig = Signature.getInstance("SHA256withECDSA")
-                    sig.initSign(privateKey)
-                    sig.update(stream.toByteArray())
-                    return sig.sign()
-                }
-            }
-            val csr = csrBuilder.build(signer)
-            val csrDer = csr.encoded
+            val csrDer = buildCSR(publicKey, privateKey)
             val csrBase64 = Base64.encodeToString(csrDer, Base64.NO_WRAP)
 
-            // TODO: Platform Attestation (Key Attestation + Play Integrity)
-            // 現時点ではDev Modeのため省略
+            // Key Attestation chain取得（§4.4.1: ハードウェアが署名した証明書チェーン）
+            val attestationChain = getKeyAttestationChain(keyStore)
 
             val result = Arguments.createMap().apply {
                 putString("csr", csrBase64)
                 putString("platform", "android")
+                // Attestation data
+                val attestation = Arguments.createMap().apply {
+                    val chainArray = Arguments.createArray()
+                    attestationChain.forEach { chainArray.pushString(it) }
+                    putArray("key_attestation_chain", chainArray)
+                    // TODO: Play Integrity Token（Google Play Services依存、Phase 2で追加）
+                }
+                putMap("attestation", attestation)
             }
 
-            Log.d(TAG, "generateDeviceCredentials: CSR created (${csrDer.size} bytes)")
+            Log.d(TAG, "generateDeviceCredentials: CSR created (${csrDer.size} bytes), attestation chain: ${attestationChain.size} certs")
             promise.resolve(result)
         } catch (e: Exception) {
             Log.e(TAG, "generateDeviceCredentials failed", e)
             promise.reject("TEE_ERROR", e.message, e)
+        }
+    }
+
+    /**
+     * TEE内でEC P-256鍵を生成する。
+     * §4.2: ES256, §4.4.1: StrongBox優先、TEEフォールバック
+     * Key AttestationのためsetAttestationChallengeを設定する。
+     */
+    private fun generateTeeKey(keyStore: KeyStore) {
+        // attestation challengeは鍵生成時に固定される。
+        // サーバー側ではCSR公開鍵とattestation cert公開鍵の一致で検証する。
+        val challenge = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+
+        // StrongBoxを試み、非対応ならTEEにフォールバック
+        try {
+            val paramBuilder = KeyGenParameterSpec.Builder(
+                TEE_KEY_ALIAS,
+                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+            )
+                .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .setAttestationChallenge(challenge)
+                .setIsStrongBoxBacked(true)
+
+            val kpg = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore")
+            kpg.initialize(paramBuilder.build())
+            kpg.generateKeyPair()
+            Log.d(TAG, "TEE key generated (StrongBox)")
+        } catch (e: Exception) {
+            Log.w(TAG, "StrongBox not available, falling back to TEE", e)
+            // 既にStrongBox試行で鍵が作られている可能性があるので削除
+            try { keyStore.deleteEntry(TEE_KEY_ALIAS) } catch (_: Exception) {}
+
+            val fallbackBuilder = KeyGenParameterSpec.Builder(
+                TEE_KEY_ALIAS,
+                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+            )
+                .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .setAttestationChallenge(challenge)
+
+            val kpg = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore")
+            kpg.initialize(fallbackBuilder.build())
+            kpg.generateKeyPair()
+            Log.d(TAG, "TEE key generated (TEE fallback)")
+        }
+    }
+
+    /**
+     * PKCS#10 CSR作成
+     * AndroidKeyStoreはBouncyCastleのJcaContentSignerBuilderと互換性がないため、
+     * 標準JCA Signatureを使ったカスタムContentSignerでCSRに署名する。
+     */
+    private fun buildCSR(publicKey: PublicKey, privateKey: PrivateKey): ByteArray {
+        val subject = X500Name("CN=RootLens Device")
+        val csrBuilder = JcaPKCS10CertificationRequestBuilder(subject, publicKey)
+        val signer = object : org.bouncycastle.operator.ContentSigner {
+            private val stream = java.io.ByteArrayOutputStream()
+            override fun getAlgorithmIdentifier() =
+                org.bouncycastle.asn1.x509.AlgorithmIdentifier(
+                    org.bouncycastle.asn1.x9.X9ObjectIdentifiers.ecdsa_with_SHA256
+                )
+            override fun getOutputStream(): java.io.OutputStream = stream
+            override fun getSignature(): ByteArray {
+                val sig = Signature.getInstance("SHA256withECDSA")
+                sig.initSign(privateKey)
+                sig.update(stream.toByteArray())
+                return sig.sign()
+            }
+        }
+        return csrBuilder.build(signer).encoded
+    }
+
+    /**
+     * Key Attestation chain を取得する（DER Base64配列）。
+     * Android KeyStoreが自動生成する証明書チェーン:
+     *   [0] Attestation cert（公開鍵 + attestation extension）
+     *   [1..N-1] Intermediate CAs
+     *   [N] Google Hardware Attestation Root CA
+     */
+    private fun getKeyAttestationChain(keyStore: KeyStore): List<String> {
+        val chain = keyStore.getCertificateChain(TEE_KEY_ALIAS) ?: return emptyList()
+        return chain.map { cert ->
+            Base64.encodeToString(cert.encoded, Base64.NO_WRAP)
         }
     }
 
@@ -242,6 +293,50 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             Log.e(TAG, "getDeviceCertificateExpiry failed", e)
             promise.resolve(null)
         }
+    }
+
+    /**
+     * 保存済み証明書チェーンの整合性を検証
+     * Device CertがIntermediate CAで署名されているか確認する。
+     * PKIローテーション（ICA再生成）を検出するための軽量チェック。
+     */
+    @ReactMethod
+    fun verifyStoredCertChain(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("rootlens_certs", 0)
+            val deviceCertBase64 = prefs.getString("device_cert_der", null)
+            val intermediateCaBase64 = prefs.getString("intermediate_ca_cert_der", null)
+            if (deviceCertBase64 == null || intermediateCaBase64 == null) {
+                promise.resolve(false)
+                return
+            }
+            val deviceCertDer = Base64.decode(deviceCertBase64, Base64.NO_WRAP)
+            val intermediateCaDer = Base64.decode(intermediateCaBase64, Base64.NO_WRAP)
+            val cf = CertificateFactory.getInstance("X.509")
+            val deviceCert = cf.generateCertificate(deviceCertDer.inputStream()) as X509Certificate
+            val icaCert = cf.generateCertificate(intermediateCaDer.inputStream()) as X509Certificate
+            // Device証明書がICA公開鍵で検証できるか — 失敗すればICAが再生成されている
+            deviceCert.verify(icaCert.publicKey)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.w(TAG, "verifyStoredCertChain failed: ${e.message}")
+            promise.resolve(false)
+        }
+    }
+
+    /**
+     * 保存済み証明書を全削除（re-provisioning前に使用）
+     */
+    @ReactMethod
+    fun clearStoredCertificates(promise: Promise) {
+        val prefs = reactApplicationContext.getSharedPreferences("rootlens_certs", 0)
+        prefs.edit()
+            .remove("device_cert_der")
+            .remove("intermediate_ca_cert_der")
+            .remove("root_ca_cert_der")
+            .apply()
+        Log.d(TAG, "Stored certificates cleared for re-provisioning")
+        promise.resolve(null)
     }
 
     /**

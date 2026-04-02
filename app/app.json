@@ -14,7 +14,15 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "io.rootlens.app"
+      "bundleIdentifier": "io.rootlens.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "カメラで写真や動画を撮影するために使用します",
+        "NSMicrophoneUsageDescription": "動画撮影で音声を録音するために使用します",
+        "NSPhotoLibraryUsageDescription": "端末の写真にアクセスするために使用します",
+        "NSPhotoLibraryAddUsageDescription": "撮影した写真を保存するために使用します",
+        "NSFaceIDUsageDescription": "セキュアな認証のために使用します"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,6 +30,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "io.rootlens.app",
+      "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",

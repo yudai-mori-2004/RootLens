@@ -5,10 +5,14 @@
  * 3層PKI構造:
  *   Root CA → iOS/Android Intermediate CA → Device Certificate
  *
+ * 暗号アルゴリズムは CryptoSigner インターフェースで抽象化（crypto.ts参照）。
+ * dev環境: LocalEcSigner（ファイルベース鍵）
+ * 本番: KmsSigner（AWS KMS）に差し替え
+ *
  * 環境変数:
- *   ROOT_CA_CERT_PEM / ROOT_CA_KEY_PEM — Root CA
- *   IOS_INTERMEDIATE_CA_CERT_PEM / IOS_INTERMEDIATE_CA_KEY_PEM — iOS Intermediate CA
- *   ANDROID_INTERMEDIATE_CA_CERT_PEM / ANDROID_INTERMEDIATE_CA_KEY_PEM — Android Intermediate CA
+ *   ROOT_CA_CERT_PEM — Root CA 証明書
+ *   IOS_INTERMEDIATE_CA_CERT_PEM / IOS_INTERMEDIATE_CA_KEY_PEM — iOS ICA
+ *   ANDROID_INTERMEDIATE_CA_CERT_PEM / ANDROID_INTERMEDIATE_CA_KEY_PEM — Android ICA
  *
  * ローカル開発時はファイルからフォールバック。
  */
@@ -16,14 +20,33 @@
 import * as x509 from "@peculiar/x509";
 import crypto from "crypto";
 
+import {
+  type CryptoSigner,
+  type SigningAlgorithm,
+  LocalEcSigner,
+  getAlgorithmParams,
+  validatePublicKeyAlgorithm,
+} from "./crypto";
+import { isKmsConfigured, getKmsSigner } from "./crypto-kms";
+
 // @peculiar/x509 が使う Crypto プロバイダを設定（Node.js環境）
 x509.cryptoProvider.set(crypto.webcrypto as Crypto);
+
+// ---------------------------------------------------------------------------
+// 定数
+// ---------------------------------------------------------------------------
+
+/** Device Certificate の有効期間（日） */
+export const DEVICE_CERT_VALIDITY_DAYS = 90;
+
+/** 現在のPKI署名アルゴリズム */
+export const PKI_ALGORITHM: SigningAlgorithm = "ES256";
 
 // ---------------------------------------------------------------------------
 // PEM 読み込みユーティリティ
 // ---------------------------------------------------------------------------
 
-function loadPem(envVar: string, fallbackPath?: string): string {
+export function loadPem(envVar: string, fallbackPath?: string): string {
   const envValue = process.env[envVar];
   if (envValue) return envValue;
   if (fallbackPath) {
@@ -56,7 +79,7 @@ async function loadRootCaCert(): Promise<x509.X509Certificate> {
 
 interface IntermediateCA {
   cert: x509.X509Certificate;
-  key: CryptoKey;
+  signer: CryptoSigner;
 }
 
 const intermediateCache: Record<string, IntermediateCA> = {};
@@ -69,23 +92,31 @@ async function loadIntermediateCA(platform: "ios" | "android"): Promise<Intermed
     `${prefix}_INTERMEDIATE_CA_CERT_PEM`,
     `../certs/dev/${platform}-intermediate-ca.pem`,
   );
-  const keyPem = loadPem(
-    `${prefix}_INTERMEDIATE_CA_KEY_PEM`,
-    `../certs/dev/${platform}-intermediate-ca-key.pem`,
-  );
-
   const cert = new x509.X509Certificate(certPem);
-  const keyDer = x509.PemConverter.decode(keyPem)[0];
-  const key = await crypto.webcrypto.subtle.importKey(
-    "pkcs8",
-    keyDer,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"],
-  );
 
-  intermediateCache[platform] = { cert, key };
+  // KMS Key ID が設定されていれば KmsSigner を使用（本番）
+  // 設定されていなければ PEM ファイルから LocalEcSigner（dev）
+  let signer: CryptoSigner;
+  if (isKmsConfigured(platform)) {
+    signer = getKmsSigner(platform);
+  } else {
+    const keyPem = loadPem(
+      `${prefix}_INTERMEDIATE_CA_KEY_PEM`,
+      `../certs/dev/${platform}-intermediate-ca-key.pem`,
+    );
+    signer = await LocalEcSigner.fromPkcs8Pem(keyPem, PKI_ALGORITHM);
+  }
+
+  intermediateCache[platform] = { cert, signer };
   return intermediateCache[platform];
+}
+
+/** テスト用: キャッシュをクリア */
+export function _resetCache(): void {
+  rootCaCert = null;
+  for (const key of Object.keys(intermediateCache)) {
+    delete intermediateCache[key];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +144,12 @@ export async function verifyCSR(
     // 公開鍵を取得
     const publicKey = await csr.publicKey.export();
 
+    // 公開鍵アルゴリズム検証 — EC P-256以外を拒否
+    const algCheck = validatePublicKeyAlgorithm(publicKey, PKI_ALGORITHM);
+    if (!algCheck.valid) {
+      return { valid: false, publicKey: null, deviceIdHash: "", error: algCheck.error };
+    }
+
     // device_id_hash = SHA-256(公開鍵DER)の先頭16文字hex
     const publicKeyDer = await crypto.webcrypto.subtle.exportKey("spki", publicKey);
     const hash = crypto.createHash("sha256").update(Buffer.from(publicKeyDer)).digest("hex");
@@ -133,33 +170,42 @@ export async function verifyCSR(
 // Device Certificate 発行（Intermediate CA で署名）
 // ---------------------------------------------------------------------------
 
-export async function issueDeviceCertificate(
-  publicKey: CryptoKey,
-  deviceIdHash: string,
-  platform: "ios" | "android" = "android",
-): Promise<{
+export interface IssuedCertificate {
   deviceCertDer: string;           // Base64 DER
   intermediateCaCertDer: string;   // Base64 DER
   rootCaCertDer: string;           // Base64 DER
   deviceId: string;
-}> {
+  serialNumber: string;            // 発行ログ・CRL用
+}
+
+export async function issueDeviceCertificate(
+  publicKey: CryptoKey,
+  deviceIdHash: string,
+  platform: "ios" | "android" = "android",
+): Promise<IssuedCertificate> {
   const intermediateCa = await loadIntermediateCA(platform);
   const rootCa = await loadRootCaCert();
+  const algParams = getAlgorithmParams(PKI_ALGORITHM);
 
   // §4.3.2 Device Certificate プロファイル
   // 有効期限: 90日（短寿命証明書モデル）
   const now = new Date();
-  const notAfter = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const notAfter = new Date(now.getTime() + DEVICE_CERT_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
+  const serialNumber = crypto.randomBytes(20).toString("hex");
 
   const deviceCert = await x509.X509CertificateGenerator.create({
-    serialNumber: crypto.randomBytes(20).toString("hex"),
+    serialNumber,
     subject: `CN=RootLens Device ${deviceIdHash}, O=RootLens`,
     issuer: intermediateCa.cert.subject,
     notBefore: now,
     notAfter: notAfter,
-    signingAlgorithm: { name: "ECDSA", hash: "SHA-256" },
+    signingAlgorithm: { name: algParams.name, hash: algParams.hash },
     publicKey: publicKey,
-    signingKey: intermediateCa.key,
+    // LocalEcSigner → CryptoKey を直接使用
+    // KmsSigner の場合は tbsCertificate 手動構築 + KMS Sign が必要（crypto-kms.ts 参照）
+    signingKey: intermediateCa.signer instanceof LocalEcSigner
+      ? intermediateCa.signer.getCryptoKey()
+      : (() => { throw new Error("KMS signing requires manual tbsCertificate construction. See crypto-kms.ts"); })(),
     extensions: [
       new x509.BasicConstraintsExtension(false, undefined, true), // CA:FALSE, critical
       new x509.KeyUsagesExtension(
@@ -180,6 +226,7 @@ export async function issueDeviceCertificate(
     intermediateCaCertDer: Buffer.from(intermediateCa.cert.rawData).toString("base64"),
     rootCaCertDer: Buffer.from(rootCa.rawData).toString("base64"),
     deviceId: deviceIdHash,
+    serialNumber,
   };
 }
 

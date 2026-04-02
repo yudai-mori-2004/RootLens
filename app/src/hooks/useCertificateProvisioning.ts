@@ -14,6 +14,8 @@ import {
   storeDeviceCertificate,
   hasDeviceCertificate,
   getDeviceCertificateExpiry,
+  verifyStoredCertChain,
+  clearStoredCertificates,
 } from '../native/c2paBridge';
 import { config } from '../config';
 
@@ -43,14 +45,14 @@ async function requestCertificate(
   // §4.4.1: TEE鍵生成 + CSR作成
   const credentials = await generateDeviceCredentials();
 
-  // §4.4.1: サーバーに送信
+  // §4.4.1: サーバーに送信（attestationがあれば含める）
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       platform: credentials.platform,
       csr: credentials.csr,
-      // TODO: Platform Attestation（Key Attestation / App Attest）
+      attestation: credentials.attestation,
     }),
   });
 
@@ -142,6 +144,16 @@ export function useCertificateProvisioning(): CertState & { retry: () => void } 
 
       if (!hasCert) {
         // 初回起動: 証明書を取得
+        await provision();
+        return;
+      }
+
+      // PKIローテーション検出: Device CertがICAで署名されているか検証
+      // ICA鍵が変わった場合（Root CA再生成やICA再発行時）に自動で再プロビジョニングする
+      const chainValid = await verifyStoredCertChain();
+      if (!chainValid) {
+        console.warn('[CertProvisioning] Chain integrity check failed — ICA rotation detected, re-provisioning');
+        await clearStoredCertificates();
         await provision();
         return;
       }

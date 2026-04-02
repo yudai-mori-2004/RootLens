@@ -7,9 +7,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyCSR, issueDeviceCertificate } from "@/lib/server/ca";
+import crypto from "crypto";
+import { verifyCSR, issueDeviceCertificate, DEVICE_CERT_VALIDITY_DAYS } from "@/lib/server/ca";
+import { recordCertificateIssuance } from "@/lib/server/cert-store";
+import { verifyAndroidAttestation } from "@/lib/server/attestation-android";
+import { verifyIOSAttestation as verifyIOSAppAttest } from "@/lib/server/attestation-ios";
+import { checkRateLimit, getClientIp, RATE_LIMITS } from "@/lib/server/rate-limit";
 
-const DEV_MODE = process.env.DEV_MODE !== "false"; // デフォルトtrue
+// 安全なデフォルト: 明示的に DEV_MODE=true を設定しない限りAttestation必須
+const DEV_MODE = process.env.DEV_MODE === "true";
 
 interface DeviceCertRequest {
   platform: "android" | "ios";
@@ -26,6 +32,22 @@ interface DeviceCertRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // §4.4.3: IPベースのレート制限
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`cert-issue:${ip}`, RATE_LIMITS.certIssue);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Try again later." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+            "X-RateLimit-Remaining": "0",
+          },
+        }
+      );
+    }
+
     const body: DeviceCertRequest = await request.json();
 
     // 必須フィールド検証
@@ -53,10 +75,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Platform Attestation 検証
+    let attestationLevel: string | null = null;
     if (!DEV_MODE) {
-      // TODO: 本番環境でのAttestation検証を実装
-      // Android: Key Attestation chain + Play Integrity Token
-      // iOS: App Attest CBOR + certificate chain
       if (!body.attestation) {
         return NextResponse.json(
           { error: "Attestation required in production mode" },
@@ -64,10 +84,16 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // CSR公開鍵のSPKI DERを取得（attestation certとの紐づけ検証用）
+      const csrPubKeySpki = new Uint8Array(
+        await crypto.webcrypto.subtle.exportKey("spki", csrResult.publicKey!),
+      );
+
       const attestationResult = await verifyAttestation(
         body.platform,
         body.csr,
-        body.attestation
+        body.attestation,
+        csrPubKeySpki,
       );
       if (!attestationResult.valid) {
         return NextResponse.json(
@@ -75,6 +101,7 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       }
+      attestationLevel = attestationResult.securityLevel ?? null;
     }
 
     // Device Certificate 発行（プラットフォーム別 Intermediate CA で署名）
@@ -83,6 +110,22 @@ export async function POST(request: NextRequest) {
       csrResult.deviceIdHash,
       body.platform,
     );
+
+    // 発行記録をDBに保存（CRL・監査用）
+    const now = new Date();
+    try {
+      await recordCertificateIssuance({
+        serialNumber: result.serialNumber,
+        deviceIdHash: result.deviceId,
+        platform: body.platform,
+        attestationLevel,
+        issuedAt: now,
+        expiresAt: new Date(now.getTime() + DEVICE_CERT_VALIDITY_DAYS * 24 * 60 * 60 * 1000),
+      });
+    } catch (dbError) {
+      // DB記録失敗は証明書発行自体を失敗させない（証明書は既に生成済み）
+      console.error("[CA] Failed to record certificate issuance:", dbError);
+    }
 
     return NextResponse.json({
       device_certificate: result.deviceCertDer,
@@ -99,41 +142,37 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// --- Platform Attestation 検証 (将来実装) ---
+// --- Platform Attestation 検証 ---
 
 async function verifyAttestation(
   platform: "android" | "ios",
   csrBase64: string,
-  attestation: NonNullable<DeviceCertRequest["attestation"]>
-): Promise<{ valid: boolean; error?: string }> {
-  // §4.4.2 サーバー側検証ロジック
-  // challenge = SHA-256(CSR)
+  attestation: NonNullable<DeviceCertRequest["attestation"]>,
+  csrPublicKeySpki: Uint8Array,
+): Promise<{ valid: boolean; securityLevel?: string; error?: string }> {
   if (platform === "android") {
-    return verifyAndroidAttestation(csrBase64, attestation);
+    return verifyAndroidAttestation(
+      csrBase64,
+      {
+        key_attestation_chain: attestation.key_attestation_chain ?? [],
+        play_integrity_token: attestation.play_integrity_token,
+      },
+      csrPublicKeySpki,
+    );
   } else {
     return verifyIOSAttestation(csrBase64, attestation);
   }
 }
 
-async function verifyAndroidAttestation(
-  _csrBase64: string,
-  _attestation: NonNullable<DeviceCertRequest["attestation"]>
-): Promise<{ valid: boolean; error?: string }> {
-  // TODO: §4.4.2 Android検証ロジック
-  // 1. Key Attestation chain → Google Root CA検証
-  // 2. attestationSecurityLevel >= TRUSTED_ENVIRONMENT(1)
-  // 3. attestationChallenge == SHA-256(CSR)
-  // 4. Play Integrity Token検証
-  return { valid: false, error: "Android attestation not yet implemented" };
-}
-
 async function verifyIOSAttestation(
-  _csrBase64: string,
-  _attestation: NonNullable<DeviceCertRequest["attestation"]>
+  csrBase64: string,
+  attestation: NonNullable<DeviceCertRequest["attestation"]>,
 ): Promise<{ valid: boolean; error?: string }> {
-  // TODO: §4.4.2 iOS検証ロジック
-  // 1. App Attest CBOR解析
-  // 2. Apple Root CAまで検証
-  // 3. clientDataHash == SHA-256(CSR)
-  return { valid: false, error: "iOS attestation not yet implemented" };
+  if (!attestation.app_attest_object || !attestation.app_attest_key_id) {
+    return { valid: false, error: "app_attest_object and app_attest_key_id are required for iOS" };
+  }
+  return verifyIOSAppAttest(csrBase64, {
+    app_attest_object: attestation.app_attest_object,
+    app_attest_key_id: attestation.app_attest_key_id,
+  });
 }

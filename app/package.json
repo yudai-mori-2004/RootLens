@@ -43,7 +43,6 @@
     "expo-video-thumbnails": "~9.0.3",
     "expo-web-browser": "~14.0.2",
     "fast-text-encoding": "^1.0.6",
-    "permissionless": "^0.3.4",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-gesture-handler": "~2.20.2",
