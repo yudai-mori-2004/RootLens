@@ -232,8 +232,8 @@
     "owner": "Owner",
 
     "chip": {
-      "registered": "Registration time",
-      "shot": "Shot time"
+      "registered": "Registered",
+      "shot": "Shot"
     },
 
     "caption": {

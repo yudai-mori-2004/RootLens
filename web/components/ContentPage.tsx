@@ -207,19 +207,15 @@ export default function ContentPage({ page }: Props) {
             <>
               <ShieldIcon verified />
               <span className={styles.trustVerified}>{t("trust.verified")}</span>
-              <span className={styles.trustScore}>
-                <span className={styles.trustScoreFrac}>{passed}/{total}</span>
-                <span className={styles.trustScoreLabel}>{t("trust.checks")}</span>
-              </span>
+              <span className={styles.trustSep}>·</span>
+              <span className={styles.trustScoreFrac}>{passed}/{total}</span>
             </>
           ) : (
             <>
               <ShieldIcon verified={false} />
               <span className={styles.trustFailed}>{t("trust.failed")}</span>
-              <span className={styles.trustScore}>
-                <span className={styles.trustScoreFrac}>{passed}/{total}</span>
-                <span className={styles.trustScoreLabel}>{t("trust.checks")}</span>
-              </span>
+              <span className={styles.trustSep}>·</span>
+              <span className={styles.trustScoreFrac}>{passed}/{total}</span>
             </>
           )}
         </div>
@@ -757,7 +753,7 @@ function formatDateShort(iso: string): string {
 
 function formatTimestamp(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000);
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")} (RFC 3161)`;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
 function downloadVerificationData(data: {
