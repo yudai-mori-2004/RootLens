@@ -1,27 +1,20 @@
 import React from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Share,
-  Alert,
-  ActivityIndicator,
+  StyleSheet, Text, View, TouchableOpacity, Share, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
 import { config } from '../config';
-import { colors, typography, spacing, radii } from '../theme';
+import { colors, typography, spacing } from '../theme';
 import { t } from '../i18n';
+import ShareBar from '../components/ShareBar';
 
 // 仕様書 §3.7 公開ページプレビュー
-// 公開済みギャラリーから選択した際に、公開ページをWebViewで表示
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Route = RouteProp<RootStackParamList, 'Preview'>;
@@ -30,54 +23,33 @@ export default function PreviewScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const shortId = route.params.contentIds[0];
+  const thumbnailUrl = route.params.thumbnailUrl || '';
   const pageUrl = `${config.serverUrl}/p/${shortId}`;
-
-  const handleShare = async () => {
-    try {
-      await Share.share({ message: pageUrl });
-    } catch (_) {}
-  };
-
-  const handleCopyLink = () => {
-    Clipboard.setStringAsync(pageUrl);
-  };
-
-  const handleMore = () => {
-    Alert.alert(
-      t('menu.deleteConfirm'),
-      t('menu.deleteConfirmMessage'),
-      [
-        { text: t('menu.cancel'), style: 'cancel' },
-        {
-          text: t('menu.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await fetch(`${config.serverUrl}/api/v1/pages/${shortId}`, { method: 'DELETE' });
-              Alert.alert(t('menu.deleted'));
-              navigation.goBack();
-            } catch {}
-          },
-        },
-      ],
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ヘッダー */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => navigation.goBack()}
-        >
+        <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
           <Ionicons name="close" size={28} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('preview.title')}</Text>
+        <Text style={styles.headerTitle}>{t('preview.publishedPage')}</Text>
         <View style={styles.headerButton} />
       </View>
 
-      {/* 公開ページ WebView */}
+      <ShareBar
+        pageUrl={pageUrl}
+        shortId={shortId}
+        thumbnailUrl={thumbnailUrl}
+        onShare={async () => { try { await Share.share({ message: pageUrl }); } catch {} }}
+        onDelete={async () => {
+          try {
+            await fetch(`${config.serverUrl}/api/v1/pages/${shortId}`, { method: 'DELETE' });
+            navigation.goBack();
+          } catch {}
+        }}
+        navigation={navigation}
+      />
+
       <WebView
         source={{ uri: pageUrl }}
         style={styles.webview}
@@ -88,105 +60,22 @@ export default function PreviewScreen() {
           </View>
         )}
       />
-
-      {/* 共有アクション */}
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.sharePrimaryButton} onPress={handleShare}>
-          <Ionicons name="share-outline" size={20} color={colors.white} />
-          <Text style={styles.sharePrimaryText}>{t('preview.share')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.shareLinkButton} onPress={handleCopyLink}>
-          <Ionicons name="link-outline" size={18} color={colors.accent} />
-          <Text style={styles.shareLinkText}>{t('preview.copyLink')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.moreButton}
-          onPress={handleMore}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    height: 52,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, height: 52,
+    borderBottomWidth: 1, borderBottomColor: colors.borderLight,
   },
-  headerButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    ...typography.title,
-    color: colors.textPrimary,
-  },
-  webview: {
-    flex: 1,
-  },
+  headerButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { ...typography.title, color: colors.textPrimary },
+  webview: { flex: 1 },
   webviewLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // 共有アクション
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  sharePrimaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.accent,
-  },
-  sharePrimaryText: {
-    color: colors.white,
-    ...typography.bodyMedium,
-  },
-  shareLinkButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
-  },
-  shareLinkText: {
-    color: colors.accent,
-    ...typography.captionMedium,
-  },
-  moreButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center',
   },
 });

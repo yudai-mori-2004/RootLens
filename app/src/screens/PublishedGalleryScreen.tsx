@@ -202,8 +202,10 @@ export default function PublishedGalleryScreen() {
   }
 
   const handlePress = (item: PublishedItem) => {
-    const pageUrl = `${config.serverUrl}/p/${item.shortId}`;
-    navigation.navigate('Preview', { contentIds: [item.shortId] });
+    navigation.navigate('Preview', {
+      contentIds: [item.shortId],
+      thumbnailUrl: item.thumbnailUrl,
+    });
   };
 
   const profileHeader = loggedIn && profile && (profile.displayName || address) ? (

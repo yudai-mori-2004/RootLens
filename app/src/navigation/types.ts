@@ -9,6 +9,7 @@ export interface MediaItem {
 export interface PublishResult {
   shortId: string;
   pageUrl: string;
+  thumbnailUrl: string;
 }
 
 export type RootStackParamList = {
@@ -17,8 +18,10 @@ export type RootStackParamList = {
   CameraGallery: undefined;
   Edit: { mediaItems: MediaItem[] };
   Publishing: { signedUris: string[]; address: string };
-  Preview: { contentIds: string[] };
+  Preview: { contentIds: string[]; thumbnailUrl?: string };
   Registration: { signedUris: string[] };
+  InstagramShare: { pageUrl: string; shortId: string; thumbnailUrl: string };
+  TwitterShare: { pageUrl: string; shortId: string; thumbnailUrl: string };
 };
 
 export type GalleryStackParamList = {

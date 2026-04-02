@@ -1,7 +1,7 @@
 // Node.js polyfills for @solana/web3.js and @title-protocol/sdk
 // Must be imported before any other module
 import 'react-native-get-random-values';
-import { gcm } from '@noble/ciphers/aes';
+import { gcm } from '@noble/ciphers/aes.js';
 import { Buffer } from 'buffer';
 global.Buffer = global.Buffer || Buffer;
 

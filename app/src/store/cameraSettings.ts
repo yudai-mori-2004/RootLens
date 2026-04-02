@@ -22,10 +22,9 @@ export async function loadCameraSettings(): Promise<CameraSettings> {
     const raw = await AsyncStorage.getItem(KEY);
     if (raw) {
       cached = { ...defaults, ...JSON.parse(raw) };
-      return cached;
     }
   } catch {}
-  cached = { ...defaults };
+  if (!cached) cached = { ...defaults };
   return cached;
 }
 

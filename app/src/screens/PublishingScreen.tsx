@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as VideoThumbnails from 'expo-video-thumbnails';
@@ -25,6 +24,7 @@ import { registerOnTitleProtocol } from '../services/titleProtocol';
 import { readManifest } from '../native/c2paBridge';
 import { colors, typography, spacing, radii, shadows } from '../theme';
 import { t } from '../i18n';
+import ShareBar from '../components/ShareBar';
 
 // 仕様書 §2.4 公開パイプライン実行
 // §6.1 パイプラインA: Title Protocol登録（クライアント側）
@@ -294,6 +294,7 @@ export default function PublishingScreen() {
       const data: PublishResult = {
         shortId: serverData.shortId,
         pageUrl: serverData.pageUrl,
+        thumbnailUrl: results[0]?.thumbnailUrl || '',
       };
 
       setResult(data);
@@ -313,12 +314,6 @@ export default function PublishingScreen() {
 
   const handleDone = () => {
     navigation.popToTop();
-  };
-
-  const handleCopyLink = async () => {
-    if (!result) return;
-    await Clipboard.setStringAsync(result.pageUrl);
-    Alert.alert(t('publishing.copied'), result.pageUrl);
   };
 
   const handleShare = async () => {
@@ -399,43 +394,20 @@ export default function PublishingScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 共有バー */}
-      <View style={styles.shareBar}>
-        <TouchableOpacity style={styles.sharePrimaryButton} onPress={handleShare}>
-          <Ionicons name="share-outline" size={20} color={colors.white} />
-          <Text style={styles.sharePrimaryText}>{t('publishing.share')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.shareLinkButton} onPress={handleCopyLink}>
-          <Ionicons name="link-outline" size={18} color={colors.accent} />
-          <Text style={styles.shareLinkText}>{t('publishing.copyLink')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.moreButton}
-          onPress={() => {
-            Alert.alert(
-              t('menu.deleteConfirm'),
-              t('menu.deleteConfirmMessage'),
-              [
-                { text: t('menu.cancel'), style: 'cancel' },
-                {
-                  text: t('menu.delete'),
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      await fetch(`${config.serverUrl}/api/v1/pages/${result!.shortId}`, { method: 'DELETE' });
-                      Alert.alert(t('menu.deleted'));
-                      handleDone();
-                    } catch {}
-                  },
-                },
-              ],
-            );
-          }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      </View>
+      {/* 共有バー — 仕様書 §3.7 */}
+      <ShareBar
+        pageUrl={result!.pageUrl}
+        shortId={result!.shortId}
+        thumbnailUrl={result!.thumbnailUrl}
+        onShare={handleShare}
+        onDelete={async () => {
+          try {
+            await fetch(`${config.serverUrl}/api/v1/pages/${result!.shortId}`, { method: 'DELETE' });
+            handleDone();
+          } catch {}
+        }}
+        navigation={navigation}
+      />
 
       {/* 公開ページ WebView */}
       <WebView
@@ -565,49 +537,6 @@ const styles = StyleSheet.create({
   doneButtonText: {
     color: colors.white,
     ...typography.captionMedium,
-  },
-  // 共有バー
-  shareBar: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
-  },
-  sharePrimaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    backgroundColor: colors.accent,
-  },
-  sharePrimaryText: {
-    color: colors.white,
-    ...typography.bodyMedium,
-  },
-  shareLinkButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.md,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
-  },
-  shareLinkText: {
-    color: colors.accent,
-    ...typography.captionMedium,
-  },
-  moreButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
   },
   // WebView
   webview: {

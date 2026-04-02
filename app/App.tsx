@@ -26,6 +26,8 @@ import EditScreen from './src/screens/EditScreen';
 import PublishingScreen from './src/screens/PublishingScreen';
 import PreviewScreen from './src/screens/PreviewScreen';
 import RegistrationScreen from './src/screens/RegistrationScreen';
+import InstagramShareScreen from './src/screens/InstagramShareScreen';
+import TwitterShareScreen from './src/screens/TwitterShareScreen';
 import type { RootStackParamList } from './src/navigation/types';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
 import { colors, typography, spacing, radii } from './src/theme';
@@ -157,6 +159,16 @@ function AppContent() {
             presentation: 'fullScreenModal',
             gestureEnabled: false,
           }}
+        />
+        <RootStack.Screen
+          name="InstagramShare"
+          component={InstagramShareScreen}
+          options={{ headerShown: false, presentation: 'modal' }}
+        />
+        <RootStack.Screen
+          name="TwitterShare"
+          component={TwitterShareScreen}
+          options={{ headerShown: false, presentation: 'modal' }}
         />
       </RootStack.Navigator>
       <StatusBar style="auto" />

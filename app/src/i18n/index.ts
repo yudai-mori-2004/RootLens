@@ -136,6 +136,7 @@ const ja: TranslationDict = {
 
   // ── プレビュー ──
   'preview.title': 'プレビュー',
+  'preview.publishedPage': '公開ページ',
   'preview.share': 'SNSでシェア',
   'preview.copyLink': 'リンクをコピー',
 
@@ -211,7 +212,33 @@ const ja: TranslationDict = {
   // ── 共通 ──
   'common.error': 'エラー',
   'common.loading': '読み込み中...',
+  'common.processing': '処理中...',
   'common.saveFailed': '保存に失敗しました: {message}',
+
+  // ── SNSシェア ──
+  'share.shareTo': 'Share to',
+  'share.copyLink': 'リンクをコピー',
+  'share.copied': 'コピーしました',
+  'share.instagram': 'Instagram シェア',
+  'share.twitter': 'X シェア',
+  'share.post': '投稿',
+  'share.story': 'ストーリー',
+  'share.reel': 'リール',
+  'share.showWatermark': 'ウォーターマークを表示',
+  'share.image': '画像',
+  'share.link': 'リンク',
+  'share.saveImage': '画像を保存',
+  'share.saved': '保存しました',
+  'share.openInstagram': '投稿',
+  'share.postToX': 'ポスト',
+  'share.defaultCta': 'This photo is real. Verify it →',
+  'share.instagramUsername': 'Instagramユーザーネーム',
+  'share.instagramUsernamePlaceholder': '@username',
+  'share.textCopied': 'テキストをコピーしました',
+  'share.menuDelete': '削除する',
+  'share.action': 'シェア',
+  'share.composing': '合成中...',
+  'share.menuCancel': 'キャンセル',
 };
 
 const en: TranslationDict = {
@@ -299,6 +326,7 @@ const en: TranslationDict = {
 
   // ── Preview ──
   'preview.title': 'Preview',
+  'preview.publishedPage': 'Published page',
   'preview.share': 'Share on social',
   'preview.copyLink': 'Copy link',
 
@@ -374,7 +402,33 @@ const en: TranslationDict = {
   // ── Common ──
   'common.error': 'Error',
   'common.loading': 'Loading...',
+  'common.processing': 'Processing...',
   'common.saveFailed': 'Save failed: {message}',
+
+  // ── SNS Share ──
+  'share.shareTo': 'Share to',
+  'share.copyLink': 'Copy link',
+  'share.copied': 'Copied',
+  'share.instagram': 'Instagram Share',
+  'share.twitter': 'X Share',
+  'share.post': 'Post',
+  'share.story': 'Story',
+  'share.reel': 'Reel',
+  'share.showWatermark': 'Show watermark',
+  'share.image': 'Image',
+  'share.link': 'Link',
+  'share.saveImage': 'Save image',
+  'share.saved': 'Saved',
+  'share.openInstagram': 'Post',
+  'share.postToX': 'Post',
+  'share.defaultCta': 'This photo is real. Verify it →',
+  'share.instagramUsername': 'Instagram username',
+  'share.instagramUsernamePlaceholder': '@username',
+  'share.textCopied': 'Text copied',
+  'share.menuDelete': 'Delete',
+  'share.action': 'Share',
+  'share.composing': 'Composing...',
+  'share.menuCancel': 'Cancel',
 };
 
 const dictionaries: Record<Locale, TranslationDict> = { ja, en };
