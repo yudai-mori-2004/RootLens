@@ -51,10 +51,11 @@ export default async function TechnologyPage() {
           <p className={s.prose}>{tC2pa("p1")}</p>
           <p className={s.prose}>{tC2pa("p2")}</p>
           <p className={s.prose}>{tC2pa("p3")}</p>
+          <p className={s.prose}>{tC2pa("p4")}</p>
           <p className={s.prose}>
-            <span className={s.emphasis}>{tC2pa("p4")}</span>
+            <span className={s.emphasis}>{tC2pa("p5")}</span>
           </p>
-          <p className={s.prose}>{tC2pa("p5")}</p>
+          <p className={s.prose}>{tC2pa("p6")}</p>
         </div>
       </section>
 
