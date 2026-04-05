@@ -400,7 +400,7 @@
     "offchainUri": "オフチェーンURI",
     "hammingDistance": "ハミング距離",
     "download": "検証データをダウンロード (.csv)",
-    "rawData": "オンチェーン生データ"
+    "rawData": "検証に使用したデータ"
   },
 
   "check": {
