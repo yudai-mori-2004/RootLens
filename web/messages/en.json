@@ -253,9 +253,9 @@
       "toggle": "View verification details",
 
       "intro": {
-        "title": "Verification via Title Protocol",
-        "desc": "Title Protocol is an open protocol that verifies the provenance and authenticity of C2PA-signed content inside a TEE (Trusted Execution Environment) and records the results on the Solana blockchain. For each piece of content, a Core NFT (provenance record) and any number of Extension NFTs (attribute verification) are issued.",
-        "trustChain": "Trust is established through the following chain: Global Config on-chain (managed by DAO) defines the official collection address → confirm the NFT belongs to the official collection → fetch off-chain data from the URI referenced by the NFT → verify the TEE signature to confirm data integrity. Each step is independently executed in this browser."
+        "title": "How this verification works",
+        "desc": "RootLens verifies the provenance and authenticity of C2PA-signed content inside a TEE (Trusted Execution Environment — hardware-isolated processing that the server operator cannot access) and records the results on the Solana blockchain.",
+        "trustChain": "Trust is established through a chain of checks: the on-chain configuration defines trusted verification nodes → the NFT is confirmed to belong to the official collection → the off-chain verification data is fetched → the TEE signature is verified to confirm data integrity. Each step runs independently in this browser."
       },
 
       "core": {
@@ -272,7 +272,7 @@
         "c2paPass": "{count} provenance nodes recorded",
         "c2paFail": "Could not confirm provenance chain record",
         "offchainTitle": "Off-chain Data (signed_json)",
-        "offchainDesc": "The TEE signs the verification result and returns it to the client (SDK), which then permanently stores it in off-chain storage. The protocol does not mandate a specific storage provider, but Arweave is recommended for Core due to its permanence guarantees. The TEE is stateless by design and never accesses storage directly. You can see the actual storage URI in the \"On-chain References\" section below.",
+        "offchainDesc": "The TEE signs the verification result and returns it to the client, which stores it in off-chain storage. The TEE is stateless by design and never accesses storage directly.",
         "provenanceTitle": "Provenance Graph",
         "nodes": "Provenance Nodes",
         "nodesCount": "{count}",
@@ -349,13 +349,13 @@
       "why": {
         "title": "Why You Can Trust This Verification",
         "trustless": "Why trustless verification is possible without the original C2PA data",
-        "trustlessDesc": "The C2PA verification — validating the signature chain and hash-matching against the content body — was already completed inside the TEE. The TEE signed the verification result with its private key (Ed25519), and the client permanently stored it in off-chain storage. Viewers only need to verify this TEE signature; there is no need to possess the original C2PA binary data. If the TEE signature is valid, it confirms that \"a trusted execution environment certified that C2PA verification passed.\"",
+        "trustlessDesc": "The C2PA verification — validating the signature chain and hash-matching against the content body — was already completed inside the TEE. The TEE signed the verification result with its private key (Ed25519), and the client stored it in off-chain storage. Viewers only need to verify this TEE signature; there is no need to possess the original C2PA binary data. If the TEE signature is valid, it confirms that \"a trusted execution environment certified that C2PA verification passed.\"",
         "tsa": "What the TSA timestamp means",
         "tsaDesc": "An RFC 3161-compliant TSA (Time Stamping Authority) is a mechanism where a third-party authority cryptographically certifies the capture time. The TSA timestamp is embedded within the C2PA signature chain, and the TEE verified its validity before recording it. This ensures that no one — including RootLens — can falsify the capture time.",
         "noServer": "No RootLens server is involved in verification",
         "noServerDesc": "All data used in this verification is fetched directly from Solana RPC nodes and off-chain storage. The RootLens server serves the page and display images, but has no involvement in the verification process. You can confirm the network destinations in your browser's developer tools (Network tab).",
         "oss": "All source code is publicly available",
-        "ossDesc": "The source code for both Title Protocol and RootLens is fully published on GitHub. The verification logic running on this page, the protocol specification and implementation, the code executed inside the TEE — you can inspect everything yourself and independently reproduce the verification."
+        "ossDesc": "All source code is published on GitHub. The verification logic on this page, the TEE code, and the underlying protocol — you can inspect everything yourself. Built on Title Protocol, an open protocol for content provenance."
       }
     }
   },
