@@ -399,7 +399,8 @@
     "assetId": "NFT Asset ID",
     "offchainUri": "オフチェーンURI",
     "hammingDistance": "ハミング距離",
-    "download": "検証データをダウンロード (.csv)"
+    "download": "検証データをダウンロード (.csv)",
+    "rawData": "オンチェーン生データ"
   },
 
   "check": {
