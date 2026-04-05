@@ -430,41 +430,46 @@ export default function ContentPage({ page }: Props) {
               })()}
             </section>
 
-            {/* --- 5. 生データ（折りたたみ） --- */}
-            <NftToggle label={tField("rawData")} defaultOpen={false}>
-              {/* GlobalConfig */}
-              <div className={styles.dataBlock}>
-                <DataField label="program" value={truncate(protocolAddr.programId, 12)} full={protocolAddr.programId} />
-                <DataField label="globalConfigPda" value={truncate(protocolAddr.globalConfigPda, 12)} full={protocolAddr.globalConfigPda} />
-                <DataField label="network" value="Solana devnet" />
-                {globalConfig && (
-                  <>
-                    <DataField label="authority" value={truncate(globalConfig.authority, 12)} full={globalConfig.authority} />
-                    <DataField label="coreCollection" value={truncate(globalConfig.core, 12)} full={globalConfig.core} />
-                    <DataField label="extCollection" value={truncate(globalConfig.ext, 12)} full={globalConfig.ext} />
-                    <DataField label="trustedTeeNodes" value={`${globalConfig.trustedTeeNodes.length}`} />
-                    <DataField label="trustedTsaKeys" value={globalConfig.trustedTsaKeys.length > 0 ? `${globalConfig.trustedTsaKeys.length}` : tField("none")} />
-                    <DataField label="trustedWasmModules" value={globalConfig.trustedWasmModules.map(m => m.extension_id).join(", ") || tField("none")} />
-                  </>
-                )}
-              </div>
+            {/* --- 5. 検証に使用したデータ --- */}
+            <section className={styles.techGroup}>
+              <h3 className={styles.techGroupTitle}>{tField("rawData")}</h3>
 
-              {/* Content-level */}
-              <div className={styles.dataBlock}>
-                <DataField label="content_hash" value={truncate(currentContent.contentHash, 16)} full={currentContent.contentHash} />
-                <DataField label="content_type" value={corePayload?.content_type || record?.mediaType || ""} />
-                {record?.signingAlgorithm && <DataField label="c2paSigning" value={record.signingAlgorithm} />}
-                {record?.sourceDimensions && record.sourceDimensions.width > 0 && (
-                  <DataField label="dimensions" value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`} />
-                )}
-                {record?.tsaProvider && (
-                  <DataField label="tsa_timestamp" value={`${record.tsaProvider}${record.tsaTimestamp ? ` (${formatDateShort(record.tsaTimestamp)})` : ""}`} />
-                )}
-              </div>
+              {/* 検証環境 */}
+              <NftToggle label={tField("rawDataEnv")} defaultOpen={false}>
+                <div className={styles.dataBlock}>
+                  <DataField label="program" value={truncate(protocolAddr.programId, 12)} full={protocolAddr.programId} />
+                  <DataField label="globalConfigPda" value={truncate(protocolAddr.globalConfigPda, 12)} full={protocolAddr.globalConfigPda} />
+                  <DataField label="network" value="Solana devnet" />
+                  {globalConfig && (
+                    <>
+                      <DataField label="authority" value={truncate(globalConfig.authority, 12)} full={globalConfig.authority} />
+                      <DataField label="coreCollection" value={truncate(globalConfig.core, 12)} full={globalConfig.core} />
+                      <DataField label="extCollection" value={truncate(globalConfig.ext, 12)} full={globalConfig.ext} />
+                      <DataField label="trustedTeeNodes" value={`${globalConfig.trustedTeeNodes.length}`} />
+                      <DataField label="trustedTsaKeys" value={globalConfig.trustedTsaKeys.length > 0 ? `${globalConfig.trustedTsaKeys.length}` : tField("none")} />
+                      <DataField label="trustedWasmModules" value={globalConfig.trustedWasmModules.map(m => m.extension_id).join(", ") || tField("none")} />
+                    </>
+                  )}
+                </div>
+                <div className={styles.dataBlock}>
+                  <DataField label="content_hash" value={truncate(currentContent.contentHash, 16)} full={currentContent.contentHash} />
+                  <DataField label="content_type" value={corePayload?.content_type || record?.mediaType || ""} />
+                  {record?.signingAlgorithm && <DataField label="c2paSigning" value={record.signingAlgorithm} />}
+                  {record?.sourceDimensions && record.sourceDimensions.width > 0 && (
+                    <DataField label="dimensions" value={`${record.sourceDimensions.width} × ${record.sourceDimensions.height}`} />
+                  )}
+                  {record?.tsaProvider && (
+                    <DataField label="tsa_timestamp" value={`${record.tsaProvider}${record.tsaTimestamp ? ` (${formatDateShort(record.tsaTimestamp)})` : ""}`} />
+                  )}
+                </div>
+              </NftToggle>
 
-              {/* Per-processor data */}
+              <div className={styles.rawDataDivider} />
+
+              {/* NFTごとのデータ */}
               {verification.processors.map((proc, procIdx) => {
                 const isCore = proc.processorId === "core-c2pa";
+                const label = isCore ? "Core: C2PA" : `Extension: ${proc.processorId}`;
                 const sjData = isCore
                   ? resolved?.coreSignedJson
                   : resolved?.extensionNfts.find(n => {
@@ -484,42 +489,43 @@ export default function ContentPage({ page }: Props) {
                   : [];
 
                 return (
-                  <div key={proc.processorId + procIdx} className={styles.dataBlock}>
-                    <DataField label="processor" value={proc.processorId} />
-                    {nftCollection && <DataField label="collection" value={truncate(nftCollection, 16)} full={nftCollection} />}
-                    {nftAssetId && <DataField label="assetId" value={truncate(nftAssetId, 16)} full={nftAssetId} />}
-                    {nftArweaveUri && <DataField label="offchainUri" value={truncate(nftArweaveUri, 20)} full={nftArweaveUri} />}
-                    {sjData && (
-                      <>
-                        <DataField label="protocol" value={sjData.protocol} />
-                        <DataField label="tee_type" value={sjData.tee_type || ""} />
-                        <DataField label="teeSigning" value="Ed25519" />
-                        <DataField label="tee_pubkey" value={truncate(sjData.tee_pubkey, 16)} full={sjData.tee_pubkey} />
-                        <DataField label="tee_signature" value={truncate(sjData.tee_signature, 16)} full={sjData.tee_signature} />
-                        {sjData.tee_attestation && (
-                          <DataField label="tee_attestation" value={truncate(sjData.tee_attestation, 16)} full={sjData.tee_attestation} />
-                        )}
-                      </>
-                    )}
-                    {nftOwner && <DataField label="owner" value={truncate(nftOwner, 12)} full={nftOwner} />}
-                    {isCore && corePayload && (
-                      <>
-                        <DataField label="creator_wallet" value={corePayload.creator_wallet ? truncate(corePayload.creator_wallet, 12) : "\u2014"} full={corePayload.creator_wallet} />
-                        {(corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash && (
-                          <DataField label="tsa_pubkey_hash" value={truncate(String((corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash), 16)} full={String((corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash)} />
-                        )}
-                      </>
-                    )}
-                    {!isCore && payloadEntries.map(([k, v]) => {
-                      const display = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v);
-                      return (
-                        <DataField key={k} label={k} value={truncate(display, 20)} full={display.length > 40 ? display : undefined} />
-                      );
-                    })}
-                  </div>
+                  <NftToggle key={proc.processorId + procIdx} label={label} defaultOpen={false}>
+                    <div className={styles.dataBlock}>
+                      {nftCollection && <DataField label="collection" value={truncate(nftCollection, 16)} full={nftCollection} />}
+                      {nftAssetId && <DataField label="assetId" value={truncate(nftAssetId, 16)} full={nftAssetId} />}
+                      {nftArweaveUri && <DataField label="offchainUri" value={truncate(nftArweaveUri, 20)} full={nftArweaveUri} />}
+                      {sjData && (
+                        <>
+                          <DataField label="protocol" value={sjData.protocol} />
+                          <DataField label="tee_type" value={sjData.tee_type || ""} />
+                          <DataField label="teeSigning" value="Ed25519" />
+                          <DataField label="tee_pubkey" value={truncate(sjData.tee_pubkey, 16)} full={sjData.tee_pubkey} />
+                          <DataField label="tee_signature" value={truncate(sjData.tee_signature, 16)} full={sjData.tee_signature} />
+                          {sjData.tee_attestation && (
+                            <DataField label="tee_attestation" value={truncate(sjData.tee_attestation, 16)} full={sjData.tee_attestation} />
+                          )}
+                        </>
+                      )}
+                      {nftOwner && <DataField label="owner" value={truncate(nftOwner, 12)} full={nftOwner} />}
+                      {isCore && corePayload && (
+                        <>
+                          <DataField label="creator_wallet" value={corePayload.creator_wallet ? truncate(corePayload.creator_wallet, 12) : "\u2014"} full={corePayload.creator_wallet} />
+                          {(corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash && (
+                            <DataField label="tsa_pubkey_hash" value={truncate(String((corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash), 16)} full={String((corePayload as unknown as Record<string, unknown>).tsa_pubkey_hash)} />
+                          )}
+                        </>
+                      )}
+                      {!isCore && payloadEntries.map(([k, v]) => {
+                        const display = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v);
+                        return (
+                          <DataField key={k} label={k} value={truncate(display, 20)} full={display.length > 40 ? display : undefined} />
+                        );
+                      })}
+                    </div>
+                  </NftToggle>
                 );
               })}
-            </NftToggle>
+            </section>
 
             {/* Download */}
             <button

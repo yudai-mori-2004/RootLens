@@ -400,7 +400,8 @@
     "offchainUri": "Off-chain URI",
     "hammingDistance": "Hamming Distance",
     "download": "Download verification data (.csv)",
-    "rawData": "Verification data"
+    "rawData": "Verification data",
+    "rawDataEnv": "Verification environment"
   },
 
   "check": {
