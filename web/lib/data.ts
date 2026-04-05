@@ -29,6 +29,7 @@ export async function resolvePageMeta(
       `
       short_id,
       caption,
+      published_at,
       users (
         address,
         username,
@@ -69,11 +70,12 @@ export async function resolvePageMeta(
     avatar_url: string | null;
   } | null;
 
-  const rawData = data as unknown as { caption?: string | null };
+  const rawData = data as unknown as { caption?: string | null; published_at?: string };
 
   return {
     shortId,
     caption: rawData.caption ?? null,
+    publishedAt: rawData.published_at || new Date().toISOString(),
     contents: rawContents.map((c) => ({
       contentHash: c.content_hash,
       thumbnailUrl: c.thumbnail_url || "",

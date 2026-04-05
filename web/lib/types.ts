@@ -36,6 +36,8 @@ export interface PageMeta {
   user: UserProfile | null;
   /** 投稿者が自由に記述したキャプション（未設定は null） */
   caption: string | null;
+  /** ページ公開日時 (ISO 8601) — TSAなし時の日時表示用 */
+  publishedAt: string;
 }
 
 // --- Title Protocol (Solana / Arweave) から取得するデータ ---

@@ -92,10 +92,12 @@ export default function ContentPage({ page }: Props) {
   const coreSj = resolved?.coreSignedJson ?? null;
 
   // 日付ソース
+  // TSAあり → 撮影時刻 (tsa_timestamp)
+  // TSAなし → 投稿時刻 (Supabase published_at, SSRで即表示可能)
   const hasTsa = corePayload?.tsa_timestamp != null;
   const capturedDate = hasTsa
     ? formatTimestamp(corePayload!.tsa_timestamp!)
-    : record?.capturedAt ? formatDate(record.capturedAt) : null;
+    : record ? formatDate(page.publishedAt) : null;
 
   // ヘルパー
   const findProc = (id: string) => verification.processors.find(p => p.processorId === id);
