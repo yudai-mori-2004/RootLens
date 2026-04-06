@@ -151,6 +151,67 @@ export async function indexOneAsset(asset: DasAsset): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
+// TX署名からインデックス（publish API用リアルタイム登録）
+// ---------------------------------------------------------------------------
+
+/**
+ * txSignatureからミントされたcNFTを抽出しインデクサに登録する。
+ * ログから "Leaf asset ID: ..." を探し、各asset_idをindexOneAssetで処理。
+ */
+export async function indexFromTransaction(txSignature: string): Promise<number> {
+  const txRes = await fetch(DAS_RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "indexer",
+      method: "getTransaction",
+      params: [txSignature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
+    }),
+  });
+  const txJson = await txRes.json();
+  const tx = txJson.result;
+  if (!tx || tx.meta?.err) return 0;
+
+  const blockTime: number = tx.blockTime;
+
+  // ログから Leaf asset ID を抽出
+  const logs: string[] = tx.meta?.logMessages || [];
+  const assetIds: string[] = [];
+  for (const log of logs) {
+    const match = log.match(/Leaf asset ID: (\w+)/);
+    if (match) assetIds.push(match[1]);
+  }
+
+  let indexed = 0;
+  for (const assetId of assetIds) {
+    const asset = await dasGetAsset(assetId);
+    if (!asset) continue;
+
+    const contentHash = getAttribute(asset, "content_hash");
+    if (!contentHash) continue;
+
+    const processorId = deriveProcessorId(asset);
+
+    const { error } = await supabase.from("cnft_assets").upsert(
+      {
+        asset_id: assetId,
+        content_hash: contentHash,
+        processor_id: processorId,
+        network: NETWORK,
+        solana_block_time: blockTime,
+        tsa_timestamp: null,
+      },
+      { onConflict: "asset_id" },
+    );
+
+    if (!error) indexed++;
+  }
+
+  return indexed;
+}
+
+// ---------------------------------------------------------------------------
 // 差分 Poll
 // ---------------------------------------------------------------------------
 

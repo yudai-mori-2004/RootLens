@@ -275,6 +275,7 @@ export default function PublishingScreen() {
         body: JSON.stringify({
           contents: results.map(r => ({
             contentHash: r.contentHash,
+            txSignature: r.txSignature,
             thumbnailUrl: r.thumbnailUrl,
             ogpImageUrl: r.ogpImageUrl,
             mediaUrl: r.mediaUrl,

@@ -1,17 +1,16 @@
 /**
- * 仕様書 §6.2, §6.4
- *
  * POST /api/v1/publish
  *
- * パイプラインB: ページ生成
+ * パイプラインB: ページ生成 + cNFTインデクサ登録
+ *
  * アプリ側で画像処理・R2アップロード・Title Protocol登録は完了済み。
  * サーバーはメタデータを受け取り、Supabaseにページレコードを作成する。
- *
- * リクエスト: { contents: [{ contentHash, thumbnailUrl, ogpImageUrl }], address? }
+ * txSignatureがあれば、トランザクションからasset_idを抽出しインデクサに登録する。
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createPage } from "@/lib/server/page-store";
+import { indexFromTransaction } from "@/lib/server/cnft-indexer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -49,6 +48,20 @@ export async function POST(req: NextRequest) {
         mediaType: c.mediaType || "image",
       })),
     });
+
+    // cNFTインデクサ登録（txSignatureがあれば）
+    // 失敗してもページ作成は成功とする（Pollが補完する）
+    const txSignatures = contents
+      .map((c: any) => c.txSignature)
+      .filter((s: any): s is string => !!s);
+
+    for (const sig of [...new Set(txSignatures)]) {
+      try {
+        await indexFromTransaction(sig);
+      } catch (e) {
+        console.warn("[publish] indexer insert failed for", sig, e);
+      }
+    }
 
     const baseUrl = process.env.PUBLIC_PAGE_URL || "https://www.rootlens.io";
     const pageUrl = `${baseUrl}/p/${record.shortId}`;
