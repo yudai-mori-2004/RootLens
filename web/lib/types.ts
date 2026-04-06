@@ -2,7 +2,7 @@
  * 仕様書 §7 公開ページ — データモデル
  *
  * content_hash とサムネイルURLのみ RootLens サーバーから取得。
- * それ以外は Title Protocol (Solana cNFT + Arweave) からクライアントサイドで取得する。
+ * それ以外は Title Protocol (Solana cNFT + オフチェーンストレージ) からクライアントサイドで取得する。
  *
  * 検証結果の型は lib/verify/checks/types.ts で定義。
  */
@@ -40,7 +40,7 @@ export interface PageMeta {
   publishedAt: string;
 }
 
-// --- Title Protocol (Solana / Arweave) から取得するデータ ---
+// --- Title Protocol (Solana / オフチェーンストレージ) から取得するデータ ---
 
 /** cNFT + Extension から取得できるコンテンツ情報 */
 export interface ContentRecord {

@@ -352,7 +352,7 @@ export default function ContentPage({ page }: Props) {
                     {t("tech.dyn.teeVerified", {
                       teeType: coreSj.tee_type,
                       pubkey: truncate(coreSj.tee_pubkey, 8),
-                      uri: truncate(resolved?.arweaveUri ?? "", 16),
+                      uri: truncate(resolved?.signedJsonUri ?? "", 16),
                       assetId: truncate(resolved?.assetId ?? "", 8),
                     })}
                   </p>
@@ -481,7 +481,7 @@ export default function ContentPage({ page }: Props) {
                   return p.extension_id === proc.processorId;
                 }) : undefined;
                 const nftAssetId = isCore ? resolved?.assetId : extNft?.assetId;
-                const nftArweaveUri = isCore ? resolved?.arweaveUri : extNft?.arweaveUri;
+                const nftSignedJsonUri = isCore ? resolved?.signedJsonUri : extNft?.signedJsonUri;
                 const nftCollection = isCore ? resolved?.collectionAddress : extNft?.collectionAddress;
                 const nftOwner = isCore ? resolved?.ownerWallet : extNft?.ownerWallet;
                 const payloadEntries = !isCore && sjData
@@ -493,7 +493,7 @@ export default function ContentPage({ page }: Props) {
                     <div className={styles.dataBlock}>
                       {nftCollection && <DataField label="collection" value={truncate(nftCollection, 16)} full={nftCollection} />}
                       {nftAssetId && <DataField label="assetId" value={truncate(nftAssetId, 16)} full={nftAssetId} />}
-                      {nftArweaveUri && <DataField label="offchainUri" value={truncate(nftArweaveUri, 20)} full={nftArweaveUri} />}
+                      {nftSignedJsonUri && <DataField label="offchainUri" value={truncate(nftSignedJsonUri, 20)} full={nftSignedJsonUri} />}
                       {sjData && (
                         <>
                           <DataField label="protocol" value={sjData.protocol} />
@@ -604,7 +604,7 @@ function dataFieldHref(label: string, value: string): string | null {
   if (solanaLabels.includes(l) || l.includes("wallet") || l.includes("owner") || l.includes("creator") || l.includes("asset")) {
     return solanaExplorerUrl(value);
   }
-  // Arweave / HTTP URIs
+  // Storage URIs
   if (value.startsWith("https://") || value.startsWith("http://")) {
     return value;
   }
@@ -747,7 +747,7 @@ function truncate(s: string, len = 8): string {
   return `${s.slice(0, len)}...${s.slice(-len)}`;
 }
 
-function arweaveHttpUrl(uri: string): string {
+function resolveStorageUrl(uri: string): string {
   if (uri.startsWith("ar://")) return `https://arweave.net/${uri.slice(5)}`;
   return uri;
 }
@@ -839,7 +839,7 @@ function downloadVerificationData(data: {
     rows.push(["# Core NFT (c2pa)", "", ""]);
     add("NFT Asset ID", "cNFT.id", data.resolved.assetId);
     add("Collection", "cNFT.collection.address", data.resolved.collectionAddress);
-    add("Off-chain URI", "cNFT.content.json_uri", data.resolved.arweaveUri);
+    add("Off-chain URI", "cNFT.content.json_uri", data.resolved.signedJsonUri);
     add("Owner", "cNFT.owner", data.resolved.ownerWallet);
     if (data.coreSignedJson) {
       add("Protocol", "signed_json.protocol", data.coreSignedJson.protocol);
@@ -868,7 +868,7 @@ function downloadVerificationData(data: {
       rows.push([`# Extension NFT (${extId})`, "", ""]);
       add("NFT Asset ID", "cNFT.id", extNft.assetId);
       add("Collection", "cNFT.collection.address", extNft.collectionAddress);
-      add("Off-chain URI", "cNFT.content.json_uri", extNft.arweaveUri);
+      add("Off-chain URI", "cNFT.content.json_uri", extNft.signedJsonUri);
       add("Owner", "cNFT.owner", extNft.ownerWallet);
       add("Protocol", "signed_json.protocol", extNft.signedJson.protocol);
       add("TEE Type", "signed_json.tee_type", extNft.signedJson.tee_type);

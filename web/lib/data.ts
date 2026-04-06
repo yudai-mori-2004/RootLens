@@ -4,7 +4,7 @@
  * データフロー:
  *  1. サーバー: shortId → { contentHash, thumbnailUrl, ogpImageUrl }
  *  2. DAS API: content_hash trait → cNFT メタデータ
- *  3. Arweave: json_uri → オフチェーン signed_json
+ *  3. オフチェーンストレージ: json_uri → signed_json
  *  4. ブラウザ内検証: Ed25519 + PDQ (サーバー関与なし)
  */
 
@@ -153,7 +153,7 @@ function parseAssuranceLevel(raw: string | undefined): 1 | 2 {
 
 /**
  * content_hash からオンチェーンのコンテンツ記録を取得する。
- * DAS API で cNFT を trait 検索 → Arweave から signed_json 取得。
+ * DAS API で cNFT を trait 検索 → オフチェーンストレージから signed_json 取得。
  */
 export async function fetchContentRecord(
   contentHash: string,

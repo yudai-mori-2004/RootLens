@@ -2,7 +2,7 @@
  * RootLens Trustless Verification Module
  *
  * このモジュールはクライアントサイド検証を完全にブラウザ内で完結させる。
- * 接続先は Solana RPC / Arweave のみ。WASM 依存なし。
+ * 接続先は Solana RPC + オフチェーンストレージのみ。WASM 依存なし。
  * RootLens サーバーには一切接続しない。
  *
  * 仕様書 §7.4 クライアントサイド検証アーキテクチャ
