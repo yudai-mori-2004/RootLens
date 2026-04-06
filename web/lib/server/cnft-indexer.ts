@@ -2,7 +2,11 @@
  * cNFT インデクサ コアロジック
  *
  * Task 26: DAS APIのページネーション制約を回避し、content_hashでO(1)検索可能にする。
- * Webhook と Poll の両方から呼ばれる共通INSERT処理。
+ *
+ * 重複解決（§2.4相当）:
+ * - Core: tsa_timestamp（TSAあり）or solana_block_time（TSAなし）で最古を選択
+ * - Extension: solana_block_time で最古を選択（TSAなし）
+ *
  * 全クエリに network フィルタを強制し、devnet/mainnet の混在を防止。
  */
 
@@ -71,6 +75,39 @@ export async function dasGetAsset(assetId: string): Promise<DasAsset | null> {
   return json.result;
 }
 
+/** asset_id → ミントTXの blockTime を取得 */
+async function getBlockTime(assetId: string): Promise<number | null> {
+  // Step 1: getSignaturesForAsset でミントTX sigを取得
+  const sigRes = await fetch(DAS_RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "indexer",
+      method: "getSignaturesForAsset",
+      params: { id: assetId, limit: 1 },
+    }),
+  });
+  const sigJson = await sigRes.json();
+  const items = sigJson.result?.items;
+  if (!items || items.length === 0) return null;
+  const txSig = items[0][0];
+
+  // Step 2: getTransaction で blockTime を取得
+  const txRes = await fetch(DAS_RPC_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "indexer",
+      method: "getTransaction",
+      params: [txSig, { encoding: "json", maxSupportedTransactionVersion: 0 }],
+    }),
+  });
+  const txJson = await txRes.json();
+  return txJson.result?.blockTime ?? null;
+}
+
 // ---------------------------------------------------------------------------
 // Asset → DB レコード変換
 // ---------------------------------------------------------------------------
@@ -93,7 +130,7 @@ function deriveProcessorId(asset: DasAsset): string {
 // 単一asset のインデックス
 // ---------------------------------------------------------------------------
 
-/** 1つのassetをfetch → DBにUPSERT。既に存在する場合はスキップ。 */
+/** 1つのassetをfetch → DBにUPSERT。 */
 export async function indexOneAsset(asset: DasAsset): Promise<boolean> {
   const contentHash = getAttribute(asset, "content_hash");
   if (!contentHash) return false;
@@ -101,7 +138,8 @@ export async function indexOneAsset(asset: DasAsset): Promise<boolean> {
   const jsonUri = asset.content.json_uri;
   if (!jsonUri) return false;
 
-  let signedJson: unknown;
+  // signed_json 取得
+  let signedJson: any;
   try {
     const url = jsonUri.startsWith("ar://")
       ? `https://arweave.net/${jsonUri.slice(5)}`
@@ -113,6 +151,13 @@ export async function indexOneAsset(asset: DasAsset): Promise<boolean> {
     return false;
   }
 
+  // solana_block_time 取得
+  const blockTime = await getBlockTime(asset.id);
+  if (blockTime === null) return false;
+
+  // tsa_timestamp 抽出（Coreのみ、存在する場合）
+  const tsaTimestamp = signedJson?.payload?.tsa_timestamp ?? null;
+
   const processorId = deriveProcessorId(asset);
 
   const { error } = await supabase.from("cnft_assets").upsert(
@@ -122,6 +167,8 @@ export async function indexOneAsset(asset: DasAsset): Promise<boolean> {
       processor_id: processorId,
       signed_json: signedJson,
       network: NETWORK,
+      tsa_timestamp: tsaTimestamp,
+      solana_block_time: blockTime,
     },
     { onConflict: "asset_id" },
   );
@@ -171,7 +218,6 @@ async function pollCollection(collection: string): Promise<number> {
 
 /**
  * 全コレクション（core + ext）の差分Pollを実行。
- * @returns { core: number, ext: number } 新規インデックス件数
  */
 export async function pollAll(): Promise<{ core: number; ext: number }> {
   const collections = await getCollectionMints();

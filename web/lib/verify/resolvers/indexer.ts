@@ -2,10 +2,10 @@
  * cNFTインデクサベースの ContentResolver 実装
  *
  * Task 26: DAS直接検索をSupabaseインデクサに置き換え。
- * content_hashでO(1)検索。signed_json込みで即返却。
  *
- * page-store.ts (node:crypto依存) を避けて、Supabaseクライアントを直接使用。
- * これによりクライアントバンドルにnode:cryptoが引き込まれない。
+ * 重複解決:
+ * - Core: tsa_timestamp（TSAあり）or solana_block_time → 最古を選択
+ * - Extension: solana_block_time → 同一extension_idごとに最古を選択
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -36,6 +36,29 @@ function isCorePayload(payload: unknown): boolean {
   return typeof payload === "object" && payload !== null && "nodes" in payload;
 }
 
+/**
+ * 作成時刻の決定
+ * TSAあり → tsa_timestamp、TSAなし → solana_block_time
+ */
+function getCreationTime(row: any): number {
+  if (row.tsa_timestamp != null) return row.tsa_timestamp;
+  return row.solana_block_time;
+}
+
+/**
+ * 同一作成時刻ならsolana_block_time（登録時刻）で最古を選択
+ */
+function selectOldest(rows: any[]): any | null {
+  if (rows.length === 0) return null;
+  return rows.reduce((oldest, row) => {
+    const oldestTime = getCreationTime(oldest);
+    const rowTime = getCreationTime(row);
+    if (rowTime < oldestTime) return row;
+    if (rowTime === oldestTime && row.solana_block_time < oldest.solana_block_time) return row;
+    return oldest;
+  });
+}
+
 export class IndexerContentResolver implements ContentResolver {
   async resolveByContentHash(
     contentHash: string,
@@ -51,24 +74,37 @@ export class IndexerContentResolver implements ContentResolver {
       if (error) throw new Error(error.message);
       if (!assets || assets.length === 0) return null;
 
-      const coreAsset = assets.find((a: any) => a.processor_id === "core-c2pa");
+      // Core: 最古を選択（§2.4）
+      const coreAssets = assets.filter((a: any) => a.processor_id === "core-c2pa");
+      const coreAsset = selectOldest(coreAssets);
       if (!coreAsset) return null;
 
       const coreSj = isSignedJson(coreAsset.signed_json) && isCorePayload(coreAsset.signed_json.payload)
         ? coreAsset.signed_json as SignedJson
         : null;
 
+      // Extension: extension_idごとに最古を選択（§3.4）
       const extAssets = assets.filter((a: any) => a.processor_id !== "core-c2pa");
-      const extensionNfts: ExtensionNft[] = extAssets
-        .filter((a: any) => isSignedJson(a.signed_json))
-        .map((a: any) => ({
-          assetId: a.asset_id,
+      const extByProcessorId = new Map<string, any[]>();
+      for (const a of extAssets) {
+        const list = extByProcessorId.get(a.processor_id) || [];
+        list.push(a);
+        extByProcessorId.set(a.processor_id, list);
+      }
+
+      const extensionNfts: ExtensionNft[] = [];
+      for (const [, rows] of extByProcessorId) {
+        const oldest = selectOldest(rows);
+        if (!oldest || !isSignedJson(oldest.signed_json)) continue;
+        extensionNfts.push({
+          assetId: oldest.asset_id,
           collectionAddress: "",
           signedJsonUri: "",
           attributes: [],
-          signedJson: a.signed_json as SignedJson,
-          ownerWallet: (a.signed_json as any)?.payload?.creator_wallet || "",
-        }));
+          signedJson: oldest.signed_json as SignedJson,
+          ownerWallet: (oldest.signed_json as any)?.payload?.creator_wallet || "",
+        });
+      }
 
       return {
         assetId: coreAsset.asset_id,
@@ -85,6 +121,10 @@ export class IndexerContentResolver implements ContentResolver {
     }
   }
 
+  /**
+   * 同一content_hashの全Core cNFTを返す（重複解決表示用）。
+   * solana_block_time昇順でソート。
+   */
   async resolveAllByContentHash(
     contentHash: string,
   ): Promise<ResolvedContent[] | null> {
@@ -92,10 +132,11 @@ export class IndexerContentResolver implements ContentResolver {
       const supabase = getSupabase();
       const { data: assets, error } = await supabase
         .from("cnft_assets")
-        .select("asset_id, processor_id")
+        .select("asset_id, processor_id, solana_block_time, tsa_timestamp")
         .eq("network", NETWORK)
         .eq("content_hash", contentHash)
-        .eq("processor_id", "core-c2pa");
+        .eq("processor_id", "core-c2pa")
+        .order("solana_block_time", { ascending: true });
 
       if (error) throw new Error(error.message);
       if (!assets) return null;
