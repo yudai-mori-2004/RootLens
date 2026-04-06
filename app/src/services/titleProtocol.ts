@@ -5,10 +5,11 @@
 import {
   fetchGlobalConfig,
   TitleClient,
-  generateEphemeralKeyPair,
-  deriveSharedSecret,
-  deriveSymmetricKey,
+  decryptResponse,
 } from '@title-protocol/sdk';
+import { x25519 } from '@noble/curves/ed25519';
+import { hkdf } from '@noble/hashes/hkdf';
+import { sha256 } from '@noble/hashes/sha256';
 import { Connection } from '@solana/web3.js';
 import { NativeModules } from 'react-native';
 import * as FileSystem from 'expo-file-system';
@@ -60,11 +61,26 @@ function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+// ---------------------------------------------------------------------------
+// HKDF方向別鍵導出 — Rust sealed_channel::derive_keys() と同一パラメータ
+// ---------------------------------------------------------------------------
+
+/** HKDF-SHA256で方向別鍵を導出。salt=encapKey, info="title-request-key"/"title-response-key" */
+function deriveDirectionalKeys(
+  sharedSecret: Uint8Array,
+  encapKey: Uint8Array,
+): { requestKey: Uint8Array; responseKey: Uint8Array } {
+  const requestKey = hkdf(sha256, sharedSecret, encapKey, 'title-request-key', 32);
+  const responseKey = hkdf(sha256, sharedSecret, encapKey, 'title-response-key', 32);
+  return { requestKey, responseKey };
+}
+
 /**
  * Title Protocol にコンテンツを登録する（ファイルパスベース）
  *
- * 暗号化をネイティブに委譲し、5MBのコンテンツが
- * JS↔Native Bridgeを一切通過しない。
+ * ECDH + HKDF はJS（@noble/curves, 32B鍵演算で高速）。
+ * AES-256-GCM暗号化はネイティブ（javax.crypto, ファイルパス方式で大容量対応）。
+ * 5MBのコンテンツがJS↔Native Bridgeを一切通過しない。
  */
 export async function registerOnTitleProtocol(
   contentFilePath: string,
@@ -86,23 +102,29 @@ export async function registerOnTitleProtocol(
   const node = await client.selectNode();
   lap('selectNode done');
 
-  // ECDH + HKDF（32Bのみ、JSで十分速い）
+  // KEM: X25519 ECDH（32B演算、JSで十分速い）
   const teeEncPubkey = nativeCryptoProvider.fromBase64(node.encryptionPubkey);
-  const eph = generateEphemeralKeyPair();
-  const shared = deriveSharedSecret(eph.secretKey, teeEncPubkey);
-  const symmetricKey = deriveSymmetricKey(shared);
+  const ephSecretKey = x25519.utils.randomPrivateKey();
+  const ephPublicKey = x25519.getPublicKey(ephSecretKey);
+  const sharedSecret = x25519.getSharedSecret(ephSecretKey, teeEncPubkey);
+
+  // KDF: 方向別鍵導出（Rust sealed_channel::derive_keys と同一）
+  const { requestKey, responseKey } = deriveDirectionalKeys(sharedSecret, ephPublicKey);
   lap('ECDH+HKDF done');
 
   // ネイティブで暗号化（コンテンツがBridgeを通過しない）
+  // 新ワイヤーフォーマット: [suite_id(1B)][encap_key_len(2B BE)][encap_key][nonce][ct]
   const payloadPath = `${FileSystem.cacheDirectory}tp_payload_${Date.now()}.bin`.replace('file://', '');
   const contentPath = contentFilePath.replace('file://', '');
   const metadata = JSON.stringify({ owner_wallet: ownerWallet });
+  const aad = '/verify';
 
   await AesGcmBridge.buildAndEncryptPayload(
     contentPath,
     metadata,
-    toBase64(symmetricKey),
-    toBase64(eph.publicKey),
+    toBase64(requestKey),
+    toBase64(ephPublicKey),
+    aad,
     payloadPath,
   );
   lap('native encrypt done');
@@ -133,11 +155,12 @@ export async function registerOnTitleProtocol(
   lap('verify done');
 
   // decrypt（レスポンスは小さいのでJS CryptoProviderで十分）
-  const { decryptResponse } = await import('@title-protocol/sdk');
+  const verifyAad = new TextEncoder().encode(aad);
   const responsePlaintext = await decryptResponse(
-    symmetricKey,
+    responseKey,
     encryptedResponse.nonce,
     encryptedResponse.ciphertext,
+    verifyAad,
     nativeCryptoProvider,
   );
   const verifyResponse = JSON.parse(new TextDecoder().decode(responsePlaintext));

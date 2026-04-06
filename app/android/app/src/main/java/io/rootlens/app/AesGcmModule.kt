@@ -22,16 +22,17 @@ class AesGcmModule(reactContext: ReactApplicationContext) :
     override fun getName() = "AesGcmBridge"
 
     /**
-     * バイナリペイロード構築 + AES-GCM暗号化をネイティブで一括実行。
+     * バイナリペイロード構築 + AES-256-GCM暗号化をネイティブで一括実行。
      * 5MBのコンテンツがJS↔Native Bridgeを一切通過しない。
      *
-     * plaintext: [4B meta_len][metadata][content_file_bytes]
-     * output:    [32B eph_pk][12B nonce][ciphertext+tag]
+     * plaintext: [4B meta_len BE][metadata][content_file_bytes]
+     * output:    [suite_id(1B)][encap_key_len(2B BE)][encap_key][nonce(12B)][ciphertext+tag]
      *
      * @param contentFilePath コンテンツファイルパス
      * @param metadataJson   メタデータJSON文字列 ({"owner_wallet":"..."})
-     * @param symmetricKeyBase64 対称鍵 (32B Base64)
-     * @param ephPubkeyBase64   エフェメラル公開鍵 (32B Base64)
+     * @param requestKeyBase64  方向別鍵 request_key (32B Base64)
+     * @param encapKeyBase64    エフェメラル公開鍵 = encapsulated key (32B Base64)
+     * @param aadString         Additional Authenticated Data (例: "/verify")
      * @param outputFilePath 出力ファイルパス
      * @return { size: number } 出力ファイルサイズ
      */
@@ -39,14 +40,16 @@ class AesGcmModule(reactContext: ReactApplicationContext) :
     fun buildAndEncryptPayload(
         contentFilePath: String,
         metadataJson: String,
-        symmetricKeyBase64: String,
-        ephPubkeyBase64: String,
+        requestKeyBase64: String,
+        encapKeyBase64: String,
+        aadString: String,
         outputFilePath: String,
         promise: Promise
     ) {
         try {
-            val key = Base64.decode(symmetricKeyBase64, Base64.NO_WRAP)
-            val ephPk = Base64.decode(ephPubkeyBase64, Base64.NO_WRAP)
+            val key = Base64.decode(requestKeyBase64, Base64.NO_WRAP)
+            val encapKey = Base64.decode(encapKeyBase64, Base64.NO_WRAP)
+            val aad = aadString.toByteArray(Charsets.UTF_8)
             val metaBytes = metadataJson.toByteArray(Charsets.UTF_8)
             val content = File(contentFilePath).readBytes()
 
@@ -54,57 +57,45 @@ class AesGcmModule(reactContext: ReactApplicationContext) :
             val metaLen = ByteBuffer.allocate(4).putInt(metaBytes.size).array()
             val plaintext = metaLen + metaBytes + content
 
-            // AES-256-GCM
+            // AES-256-GCM with AAD
             val nonce = ByteArray(12).also { SecureRandom().nextBytes(it) }
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
+            cipher.updateAAD(aad)
             val ciphertext = cipher.doFinal(plaintext)
 
-            // wire: [32B eph_pk][12B nonce][ciphertext+tag]
+            // wire format v1: [suite_id(1B)][encap_key_len(2B BE)][encap_key][nonce(12B)][ct+tag]
+            val suiteId: Byte = 0x01  // X25519-AES-256-GCM
+            val encapKeyLen = ByteBuffer.allocate(2).putShort(encapKey.size.toShort()).array()
+
             FileOutputStream(outputFilePath).use { out ->
-                out.write(ephPk)
+                out.write(byteArrayOf(suiteId))
+                out.write(encapKeyLen)
+                out.write(encapKey)
                 out.write(nonce)
                 out.write(ciphertext)
             }
 
+            val totalSize = 1 + 2 + encapKey.size + nonce.size + ciphertext.size
             val result = Arguments.createMap()
-            result.putInt("size", ephPk.size + nonce.size + ciphertext.size)
+            result.putInt("size", totalSize)
             promise.resolve(result)
         } catch (e: Exception) {
             promise.reject("BUILD_ENCRYPT_ERROR", e.message, e)
         }
     }
 
+    /** ファイルパス方式 AES-256-GCM暗号化（AAD付き）。大容量データがBridgeを通過しない。 */
     @ReactMethod
-    fun encrypt(keyBase64: String, plaintextBase64: String, promise: Promise) {
+    fun encryptFile(inputPath: String, outputPath: String, keyBase64: String, aadBase64: String, promise: Promise) {
         try {
             val key = Base64.decode(keyBase64, Base64.NO_WRAP)
-            val plaintext = Base64.decode(plaintextBase64, Base64.NO_WRAP)
-
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"))
-
-            val iv = cipher.iv
-            val ciphertextWithTag = cipher.doFinal(plaintext)
-
-            val result = Arguments.createMap()
-            result.putString("nonce", Base64.encodeToString(iv, Base64.NO_WRAP))
-            result.putString("ciphertext", Base64.encodeToString(ciphertextWithTag, Base64.NO_WRAP))
-            promise.resolve(result)
-        } catch (e: Exception) {
-            promise.reject("AES_ENCRYPT_ERROR", e.message, e)
-        }
-    }
-
-    /** ファイルパス方式: 9.7MBがBridgeを通過しない */
-    @ReactMethod
-    fun encryptFile(inputPath: String, outputPath: String, keyBase64: String, promise: Promise) {
-        try {
-            val key = Base64.decode(keyBase64, Base64.NO_WRAP)
+            val aad = Base64.decode(aadBase64, Base64.NO_WRAP)
             val plaintext = File(inputPath).readBytes()
 
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"))
+            cipher.updateAAD(aad)
             val ciphertextWithTag = cipher.doFinal(plaintext)
 
             File(outputPath).outputStream().use { out ->
@@ -120,38 +111,24 @@ class AesGcmModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    /** ファイルパス方式 AES-256-GCM復号（AAD付き） */
     @ReactMethod
-    fun decryptFile(inputPath: String, outputPath: String, keyBase64: String, nonceBase64: String, promise: Promise) {
+    fun decryptFile(inputPath: String, outputPath: String, keyBase64: String, nonceBase64: String, aadBase64: String, promise: Promise) {
         try {
             val key = Base64.decode(keyBase64, Base64.NO_WRAP)
             val nonce = Base64.decode(nonceBase64, Base64.NO_WRAP)
+            val aad = Base64.decode(aadBase64, Base64.NO_WRAP)
             val ciphertext = File(inputPath).readBytes()
 
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
+            cipher.updateAAD(aad)
             val plaintext = cipher.doFinal(ciphertext)
 
             File(outputPath).writeBytes(plaintext)
             promise.resolve(outputPath)
         } catch (e: Exception) {
             promise.reject("AES_DECRYPT_FILE_ERROR", e.message, e)
-        }
-    }
-
-    @ReactMethod
-    fun decrypt(keyBase64: String, nonceBase64: String, ciphertextBase64: String, promise: Promise) {
-        try {
-            val key = Base64.decode(keyBase64, Base64.NO_WRAP)
-            val nonce = Base64.decode(nonceBase64, Base64.NO_WRAP)
-            val ciphertext = Base64.decode(ciphertextBase64, Base64.NO_WRAP)
-
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
-
-            val plaintext = cipher.doFinal(ciphertext)
-            promise.resolve(Base64.encodeToString(plaintext, Base64.NO_WRAP))
-        } catch (e: Exception) {
-            promise.reject("AES_DECRYPT_ERROR", e.message, e)
         }
     }
 }

@@ -12,9 +12,6 @@ import {
   buildPlaintext,
   encryptPayload,
   decryptResponse,
-  generateEphemeralKeyPair,
-  deriveSharedSecret,
-  deriveSymmetricKey,
 } from "@title-protocol/sdk";
 import type { VerifyResponse } from "@title-protocol/sdk";
 import { Connection } from "@solana/web3.js";
@@ -56,9 +53,11 @@ async function main() {
   );
 
   const teeEncPubkey = Buffer.from(node.encryptionPubkey, "base64");
-  const { symmetricKey, payload } = await encryptPayload(
+  const aad = new TextEncoder().encode("/verify");
+  const { responseKey, payload } = await encryptPayload(
     new Uint8Array(teeEncPubkey),
     plaintext,
+    aad,
   );
   console.log(`Encrypted payload: ${(payload.length / 1024 / 1024).toFixed(1)} MB`);
 
@@ -88,9 +87,10 @@ async function main() {
 
   // Decrypt
   const responsePlaintext = await decryptResponse(
-    symmetricKey,
+    responseKey,
     encResponse.nonce,
     encResponse.ciphertext,
+    aad,
   );
   const response: VerifyResponse = JSON.parse(
     new TextDecoder().decode(responsePlaintext),

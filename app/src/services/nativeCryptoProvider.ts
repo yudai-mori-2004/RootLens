@@ -1,8 +1,8 @@
 /**
- * ネイティブ AES-256-GCM CryptoProvider（ファイルパス方式）
+ * ネイティブ AES-256-GCM CryptoProvider（ファイルパス方式 + AAD対応）
  *
- * 9.7MBのデータがJS↔ネイティブBridgeを通過しない。
- * Bridgeを流れるのは鍵(32byte)、nonce(12byte)、ファイルパス文字列のみ。
+ * 大容量データがJS↔ネイティブBridgeを通過しない。
+ * Bridgeを流れるのは鍵(32byte)、nonce(12byte)、AAD、ファイルパス文字列のみ。
  */
 
 import { NativeModules } from 'react-native';
@@ -38,7 +38,7 @@ function stripFileScheme(uri: string): string {
 }
 
 export const nativeCryptoProvider: CryptoProvider = {
-  async encrypt(key: Uint8Array, plaintext: Uint8Array) {
+  async encrypt(key: Uint8Array, plaintext: Uint8Array, aad: Uint8Array) {
     const ts = Date.now();
     const t0 = Date.now();
     const lap = (l: string) => console.log(`[AES] ${l}: ${Date.now() - t0}ms`);
@@ -58,6 +58,7 @@ export const nativeCryptoProvider: CryptoProvider = {
         stripFileScheme(inputUri),
         stripFileScheme(outputUri),
         uint8ArrayToBase64(key),
+        uint8ArrayToBase64(aad),
       );
 
       lap('encryptFile done');
@@ -80,7 +81,7 @@ export const nativeCryptoProvider: CryptoProvider = {
     }
   },
 
-  async decrypt(key: Uint8Array, nonce: Uint8Array, ciphertext: Uint8Array) {
+  async decrypt(key: Uint8Array, nonce: Uint8Array, ciphertext: Uint8Array, aad: Uint8Array) {
     const ts = Date.now();
     const inputUri = `${cacheDir}aes_dec_in_${ts}.bin`;
     const outputUri = `${cacheDir}aes_dec_out_${ts}.bin`;
@@ -95,6 +96,7 @@ export const nativeCryptoProvider: CryptoProvider = {
         stripFileScheme(outputUri),
         uint8ArrayToBase64(key),
         uint8ArrayToBase64(nonce),
+        uint8ArrayToBase64(aad),
       );
 
       const plaintextBase64 = await FileSystem.readAsStringAsync(outputUri, {
