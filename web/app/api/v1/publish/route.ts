@@ -69,18 +69,21 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.PUBLIC_PAGE_URL || "https://www.rootlens.io";
     const pageUrl = `${baseUrl}/p/${record.shortId}`;
 
-    if (indexErrors.length > 0) {
-      return NextResponse.json({
-        shortId: record.shortId,
-        pageUrl,
-        indexerErrors: indexErrors,
-      }, { status: 207 }); // Multi-Status: ページ作成OK、インデクサ一部失敗
-    }
-
-    return NextResponse.json({
+    const response: Record<string, unknown> = {
       shortId: record.shortId,
       pageUrl,
-    });
+      _debug: {
+        txSignatureCount: txSignatures.length,
+        txSignatures,
+        indexErrors,
+      },
+    };
+
+    if (indexErrors.length > 0) {
+      return NextResponse.json(response, { status: 207 });
+    }
+
+    return NextResponse.json(response);
   } catch (e: unknown) {
     console.error("[publish] Error:", e);
     const msg = e instanceof Error ? e.message : "Internal server error";
