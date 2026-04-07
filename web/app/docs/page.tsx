@@ -89,15 +89,19 @@ export default async function DocsOverview() {
       <div className={s.phaseCards}>
         {PHASES.map((phase) => (
           <div key={phase.label} className={s.phaseCard}>
-            <div className={s.phaseCardLabel}>{phase.label}</div>
-            <div className={s.phaseCardTitle}>{phase.title}</div>
+            <div className={s.phaseCardHeader}>
+              <span className={s.phaseCardLabel}>{phase.label}</span>
+              <span className={s.phaseCardTitle}>{phase.title}</span>
+            </div>
             <div className={s.phaseCardSteps}>
               {phase.steps.map((step, i) => (
                 <div key={i} className={s.phaseCardStep}>{step}</div>
               ))}
             </div>
-            <div className={s.phaseCardQuestion}>{phase.question}</div>
-            <div className={s.phaseCardTrust}>{phase.trust}</div>
+            <div className={s.phaseCardFooter}>
+              <div className={s.phaseCardQuestion}>{phase.question}</div>
+              <div className={s.phaseCardTrust}>{phase.trust}</div>
+            </div>
           </div>
         ))}
       </div>
