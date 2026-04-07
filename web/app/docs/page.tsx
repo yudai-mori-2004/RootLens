@@ -19,24 +19,23 @@ export default async function DocsOverview() {
     { term: "GlobalConfig", def: t("termGlobalConfig") },
   ] as const;
 
-  const DIAGRAM = `Phase 1                   Phase 2                   Phase 3
-CONTENT CREATION          VERIFICATION & RECORD     ANYONE CAN RE-VERIFY
-─────────────────         ────────────────────       ───────────────────
-
-Camera sensor              Title Protocol TEE        Viewer's browser
-  ↓                          ↓                         ↓
-C2PA signature             Receives encrypted        Fetches proof from
-(device key)               content, verifies the     blockchain, re-verifies
-  ↓                        C2PA chain inside TEE,    the TEE signature,
-Content with               signs results with a      recomputes the visual
-provenance data            hardware-isolated key     fingerprint from the
-                             ↓                       displayed image
-                           Records results as          ↓
-                           cNFTs on Solana           Shows verified / failed
-
-"Who took this?"           "Is it real?"             "Can I trust this?"
-Depends on device          TEE hardware              Re-verifies Phase 2
-                                                     proofs locally`;
+  const PHASES = [
+    {
+      label: t("phase1label"), title: t("phase1title"),
+      steps: [t("phase1step1"), t("phase1step2")],
+      question: t("phase1question"), trust: t("phase1trustShort"),
+    },
+    {
+      label: t("phase2label"), title: t("phase2title"),
+      steps: [t("phase2step1"), t("phase2step2"), t("phase2step3")],
+      question: t("phase2question"), trust: t("phase2trustShort"),
+    },
+    {
+      label: t("phase3label"), title: t("phase3title"),
+      steps: [t("phase3step1"), t("phase3step2"), t("phase3step3")],
+      question: t("phase3question"), trust: t("phase3trustShort"),
+    },
+  ];
 
   return (
     <article className={s.article}>
@@ -87,7 +86,21 @@ Depends on device          TEE hardware              Re-verifies Phase 2
       <h2 className={s.h2}>{t("phasesTitle")}</h2>
       <p className={s.p}>{t("phasesIntro")}</p>
 
-      <div className={s.diagram}>{DIAGRAM}</div>
+      <div className={s.phaseCards}>
+        {PHASES.map((phase) => (
+          <div key={phase.label} className={s.phaseCard}>
+            <div className={s.phaseCardLabel}>{phase.label}</div>
+            <div className={s.phaseCardTitle}>{phase.title}</div>
+            <div className={s.phaseCardSteps}>
+              {phase.steps.map((step, i) => (
+                <div key={i} className={s.phaseCardStep}>{step}</div>
+              ))}
+            </div>
+            <div className={s.phaseCardQuestion}>{phase.question}</div>
+            <div className={s.phaseCardTrust}>{phase.trust}</div>
+          </div>
+        ))}
+      </div>
 
       <table className={s.table}>
         <thead>
