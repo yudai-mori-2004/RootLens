@@ -40,15 +40,24 @@ export async function checkTeeSignature(
   signedJson: SignedJson,
 ): Promise<CheckResult> {
   try {
-    const { tee_pubkey, tee_signature, payload, attributes } = signedJson;
+    const { tee_pubkey, tee_signature, tee_signature_algorithm, payload, attributes } = signedJson;
     const canonicalize = (await import("canonicalize")).default;
     const target = canonicalize({ payload, attributes });
     if (!target) {
       return { id: "tee_signature", status: "failed", detail: "JCS canonicalization returned null" };
     }
 
-    const data = new TextEncoder().encode(target);
-    const pubkeyBytes = base58Decode(tee_pubkey);
+    const canonBytes = new TextEncoder().encode(target);
+
+    // ドメインタグ: tee_signature_algorithm が存在する = 新プロトコル → domain_tagged
+    const data = tee_signature_algorithm
+      ? domainTagged("title-protocol-v1", canonBytes)
+      : canonBytes;
+
+    // tee_pubkey: Base64（新）またはBase58（旧）
+    const pubkeyBytes = tee_signature_algorithm
+      ? base64ToBytes(tee_pubkey)
+      : base58Decode(tee_pubkey);
     const sigBytes = base64ToBytes(tee_signature);
 
     const cryptoKey = await crypto.subtle.importKey(
@@ -126,6 +135,17 @@ export async function runCommonChecks(
 // ---------------------------------------------------------------------------
 // エンコーディングユーティリティ
 // ---------------------------------------------------------------------------
+
+/** domain_tagged: [4B domain_len BE u32][domain bytes][message bytes] */
+function domainTagged(domain: string, message: Uint8Array): Uint8Array {
+  const domainBytes = new TextEncoder().encode(domain);
+  const out = new Uint8Array(4 + domainBytes.length + message.length);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, domainBytes.length);
+  out.set(domainBytes, 4);
+  out.set(message, 4 + domainBytes.length);
+  return out;
+}
 
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
