@@ -4,24 +4,6 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "cNFT Structure" };
 
-const OVERVIEW_DIAGRAM = `content_hash
-  |
-  +-- Core cNFT (core-c2pa)
-  |     Provenance graph
-  |
-  +-- cert-* Extension
-  |     Certificate chain verified?
-  |
-  +-- image-pdq Extension
-  |     256-bit PDQ hash
-  |
-  +-- video-vpdq Extension
-        Per-frame PDQ hashes
-
-* All cNFTs share the same content_hash
-* Core --> core_collection_mint
-* Extensions --> ext_collection_mint`;
-
 export default async function CnftStructurePage() {
   const t = await getTranslations("docs.cnftStructure");
   const tn = await getTranslations("docs.nav");
@@ -33,7 +15,29 @@ export default async function CnftStructurePage() {
       <p className={s.subtitle}>{t("subtitle")}</p>
 
       <h2 className={s.h2}>{t("overviewTitle")}</h2>
-      <div className={s.diagram}>{OVERVIEW_DIAGRAM}</div>
+      <ul className={s.tree}>
+        <li>
+          <span className={s.treeLabel}>content_hash</span>
+          <ul>
+            <li>
+              <span className={s.treeLabel}>Core cNFT</span>
+              <span className={s.treeSub}>core-c2pa / Provenance graph</span>
+            </li>
+            <li>
+              <span className={s.treeLabel}>cert-* Extension</span>
+              <span className={s.treeSub}>Certificate chain verified?</span>
+            </li>
+            <li>
+              <span className={s.treeLabel}>image-pdq Extension</span>
+              <span className={s.treeSub}>256-bit PDQ hash</span>
+            </li>
+            <li>
+              <span className={s.treeLabel}>video-vpdq Extension</span>
+              <span className={s.treeSub}>Per-frame PDQ hashes</span>
+            </li>
+          </ul>
+        </li>
+      </ul>
 
       {/* Core cNFT */}
       <h2 className={s.h2}>{t("coreTitle")}</h2>

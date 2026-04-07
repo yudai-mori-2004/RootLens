@@ -4,70 +4,6 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "PKI Architecture" };
 
-const HIERARCHY_DIAGRAM = `Root CA
-  |
-  +-- iOS Intermediate CA
-  |     |
-  |     +-- Device Cert (iOS)
-  |
-  +-- Android Intermediate CA
-        |
-        +-- Device Cert (Android)`;
-
-const ISSUANCE_DIAGRAM = `Device                              Server
-------                              ------
-
-1. Generate EC P-256 key pair
-   inside TEE
-   (Secure Enclave / StrongBox)
-
-2. Create PKCS#10 CSR
-   (self-signed with private key
-    = Proof of Possession)
-
-3. Obtain Platform Attestation
-   iOS:     App Attest
-            clientDataHash
-            = SHA-256(CSR)
-   Android: Key Attestation chain
-            + Play Integrity
-            nonce = SHA-256(CSR)
-              |
-4. Send CSR  |
- + Attestation ------------->  5. Verify CSR
-                                  self-signature
-                                  (Proof of Possession)
-
-                               6. Verify public key
-                                  algorithm
-                                  (must be EC P-256)
-
-                               7. Verify Platform
-                                  Attestation
-                                  iOS:  clientDataHash
-                                        matches CSR
-                                  Android: CSR pubkey
-                                  == attestation
-                                     cert[0] pubkey
-
-                               8. Sign Device Cert
-                                  with ICA key
-                                  (via KMS)
-
-                               9. Record issuance
-                                  in DB
-                                  (for CRL & audit)
-                                        |
-10. Receive certs  <--------------------+
-    Device Cert + ICA Cert + Root Cert
-
-11. Store 3-layer cert chain
-    in TEE alongside key pair
-
-12. Use for C2PA signing
-    Renewal: 14 days before expiry
-    (background, non-blocking)`;
-
 export default async function PkiPage() {
   const t = await getTranslations("docs.pki");
   const tn = await getTranslations("docs.nav");
@@ -86,7 +22,28 @@ export default async function PkiPage() {
       </div>
 
       <h2 className={s.h2}>{t("hierarchyTitle")}</h2>
-      <div className={s.diagram}>{HIERARCHY_DIAGRAM}</div>
+      <ul className={s.tree}>
+        <li>
+          <span className={s.treeLabel}>Root CA</span>
+          <span className={s.treeSub}>AWS KMS, 20 years</span>
+          <ul>
+            <li>
+              <span className={s.treeLabel}>iOS Intermediate CA</span>
+              <span className={s.treeSub}>AWS KMS</span>
+              <ul>
+                <li>Device Certificate <span className={s.treeSub}>90-day, TEE key</span></li>
+              </ul>
+            </li>
+            <li>
+              <span className={s.treeLabel}>Android Intermediate CA</span>
+              <span className={s.treeSub}>AWS KMS</span>
+              <ul>
+                <li>Device Certificate <span className={s.treeSub}>90-day, TEE key</span></li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
 
       <table className={s.table}>
         <thead>
@@ -147,7 +104,54 @@ export default async function PkiPage() {
       <p className={s.p}>{t("kmsP1")}</p>
 
       <h2 className={s.h2}>{t("issuanceTitle")}</h2>
-      <div className={s.diagram}>{ISSUANCE_DIAGRAM}</div>
+      <div className={s.sequence}>
+        <div className={s.sequenceHeader}>Device</div>
+        <div className={s.sequenceHeader}>Server</div>
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>1. Generate key pair in TEE</div>
+          EC P-256 (Secure Enclave / StrongBox)
+        </div>
+        <div className={s.sequenceCell} />
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>2. Create CSR</div>
+          Self-signed = Proof of Possession
+        </div>
+        <div className={s.sequenceCell} />
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>3. Platform Attestation</div>
+          iOS: App Attest / Android: Key Attestation + Play Integrity
+        </div>
+        <div className={s.sequenceCell} />
+
+        <div className={s.sequenceArrow}>
+          4. CSR + Attestation &rarr;
+        </div>
+
+        <div className={s.sequenceCell} />
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>5-7. Verify</div>
+          CSR signature, key algorithm, Platform Attestation
+        </div>
+
+        <div className={s.sequenceCell} />
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>8. Sign Device Certificate</div>
+          ICA key via KMS
+        </div>
+
+        <div className={s.sequenceArrow}>
+          &larr; 9. Device Cert + ICA Cert + Root Cert
+        </div>
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>10. Store cert chain in TEE</div>
+          Auto-renewal 14 days before expiry
+        </div>
+        <div className={s.sequenceCell} />
+      </div>
 
       <h2 className={s.h2}>{t("bindingTitle")}</h2>
       <p className={s.p}>{t("bindingIntro")}</p>

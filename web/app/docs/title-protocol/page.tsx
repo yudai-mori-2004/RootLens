@@ -4,32 +4,6 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "Title Protocol" };
 
-const E2E_DIAGRAM = `App                                TEE Node
-----                               --------
-
-1. Look up the TEE node's public key
-   (from on-chain GlobalConfig)
-
-2. Establish a shared secret
-   (ephemeral key exchange -- provides
-    forward secrecy: even if a key is
-    later compromised, past sessions
-    remain protected)
-
-3. Derive separate encryption keys
-   for each direction
-   (app --> TEE, TEE --> app)
-
-4. Encrypt the content locally
-   and upload the ciphertext
-        |
-        \`---------------------->  5. Decrypt inside TEE
-                                     Verify C2PA chain
-                                     Run processors
-                                     Sign results
-  6. Receive encrypted results       |
-     Decrypt locally          <------+`;
-
 const SIGNED_JSON_EXAMPLE = `{
   "protocol": "Title-v1",
   "tee_pubkey": "<public key, Base64>",
@@ -84,7 +58,47 @@ export default async function TitleProtocolPage() {
 
       <h2 className={s.h2}>{t("e2eTitle")}</h2>
       <p className={s.p}>{t("e2eIntro")}</p>
-      <div className={s.diagram}>{E2E_DIAGRAM}</div>
+      <div className={s.sequence}>
+        <div className={s.sequenceHeader}>App</div>
+        <div className={s.sequenceHeader}>TEE Node</div>
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>1. Look up TEE public key</div>
+          from on-chain GlobalConfig
+        </div>
+        <div className={s.sequenceCell} />
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>2. Key exchange</div>
+          Ephemeral ECDH &rarr; shared secret (forward secrecy)
+        </div>
+        <div className={s.sequenceCell} />
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>3. Derive directional keys</div>
+          Separate keys for app&rarr;TEE and TEE&rarr;app
+        </div>
+        <div className={s.sequenceCell} />
+
+        <div className={s.sequenceArrow}>
+          4. Encrypted content &rarr;
+        </div>
+
+        <div className={s.sequenceCell} />
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>5. Process inside TEE</div>
+          Decrypt, verify C2PA, run processors, sign results
+        </div>
+
+        <div className={s.sequenceArrow}>
+          &larr; 6. Encrypted results
+        </div>
+
+        <div className={s.sequenceCell}>
+          <div className={s.sequenceCellLabel}>7. Decrypt locally</div>
+        </div>
+        <div className={s.sequenceCell} />
+      </div>
       <p className={s.p}>{t("e2eConclusion")}</p>
 
       <h2 className={s.h2}>{t("processorTitle")}</h2>

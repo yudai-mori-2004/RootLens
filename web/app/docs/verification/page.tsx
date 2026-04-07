@@ -4,38 +4,6 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "Client-Side Verification" };
 
-const FLOW_DIAGRAM = `Viewer's Browser
-----------------------------------------------
-
-1. Short ID --> content_hash
-   The server resolves the short ID to a
-   content_hash. This is a convenience
-   lookup, not a trust-bearing step.
-
-2. content_hash --> cNFT candidates
-   The indexer cache returns candidate
-   cNFT IDs. These are NOT trusted --
-   every candidate is re-verified.
-
-3. cNFT ID --> on-chain verification
-   For each candidate, the browser queries
-   the Solana blockchain directly:
-   |-- Belongs to official collection?
-   |   (on-chain GlobalConfig) --> NO: reject
-   |-- content_hash matches? --> NO: reject
-   \`-- Fetch signed_json from cNFT's URI
-
-4. signed_json --> browser verification
-   |-- TEE signature check (Ed25519)
-   |-- Collection membership
-   |-- Content binding
-   |-- Processor-specific checks
-   \`-- Perceptual hash recomputation
-
-----------------------------------------------
-Steps 3 and 4 do not contact the
-RootLens server.`;
-
 const ATTACKS = [1, 2, 3, 4, 5, 6] as const;
 
 export default async function VerificationPage() {
@@ -56,7 +24,35 @@ export default async function VerificationPage() {
         <code className={s.code}>{t("flowIntroCode")}</code>
         {t("flowIntroAfter")}
       </p>
-      <div className={s.diagram}>{FLOW_DIAGRAM}</div>
+      <ol className={s.steps}>
+        <li>
+          <div className={s.stepLabel}>Short ID &rarr; content_hash</div>
+          <div className={s.stepSub}>
+            {t("flowStep1")}
+          </div>
+        </li>
+        <li>
+          <div className={s.stepLabel}>content_hash &rarr; cNFT candidates</div>
+          <div className={s.stepSub}>
+            {t("flowStep2")}
+          </div>
+        </li>
+        <li>
+          <div className={s.stepLabel}>cNFT ID &rarr; on-chain verification</div>
+          <div className={s.stepSub}>
+            {t("flowStep3")}
+          </div>
+        </li>
+        <li>
+          <div className={s.stepLabel}>signed_json &rarr; browser verification</div>
+          <div className={s.stepSub}>
+            {t("flowStep4")}
+          </div>
+        </li>
+      </ol>
+      <div className={s.callout}>
+        <div className={s.calloutLabel}>{t("flowNote")}</div>
+      </div>
 
       <h2 className={s.h2}>{t("commonTitle")}</h2>
       <p className={s.p}>{t("commonIntro")}</p>

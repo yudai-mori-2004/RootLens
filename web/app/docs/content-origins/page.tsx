@@ -4,33 +4,6 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "How Content Is Signed" };
 
-const HW_DIAGRAM = `
-  Camera      Image         Secure        C2PA
-  Sensor -->  Processing --> Chip     --> Signature
-               (ISP)        (Titan M2)
-
-  * Signing key is factory-bound
-  * Cannot be extracted from the chip
-`.trim();
-
-const APP_DIAGRAM = `
-  Camera         TEE                 C2PA
-  API (OS) -->  (Secure Enclave / --> Signature
-                 StrongBox)
-
-  * Private key generated in TEE, never exported
-  * Sensor --> TEE path goes through the OS
-`.trim();
-
-const PKI_DIAGRAM = `
-  Root CA (AWS KMS, 20-year validity)
-  |-- iOS Intermediate CA (AWS KMS)
-  |   \`-- Device Cert (90-day, TEE public key)
-  |
-  \`-- Android Intermediate CA (AWS KMS)
-      \`-- Device Cert (90-day, TEE public key)
-`.trim();
-
 export default async function ContentOriginsPage() {
   const t = await getTranslations("docs.contentOrigins");
   const tn = await getTranslations("docs.nav");
@@ -53,7 +26,28 @@ export default async function ContentOriginsPage() {
       {/* Hardware */}
       <h2 className={s.h2} id="hardware">{t("hwTitle")}</h2>
       <p className={s.p}>{t("hwP1")}</p>
-      <div className={s.diagram}>{HW_DIAGRAM}</div>
+      <div className={s.flow}>
+        <div className={s.flowNode}>
+          <div className={s.flowNodeLabel}>Camera Sensor</div>
+        </div>
+        <div className={s.flowArrow}>&rarr;</div>
+        <div className={s.flowNode}>
+          <div className={s.flowNodeLabel}>Image Processing</div>
+          <div className={s.flowNodeSub}>ISP</div>
+        </div>
+        <div className={s.flowArrow}>&rarr;</div>
+        <div className={s.flowNode}>
+          <div className={s.flowNodeLabel}>Secure Chip</div>
+          <div className={s.flowNodeSub}>Titan M2 etc.</div>
+        </div>
+        <div className={s.flowArrow}>&rarr;</div>
+        <div className={s.flowNode}>
+          <div className={s.flowNodeLabel}>C2PA Signature</div>
+        </div>
+      </div>
+      <p className={s.flowNote}>
+        * Signing key is factory-bound and cannot be extracted from the chip
+      </p>
 
       <table className={s.table}>
         <thead>
@@ -81,7 +75,25 @@ export default async function ContentOriginsPage() {
       {/* App-Level */}
       <h2 className={s.h2} id="app">{t("appTitle")}</h2>
       <p className={s.p}>{t("appP1")}</p>
-      <div className={s.diagram}>{APP_DIAGRAM}</div>
+      <div className={s.flow}>
+        <div className={s.flowNode}>
+          <div className={s.flowNodeLabel}>Camera API</div>
+          <div className={s.flowNodeSub}>OS</div>
+        </div>
+        <div className={s.flowArrow}>&rarr;</div>
+        <div className={s.flowNode}>
+          <div className={s.flowNodeLabel}>TEE</div>
+          <div className={s.flowNodeSub}>Secure Enclave / StrongBox</div>
+        </div>
+        <div className={s.flowArrow}>&rarr;</div>
+        <div className={s.flowNode}>
+          <div className={s.flowNodeLabel}>C2PA Signature</div>
+        </div>
+      </div>
+      <p className={s.flowNote}>
+        * Private key generated in TEE, never exported<br />
+        * Sensor-to-TEE path goes through the OS
+      </p>
       <p className={s.p}>{t("appMechanisms")}</p>
 
       <h3 className={s.h3}>{t("appAttestation")}</h3>
@@ -104,7 +116,28 @@ export default async function ContentOriginsPage() {
 
       <h3 className={s.h3}>{t("appPkiTitle")}</h3>
       <p className={s.p}>{t("appPkiP1")}</p>
-      <div className={s.diagram}>{PKI_DIAGRAM}</div>
+      <ul className={s.tree}>
+        <li>
+          <span className={s.treeLabel}>Root CA</span>
+          <span className={s.treeSub}>AWS KMS, 20-year validity</span>
+          <ul>
+            <li>
+              <span className={s.treeLabel}>iOS Intermediate CA</span>
+              <span className={s.treeSub}>AWS KMS</span>
+              <ul>
+                <li>Device Certificate <span className={s.treeSub}>90-day, TEE public key</span></li>
+              </ul>
+            </li>
+            <li>
+              <span className={s.treeLabel}>Android Intermediate CA</span>
+              <span className={s.treeSub}>AWS KMS</span>
+              <ul>
+                <li>Device Certificate <span className={s.treeSub}>90-day, TEE public key</span></li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
       <p className={s.p}>
         {t("appPkiLinkBefore")}
         <a href="/docs/pki" className={s.link}>{t("appPkiLinkText")}</a>

@@ -906,7 +906,12 @@
       "verdictP1bold": "every check across all processors passes",
       "verdictP1c": ". A single failure in any check sets the overall result to ",
       "verdictP1code2": "failed",
-      "verdictP1d": "."
+      "verdictP1d": ".",
+      "flowStep1": "The server resolves the short ID to a content_hash. This is a convenience lookup, not a trust-bearing step.",
+      "flowStep2": "The indexer cache returns candidate cNFT IDs. These are NOT trusted — every candidate is re-verified on-chain.",
+      "flowStep3": "For each candidate, the browser queries the Solana blockchain directly. It checks collection membership, content_hash match, and fetches signed_json from the cNFT's URI.",
+      "flowStep4": "TEE signature check, collection membership, content binding, processor-specific checks, and perceptual hash recomputation.",
+      "flowNote": "Steps 3 and 4 do not contact the RootLens server"
     },
     "pki": {
       "title": "PKI Architecture",
