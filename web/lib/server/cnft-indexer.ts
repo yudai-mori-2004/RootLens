@@ -156,7 +156,7 @@ export async function indexOneAsset(asset: DasAsset): Promise<boolean> {
 
 /**
  * txSignatureからミントされたcNFTを抽出しインデクサに登録する。
- * ログから "Leaf asset ID: ..." を探し、各asset_idをindexOneAssetで処理。
+ * ログから "Leaf asset ID: ..." を探し、DASにインデックスされるまでリトライして登録。
  */
 export async function indexFromTransaction(txSignature: string): Promise<number> {
   const txRes = await fetch(DAS_RPC_URL, {
@@ -175,7 +175,6 @@ export async function indexFromTransaction(txSignature: string): Promise<number>
 
   const blockTime: number = tx.blockTime;
 
-  // ログから Leaf asset ID を抽出
   const logs: string[] = tx.meta?.logMessages || [];
   const assetIds: string[] = [];
   for (const log of logs) {
@@ -183,29 +182,47 @@ export async function indexFromTransaction(txSignature: string): Promise<number>
     if (match) assetIds.push(match[1]);
   }
 
+  if (assetIds.length === 0) return 0;
+
+  // DASインデックス遅延に対応: 全asset_idが取得できるまでリトライ
+  const maxRetries = 10;
+  const retryInterval = 2000; // 2秒
   let indexed = 0;
-  for (const assetId of assetIds) {
-    const asset = await dasGetAsset(assetId);
-    if (!asset) continue;
+  const pending = new Set(assetIds);
 
-    const contentHash = getAttribute(asset, "content_hash");
-    if (!contentHash) continue;
+  for (let attempt = 0; attempt < maxRetries && pending.size > 0; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, retryInterval));
 
-    const processorId = deriveProcessorId(asset);
+    for (const assetId of [...pending]) {
+      const asset = await dasGetAsset(assetId);
+      if (!asset) continue;
 
-    const { error } = await supabase.from("cnft_assets").upsert(
-      {
-        asset_id: assetId,
-        content_hash: contentHash,
-        processor_id: processorId,
-        network: NETWORK,
-        solana_block_time: blockTime,
-        tsa_timestamp: null,
-      },
-      { onConflict: "asset_id" },
-    );
+      const contentHash = getAttribute(asset, "content_hash");
+      if (!contentHash) continue;
 
-    if (!error) indexed++;
+      const processorId = deriveProcessorId(asset);
+
+      const { error } = await supabase.from("cnft_assets").upsert(
+        {
+          asset_id: assetId,
+          content_hash: contentHash,
+          processor_id: processorId,
+          network: NETWORK,
+          solana_block_time: blockTime,
+          tsa_timestamp: null,
+        },
+        { onConflict: "asset_id" },
+      );
+
+      if (!error) {
+        indexed++;
+        pending.delete(assetId);
+      }
+    }
+  }
+
+  if (pending.size > 0) {
+    console.warn(`[indexer] ${pending.size} assets not indexed after ${maxRetries} retries:`, [...pending]);
   }
 
   return indexed;
@@ -215,7 +232,7 @@ export async function indexFromTransaction(txSignature: string): Promise<number>
 // 差分 Poll
 // ---------------------------------------------------------------------------
 
-async function pollCollection(collection: string): Promise<number> {
+async function pollCollection(collection: string, full: boolean): Promise<number> {
   let page = 1;
   let indexed = 0;
 
@@ -232,8 +249,8 @@ async function pollCollection(collection: string): Promise<number> {
         .maybeSingle();
 
       if (data) {
-        hitKnown = true;
-        break;
+        if (!full) { hitKnown = true; break; }
+        continue; // fullモード: スキップして続行
       }
 
       const ok = await indexOneAsset(asset);
@@ -247,10 +264,14 @@ async function pollCollection(collection: string): Promise<number> {
   return indexed;
 }
 
-export async function pollAll(): Promise<{ core: number; ext: number }> {
+/**
+ * 全コレクションの差分Pollを実行。
+ * @param full true: 全件走査（穴埋め）。false: 既知到達で打ち切り（通常差分）。
+ */
+export async function pollAll(full = false): Promise<{ core: number; ext: number }> {
   const collections = await getCollectionMints();
-  const core = await pollCollection(collections.core);
-  const ext = await pollCollection(collections.ext);
+  const core = await pollCollection(collections.core, full);
+  const ext = await pollCollection(collections.ext, full);
   return { core, ext };
 }
 

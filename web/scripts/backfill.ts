@@ -1,18 +1,15 @@
 /**
- * cNFT インデクサ初回バックフィル
+ * cNFT インデクサ バックフィル / 穴埋め
  *
- * 使い方: cd web && npx next exec scripts/backfill.ts
- * または: cd web && npx tsx --env-file=.env scripts/backfill.ts
+ * 全件走査モードで実行し、インデックス漏れを補完する。
+ * 使い方: cd web && npx tsx --env-file=.env scripts/backfill.ts
  */
 
 import { pollAll } from "../lib/server/cnft-indexer";
 
 async function main() {
-  console.log("Starting cNFT backfill...");
-  console.log("SUPABASE_URL:", process.env.SUPABASE_URL ? "set" : "MISSING");
-  console.log("DAS_RPC:", process.env.NEXT_PUBLIC_DAS_RPC_URL ? "set" : "MISSING");
-
-  const result = await pollAll();
+  console.log("Starting cNFT backfill (full scan)...");
+  const result = await pollAll(true);
   console.log("Backfill complete:", result);
 }
 

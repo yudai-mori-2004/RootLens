@@ -57,9 +57,10 @@ export async function POST(req: NextRequest) {
 
     for (const sig of [...new Set(txSignatures)]) {
       try {
-        await indexFromTransaction(sig);
+        const count = await indexFromTransaction(sig);
+        console.log(`[publish] indexed ${count} assets from TX ${sig}`);
       } catch (e) {
-        console.warn("[publish] indexer insert failed for", sig, e);
+        console.error("[publish] indexer insert failed for", sig, e);
       }
     }
 
