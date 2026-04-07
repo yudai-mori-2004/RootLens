@@ -24,26 +24,26 @@ const NAV: NavSection[] = [
     ],
   },
   {
-    titleKey: "contentOrigins",
+    titleKey: "contentSigning",
     items: [
       { href: "/docs/content-origins", labelKey: "howContentIsSigned" },
       { href: "/docs/content-origins#hardware", labelKey: "hardwareSigning", sub: true },
       { href: "/docs/content-origins#app", labelKey: "appLevelSigning", sub: true },
       { href: "/docs/content-origins#provenance", labelKey: "provenanceGraph", sub: true },
+      { href: "/docs/pki", labelKey: "pkiArchitecture" },
     ],
   },
   {
-    titleKey: "verificationPipeline",
+    titleKey: "verificationAndRecord",
     items: [
       { href: "/docs/title-protocol", labelKey: "titleProtocol" },
       { href: "/docs/cnft-structure", labelKey: "cnftStructure" },
-      { href: "/docs/verification", labelKey: "clientSideVerification" },
     ],
   },
   {
-    titleKey: "infrastructure",
+    titleKey: "browserVerification",
     items: [
-      { href: "/docs/pki", labelKey: "pkiArchitecture" },
+      { href: "/docs/verification", labelKey: "clientSideVerification" },
     ],
   },
 ];

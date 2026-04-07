@@ -426,17 +426,17 @@
       "gettingStarted": "はじめに",
       "overview": "概要",
       "trustModel": "信頼モデル",
-      "contentOrigins": "コンテンツの出自",
       "howContentIsSigned": "コンテンツの署名方法",
       "hardwareSigning": "ハードウェア署名",
       "appLevelSigning": "アプリレベル署名",
       "provenanceGraph": "来歴グラフ",
-      "verificationPipeline": "検証パイプライン",
       "titleProtocol": "Title Protocol TEE",
       "cnftStructure": "cNFT構造",
       "clientSideVerification": "クライアントサイド検証",
-      "infrastructure": "インフラストラクチャ",
-      "pkiArchitecture": "PKIアーキテクチャ"
+      "pkiArchitecture": "PKIアーキテクチャ",
+      "contentSigning": "コンテンツの署名",
+      "verificationAndRecord": "検証と記録",
+      "browserVerification": "閲覧者による検証"
     },
     "overview": {
       "title": "RootLens ドキュメント",

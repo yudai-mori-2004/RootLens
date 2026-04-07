@@ -426,17 +426,17 @@
       "gettingStarted": "Getting Started",
       "overview": "Overview",
       "trustModel": "Trust Model",
-      "contentOrigins": "Content Origins",
       "howContentIsSigned": "How Content Is Signed",
       "hardwareSigning": "Hardware Signing",
       "appLevelSigning": "App-Level Signing",
       "provenanceGraph": "Provenance Graph",
-      "verificationPipeline": "Verification Pipeline",
       "titleProtocol": "Title Protocol TEE",
       "cnftStructure": "cNFT Structure",
       "clientSideVerification": "Client-Side Verification",
-      "infrastructure": "Infrastructure",
-      "pkiArchitecture": "PKI Architecture"
+      "pkiArchitecture": "PKI Architecture",
+      "contentSigning": "Content Signing",
+      "verificationAndRecord": "Verification & Record",
+      "browserVerification": "Browser Verification"
     },
     "overview": {
       "title": "RootLens Documentation",
