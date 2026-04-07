@@ -107,6 +107,7 @@ function getCreationTime(row: any): number {
   return row.solana_block_time;
 }
 
+/** Core: 最古を選択（権利帰属の優先順位） */
 function selectOldest(rows: any[]): any | null {
   if (rows.length === 0) return null;
   return rows.reduce((oldest, row) => {
@@ -115,6 +116,15 @@ function selectOldest(rows: any[]): any | null {
     if (rowTime < oldestTime) return row;
     if (rowTime === oldestTime && row.solana_block_time < oldest.solana_block_time) return row;
     return oldest;
+  });
+}
+
+/** Extension: 最新を選択（最新WASMバージョンの結果を優先） */
+function selectNewest(rows: any[]): any | null {
+  if (rows.length === 0) return null;
+  return rows.reduce((newest, row) => {
+    if (row.solana_block_time > newest.solana_block_time) return row;
+    return newest;
   });
 }
 
@@ -161,7 +171,7 @@ export class IndexerContentResolver implements ContentResolver {
       const coreSj = await fetchSignedJson(coreAsset.content.json_uri);
       const coreSignedJson = coreSj && isCorePayload(coreSj.payload) ? coreSj : null;
 
-      // Step 4: Extension の重複解決 → extension_id ごとに最古を選択
+      // Step 4: Extension → extension_id ごとに最新を選択（最新WASM結果を優先）
       const extRows = rows.filter((r: any) => r.processor_id !== "core-c2pa");
       const extByProcessorId = new Map<string, any[]>();
       for (const r of extRows) {
@@ -172,11 +182,11 @@ export class IndexerContentResolver implements ContentResolver {
 
       const extensionNfts: ExtensionNft[] = [];
       for (const [, group] of extByProcessorId) {
-        const oldest = selectOldest(group);
-        if (!oldest) continue;
+        const newest = selectNewest(group);
+        if (!newest) continue;
 
         // DAS で検証
-        const extAsset = await dasGetAsset(oldest.asset_id);
+        const extAsset = await dasGetAsset(newest.asset_id);
         if (!extAsset) continue;
 
         const extCollection = getCollectionAddress(extAsset);
@@ -188,7 +198,7 @@ export class IndexerContentResolver implements ContentResolver {
         if (!extSj) continue;
 
         extensionNfts.push({
-          assetId: oldest.asset_id,
+          assetId: newest.asset_id,
           collectionAddress: extCollection,
           signedJsonUri: extAsset.content.json_uri,
           attributes: extAsset.content.metadata.attributes ?? [],
