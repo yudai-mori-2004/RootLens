@@ -42,7 +42,7 @@ async function dasSearchAssets(
       method: "searchAssets",
       params: {
         grouping: ["collection", collection],
-        sortBy: { sortBy: "id", sortDirection: "desc" },
+        sortBy: { sortBy: "recent_action", sortDirection: "desc" },
         page,
         limit,
       },
