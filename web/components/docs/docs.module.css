@@ -412,15 +412,15 @@
 }
 
 .phaseCardQuestion {
-  font-size: 0.78rem;
-  color: var(--docs-text-tertiary);
+  font-size: 0.8rem;
+  color: var(--docs-text-secondary);
+  line-height: 1.5;
 }
 
 .phaseCardTrust {
-  font-size: 0.78rem;
-  color: var(--docs-accent);
-  font-weight: 600;
-  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--docs-text-tertiary);
+  margin-top: 4px;
 }
 
 @media (max-width: 900px) {

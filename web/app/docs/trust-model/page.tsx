@@ -149,8 +149,7 @@ export default async function TrustModelPage() {
       </ul>
       <p className={s.p}>{t("attestationConclusion")}</p>
 
-      {/* Self-Proving Data */}
-      <h2 className={s.h2}>{t("selfProvingTitle")}</h2>
+      <h3 className={s.h3}>{t("selfProvingTitle")}</h3>
       <p className={s.p}>
         {t("selfProvingP1a")}
         <code className={s.code}>{t("selfProvingP1code")}</code>
