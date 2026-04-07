@@ -87,9 +87,9 @@ export default async function PkiPage() {
 
       <div className={s.callout}>
         <div className={s.calloutLabel}>{t("scopeLabel")}</div>
-        {t.rich("scopeText", {
-          rootlensSigning: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("scopeTextBefore")}
+        <span className={s.strong}>{t("scopeTextBold")}</span>
+        {t("scopeTextAfter")}
       </div>
 
       <h2 className={s.h2}>{t("hierarchyTitle")}</h2>
@@ -99,9 +99,9 @@ export default async function PkiPage() {
 
       <h3 className={s.h3}>{t("isolationTitle")}</h3>
       <p className={s.p}>
-        {t.rich("isolationP1", {
-          pathLen: () => <code className={s.code}>pathLenConstraint: 0</code>,
-        })}
+        {t("isolationP1before")}
+        <code className={s.code}>{t("isolationP1code")}</code>
+        {t("isolationP1after")}
       </p>
 
       <h3 className={s.h3}>{t("shortLivedTitle")}</h3>
@@ -131,17 +131,17 @@ export default async function PkiPage() {
           <tr>
             <td><span className={s.strong}>Android Play Integrity</span></td>
             <td>
-              {t.rich("androidPlayIntegrity", {
-                hash: () => <code className={s.code}>SHA-256(CSR)</code>,
-              })}
+              {t("androidPlayIntegrityBefore")}
+              <code className={s.code}>{t("androidPlayIntegrityCode")}</code>
+              {t("androidPlayIntegrityAfter")}
             </td>
           </tr>
           <tr>
             <td><span className={s.strong}>iOS App Attest</span></td>
             <td>
-              {t.rich("iosAppAttest", {
-                hash: () => <code className={s.code}>clientDataHash = SHA-256(CSR)</code>,
-              })}
+              {t("iosAppAttestBefore")}
+              <code className={s.code}>{t("iosAppAttestCode")}</code>
+              {t("iosAppAttestAfter")}
             </td>
           </tr>
         </tbody>
@@ -149,9 +149,9 @@ export default async function PkiPage() {
 
       <h2 className={s.h2}>{t("crlTitle")}</h2>
       <p className={s.p}>
-        {t.rich("crlP1", {
-          endpoint: () => <code className={s.code}>/api/v1/crl</code>,
-        })}
+        {t("crlP1before")}
+        <code className={s.code}>{t("crlP1code")}</code>
+        {t("crlP1after")}
       </p>
 
       <h2 className={s.h2}>{t("rotationTitle")}</h2>

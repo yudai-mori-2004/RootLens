@@ -67,7 +67,7 @@ export default async function CnftStructurePage() {
       <h3 className={s.h3}>{t("checksTitle")}</h3>
       <ul className={s.list}>
         {(["checkCollection", "checkTeeSig", "checkBinding", "checkProvenance", "checkOriginality"] as const).map((k) => (
-          <li key={k}>{t.rich(k, { label: (c) => <span className={s.strong}>{c}</span> })}</li>
+          <li key={k}><span className={s.strong}>{t(`${k}Label` as any)}</span> — {t(`${k}Text` as any)}</li>
         ))}
       </ul>
 
@@ -96,7 +96,7 @@ export default async function CnftStructurePage() {
       <h3 className={s.h3}>{t("checksTitle")}</h3>
       <ul className={s.list}>
         {(["checkExtCollection", "checkTeeSig", "checkBinding", "checkWasm", "checkCertVerified"] as const).map((k) => (
-          <li key={k}>{t.rich(k, { label: (c) => <span className={s.strong}>{c}</span> })}</li>
+          <li key={k}><span className={s.strong}>{t(`${k}Label` as any)}</span> — {t(`${k}Text` as any)}</li>
         ))}
       </ul>
 
@@ -120,9 +120,9 @@ export default async function CnftStructurePage() {
 
       <h3 className={s.h3}>{t("pdqVerifyTitle")}</h3>
       <p className={s.p}>
-        {t.rich("pdqVerifyP1", {
-          hammingDistance: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("pdqVerifyP1before")}
+        <span className={s.strong}>{t("pdqVerifyP1bold")}</span>
+        {t("pdqVerifyP1after")}
       </p>
 
       {/* Video vPDQ */}

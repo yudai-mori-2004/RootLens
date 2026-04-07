@@ -62,14 +62,12 @@ export default async function ContentOriginsPage() {
       </table>
 
       <p className={s.p}>
-        {t.rich("hwTrustBasis", {
-          label: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        <span className={s.strong}>{t("hwTrustBasisLabel")}</span>
+        {t("hwTrustBasisText")}
       </p>
       <p className={s.p}>
-        {t.rich("hwRulesOut", {
-          label: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        <span className={s.strong}>{t("hwRulesOutLabel")}</span>
+        {t("hwRulesOutText")}
       </p>
 
       {/* App-Level */}
@@ -82,15 +80,14 @@ export default async function ContentOriginsPage() {
       <p className={s.p}>{t("appAttestationP1")}</p>
       <ul className={s.list}>
         <li>
-          {t.rich("appAttestationAndroid", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-          })}
+          <span className={s.strong}>{t("appAttestationAndroidLabel")}</span>
+          {t("appAttestationAndroidText")}
         </li>
         <li>
-          {t.rich("appAttestationIos", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            hash: () => <code className={s.code}>clientDataHash = SHA-256(CSR)</code>,
-          })}
+          <span className={s.strong}>{t("appAttestationIosLabel")}</span>
+          {t("appAttestationIosBefore")}
+          <code className={s.code}>{t("appAttestationIosCode")}</code>
+          {t("appAttestationIosAfter")}
         </li>
       </ul>
 
@@ -101,9 +98,9 @@ export default async function ContentOriginsPage() {
       <p className={s.p}>{t("appPkiP1")}</p>
       <div className={s.diagram}>{PKI_DIAGRAM}</div>
       <p className={s.p}>
-        {t.rich("appPkiLink", {
-          link: () => <a href="/docs/pki" className={s.link}>{t("appPkiLinkText")}</a>,
-        })}
+        {t("appPkiLinkBefore")}
+        <a href="/docs/pki" className={s.link}>{t("appPkiLinkText")}</a>
+        {t("appPkiLinkAfter")}
       </p>
 
       <h3 className={s.h3}>{t("tradeoffTitle")}</h3>
@@ -153,9 +150,9 @@ export default async function ContentOriginsPage() {
       {/* Provenance */}
       <h2 className={s.h2} id="provenance">{t("provenanceTitle")}</h2>
       <p className={s.p}>
-        {t.rich("provenanceP1", {
-          provenanceGraph: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("provenanceP1before")}
+        <span className={s.strong}>{t("provenanceP1bold")}</span>
+        {t("provenanceP1after")}
       </p>
 
       <table className={s.table}>

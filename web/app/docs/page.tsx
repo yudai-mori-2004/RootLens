@@ -45,25 +45,24 @@ Depends on device          TEE hardware              Re-verifies Phase 2
 
       <h2 className={s.h2}>{t("whatTitle")}</h2>
       <p className={s.p}>
-        {t.rich("whatP1", {
-          authentic: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("whatP1before")}
+        <span className={s.strong}>{t("whatP1bold")}</span>
+        {t("whatP1after")}
       </p>
       <p className={s.p}>
-        {t.rich("whatP2tee", {
-          tee: (c) => <span className={s.strong}>{c}</span>,
-          nobodyCanExtract: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("whatP2a")}
+        <span className={s.strong}>{t("whatP2teeBold")}</span>
+        {t("whatP2b")}
+        <span className={s.strong}>{t("whatP2nobodyBold")}</span>
+        {t("whatP2c")}
       </p>
       <p className={s.p}>{t("whatP3chain")}</p>
 
       <h2 className={s.h2}>{t("userTitle")}</h2>
       <p className={s.p}>
-        {t.rich("userP1", {
-          exampleLink: () => (
-            <code className={s.code}>rootlens.io/p/abc123</code>
-          ),
-        })}
+        {t("userP1before")}
+        <code className={s.code}>{t("userP1link")}</code>
+        {t("userP1after")}
       </p>
 
       <h2 className={s.h2}>{t("termsTitle")}</h2>

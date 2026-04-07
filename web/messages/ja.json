@@ -4,7 +4,6 @@
     "demoLink": "検証済み写真を確認する",
     "comingSoon": "近日公開"
   },
-
   "diagram": {
     "c2paTitle": "C2PA単体",
     "c2paSubtitle": "証明はファイルの中",
@@ -15,7 +14,6 @@
     "step3": "SNSアップロード",
     "step4": "再ダウンロード"
   },
-
   "nav": {
     "technology": "技術",
     "why": "課題",
@@ -23,7 +21,6 @@
     "about": "概要",
     "demo": "検証ページ"
   },
-
   "pages": {
     "home": {
       "closingTitle": "試してみる",
@@ -67,7 +64,6 @@
       "closingCtaGithub": "GitHubで見る"
     }
   },
-
   "lp": {
     "hero": {
       "title": "Prove it's real.",
@@ -76,15 +72,22 @@
       "ctaDemo": "検証ページを開く",
       "ctaHow": "仕組みを見る"
     },
-
     "appFlow": {
       "title": "使い方",
-      "step1": { "label": "撮影", "text": "RootLensで写真や動画を撮影します。その場でデジタル署名が付きます。" },
-      "step2": { "label": "証明", "text": "Title Protocolが署名を検証し、証明をファイルとは独立した永続的な記録として保存します。" },
-      "step3": { "label": "共有", "text": "リンクを取得し、どこにでも投稿できます。リンクを開けば、カメラで実際に撮影されたコンテンツであることを誰でも確認できます。" },
+      "step1": {
+        "label": "撮影",
+        "text": "RootLensで写真や動画を撮影します。その場でデジタル署名が付きます。"
+      },
+      "step2": {
+        "label": "証明",
+        "text": "Title Protocolが署名を検証し、証明をファイルとは独立した永続的な記録として保存します。"
+      },
+      "step3": {
+        "label": "共有",
+        "text": "リンクを取得し、どこにでも投稿できます。リンクを開けば、カメラで実際に撮影されたコンテンツであることを誰でも確認できます。"
+      },
       "editing": "共有前にクロップ、マスク、トリムの編集も可能です。RootLensはすべての編集を記録するため、閲覧者は何が変更されたかを確認し、元の写真が本物であることを検証できます。"
     },
-
     "issues": {
       "title": "なぜ必要なのか",
       "intro": "業界を横断して、同じ危機が進行しています。何が本物かを、誰も判別できなくなっています。",
@@ -105,7 +108,6 @@
         "text": "AI企業は学習データの権利問題で数千億円規模の訴訟に直面しています。偽造文書が裁判証拠の信頼性を揺るがしています。遠隔診療の画像に改ざん検証手段がありません。研究画像の捏造が容易になり、論文撤回が増加しています。"
       }
     },
-
     "c2pa": {
       "title": "正しい基盤はすでに存在する",
       "p1": "ディープフェイクや無断転載のような問題の根本原因は共通しています。デジタルコンテンツの「出自」と「権利帰属」が、実害が起きて誰かが主張するまでわからないということです。",
@@ -115,7 +117,6 @@
       "p5": "C2PA（Coalition for Content Provenance and Authenticity）は、Adobe、Microsoft、Googleなど6,000以上の組織が参加する、この来歴記録方式のオープン標準です。どのデバイス・ソフトウェアが、いつ、どんな編集をしたかを暗号署名付きで記録します。",
       "p6": "Google PixelはTitan M2チップで写真に署名します。Sony、NikonのハイエンドカメラもC2PA署名を実装しています。OpenAI、Google、AdobeはAI生成コンテンツにC2PA署名を付与しています。基盤は実在し、拡大しています。"
     },
-
     "gap": {
       "title": "しかし、証明は拡散の過程で消える",
       "p1": "C2PAの検証には2つが必要です。C2PAの完全なマニフェストデータ（署名チェーン、証明書、編集履歴を格納するJUMBFコンテナ）と、コンテンツ自体の完全なデータです。写真ならフル解像度の撮影データ、動画なら元の動画ファイル全体が必要です。コンテンツデータが1バイトでも変わればハッシュが一致しなくなり、検証は失敗します。この密結合（C2PA仕様ではhard bindingと呼称される）は完全性保証のために不可欠な設計ですが、コンテンツが配布される場面では障壁になります。",
@@ -124,7 +125,6 @@
       "p4": "既存の解決策には、透かしにURLを埋め込みクラウドストレージを使ってC2PAマニフェストを復元するなどの仕組みがあります。しかしこれらは総じて、暗号的な検証可能性を既に失ったコンテンツデータとC2PAマニフェストを近似的に再関連付けしようとする手法です。",
       "p5": "カメラで撮影されたことの証明がSNS上で人に届く仕組みを作るには、別の問題を解く必要がありました。コンテンツにカメラ撮影の来歴が記録されていてC2PA検証に合格したという証明を、コンテンツから分離し、完全なオリジナルファイルが手元になくても信頼できる形でアクセスできるようにすることです。"
     },
-
     "tp": {
       "title": "Title Protocol: 証明を独立させる",
       "subtitle": "コンテンツから抽出された任意の属性を、それ自体で信頼できる独立した記録として保存する。",
@@ -170,7 +170,6 @@
         }
       }
     },
-
     "comparison": {
       "title": "既存技術の現状と、残されている課題",
       "intro": "C2PA検証サービスや来歴レジストリは存在します。しかし以下の課題が未解決です。",
@@ -191,7 +190,6 @@
         "text": "企業が検証を行う場合、その企業を信頼する必要があります。Title ProtocolはTEEを使用し、検証は運営者が介入できないよう設計されたハードウェア隔離環境で行われます。結果は暗号署名され、クライアント側で検証可能です。TEEエンクレーブのコードはすべてオープンソースであり、検証ロジック自体を独立に監査できます。信頼の対象が企業の評判から、公開監査可能なコードベースとセキュリティモデルへと移行します。"
       }
     },
-
     "rootlens": {
       "title": "RootLens",
       "subtitle": "Title Protocolを作った理由",
@@ -203,7 +201,6 @@
       "permanence": "証明はアプリより長く残ります。RootLensが明日消えても、検証記録はオンチェーンのNFTに紐づいた形で残り続けます。Title Protocol上の他のアプリケーションも同じ記録にアクセスできます。",
       "targets": "AI生成の疑惑を受けるクリエイター、検証可能な証拠を必要とするジャーナリスト、そしてコンテンツが本物であることを証明する価値があるすべての人のために。"
     },
-
     "openSource": {
       "title": "オープンソース。オープンプロトコル。",
       "spec": "仕様書、アーキテクチャドキュメント、実装のすべてが公開されています。ドキュメントを読めば、システム全体を独立して検証・再実装できます。",
@@ -213,7 +210,6 @@
       "rlRepo": "RootLens",
       "specLink": "仕様書を読む"
     },
-
     "footer": {
       "builtBy": "森 雄大 ・ 河野 瞭人",
       "links": {
@@ -224,40 +220,33 @@
       "license": "Apache 2.0"
     }
   },
-
   "content": {
     "shotOn": "{device} で撮影",
     "shotOnDefault": "RootLens で撮影",
     "dateTsa": "TSA認証時刻",
     "dateRegistration": "登録時刻",
     "owner": "所有者",
-
     "chip": {
       "registered": "登録時刻",
       "shot": "撮影時刻"
     },
-
     "caption": {
       "seeMore": "続きを読む",
       "seeLess": "閉じる"
     },
-
     "trust": {
       "verifying": "検証中...",
       "verified": "本物のコンテンツです",
       "failed": "確認できない項目があります",
       "checks": "項目"
     },
-
     "tech": {
       "toggle": "検証の詳細を見る",
-
       "intro": {
         "title": "この検証の仕組み",
         "desc": "RootLensは、C2PA署名付きコンテンツの来歴と真正性を、TEE（Trusted Execution Environment: サーバー運営者もアクセスできないハードウェア隔離環境）内で検証し、その結果をSolanaブロックチェーンに記録します。",
         "trustChain": "検証の信頼は以下の連鎖で成立します: ブロックチェーン上の設定が信頼された検証ノードを定義 → NFTが公式コレクションに所属していることを確認 → オフチェーンの検証データを取得 → TEE署名を検証しデータの改ざんがないことを確認。各ステップはこのブラウザ内で独立に実行されています。"
       },
-
       "core": {
         "title": "Core NFT — 来歴の記録",
         "desc": "Core NFTは、コンテンツに埋め込まれたC2PA署名チェーンの検証結果を、TEE内部で署名しブロックチェーンに記録したものです。「誰が・いつ・何のツールで撮影・編集したか」という来歴全体が、改ざん不可能な形で保存されています。",
@@ -284,7 +273,6 @@
         "currentOwner": "現在の所有者",
         "sameOwner": "（同一 — 譲渡なし）"
       },
-
       "ext": {
         "title": "Extension NFT — 属性の検証",
         "desc": "Extensionは、コンテンツの生データからTEE内のWASMモジュールが算出した客観的な属性値です。CoreがC2PA来歴チェーン（コンテンツ間の権利構造）を扱うのに対し、Extensionは個々のコンテンツの性質（知覚ハッシュ、ハードウェア署名等）を扱います。Extensionの数に制限はなく、新たなWASMモジュールの追加により検証項目を自由に拡張できます。",
@@ -296,7 +284,6 @@
         "teeSigFail": "ExtensionオフチェーンデータのEd25519署名がTEE公開鍵で検証できませんでした",
         "dataTitle": "データ"
       },
-
       "pdq": {
         "title": "image-pdq — 画像の同一性検証",
         "desc": "PDQ（Meta開発の知覚ハッシュ）は画像の見た目を256ビットの数値に変換した指紋です。TEE内のWASMモジュールが元画像から算出し、ブロックチェーンに記録します。閲覧者のブラウザは、表示中の画像からTEEと同一のWASMバイナリとJaroszダウンサンプリングでPDQハッシュを再計算し、オンチェーンの値と比較します。両者のハミング距離（ビット単位の差異）が閾値以下なら、同一画像と判定されます。",
@@ -307,7 +294,6 @@
         "onchain": "オンチェーンPDQハッシュ",
         "computed": "再計算PDQハッシュ (ブラウザ算出)"
       },
-
       "hardware": {
         "title": "{id} — ハードウェア撮影証明",
         "titleDefault": "ハードウェア撮影証明",
@@ -315,7 +301,6 @@
         "wip": "検証WASMモジュール準備中",
         "notDetected": "ハードウェア署名は検出されませんでした（ソフトウェア署名のみ）"
       },
-
       "refs": {
         "title": "オンチェーン参照",
         "contentHash": "Content Hash",
@@ -329,7 +314,6 @@
         "viewOnSolana": "Solana Explorer",
         "viewOnStorage": "表示"
       },
-
       "dyn": {
         "protocolContext": "Program: {program} / GlobalConfig: {pda} / Network: {network}",
         "coreSummary": "Content Hash {hash} ({type}) {signing}。来歴ノード{nodes}件{links}。",
@@ -345,7 +329,6 @@
         "teeSigPending": "検証中",
         "tsaResult": "このコンテンツ: {provider}、{time}"
       },
-
       "why": {
         "title": "なぜこの検証を信頼できるのか",
         "trustless": "元のC2PAデータなしにトラストレス検証できる理由",
@@ -359,7 +342,6 @@
       }
     }
   },
-
   "field": {
     "content_hash": "Content Hash",
     "content_type": "コンテンツ種別",
@@ -403,7 +385,6 @@
     "rawData": "検証に使用したデータ",
     "rawDataEnv": "検証環境"
   },
-
   "check": {
     "c2pa_chain": "C2PA来歴チェーン",
     "c2pa_chain_pass": "C2PA署名チェーン内の来歴グラフ: ノード{nodes}件、リンク{links}件。撮影から現在までの編集履歴と素材関係が記録されている",
@@ -429,16 +410,13 @@
     "hardware_signing_pass": "C2PA署名チェーン内にハードウェアセキュアエレメント ({id}) の署名を検出。デバイスの物理的な撮影であることが証明されている",
     "hardware_signing_fail": "ハードウェア署名の検証に失敗しました"
   },
-
   "notfound": {
     "title": "コンテンツが見つかりません",
     "description": "このリンクは無効か、コンテンツが削除された可能性があります。"
   },
-
   "footer": {
     "tagline": "Prove it's real."
   },
-
   "docs": {
     "nav": {
       "next": "次へ",
@@ -464,11 +442,19 @@
       "title": "RootLens ドキュメント",
       "subtitle": "RootLensがコンテンツの真正性を証明する仕組み。カメラセンサーからブラウザ検証まで。",
       "whatTitle": "RootLensとは",
-      "whatP1": "ネット上で写真を見たとき、それが本物だとどうやってわかりますか？ RootLensはその問いに答えます。写真や動画が{authentic}であること（本物のカメラで、本物のデバイスで、改ざんなく撮影されたこと）を証明し、誰でもその証明を独立に検証できるようにします。",
-      "whatP2tee": "最も高いレベルで説明すると、こうです。カメラが撮影時にコンテンツに署名します。その署名済みコンテンツは、エンドツーエンド暗号化されて{tee}に送られます。TEEとは、誰も内部のデータを見たり検証コードを改ざんしたりできない、隔離されたハードウェアです。TEEは署名を検査し、重要な事実（誰が署名したか、画像がどのようなものか）を抽出し、その結果を、このシステムの開発者ですら取り出せない{nobodyCanExtract}秘密鍵で署名します。このTEE署名が信頼の根源です。",
+      "whatP1before": "ネット上で写真を見たとき、それが本物だとどうやってわかりますか？ RootLensはその問いに答えます。写真や動画が",
+      "whatP1bold": "本物",
+      "whatP1after": "であること（本物のカメラで、本物のデバイスで、改ざんなく撮影されたこと）を証明し、誰でもその証明を独立に検証できるようにします。",
+      "whatP2a": "最も高いレベルで説明すると、こうです。カメラが撮影時にコンテンツに署名します。その署名済みコンテンツは、エンドツーエンド暗号化されて",
+      "whatP2teeBold": "Trusted Execution Environment（TEE）",
+      "whatP2b": "に送られます。TEEとは、誰も内部のデータを見たり検証コードを改ざんしたりできない、隔離されたハードウェアです。TEEは署名を検査し、重要な事実（誰が署名したか、画像がどのようなものか）を抽出し、その結果を、このシステムの開発者ですら取り出せない",
+      "whatP2nobodyBold": "誰にも取り出せない",
+      "whatP2c": "秘密鍵で署名します。このTEE署名が信頼の根源です。",
       "whatP3chain": "検証結果はオンチェーンのレコード（Solana上のcNFT）と紐づけられ、誰でも見つけられるようになります。実際の検証データはオフチェーンに保存されますが、TEE署名を内包しています。つまりブロックチェーンは証明の発見用インデックスであり、証明そのものの格納場所ではありません。閲覧者のブラウザはオンチェーンのポインタ経由でデータを取得し、TEE署名をローカルで再検証します。サーバーへの問い合わせは不要です。",
       "userTitle": "ユーザーから見た動作",
-      "userP1": "コンテンツクリエイターがRootLensアプリで写真を公開すると、共有可能なリンク（例: {exampleLink}）が生成されます。誰かがそのリンクをブラウザで開くと、写真とともに検証バッジが表示されます。裏側ではブラウザがオンチェーンのポインタ経由で証明データを取得し、RootLensのサーバーに問い合わせることなく、TEE署名をローカルで再検証しています。",
+      "userP1before": "コンテンツクリエイターがRootLensアプリで写真を公開すると、共有可能なリンク（例: ",
+      "userP1link": "rootlens.io/p/abc123",
+      "userP1after": "）が生成されます。誰かがそのリンクをブラウザで開くと、写真とともに検証バッジが表示されます。裏側ではブラウザがオンチェーンのポインタ経由で証明データを取得し、RootLensのサーバーに問い合わせることなく、TEE署名をローカルで再検証しています。",
       "termsTitle": "用語集",
       "termsIntro": "先に進む前に、このドキュメント全体で登場する用語を紹介します:",
       "termHeader": "用語",
@@ -501,16 +487,9 @@
       "title": "信頼モデル",
       "subtitle": "何を信頼する必要があり、何を信頼しなくてよいのか。正直に。",
       "originTitle": "信頼はどこから来るのか",
-      "originP1": "このシステムの信頼の根源は{teeHardware}です。ブロックチェーンではありません。暗号アルゴリズムでもありません。ハードウェアです。",
-      "originP2": "TEEは各検証結果を、ノード運用者にもRootLens開発者にも取り出せない{nobodyCanExtract}秘密鍵で署名します。これが署名を偽造不可能にしている理由です。暗号アルゴリズム（現在はEd25519、耐量子暗号への移行を設計済み）は検証の仕組みですが、それが機能する理由は鍵がハードウェアによって隔離されているからです。",
-      "originP3": "ブロックチェーン（Solana）は発見可能性と永続性を提供します。証明を見つけ、削除されていないことを確認できます。しかし証明が信頼できる理由はTEE署名にあり、ブロックチェーン上にあるからではありません。{signedJson}ファイルを手元に持っていれば、ブロックチェーンなしでも検証できます。",
       "mustTrustTitle": "信頼が必要なもの、不要なもの",
-      "mustTrustP1": "検証にRootLensやサーバーへの信頼は不要です。ただし、{teeWorking}という信頼は必要です。具体的には、TEE製造者（例: AWS Nitro Enclaves、AppleのSecure Enclave）が侵害されたシリコンを出荷しておらず、TEEに悪用可能な脆弱性がないということです。これはハードウェア信頼であり、ゼロトラストではありません。",
-      "mustTrustP2": "ただし、何が有効かを定義する{rules}（どのTEEノードが信頼されるか、どのWASMハッシュが承認されるか、どのcNFTコレクションが公式か）は、{globalConfig}オンチェーンレコードによって設定されています。このレコードは現在、単一のプロトコル権限鍵によって管理されています。つまり、その権限が悪意あるTEEノードや侵害されたWASMバイナリを登録していないことを信頼する必要があります。",
       "mustTrustP3": "これは真正な制限であり、正直に述べます。ロードマップではGlobalConfigのガバナンスをマルチシグ、最終的にはDAOに移行し、この信頼を複数の独立した当事者に分散させる予定です。しかし現時点では、これは中央集権的な信頼ポイントです。",
-      "mustTrustP4": "軽減要因: すべてのWASM検証コードは{openSource}です。誰でもコードを監査し、WASMバイナリを再ビルドし、そのハッシュをオンチェーンに登録されているものと比較できます。悪意ある更新は公に可視化されます。",
       "layersTitle": "信頼レイヤー",
-      "layersIntro": "システムには複数のコンポーネントがあり、それぞれ異なる信頼レベルを持ちます。重要な洞察: そのほとんどは{doNotNeedTrust}。",
       "layerHeader": "レイヤー",
       "layerTrustHeader": "信頼レベル",
       "layerWhyHeader": "理由",
@@ -545,25 +524,17 @@
       "layerIndexerCompromised": "サービス拒否のみ可能。証明の偽造は不可能（下記参照）",
       "serverTitle": "サーバーに関する疑問",
       "serverIntro": "自然な疑問: RootLensにサーバーがあるなら、検証にサーバーへの信頼が不要とはどういう意味か？ サーバーは2つのことを行います:",
-      "serverRouting": "{label}:{link}を開くと、サーバーがショートIDを{contentHash}に解決します。",
       "serverRoutingLabel": "ページルーティング",
-      "serverIndexer": "{label}:{contentHash}をオンチェーンのcNFT IDにマッピングし、ブラウザがブロックチェーン全体をスキャンしなくて済むようにします。",
       "serverIndexerLabel": "インデクサキャッシュ",
-      "serverAttackIntro": "サーバーが間違った{contentHash}を返し、ブラウザを別のコンテンツに向ける可能性はあるか？ あります。2つのレイヤーがこれを防御します:",
-      "serverDefensePdq": "{label}:ブラウザが実際に表示されている画像の視覚的指紋を計算し、オンチェーンのハッシュと比較します。視覚的に異なる画像への差し替えは検出されます。",
       "serverDefensePdqLabel": "知覚ハッシュの再計算",
-      "serverDefenseBinding": "{label}:TEE署名は{contentHash}をカバーしており、これは元ファイルのSHA-256です。これが主要な完全性保証を提供します: 知覚的に類似していても異なるファイルは異なる{contentHash2}を持ち、TEE署名された証明と一致しません。",
       "serverDefenseBindingLabel": "暗号的コンテンツバインディング",
       "serverConclusion": "サーバーはサービス拒否（証明を見つけられない）を引き起こせますが、偽陽性（誤った内容に「検証済み」が表示される）は引き起こせません。暗号ハッシュと視覚的指紋の両方が同時に一致する必要があるためです。",
       "attestationTitle": "TEEアテステーション",
       "attestationIntro": "Title Protocol TEEノードが実際に本物のTEEハードウェア内で動作していることをどうやって知るのか？ 2層の証拠があります:",
-      "attestationCollection": "{label}:cNFTは、GlobalConfigに公開鍵が登録されたTEEノードのみが公式コレクションにミントできます。cNFTがコレクションに存在するなら、権限者が登録時にTEEの身元を検証したことを意味します。",
       "attestationCollectionLabel": "オンチェーンのコレクション所属",
-      "attestationData": "{label}:各{signedJson}にはTEEのアテステーション情報（例: AWS Nitro Enclavesのアテステーションドキュメント）が含まれています。プロトコルはオープンソースなので、誰でもこのアテステーションを独立に検証できます: ソースからエンクレーブイメージを再ビルドし、期待される測定値を導出し、証明に添付されたアテステーションドキュメントと比較します。",
       "attestationDataLabel": "オフチェーンレコード内のアテステーションデータ",
       "attestationConclusion": "第1層は通常の検証に十分です。cNFTが公式コレクションに属していれば、ミント時にTEEは信頼されていたことを意味します。第2層はより深い、完全に独立したチェックを提供し、GlobalConfigへの信頼を必要としません。",
       "selfProvingTitle": "自己証明的データ",
-      "selfProvingP1": "オフチェーンに保存された{signedJson}は{selfProving}です。検証結果とTEE署名（現在はEd25519）を含みます。署名が信頼できる理由はアルゴリズムではなく、秘密鍵がTEEハードウェア内にロックされて取り出せないこと、そしてTEEが承認された検証コード（ハッシュがオンチェーンにピン留め）が生成したデータのみに署名することです。鍵の隔離とコードの整合性の両方が保証に必要です。",
       "selfProvingP2": "つまりストレージプロバイダを信頼する必要はありません。データがどこに保存されていても、ブラウザは署名をチェックすることでその整合性を検証できます。データが改ざんされていれば、検証は失敗します。",
       "globalConfigTitle": "GlobalConfig",
       "globalConfigP1": "GlobalConfigはSolana上のオンチェーンレコードで、プロトコル全体の設定を定義します。ブラウザはこれをブロックチェーンから直接読み取り、RootLensサーバーを経由しません。以下を含みます:",
@@ -572,7 +543,56 @@
       "globalConfigItem3": "どの検証コード（WASM）ハッシュが承認されているか（改ざんされたコードを防止）",
       "globalConfigP2": "このデータはオンチェーンにあるため、RootLensサーバーが偽の値を注入することはできません。ブラウザは信頼の源を直接読み取ります。ただし、GlobalConfig権限鍵の保持者はこれらの値を更新できます。これが上述のガバナンス信頼ポイントです。",
       "honestLabel": "正直な評価",
-      "honestText": "検証にRootLensやサーバーへの信頼は不要ですが、TEEハードウェアへの信頼は必要です。ガバナンスは現在中央集権的です（単一の権限鍵）。分散化への道筋（マルチシグ → DAO）は計画されていますが、まだ実装されていません。すべての検証コード（TEE側のWASMとクライアント側の両方）はオープンソースです。"
+      "honestText": "検証にRootLensやサーバーへの信頼は不要ですが、TEEハードウェアへの信頼は必要です。ガバナンスは現在中央集権的です（単一の権限鍵）。分散化への道筋（マルチシグ → DAO）は計画されていますが、まだ実装されていません。すべての検証コード（TEE側のWASMとクライアント側の両方）はオープンソースです。",
+      "originP1before": "このシステムの信頼の根源は",
+      "originP1bold": "TEEハードウェア",
+      "originP1after": "です。ブロックチェーンではありません。暗号アルゴリズムでもありません。ハードウェアです。",
+      "originP2before": "TEEは各検証結果を、ノード運用者にもRootLens開発者にも取り出せない",
+      "originP2bold": "誰にも取り出せない",
+      "originP2after": "秘密鍵で署名します。これが署名を偽造不可能にしている理由です。暗号アルゴリズム（現在はEd25519、耐量子暗号への移行を設計済み）は検証の仕組みですが、それが機能する理由は鍵がハードウェアによって隔離されているからです。",
+      "originP3before": "ブロックチェーン（Solana）は発見可能性と永続性を提供します。証明を見つけ、削除されていないことを確認できます。しかし証明が信頼できる理由はTEE署名にあり、ブロックチェーン上にあるからではありません。",
+      "originP3code": "signed_json",
+      "originP3after": "ファイルを手元に持っていれば、ブロックチェーンなしでも検証できます。",
+      "mustTrustP1before": "検証にRootLensやサーバーへの信頼は不要です。ただし、",
+      "mustTrustP1bold": "TEEハードウェアが設計通りに動作している",
+      "mustTrustP1after": "という信頼は必要です。具体的には、TEE製造者（例: AWS Nitro Enclaves、AppleのSecure Enclave）が侵害されたシリコンを出荷しておらず、TEEに悪用可能な脆弱性がないということです。これはハードウェア信頼であり、ゼロトラストではありません。",
+      "mustTrustP2a": "ただし、何が有効かを定義する",
+      "mustTrustP2rulesBold": "ルール",
+      "mustTrustP2b": "（どのTEEノードが信頼されるか、どのWASMハッシュが承認されるか、どのcNFTコレクションが公式か）は、",
+      "mustTrustP2gcCode": "GlobalConfig",
+      "mustTrustP2c": "オンチェーンレコードによって設定されています。このレコードは現在、単一のプロトコル権限鍵によって管理されています。つまり、その権限が悪意あるTEEノードや侵害されたWASMバイナリを登録していないことを信頼する必要があります。",
+      "mustTrustP4before": "軽減要因: すべてのWASM検証コードは",
+      "mustTrustP4bold": "オープンソース",
+      "mustTrustP4after": "です。誰でもコードを監査し、WASMバイナリを再ビルドし、そのハッシュをオンチェーンに登録されているものと比較できます。悪意ある更新は公に可視化されます。",
+      "layersIntroBefore": "システムには複数のコンポーネントがあり、それぞれ異なる信頼レベルを持ちます。重要な洞察: そのほとんどは",
+      "layersIntroBold": "信頼する必要がない",
+      "layersIntroAfter": "。",
+      "serverRoutingText": "",
+      "serverRoutingLink": "rootlens.io/p/abc123",
+      "serverRoutingText2": "を開くと、サーバーがショートIDを",
+      "serverRoutingCode": "content_hash",
+      "serverRoutingText3": "に解決します。",
+      "serverIndexerText": "",
+      "serverIndexerCode": "content_hash",
+      "serverIndexerText2": "をオンチェーンのcNFT IDにマッピングし、ブラウザがブロックチェーン全体をスキャンしなくて済むようにします。",
+      "serverAttackBefore": "サーバーが間違った",
+      "serverAttackCode": "content_hash",
+      "serverAttackAfter": "を返し、ブラウザを別のコンテンツに向ける可能性はあるか？ あります。2つのレイヤーがこれを防御します:",
+      "serverDefensePdqText": "ブラウザが実際に表示されている画像の視覚的指紋を計算し、オンチェーンのハッシュと比較します。視覚的に異なる画像への差し替えは検出されます。",
+      "serverDefenseBindingText": "TEE署名は",
+      "serverDefenseBindingCode": "content_hash",
+      "serverDefenseBindingText2": "をカバーしており、これは元ファイルのSHA-256です。これが主要な完全性保証を提供します。知覚的に類似していても異なるファイルは異なる",
+      "serverDefenseBindingCode2": "content_hash",
+      "serverDefenseBindingText3": "を持ち、TEE署名された証明と一致しません。",
+      "attestationCollectionText": "cNFTは、GlobalConfigに公開鍵が登録されたTEEノードのみが公式コレクションにミントできます。cNFTがコレクションに存在するなら、権限者が登録時にTEEの身元を検証したことを意味します。",
+      "attestationDataText": "各",
+      "attestationDataCode": "signed_json",
+      "attestationDataText2": "にはTEEのアテステーション情報（例: AWS Nitro Enclavesのアテステーションドキュメント）が含まれています。プロトコルはオープンソースなので、誰でもこのアテステーションを独立に検証できます。ソースからエンクレーブイメージを再ビルドし、期待される測定値を導出し、証明に添付されたアテステーションドキュメントと比較します。",
+      "selfProvingP1a": "オフチェーンに保存された",
+      "selfProvingP1code": "signed_json",
+      "selfProvingP1b": "は",
+      "selfProvingP1bold": "自己証明的",
+      "selfProvingP1c": "です。検証結果とTEE署名（現在はEd25519）を含みます。署名が信頼できる理由はアルゴリズムではなく、秘密鍵がTEEハードウェア内にロックされて取り出せないこと、そしてTEEが承認された検証コード（ハッシュがオンチェーンにピン留め）が生成したデータのみに署名することです。鍵の隔離とコードの整合性の両方が保証に必要です。"
     },
     "contentOrigins": {
       "title": "コンテンツの署名方式",
@@ -584,8 +604,6 @@
       "hwProvesHeader": "何を証明するか",
       "hwPixel": "画像がこのデバイスのセンサーから、改ざんなく取得された",
       "hwSony": "画像がこのカメラのセンサーから、改ざんなく取得された",
-      "hwTrustBasis": "{label} デバイスメーカーが工場出荷時にセキュアチップに署名鍵をバインドし、自社のRoot CAでデバイス証明書に署名します。センサーから署名までの全経路がメーカーのハードウェアによって管理されています。",
-      "hwRulesOut": "{label} 仮想カメラ、スクリーンキャプチャの注入。メーカーのハードウェアアーキテクチャが署名鍵を保護し、その署名がその特定のデバイスで生成されたことを証明します。ハードウェア保護の正確な境界はメーカーによって異なります。",
       "trustBasisLabel": "信頼の根拠:",
       "rulesOutLabel": "排除できること:",
       "appTitle": "アプリレベル署名（RootLens）",
@@ -593,13 +611,10 @@
       "appMechanisms": "RootLensは3つのメカニズムで信頼を構築します:",
       "appAttestation": "1. Platform Attestation",
       "appAttestationP1": "Device Certificateを発行する前に、RootLensサーバーがデバイスの真正性と非改ざん性を検証します:",
-      "appAttestationAndroid": "{label} Key Attestation（鍵がTEE内で生成されたことを証明）+ Play Integrity（デバイスがroot化されておらず、デバッグビルドでないことを証明）",
-      "appAttestationIos": "{label} App Attest（アプリが正規のAppleハードウェア上で動作する正規のRootLensバイナリであることを証明）、{hash}でアテステーションを特定の鍵にバインド",
       "appTeeTitle": "2. TEE鍵保護",
       "appTeeP1": "EC P-256署名鍵はデバイスのTEE内（iOSはSecure Enclave、AndroidはStrongBox）で生成されます。秘密鍵はTEEの外に出ることはなく、署名操作はチップ内部で行われます。",
       "appPkiTitle": "3. 3層PKI",
       "appPkiP1": "デバイスの公開鍵は、RootLensが管理する3層の証明書チェーンで認証されます:",
-      "appPkiLink": "完全な証明書プロファイルと発行フローについては、{link}ページを参照してください。",
       "appPkiLinkText": "PKIアーキテクチャ",
       "tradeoffTitle": "正直なトレードオフ",
       "tradeoffLabel": "設計上の決定",
@@ -628,7 +643,6 @@
       "keyPointLabel": "重要なポイント",
       "keyPointText": "Phase 2（TEE検証 + cNFTミント）とPhase 3（ブラウザ検証）は、すべてのコンテンツ出自で同一です。違いはPhase 1（元の署名の信頼根拠）のみです。",
       "provenanceTitle": "来歴グラフ（編集）",
-      "provenanceP1": "RootLensは撮影後のコンテンツ編集（クロップ、マスク、トリム）に対応しています。コンテンツが編集されると、C2PA標準は元のマニフェストを「素材（ingredient）」として参照する新しいマニフェストを作成します。これにより{provenanceGraph}（撮影から各編集に至るコンテンツの全履歴を辿れる署名の連鎖）が形成されます。",
       "provenanceScenario": "シナリオ",
       "provenanceChain": "C2PAチェーン",
       "provenanceDisplay": "表示",
@@ -644,39 +658,90 @@
       "prov4scenario": "RootLens撮影 → 編集 → 公開",
       "prov4chain": "RootLens署名（撮影）→ RootLens署名（編集）",
       "prov4display": "「Shot on RootLens」（編集履歴付き）",
-      "provenanceP2": "RootLensで写真を編集すると、アプリは元のファイルを「素材」として取り込み、編集を記録する新しいC2PAマニフェストを作成します。元のメーカー署名は来歴グラフに保持されるため、検証パイプラインは元のカメラ撮影からその後の各編集まで、全履歴を辿ることができます。"
+      "provenanceP2": "RootLensで写真を編集すると、アプリは元のファイルを「素材」として取り込み、編集を記録する新しいC2PAマニフェストを作成します。元のメーカー署名は来歴グラフに保持されるため、検証パイプラインは元のカメラ撮影からその後の各編集まで、全履歴を辿ることができます。",
+      "hwTrustBasisLabel": "信頼の根拠:",
+      "hwTrustBasisText": " デバイスメーカーが工場出荷時にセキュアチップに署名鍵をバインドし、自社のRoot CAでデバイス証明書に署名します。センサーから署名までの全経路がメーカーのハードウェアによって管理されています。",
+      "hwRulesOutLabel": "排除できること:",
+      "hwRulesOutText": " 仮想カメラ、スクリーンキャプチャの注入。メーカーのハードウェアアーキテクチャが署名鍵を保護し、その署名がその特定のデバイスで生成されたことを証明します。ハードウェア保護の正確な境界はメーカーによって異なります。",
+      "appAttestationAndroidLabel": "Android:",
+      "appAttestationAndroidText": " Key Attestation（鍵がTEE内で生成されたことを証明）+ Play Integrity（デバイスがroot化されておらず、デバッグビルドでないことを証明）",
+      "appAttestationIosLabel": "iOS:",
+      "appAttestationIosBefore": " App Attest（アプリが正規のAppleハードウェア上で動作する正規のRootLensバイナリであることを証明）、",
+      "appAttestationIosCode": "clientDataHash = SHA-256(CSR)",
+      "appAttestationIosAfter": "でアテステーションを特定の鍵にバインド",
+      "appPkiLinkBefore": "完全な証明書プロファイルと発行フローについては、",
+      "appPkiLinkAfter": "ページを参照してください。",
+      "provenanceP1before": "RootLensは撮影後のコンテンツ編集（クロップ、マスク、トリム）に対応しています。コンテンツが編集されると、C2PA標準は元のマニフェストを「素材（ingredient）」として参照する新しいマニフェストを作成します。これにより",
+      "provenanceP1bold": "来歴グラフ",
+      "provenanceP1after": "（撮影から各編集に至るコンテンツの全履歴を辿れる署名の連鎖）が形成されます。"
     },
     "titleProtocol": {
       "title": "Title Protocol",
       "subtitle": "コンテンツを誰にも見せずに、検証可能な事実を抽出するオープンプロトコル。",
       "whatTitle": "Title Protocolとは",
-      "whatP1": "Title Protocolは、C2PA署名されたコンテンツから{verifiable}を抽出する汎用プロトコルです。コンテンツをTEE内で処理し、抽出結果をTEE署名で封印し、Solana上のcNFTと紐づけます。",
-      "whatP2": "重要な特性は、{nobodySees}ということです。取り込みから結果出力まで、パイプライン全体がエンドツーエンド暗号化で動作します。TEEは暗号化されたコンテンツを受け取り、内部で復号し、要求された属性を抽出し、結果に署名して、暗号化して返します。共有されるのは抽出された事実（例:「この証明書チェーンは有効」「知覚ハッシュはX」）のみで、コンテンツ自体は決して共有されません。",
       "whatP3": "TEEはノード運用者が生のコンテンツを見ることを防ぎ、エンクレーブから出るのは抽出され署名された事実のみです。信頼はTEEハードウェア隔離から来ます: 署名鍵は取り出せず、検証コード（WASM）はオンチェーンのハッシュでピン留めされているため、その正当性は公に監査可能です。",
       "agnosticTitle": "コンテンツ出自に非依存",
-      "agnosticP1": "プロトコルはコンテンツの署名者を問いません。Google Pixelの写真もRootLensの写真も同じパイプラインに入ります。違いはどの{cert}プロセッサが証明書チェーンを検証するかだけで、コアの抽出・署名ロジックは同一です。",
       "rlAppTitle": "アプリケーションとしてのRootLens",
       "rlAppP1": "RootLensはTitle Protocol上に構築された最初のアプリケーションです。プロトコルを使ってカメラコンテンツから来歴情報、証明書検証結果、知覚ハッシュを抽出し、結果を共有可能なリンクとして公開します。ただしTitle Protocol自体はカメラコンテンツやRootLensに限定されません。",
       "e2eTitle": "エンドツーエンド暗号化チャネル",
       "e2eIntro": "ネットワークも、ノード運用者も、RootLensも、生のコンテンツを見ることはできません。TEEノードにコンテンツを送信する前に、アプリはエンドツーエンド暗号化チャネルを確立します:",
       "e2eConclusion": "結果として、コンテンツはすべての段階で暗号化されたまま移動します。TEEノード運用者、ネットワーク、RootLensは生のコンテンツを見ることができません。TEEから出るのは、TEEの署名で封印された抽出結果のみです。",
       "processorTitle": "プロセッサ選択",
-      "processorIntro": "すべてのC2PAマニフェストには{signerOrg}フィールド（コンテンツに署名した証明書の発行組織名）が含まれています（例: Pixel写真なら「Google」、アプリ署名写真なら「RootLens」）。アプリはこのフィールドを読み取り、TEEに実行するプロセッサを指定します:",
       "processorCalloutLabel": "重要",
-      "processorCallout": "各{cert}プロセッサは、C2PA証明書チェーンをRootLensのCAではなく、{rootCa}に対して検証します。Google Pixelの写真が検証される場合、TEEはGoogleのRoot CAに対して証明書チェーンをチェックします。このRoot CAはオンチェーンにハッシュが登録されたWASMバイナリ内にハードコードされています。",
       "producesTitle": "TEEが生成するもの",
-      "producesP1": "各プロセッサについて、TEEは{signedJson}（検証結果を含むJSONオブジェクト）を生成し、TEEの秘密鍵（現在はEd25519、耐量子暗号への移行を設計済み）で署名されます:",
-      "producesP2": "{jcs}に{domainTag}のドメインタグを付けて署名をカバーします。JCS（JSON Canonicalization Scheme）はJSONが正確に1通りにシリアライズされることを保証します。これがなければ、論理的に同一のデータでも異なるバイト列が生成され、署名が壊れてしまいます。署名が信頼できる理由は、秘密鍵がTEEハードウェア内にロックされて取り出せないこと、そしてTEEが承認された検証コード（ハッシュがオンチェーンにピン留め）が生成したデータのみに署名することです。鍵の隔離とコードの整合性の両方が保証に必要です。",
       "wasmTitle": "WASMの信頼",
-      "wasmP1": "検証ロジック（Root CA公開鍵を含む）はWASMバイナリにコンパイルされ、TEE内で実行されます。各WASMバイナリのSHA-256ハッシュは、オンチェーンのGlobalConfigの{trustedWasm}に登録されています。",
-      "wasmP2": "ブラウザがcNFTを検証する際、ペイロード内の{wasmHash}がオンチェーンに登録されたハッシュと一致するかチェックします。これにより、TEEが既知の未改ざんの検証バイナリを実行したことが保証され、バックドアや弱体化されたRoot CAを持つバイナリではないことが確認できます。",
       "mintTitle": "cNFTミント",
       "mintP1": "検証後、TEEはSolana上にcNFTをミントします。各コンテンツから以下が生成されます:",
-      "mintCore": "{label}（{code}）: C2PA来歴グラフ",
-      "mintCert": "{label}（{code}）: 証明書チェーン検証結果",
-      "mintPdq": "{label}（{code}または{code2}）: 視覚的指紋",
-      "mintP2": "すべてのcNFTはGlobalConfigで定義された公式コレクションにミントされます。各cNFTの{jsonUri}はオフチェーンの{signedJson}を指します。",
-      "mintLink": "各cNFTタイプの詳細なペイロード形式については、{link}ページを参照してください。"
+      "whatP1before": "Title Protocolは、C2PA署名されたコンテンツから",
+      "whatP1bold": "客観的で検証可能な属性",
+      "whatP1after": "を抽出する汎用プロトコルです。コンテンツをTEE内で処理し、抽出結果をTEE署名で封印し、Solana上のcNFTと紐づけます。",
+      "whatP2before": "重要な特性は、",
+      "whatP2bold": "誰も生のコンテンツを見ない",
+      "whatP2after": "ということです。取り込みから結果出力まで、パイプライン全体がエンドツーエンド暗号化で動作します。TEEは暗号化されたコンテンツを受け取り、内部で復号し、要求された属性を抽出し、結果に署名して、暗号化して返します。共有されるのは抽出された事実（例:「この証明書チェーンは有効」「知覚ハッシュはX」）のみで、コンテンツ自体は決して共有されません。",
+      "agnosticP1before": "プロトコルはコンテンツの署名者を問いません。Google Pixelの写真もRootLensの写真も同じパイプラインに入ります。違いはどの",
+      "agnosticP1code": "cert-*",
+      "agnosticP1after": "プロセッサが証明書チェーンを検証するかだけで、コアの抽出・署名ロジックは同一です。",
+      "processorIntroBefore": "すべてのC2PAマニフェストには",
+      "processorIntroCode": "signer_org",
+      "processorIntroAfter": "フィールド（コンテンツに署名した証明書の発行組織名）が含まれています（例: Pixel写真なら「Google」、アプリ署名写真なら「RootLens」）。アプリはこのフィールドを読み取り、TEEに実行するプロセッサを指定します:",
+      "processorCalloutA": "各",
+      "processorCalloutCode1": "cert-*",
+      "processorCalloutB": "プロセッサは、C2PA証明書チェーンをRootLensのCAではなく、",
+      "processorCalloutBold": "対応するメーカーのRoot CA公開鍵",
+      "processorCalloutC": "に対して検証します。Google Pixelの写真が検証される場合、TEEはGoogleのRoot CAに対して証明書チェーンをチェックします。このRoot CAはオンチェーンにハッシュが登録されたWASMバイナリ内にハードコードされています。",
+      "producesP1before": "各プロセッサについて、TEEは",
+      "producesP1code": "signed_json",
+      "producesP1after": "（検証結果を含むJSONオブジェクト）を生成し、TEEの秘密鍵（現在はEd25519、耐量子暗号への移行を設計済み）で署名されます:",
+      "producesP2a": "",
+      "producesP2code1": "JCS({ payload, attributes })",
+      "producesP2b": "に",
+      "producesP2code2": "title-protocol-v1",
+      "producesP2c": "のドメインタグを付けて署名をカバーします。JCS（JSON Canonicalization Scheme）はJSONが正確に1通りにシリアライズされることを保証します。これがなければ、論理的に同一のデータでも異なるバイト列が生成され、署名が壊れてしまいます。署名が信頼できる理由は、秘密鍵がTEEハードウェア内にロックされて取り出せないこと、そしてTEEが承認された検証コード（ハッシュがオンチェーンにピン留め）が生成したデータのみに署名することです。鍵の隔離とコードの整合性の両方が保証に必要です。",
+      "wasmP1before": "検証ロジック（Root CA公開鍵を含む）はWASMバイナリにコンパイルされ、TEE内で実行されます。各WASMバイナリのSHA-256ハッシュは、オンチェーンのGlobalConfigの",
+      "wasmP1code": "trusted_wasm_modules",
+      "wasmP1after": "に登録されています。",
+      "wasmP2before": "ブラウザがcNFTを検証する際、ペイロード内の",
+      "wasmP2code": "wasm_hash",
+      "wasmP2after": "がオンチェーンに登録されたハッシュと一致するかチェックします。これにより、TEEが既知の未改ざんの検証バイナリを実行したことが保証され、バックドアや弱体化されたRoot CAを持つバイナリではないことが確認できます。",
+      "mintCoreLabel": "1 Core cNFT",
+      "mintCoreCode": "core-c2pa",
+      "mintCoreText": ": C2PA来歴グラフ",
+      "mintCertLabel": "1 Cert Extension cNFT",
+      "mintCertCode": "cert-*",
+      "mintCertText": ": 証明書チェーン検証結果",
+      "mintPdqLabel": "1 Perceptual Hash Extension cNFT",
+      "mintPdqCode1": "image-pdq",
+      "mintPdqOr": " or ",
+      "mintPdqCode2": "video-vpdq",
+      "mintPdqText": ": 視覚的指紋",
+      "mintP2a": "すべてのcNFTはGlobalConfigで定義された公式コレクションにミントされます。各cNFTの",
+      "mintP2code1": "json_uri",
+      "mintP2b": "はオフチェーンの",
+      "mintP2code2": "signed_json",
+      "mintP2c": "を指します。",
+      "mintLinkBefore": "各cNFTタイプの詳細なペイロード形式については、",
+      "mintLinkText": "cNFTの構造",
+      "mintLinkAfter": "ページを参照してください。"
     },
     "cnftStructure": {
       "title": "cNFTの構造",
@@ -697,11 +762,6 @@
       "coreLinks": "ノード間の関係（親 → 子）",
       "coreTsa": "RFC 3161タイムスタンプ（Unix秒）、利用可能な場合",
       "attrAssurance": "（ハードウェア）または（アプリ）",
-      "checkCollection": "{label}:GlobalConfigのcoreコレクションに所属",
-      "checkTeeSig": "{label}:ハードウェア隔離鍵による署名（現在はEd25519）、JCS正規化されたペイロードに対して",
-      "checkBinding": "{label}:payload.content_hashがクエリと一致",
-      "checkProvenance": "{label}:C2PAグラフに少なくとも1つのノードが存在",
-      "checkOriginality": "{label}:このcontent_hashで最古のCore cNFTである",
       "certTitle": "Cert Extension (cert-*)",
       "certP1": "C2PA証明書チェーンが適切なメーカーのRoot CAに対して検証されたかを記録します。拡張IDはどのRoot CAが使用されたかを示します:",
       "certGoogle": "GoogleのRoot CA公開鍵に対して検証",
@@ -713,9 +773,6 @@
       "certWasmHash": "検証を実行したWASMバイナリのSHA-256",
       "certVerified": "証明書チェーンが検証に合格したか",
       "certRootCa": "検証に使用したRoot CAの名前",
-      "checkExtCollection": "{label}:GlobalConfigのextコレクションに所属",
-      "checkWasm": "{label}:wasm_hashがGlobalConfigに登録されている",
-      "checkCertVerified": "{label}:verified === true",
       "pdqTitle": "Image PDQ Extension (image-pdq)",
       "pdqP1": "PDQアルゴリズム（Meta ThreatExchange互換）で計算された画像の256bit知覚ハッシュ。再エンコードや軽微なリサイズに耐える「視覚的指紋」として機能します。",
       "pdqContentHash": "同一のcontent_hash",
@@ -724,46 +781,57 @@
       "pdqHowTitle": "PDQの仕組み（簡略版）",
       "pdqHowP1": "アルゴリズムは画像をグレースケールに変換し、小さなグリッドに縮小し、周波数変換を使って支配的な視覚パターンを抽出し、結果をコンパクトな256bitハッシュに量子化します。重要な特性は、再エンコード（例: JPEG圧縮）や軽微なリサイズでは非常に類似したハッシュが生成され、大幅に異なる画像では大幅に異なるハッシュが生成されることです。",
       "pdqVerifyTitle": "検証（ブラウザ）",
-      "pdqVerifyP1": "ブラウザは同一アルゴリズムの純粋TypeScript実装を使って、表示されている画像からPDQハッシュを再計算します。次に{hammingDistance}（2つのハッシュが異なるビット位置の数）を使ってオンチェーンのハッシュと比較します。距離が31以下（256bit中）であれば、画像は一致と判定されます。",
       "vpdqTitle": "Video vPDQ Extension (video-vpdq)",
       "vpdqP1": "動画の場合、PDQハッシュはキーフレーム（Iフレーム）ごとに計算されます。品質 ≥ 50（勾配エネルギー指標）のフレームのみが含まれます。",
       "vpdqFrames": "キーフレームごとのPDQデータ",
       "vpdqPdqhash": "そのフレームの256bit PDQハッシュ",
       "vpdqQuality": "勾配エネルギー（≥ 50で含まれる）",
       "vpdqKeyframe": "キーフレームインデックス",
-      "vpdqVerifyP1": "ブラウザはWebCodecs + mp4box.jsを使ってキーフレームを抽出し、それぞれのPDQを計算し、キーフレームインデックスで照合します。オンチェーンキーフレームの80%以上がハミング距離の閾値内で一致すれば、検証に合格します。"
+      "vpdqVerifyP1": "ブラウザはWebCodecs + mp4box.jsを使ってキーフレームを抽出し、それぞれのPDQを計算し、キーフレームインデックスで照合します。オンチェーンキーフレームの80%以上がハミング距離の閾値内で一致すれば、検証に合格します。",
+      "checkCollectionLabel": "Collection",
+      "checkCollectionText": "GlobalConfigのcoreコレクションに所属",
+      "checkTeeSigLabel": "TEE Signature",
+      "checkTeeSigText": "ハードウェア隔離鍵による署名（現在はEd25519）、JCS正規化されたペイロードに対して",
+      "checkBindingLabel": "Content Binding",
+      "checkBindingText": "payload.content_hashがクエリと一致",
+      "checkProvenanceLabel": "Provenance",
+      "checkProvenanceText": "C2PAグラフに少なくとも1つのノードが存在",
+      "checkOriginalityLabel": "Originality",
+      "checkOriginalityText": "このcontent_hashで最古のCore cNFTである",
+      "checkExtCollectionLabel": "Collection",
+      "checkExtCollectionText": "GlobalConfigのextコレクションに所属",
+      "checkWasmLabel": "WASM Trusted",
+      "checkWasmText": "wasm_hashがGlobalConfigに登録済み",
+      "checkCertVerifiedLabel": "Cert Verified",
+      "checkCertVerifiedText": "verified === true",
+      "pdqVerifyP1before": "ブラウザは同一アルゴリズムの純粋TypeScript実装を使って、表示されている画像からPDQハッシュを再計算します。次に",
+      "pdqVerifyP1bold": "ハミング距離",
+      "pdqVerifyP1after": "（2つのハッシュが異なるビット位置の数）を使ってオンチェーンのハッシュと比較します。距離が31以下（256bit中）であれば、画像は一致と判定されます。"
     },
     "verification": {
       "title": "クライアントサイド検証",
       "subtitle": "すべての検証チェックは閲覧者のブラウザで実行されます。サーバーは初期コンテンツルックアップを提供しますが、信頼に関わる検証ステップには関与しません。",
       "flowTitle": "リンクを開くと何が起こるか",
-      "flowIntro": "誰かがRootLensリンク（例: {link}）を共有したとき、{shortId}の部分は公開コンテンツを識別するショートIDです。ブラウザが行うことをステップごとに説明します:",
       "commonTitle": "共通チェック（全cNFT）",
       "commonIntro": "CoreもExtensionも含め、すべてのcNFTが同じ3つの共通チェックを受けます:",
       "check1Title": "1. コレクション",
       "check1P1": "cNFTのコレクションアドレスがオンチェーンのGlobalConfigで定義された公式コレクションと一致する必要があります。ブラウザはGlobalConfigをSolana RPCから直接取得し、RootLensサーバーやハードコードされた値には依存しません。",
       "check2Title": "2. TEE署名",
-      "check2P1": "{signedJson}の{payloadAttrs}がJCSで正規化され、ドメインタグ（{domainTag}）が付加され、TEEの署名アルゴリズム（現在はEd25519）で{teePubkey}に対して検証されます。",
       "check2P2": "これが最も重要なチェックです。TEE署名が証明を偽造不可能にしています。秘密鍵はTEEハードウェア内にのみ存在し、誰にも取り出せません。ブラウザはこの署名をWeb Crypto APIを通じて完全に再検証します。外部サービスは一切関与しません。",
       "check3Title": "3. コンテンツバインディング",
-      "check3P1": "{payloadHash}がcNFTを見つけるために使用した{contentHash}と一致する必要があります。これにより、あるコンテンツのsigned_jsonが別のコンテンツに再利用されることを防ぎます。",
       "coreChecksTitle": "Core固有チェック",
       "check4Title": "4. 来歴",
       "check4P1": "C2PA来歴グラフに少なくとも1つのノードが含まれている必要があります。空のグラフは来歴情報が記録されなかったことを意味します。",
       "check5Title": "5. オリジナリティ",
-      "check5P1": "ブラウザは同じ{contentHash}を持つすべてのCore cNFTを照会し、これが最古のものかどうかを確認します。他の誰かが同じコンテンツを後から登録した場合、最初の登録が優先されます。",
       "extChecksTitle": "Extension固有チェック",
       "check6Title": "6. WASM信頼",
-      "check6P1": "ペイロード内の{wasmHash}がオンチェーンのGlobalConfigの{trustedWasm}に登録されている必要があります。これにより、TEEが既知の未改ざんの検証バイナリを実行したことが保証されます。",
       "check7Title": "7. 証明書検証済み（cert-*のみ）",
-      "check7P1": "ペイロードの{verified}フィールドが{true_val}である必要があります。これはTEEのWASMがC2PA証明書チェーンを適切なRoot CA公開鍵に対して正常に検証したことを示します。",
       "check8Title": "8. PDQマッチ（image-pdqのみ）",
       "check8P1": "ブラウザはPDQアルゴリズムの純粋TypeScript実装を使って、現在表示されている画像からPDQハッシュを再計算します。オンチェーンのハッシュと再計算されたハッシュのハミング距離が256bit中31以下である必要があります。",
       "check8P2": "これにより、あなたが見ている画像がTEEによって検証されたものと同一であることが、サーバーに依存せず証明されます。",
       "check9Title": "9. vPDQマッチ（video-vpdqのみ）",
       "check9P1": "ブラウザはWebCodecs + mp4box.jsを使って動画からキーフレームを抽出し、各キーフレームのPDQを計算し、オンチェーンのフレームごとのハッシュと比較します。キーフレームの80%以上がハミング距離の閾値内で一致する必要があります。",
       "verdictTitle": "総合判定",
-      "verdictP1": "総合結果は、{everyCheck}場合のみ{verified}になります。いずれかのチェックで1つでも失敗すると、総合結果は{failed}になります。",
       "attackTitle": "攻撃シナリオ",
       "attackHeader": "攻撃",
       "defenseHeader": "防御",
@@ -780,17 +848,53 @@
       "attack6": "RootLensサーバーを侵害",
       "defense6": "サーバーは信頼に関わる検証ステップに不参加",
       "consoleTitle": "開発者コンソール",
-      "consoleP1": "コンテンツページを閲覧中に、ブラウザの開発者コンソールを開くと完全な検証ログを確認できます。すべてのチェックがパス/フェイルのステータス、データソース、Solanaアドレスとともに記録され、RootLensサーバーが参照されなかったことを確認するサマリーラインが表示されます。"
+      "consoleP1": "コンテンツページを閲覧中に、ブラウザの開発者コンソールを開くと完全な検証ログを確認できます。すべてのチェックがパス/フェイルのステータス、データソース、Solanaアドレスとともに記録され、RootLensサーバーが参照されなかったことを確認するサマリーラインが表示されます。",
+      "flowIntroBefore": "誰かがRootLensリンク（例: ",
+      "flowIntroLink": "rootlens.io/p/abc123",
+      "flowIntroMid": "）を共有したとき、",
+      "flowIntroCode": "abc123",
+      "flowIntroAfter": "の部分は公開コンテンツを識別するショートIDです。ブラウザが行うことをステップごとに説明します:",
+      "check2P1a": "",
+      "check2P1code1": "signed_json",
+      "check2P1b": "の",
+      "check2P1code2": "{ payload, attributes }",
+      "check2P1c": "がJCSで正規化され、ドメインタグ（",
+      "check2P1code3": "title-protocol-v1",
+      "check2P1d": "）が付加され、TEEの署名アルゴリズム（現在はEd25519）で",
+      "check2P1code4": "tee_pubkey",
+      "check2P1e": "に対して検証されます。",
+      "check3P1code1": "payload.content_hash",
+      "check3P1mid": "がcNFTを見つけるために使用した",
+      "check3P1code2": "content_hash",
+      "check3P1after": "と一致する必要があります。これにより、あるコンテンツのsigned_jsonが別のコンテンツに再利用されることを防ぎます。",
+      "check5P1before": "ブラウザは同じ",
+      "check5P1code": "content_hash",
+      "check5P1after": "を持つすべてのCore cNFTを照会し、これが最古のものかどうかを確認します。他の誰かが同じコンテンツを後から登録した場合、最初の登録が優先されます。",
+      "check6P1a": "ペイロード内の",
+      "check6P1code1": "wasm_hash",
+      "check6P1b": "がオンチェーンのGlobalConfigの",
+      "check6P1code2": "trusted_wasm_modules",
+      "check6P1c": "に登録されている必要があります。これにより、TEEが既知の未改ざんの検証バイナリを実行したことが保証されます。",
+      "check7P1a": "ペイロードの",
+      "check7P1code1": "verified",
+      "check7P1b": "フィールドが",
+      "check7P1code2": "true",
+      "check7P1c": "である必要があります。これは、TEEのWASMがC2PA証明書チェーンを適切なRoot CA公開鍵に対して正常に検証したことを示します。",
+      "verdictP1a": "全体の結果は、",
+      "verdictP1code1": "verified",
+      "verdictP1b": "になるのは",
+      "verdictP1bold": "すべてのプロセッサのすべてのチェックが合格した",
+      "verdictP1c": "場合のみです。いずれかのチェックで1つでも失敗すると、全体の結果は",
+      "verdictP1code2": "failed",
+      "verdictP1d": "になります。"
     },
     "pki": {
       "title": "PKIアーキテクチャ",
       "subtitle": "アプリレベルのコンテンツ署名のためのRootLensの3層証明書階層。",
       "scopeLabel": "対象範囲",
-      "scopeText": "このページは{rootlensSigning}に使用されるPKIを説明しています。ハードウェアレベルの署名者（Google、Sony、Leica）は、それぞれのメーカーが管理する独自のPKIを使用します。",
       "hierarchyTitle": "証明書階層",
       "designTitle": "設計上の決定",
       "isolationTitle": "プラットフォーム分離",
-      "isolationP1": "iOSとAndroidは別々のIntermediate CAを持ち、それぞれ独自のKMS鍵を使用します。一方のプラットフォームのICAが侵害された場合、もう一方に影響を与えずに失効させることができます。各ICAの{pathLen}がさらなる委任を防止します。",
       "shortLivedTitle": "短寿命のDevice Certificate",
       "shortLivedP1": "Device Certificateの有効期間はわずか90日です。デバイスが侵害された場合の露出期間を制限します。証明書は有効期限の14日前にバックグラウンドで自動更新され、ユーザーをブロックしません。",
       "kmsTitle": "Root CAとIntermediate CAのKMS",
@@ -801,12 +905,24 @@
       "platformHeader": "プラットフォーム",
       "methodHeader": "バインディング方法",
       "androidKeyAttest": "アテステーション証明書チェーンのリーフ証明書にはTEE内で生成された公開鍵が含まれています。サーバーはこの公開鍵をCSRの公開鍵と比較します。一致すればCSRの鍵がTEE内にあることが証明されます。",
-      "androidPlayIntegrity": "インテグリティトークン内のnonceは{hash}であり、トークンを特定のCSRにバインドします。",
-      "iosAppAttest": "{hash}がアテステーションAPIに渡され、アテステーションをCSRにバインドします。",
       "crlTitle": "証明書失効",
-      "crlP1": "CRL（Certificate Revocation List）は{endpoint}で公開されます。失効した証明書はデータベースでシリアル番号により追跡されます。Device Certificateの90日の有効期間が自然な失効メカニズムを提供しており、明示的な失効がなくても、侵害された証明書は90日以内に使用不可能になります。",
       "rotationTitle": "PKIローテーション検出",
-      "rotationP1": "アプリは定期的に、保存されたDevice Certificateが現在のIntermediate CAによって署名されたものかをチェックします。ICAがローテーションされた場合（例: セキュリティインシデントによる）、チェックが失敗し、アプリは新しいDevice Certificateを再プロビジョニングします。"
+      "rotationP1": "アプリは定期的に、保存されたDevice Certificateが現在のIntermediate CAによって署名されたものかをチェックします。ICAがローテーションされた場合（例: セキュリティインシデントによる）、チェックが失敗し、アプリは新しいDevice Certificateを再プロビジョニングします。",
+      "scopeTextBefore": "このページは",
+      "scopeTextBold": "RootLensアプリレベル署名",
+      "scopeTextAfter": "に使用されるPKIを説明しています。ハードウェアレベルの署名者（Google、Sony、Leica）は、それぞれのメーカーが管理する独自のPKIを使用します。",
+      "isolationP1before": "iOSとAndroidは別々のIntermediate CAを持ち、それぞれ独自のKMS鍵を使用します。一方のプラットフォームのICAが侵害された場合、もう一方に影響を与えずに失効させることができます。各ICAの",
+      "isolationP1code": "pathLenConstraint: 0",
+      "isolationP1after": "がさらなる委任を防止します。",
+      "androidPlayIntegrityBefore": "インテグリティトークン内のnonceは",
+      "androidPlayIntegrityCode": "SHA-256(CSR)",
+      "androidPlayIntegrityAfter": "であり、トークンを特定のCSRにバインドします。",
+      "iosAppAttestBefore": "",
+      "iosAppAttestCode": "clientDataHash = SHA-256(CSR)",
+      "iosAppAttestAfter": "がアテステーションAPIに渡され、アテステーションをCSRにバインドします。",
+      "crlP1before": "CRL（Certificate Revocation List）は",
+      "crlP1code": "/api/v1/crl",
+      "crlP1after": "で公開されます。失効した証明書はデータベースでシリアル番号により追跡されます。Device Certificateの90日の有効期間が自然な失効メカニズムを提供しており、明示的な失効がなくても、侵害された証明書は90日以内に使用不可能になります。"
     }
   }
 }

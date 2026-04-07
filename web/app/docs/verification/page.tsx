@@ -47,10 +47,11 @@ export default async function VerificationPage() {
 
       <h2 className={s.h2}>{t("flowTitle")}</h2>
       <p className={s.p}>
-        {t.rich("flowIntro", {
-          link: () => <code className={s.code}>rootlens.io/p/abc123</code>,
-          shortId: () => <code className={s.code}>abc123</code>,
-        })}
+        {t("flowIntroBefore")}
+        <code className={s.code}>{t("flowIntroLink")}</code>
+        {t("flowIntroMid")}
+        <code className={s.code}>{t("flowIntroCode")}</code>
+        {t("flowIntroAfter")}
       </p>
       <div className={s.diagram}>{FLOW_DIAGRAM}</div>
 
@@ -62,21 +63,24 @@ export default async function VerificationPage() {
 
       <h3 className={s.h3}>{t("check2Title")}</h3>
       <p className={s.p}>
-        {t.rich("check2P1", {
-          signedJson: () => <code className={s.code}>signed_json</code>,
-          payloadAttrs: () => <code className={s.code}>{"{ payload, attributes }"}</code>,
-          domainTag: () => <code className={s.code}>title-protocol-v1</code>,
-          teePubkey: () => <code className={s.code}>tee_pubkey</code>,
-        })}
+        {t("check2P1a")}
+        <code className={s.code}>{t("check2P1code1")}</code>
+        {t("check2P1b")}
+        <code className={s.code}>{t("check2P1code2")}</code>
+        {t("check2P1c")}
+        <code className={s.code}>{t("check2P1code3")}</code>
+        {t("check2P1d")}
+        <code className={s.code}>{t("check2P1code4")}</code>
+        {t("check2P1e")}
       </p>
       <p className={s.p}>{t("check2P2")}</p>
 
       <h3 className={s.h3}>{t("check3Title")}</h3>
       <p className={s.p}>
-        {t.rich("check3P1", {
-          payloadHash: () => <code className={s.code}>payload.content_hash</code>,
-          contentHash: () => <code className={s.code}>content_hash</code>,
-        })}
+        <code className={s.code}>{t("check3P1code1")}</code>
+        {t("check3P1mid")}
+        <code className={s.code}>{t("check3P1code2")}</code>
+        {t("check3P1after")}
       </p>
 
       <h2 className={s.h2}>{t("coreChecksTitle")}</h2>
@@ -86,27 +90,29 @@ export default async function VerificationPage() {
 
       <h3 className={s.h3}>{t("check5Title")}</h3>
       <p className={s.p}>
-        {t.rich("check5P1", {
-          contentHash: () => <code className={s.code}>content_hash</code>,
-        })}
+        {t("check5P1before")}
+        <code className={s.code}>{t("check5P1code")}</code>
+        {t("check5P1after")}
       </p>
 
       <h2 className={s.h2}>{t("extChecksTitle")}</h2>
 
       <h3 className={s.h3}>{t("check6Title")}</h3>
       <p className={s.p}>
-        {t.rich("check6P1", {
-          wasmHash: () => <code className={s.code}>wasm_hash</code>,
-          trustedWasm: () => <code className={s.code}>trusted_wasm_modules</code>,
-        })}
+        {t("check6P1a")}
+        <code className={s.code}>{t("check6P1code1")}</code>
+        {t("check6P1b")}
+        <code className={s.code}>{t("check6P1code2")}</code>
+        {t("check6P1c")}
       </p>
 
       <h3 className={s.h3}>{t("check7Title")}</h3>
       <p className={s.p}>
-        {t.rich("check7P1", {
-          verified: () => <code className={s.code}>verified</code>,
-          true_val: () => <code className={s.code}>true</code>,
-        })}
+        {t("check7P1a")}
+        <code className={s.code}>{t("check7P1code1")}</code>
+        {t("check7P1b")}
+        <code className={s.code}>{t("check7P1code2")}</code>
+        {t("check7P1c")}
       </p>
 
       <h3 className={s.h3}>{t("check8Title")}</h3>
@@ -118,11 +124,13 @@ export default async function VerificationPage() {
 
       <h2 className={s.h2}>{t("verdictTitle")}</h2>
       <p className={s.p}>
-        {t.rich("verdictP1", {
-          verified: () => <code className={s.code}>verified</code>,
-          everyCheck: (c) => <span className={s.strong}>{c}</span>,
-          failed: () => <code className={s.code}>failed</code>,
-        })}
+        {t("verdictP1a")}
+        <code className={s.code}>{t("verdictP1code1")}</code>
+        {t("verdictP1b")}
+        <span className={s.strong}>{t("verdictP1bold")}</span>
+        {t("verdictP1c")}
+        <code className={s.code}>{t("verdictP1code2")}</code>
+        {t("verdictP1d")}
       </p>
 
       <h2 className={s.h2}>{t("attackTitle")}</h2>

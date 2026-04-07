@@ -4,7 +4,6 @@
     "demoLink": "See a verified photo in action",
     "comingSoon": "Coming soon"
   },
-
   "diagram": {
     "c2paTitle": "C2PA alone",
     "c2paSubtitle": "Proof is in the file",
@@ -15,7 +14,6 @@
     "step3": "Social media upload",
     "step4": "Re-download"
   },
-
   "nav": {
     "technology": "Technology",
     "why": "Why",
@@ -23,7 +21,6 @@
     "about": "About",
     "demo": "See Demo"
   },
-
   "pages": {
     "home": {
       "closingTitle": "See the proof for yourself",
@@ -67,7 +64,6 @@
       "closingCtaGithub": "View on GitHub"
     }
   },
-
   "lp": {
     "hero": {
       "title": "Prove it's real.",
@@ -76,15 +72,22 @@
       "ctaDemo": "See a verified photo",
       "ctaHow": "How it works"
     },
-
     "appFlow": {
       "title": "How it works",
-      "step1": { "label": "Capture", "text": "Take a photo or video with RootLens. A digital signature is attached instantly." },
-      "step2": { "label": "Prove", "text": "Title Protocol verifies the signature and saves the proof as a permanent record, separate from the file itself." },
-      "step3": { "label": "Share", "text": "Get a link. Post it anywhere. Anyone who opens it can verify that the content was captured by a real camera." },
+      "step1": {
+        "label": "Capture",
+        "text": "Take a photo or video with RootLens. A digital signature is attached instantly."
+      },
+      "step2": {
+        "label": "Prove",
+        "text": "Title Protocol verifies the signature and saves the proof as a permanent record, separate from the file itself."
+      },
+      "step3": {
+        "label": "Share",
+        "text": "Get a link. Post it anywhere. Anyone who opens it can verify that the content was captured by a real camera."
+      },
       "editing": "You can still crop, mask, or trim before sharing. RootLens tracks every edit, so viewers can see exactly what was changed and confirm the original is real."
     },
-
     "issues": {
       "title": "Why this matters",
       "intro": "Across industries, the same crisis is unfolding: nobody can tell what's real anymore.",
@@ -105,7 +108,6 @@
         "text": "AI companies face billion-dollar lawsuits over training data rights. Forged documents challenge court evidence. Telemedicine images lack tamper verification. Research retractions rise as image fabrication becomes trivial."
       }
     },
-
     "c2pa": {
       "title": "The right foundation already exists",
       "p1": "The root cause of problems like deepfakes and unauthorized reposting is the same: the origin and rights ownership of digital content remain unknowable until actual harm occurs and someone makes a claim.",
@@ -115,7 +117,6 @@
       "p5": "C2PA (Coalition for Content Provenance and Authenticity), backed by over 6,000 organizations including Adobe, Microsoft, and Google, is the open standard for this provenance-recording approach. It records which device or software created the content, when, and what edits were made — all cryptographically signed.",
       "p6": "Google Pixel signs photos with its Titan M2 chip. High-end Sony and Nikon cameras implement C2PA signing. OpenAI, Google, and Adobe sign their AI-generated content with C2PA. The infrastructure is real and growing."
     },
-
     "gap": {
       "title": "But proof disappears as content spreads",
       "p1": "C2PA verification requires two things: the complete C2PA manifest data (a JUMBF container holding the signature chain, certificates, and edit history) and the complete data of the content itself. For a photo, that means the full-resolution capture data. For a video, the entire original video file. If even one byte of the content data changes, the hash will no longer match and verification fails. This tight coupling (referred to as hard binding in the C2PA specification) is an essential design for integrity guarantees, but becomes a barrier when content is distributed.",
@@ -124,7 +125,6 @@
       "p4": "Existing solutions include mechanisms like embedding URLs in watermarks and using cloud storage to recover C2PA manifests. But these are fundamentally approaches that attempt to approximately re-associate content data — which has already lost its cryptographic verifiability — with C2PA manifests.",
       "p5": "To build a system where proof of camera capture actually reaches people on social media, we needed to solve a different problem: separating the proof — that the content had camera capture provenance recorded and passed C2PA verification — from the content itself, making it accessible in a trustworthy form even without the complete original file."
     },
-
     "tp": {
       "title": "Title Protocol: making proof independent",
       "subtitle": "Extracting arbitrary attributes from content and recording them as standalone, independently trustworthy records.",
@@ -170,7 +170,6 @@
         }
       }
     },
-
     "comparison": {
       "title": "What exists today and what remains unsolved",
       "intro": "C2PA verification services and provenance registries exist. Here is where the gaps remain.",
@@ -191,7 +190,6 @@
         "text": "If a company runs the verification, you must trust that company. Title Protocol uses TEE: the verification is designed to happen in hardware-isolated processing where the operator cannot intervene. The result is cryptographically signed and client-verifiable. All TEE enclave code is open source, so the verification logic itself can be independently audited. The trust shifts from a company's reputation to a publicly auditable codebase and security model."
       }
     },
-
     "rootlens": {
       "title": "RootLens",
       "subtitle": "The reason we built Title Protocol",
@@ -203,7 +201,6 @@
       "permanence": "The proof outlives the app. If RootLens disappears tomorrow, the verification records remain linked to on-chain NFTs. Other applications built on Title Protocol can access the same records.",
       "targets": "For creators who face AI-generation accusations, journalists who need verifiable evidence, and anyone whose content is worth proving real."
     },
-
     "openSource": {
       "title": "Open source. Open protocol.",
       "spec": "The specification, architecture documentation, and implementation are all publicly available. You can read the docs and independently verify or reimplement the entire system.",
@@ -213,7 +210,6 @@
       "rlRepo": "RootLens",
       "specLink": "Read the specification"
     },
-
     "footer": {
       "builtBy": "Built by Yudai Mori and Akito Kawano",
       "links": {
@@ -224,40 +220,33 @@
       "license": "Apache 2.0"
     }
   },
-
   "content": {
     "shotOn": "Shot on {device}",
     "shotOnDefault": "Shot on RootLens",
     "dateTsa": "TSA certified",
     "dateRegistration": "Registration time",
     "owner": "Owner",
-
     "chip": {
       "registered": "Registered",
       "shot": "Shot"
     },
-
     "caption": {
       "seeMore": "more",
       "seeLess": "less"
     },
-
     "trust": {
       "verifying": "Verifying...",
       "verified": "Verified authentic content",
       "failed": "Some checks could not be confirmed",
       "checks": "checks"
     },
-
     "tech": {
       "toggle": "View verification details",
-
       "intro": {
         "title": "How this verification works",
         "desc": "RootLens verifies the provenance and authenticity of C2PA-signed content inside a TEE (Trusted Execution Environment — hardware-isolated processing that the server operator cannot access) and records the results on the Solana blockchain.",
         "trustChain": "Trust is established through a chain of checks: the on-chain configuration defines trusted verification nodes → the NFT is confirmed to belong to the official collection → the off-chain verification data is fetched → the TEE signature is verified to confirm data integrity. Each step runs independently in this browser."
       },
-
       "core": {
         "title": "Core NFT — Provenance Record",
         "desc": "The Core NFT records the result of verifying the C2PA signature chain embedded in the content, signed by the TEE and stored on the blockchain. The entire provenance — who captured it, when, and with what tool — is preserved in a tamper-proof form.",
@@ -284,7 +273,6 @@
         "currentOwner": "Current Owner",
         "sameOwner": "(same — no transfer)"
       },
-
       "ext": {
         "title": "Extension NFTs — Attribute Verification",
         "desc": "Extensions are objective attribute values computed by WASM modules inside the TEE from the raw content data. While Core handles the C2PA provenance chain (rights structure between content), Extensions handle properties of individual content (perceptual hash, hardware signing, etc.). There is no limit on the number of Extensions — new verification items can be freely added through new WASM modules.",
@@ -296,7 +284,6 @@
         "teeSigFail": "Ed25519 signature on the Extension off-chain data could not be verified against the TEE Public Key",
         "dataTitle": "Data"
       },
-
       "pdq": {
         "title": "image-pdq — Image Identity Verification",
         "desc": "PDQ (Perceptual hash by Meta) is a 256-bit numerical fingerprint of an image's visual appearance. A WASM module inside the TEE computes it from the original image and records it on-chain. The viewer's browser recomputes the PDQ hash from the displayed image using the identical WASM binary and Jarosz downsampling, then compares it with the on-chain value. If the Hamming distance (bit-level difference) is within the threshold, the images are deemed identical.",
@@ -307,7 +294,6 @@
         "onchain": "On-chain PDQ hash",
         "computed": "Recomputed PDQ hash (browser)"
       },
-
       "hardware": {
         "title": "{id} — Hardware Capture Proof",
         "titleDefault": "Hardware Capture Proof",
@@ -315,7 +301,6 @@
         "wip": "Verification WASM module in preparation",
         "notDetected": "No hardware signature detected (software-signed only)"
       },
-
       "refs": {
         "title": "On-chain References",
         "contentHash": "Content Hash",
@@ -329,7 +314,6 @@
         "viewOnSolana": "Solana Explorer",
         "viewOnStorage": "View"
       },
-
       "dyn": {
         "protocolContext": "Program: {program} / GlobalConfig: {pda} / Network: {network}",
         "coreSummary": "Content Hash {hash} ({type}) {signing}. {nodes} provenance node(s){links}.",
@@ -345,7 +329,6 @@
         "teeSigPending": "verification pending",
         "tsaResult": "This content: {provider}, {time}"
       },
-
       "why": {
         "title": "Why You Can Trust This Verification",
         "trustless": "Why trustless verification is possible without the original C2PA data",
@@ -359,7 +342,6 @@
       }
     }
   },
-
   "field": {
     "content_hash": "Content Hash",
     "content_type": "Content Type",
@@ -403,7 +385,6 @@
     "rawData": "Verification data",
     "rawDataEnv": "Verification environment"
   },
-
   "check": {
     "c2pa_chain": "C2PA Provenance Chain",
     "c2pa_chain_pass": "Provenance graph in C2PA signature chain: {nodes} node(s), {links} link(s). Records the edit history and material relationships from capture to present",
@@ -429,16 +410,13 @@
     "hardware_signing_pass": "Hardware secure element signature ({id}) detected in the C2PA signature chain. Proves physical capture by the device",
     "hardware_signing_fail": "Hardware signing verification failed"
   },
-
   "notfound": {
     "title": "Content not found",
     "description": "This link may be invalid or the content may have been removed."
   },
-
   "footer": {
     "tagline": "Prove it's real."
   },
-
   "docs": {
     "nav": {
       "next": "Next",
@@ -464,11 +442,19 @@
       "title": "RootLens Documentation",
       "subtitle": "How RootLens proves content is real — from camera sensor to browser verification.",
       "whatTitle": "What RootLens Does",
-      "whatP1": "When you see a photo online, how do you know it's real? RootLens answers that question. It proves that a photo or video is {authentic} — captured by a real camera, on a real device, without manipulation — and lets anyone verify that proof independently.",
-      "whatP2tee": "Here is how it works at the highest level: a camera signs the content at capture time. That signed content is then sent — encrypted, end-to-end — to a {tee}, a piece of isolated hardware where nobody can see the raw content or tamper with the verification code. The TEE inspects the signature, extracts key facts (who signed it, what the image looks like), and signs the results with a private key that {nobodyCanExtract} — not even the developers of this system. That TEE signature is the root of trust.",
+      "whatP1before": "When you see a photo online, how do you know it's real? RootLens answers that question. It proves that a photo or video is ",
+      "whatP1bold": "authentic",
+      "whatP1after": " — captured by a real camera, on a real device, without manipulation — and lets anyone verify that proof independently.",
+      "whatP2a": "Here is how it works at the highest level: a camera signs the content at capture time. That signed content is then sent — encrypted, end-to-end — to a ",
+      "whatP2teeBold": "Trusted Execution Environment (TEE)",
+      "whatP2b": ", a piece of isolated hardware where nobody can see the raw content or tamper with the verification code. The TEE inspects the signature, extracts key facts (who signed it, what the image looks like), and signs the results with a private key that ",
+      "whatP2nobodyBold": "nobody can extract",
+      "whatP2c": " — not even the developers of this system. That TEE signature is the root of trust.",
       "whatP3chain": "The results are then linked to on-chain records (cNFTs on Solana) so that anyone can find them. The actual verification data is stored off-chain, but it carries the TEE signature — so the blockchain is an index for discovery, not the container of the proof itself. A viewer's browser fetches the data via the on-chain pointer and re-verifies the TEE signature locally, without contacting any server.",
       "userTitle": "What the User Sees",
-      "userP1": "A content creator publishes a photo through the RootLens app. This produces a shareable link (e.g., {exampleLink}). When someone opens that link in a browser, the page displays the photo along with a verification badge showing whether the proof checks out. Behind the scenes, the browser fetches the proof data via on-chain pointers and re-verifies the TEE signature locally — without contacting the RootLens server.",
+      "userP1before": "A content creator publishes a photo through the RootLens app. This produces a shareable link (e.g., ",
+      "userP1link": "rootlens.io/p/abc123",
+      "userP1after": "). When someone opens that link in a browser, the page displays the photo along with a verification badge showing whether the proof checks out. Behind the scenes, the browser fetches the proof data via on-chain pointers and re-verifies the TEE signature locally — without contacting the RootLens server.",
       "termsTitle": "Key Terms",
       "termsIntro": "Before going further, here are the terms you will encounter throughout this documentation:",
       "termHeader": "Term",
@@ -501,16 +487,9 @@
       "title": "Trust Model",
       "subtitle": "What you need to trust, what you don't, and why — honestly.",
       "originTitle": "Where Does Trust Come From?",
-      "originP1": "The root of trust in this system is {teeHardware}. Not the blockchain. Not the cryptographic algorithm. The hardware.",
-      "originP2": "The TEE signs each verification result with a private key that {nobodyCanExtract} — not the node operator, not the RootLens developers. This is what makes the signature unforgeable. The cryptographic algorithm (currently Ed25519; designed to migrate to post-quantum algorithms as they mature) is the mechanism of verification, but the reason it works is that the key lives in hardware-enforced isolation.",
-      "originP3": "The blockchain (Solana) provides discoverability and permanence — you can find the proof and confirm it hasn't been removed. But the proof is trustworthy because of the TEE signature, not because it's on a blockchain. If you had the {signedJson} file in your hand, you could verify it without any blockchain at all.",
       "mustTrustTitle": "What You Must Trust. What You Don't.",
-      "mustTrustP1": "Verification does not require trusting RootLens or any server. But it does require trusting that {teeWorking} — that the TEE manufacturer (e.g., AWS for Nitro Enclaves, Apple for Secure Enclave) has not shipped compromised silicon, and that there are no exploitable vulnerabilities in the TEE. This is hardware trust, not zero trust.",
-      "mustTrustP2": "However, the {rules} that define what counts as valid — which TEE nodes are trusted, which WASM hashes are approved, which cNFT collections are official — are set by the {globalConfig} on-chain record. This record is currently controlled by a single protocol authority key. This means you must trust that the authority has not registered a malicious TEE node or a compromised WASM binary.",
       "mustTrustP3": "This is a genuine limitation, and we state it honestly. The roadmap is to transition GlobalConfig governance to a multisig and eventually a DAO, distributing this trust across multiple independent parties. But today, this is a centralized trust point.",
-      "mustTrustP4": "The mitigating factor: all WASM verification code is {openSource}. Anyone can audit the code, rebuild the WASM binary, and compare its hash against what is registered on-chain. A malicious update would be publicly visible.",
       "layersTitle": "Trust Layers",
-      "layersIntro": "The system has several components, each with a different trust level. The key insight: most of them {doNotNeedTrust} at all.",
       "layerHeader": "Layer",
       "layerTrustHeader": "Trust Level",
       "layerWhyHeader": "Why",
@@ -545,25 +524,17 @@
       "layerIndexerCompromised": "Can only deny service, not forge proofs (see below)",
       "serverTitle": "The Server Question",
       "serverIntro": "A natural question: if RootLens has a server, what does it mean that verification doesn't require trusting it? The server does two things:",
-      "serverRouting": "{label} — when you open {link}, the server resolves that short ID to a {contentHash}.",
       "serverRoutingLabel": "Page routing",
-      "serverIndexer": "{label} — maps {contentHash} to on-chain cNFT IDs so the browser doesn't have to scan the entire blockchain.",
       "serverIndexerLabel": "Indexer cache",
-      "serverAttackIntro": "Could the server return the wrong {contentHash} — pointing the browser to a different piece of content? Yes. Two layers defend against this:",
-      "serverDefensePdq": "{label} — the browser computes a visual fingerprint of the actually displayed image and compares it to the on-chain hash. Substitution with a visually dissimilar image is detected.",
       "serverDefensePdqLabel": "Perceptual hash recomputation",
-      "serverDefenseBinding": "{label} — the TEE signature covers the {contentHash}, which is a SHA-256 of the original file. This provides the primary integrity guarantee: even a perceptually similar but different file would have a different {contentHash2} and would not match the TEE-signed proof.",
       "serverDefenseBindingLabel": "Cryptographic content binding",
       "serverConclusion": "The server can cause a denial of service (you can't find the proof), but it cannot cause a false positive — both the cryptographic hash and the visual fingerprint would need to match simultaneously.",
       "attestationTitle": "TEE Attestation",
       "attestationIntro": "How do you know the Title Protocol TEE node is actually running inside genuine TEE hardware? Two layers of evidence:",
-      "attestationCollection": "{label} — a cNFT can only be minted into the official collection by a TEE node whose public key is registered in GlobalConfig. If the cNFT exists in the collection, the authority verified the TEE's identity at the time of registration.",
       "attestationCollectionLabel": "On-chain collection membership",
-      "attestationData": "{label} — each {signedJson} includes the TEE's attestation information (e.g., an attestation document for AWS Nitro Enclaves). Because the protocol is open source, anyone can independently verify this attestation: rebuild the enclave image from source, derive the expected measurement, and compare it against the attestation document attached to the proof.",
       "attestationDataLabel": "Attestation data in off-chain records",
       "attestationConclusion": "The first layer is sufficient for normal verification — if the cNFT is in the official collection, the TEE was trusted at mint time. The second layer provides a deeper, fully independent check that does not require trusting GlobalConfig at all.",
       "selfProvingTitle": "Self-Proving Data",
-      "selfProvingP1": "The {signedJson} stored off-chain is {selfProving}. It contains the verification result plus a TEE signature (currently Ed25519). The signature is trustworthy not because of the algorithm, but because the private key is locked inside TEE hardware and cannot be extracted. The TEE will only sign data produced by the approved verification code (whose hash is pinned on-chain) — both the key isolation and the code integrity are necessary for the guarantee.",
       "selfProvingP2": "This means the storage provider does not need to be trusted. Regardless of where the data is stored, the browser can verify its integrity by checking the signature. If the data has been tampered with, the verification fails.",
       "globalConfigTitle": "GlobalConfig",
       "globalConfigP1": "GlobalConfig is an on-chain record on Solana that defines protocol-wide settings. The browser reads it directly from the blockchain — never from the RootLens server. It contains:",
@@ -572,7 +543,56 @@
       "globalConfigItem3": "Which verification code (WASM) hashes are approved (prevents tampered code)",
       "globalConfigP2": "Because this data lives on-chain, the RootLens server cannot inject fake values. The browser reads the source of truth directly. However, whoever holds the GlobalConfig authority key can update these values — this is the governance trust point discussed above.",
       "honestLabel": "Honest Assessment",
-      "honestText": "Verification does not require trusting RootLens or any server — but it does require trusting TEE hardware. Governance is currently centralized (single authority key). The path to decentralization (multisig → DAO) is planned but not yet implemented. All verification code (both TEE-side WASM and client-side) is open source."
+      "honestText": "Verification does not require trusting RootLens or any server — but it does require trusting TEE hardware. Governance is currently centralized (single authority key). The path to decentralization (multisig → DAO) is planned but not yet implemented. All verification code (both TEE-side WASM and client-side) is open source.",
+      "originP1before": "The root of trust in this system is ",
+      "originP1bold": "TEE hardware",
+      "originP1after": ". Not the blockchain. Not the cryptographic algorithm. The hardware.",
+      "originP2before": "The TEE signs each verification result with a private key that ",
+      "originP2bold": "nobody can extract",
+      "originP2after": " — not the node operator, not the RootLens developers. This is what makes the signature unforgeable. The cryptographic algorithm (currently Ed25519; designed to migrate to post-quantum algorithms as they mature) is the mechanism of verification, but the reason it works is that the key lives in hardware-enforced isolation.",
+      "originP3before": "The blockchain (Solana) provides discoverability and permanence — you can find the proof and confirm it hasn't been removed. But the proof is trustworthy because of the TEE signature, not because it's on a blockchain. If you had the ",
+      "originP3code": "signed_json",
+      "originP3after": " file in your hand, you could verify it without any blockchain at all.",
+      "mustTrustP1before": "Verification does not require trusting RootLens or any server. But it does require trusting that ",
+      "mustTrustP1bold": "TEE hardware is functioning as designed",
+      "mustTrustP1after": " — that the TEE manufacturer (e.g., AWS for Nitro Enclaves, Apple for Secure Enclave) has not shipped compromised silicon, and that there are no exploitable vulnerabilities in the TEE. This is hardware trust, not zero trust.",
+      "mustTrustP2a": "However, the ",
+      "mustTrustP2rulesBold": "rules",
+      "mustTrustP2b": " that define what counts as valid — which TEE nodes are trusted, which WASM hashes are approved, which cNFT collections are official — are set by the ",
+      "mustTrustP2gcCode": "GlobalConfig",
+      "mustTrustP2c": " on-chain record. This record is currently controlled by a single protocol authority key. This means you must trust that the authority has not registered a malicious TEE node or a compromised WASM binary.",
+      "mustTrustP4before": "The mitigating factor: all WASM verification code is ",
+      "mustTrustP4bold": "open source",
+      "mustTrustP4after": ". Anyone can audit the code, rebuild the WASM binary, and compare its hash against what is registered on-chain. A malicious update would be publicly visible.",
+      "layersIntroBefore": "The system has several components, each with a different trust level. The key insight: most of them ",
+      "layersIntroBold": "do not need to be trusted",
+      "layersIntroAfter": " at all.",
+      "serverRoutingText": "when you open ",
+      "serverRoutingLink": "rootlens.io/p/abc123",
+      "serverRoutingText2": ", the server resolves that short ID to a ",
+      "serverRoutingCode": "content_hash",
+      "serverRoutingText3": ".",
+      "serverIndexerText": "maps ",
+      "serverIndexerCode": "content_hash",
+      "serverIndexerText2": " to on-chain cNFT IDs so the browser doesn't have to scan the entire blockchain.",
+      "serverAttackBefore": "Could the server return the wrong ",
+      "serverAttackCode": "content_hash",
+      "serverAttackAfter": " — pointing the browser to a different piece of content? Yes. Two layers defend against this:",
+      "serverDefensePdqText": "the browser computes a visual fingerprint of the actually displayed image and compares it to the on-chain hash. Substitution with a visually dissimilar image is detected.",
+      "serverDefenseBindingText": "the TEE signature covers the ",
+      "serverDefenseBindingCode": "content_hash",
+      "serverDefenseBindingText2": ", which is a SHA-256 of the original file. This provides the primary integrity guarantee: even a perceptually similar but different file would have a different ",
+      "serverDefenseBindingCode2": "content_hash",
+      "serverDefenseBindingText3": " and would not match the TEE-signed proof.",
+      "attestationCollectionText": "a cNFT can only be minted into the official collection by a TEE node whose public key is registered in GlobalConfig. If the cNFT exists in the collection, the authority verified the TEE's identity at the time of registration.",
+      "attestationDataText": "each ",
+      "attestationDataCode": "signed_json",
+      "attestationDataText2": " includes the TEE's attestation information (e.g., an attestation document for AWS Nitro Enclaves). Because the protocol is open source, anyone can independently verify this attestation: rebuild the enclave image from source, derive the expected measurement, and compare it against the attestation document attached to the proof.",
+      "selfProvingP1a": "The ",
+      "selfProvingP1code": "signed_json",
+      "selfProvingP1b": " stored off-chain is ",
+      "selfProvingP1bold": "self-proving",
+      "selfProvingP1c": ". It contains the verification result plus a TEE signature (currently Ed25519). The signature is trustworthy not because of the algorithm, but because the private key is locked inside TEE hardware and cannot be extracted. The TEE will only sign data produced by the approved verification code (whose hash is pinned on-chain) — both the key isolation and the code integrity are necessary for the guarantee."
     },
     "contentOrigins": {
       "title": "How Content Is Signed",
@@ -584,8 +604,6 @@
       "hwProvesHeader": "What It Proves",
       "hwPixel": "Image came from this device's sensor, unmodified",
       "hwSony": "Image came from this camera's sensor, unmodified",
-      "hwTrustBasis": "{label} The device manufacturer binds a signing key to the secure chip at the factory and signs the device certificate with their own Root CA. The entire path from sensor to signature is controlled by the manufacturer's hardware.",
-      "hwRulesOut": "{label} Virtual cameras, screen capture injection. The manufacturer's hardware architecture protects the signing key and attests that the signature was produced on that specific device. The exact boundary of hardware protection varies by manufacturer.",
       "trustBasisLabel": "Trust basis:",
       "rulesOutLabel": "What it rules out:",
       "appTitle": "App-Level Signing (RootLens)",
@@ -593,13 +611,10 @@
       "appMechanisms": "RootLens builds trust through three mechanisms:",
       "appAttestation": "1. Platform Attestation",
       "appAttestationP1": "Before issuing a Device Certificate, the RootLens server verifies that the device is genuine and uncompromised:",
-      "appAttestationAndroid": "{label} Key Attestation (proves the key was generated inside the TEE) + Play Integrity (proves the device is not rooted or running a debug build)",
-      "appAttestationIos": "{label} App Attest (proves the app is the genuine RootLens binary running on genuine Apple hardware), with {hash} binding the attestation to the specific key",
       "appTeeTitle": "2. TEE Key Protection",
       "appTeeP1": "The EC P-256 signing key is generated inside the device's TEE (Secure Enclave on iOS, StrongBox on Android). The private key never leaves the TEE — signing operations happen inside the chip.",
       "appPkiTitle": "3. Three-Layer PKI",
       "appPkiP1": "The device's public key is certified through a three-layer certificate chain managed by RootLens:",
-      "appPkiLink": "See the {link} page for the full certificate profile and issuance flow.",
       "appPkiLinkText": "PKI Architecture",
       "tradeoffTitle": "The Honest Trade-Off",
       "tradeoffLabel": "Design Decision",
@@ -628,7 +643,6 @@
       "keyPointLabel": "Key Point",
       "keyPointText": "Phases 2 (TEE verification + cNFT minting) and 3 (browser verification) are identical for all content origins. The difference is only in Phase 1 — the trust basis of the original signature.",
       "provenanceTitle": "Provenance Graph (Editing)",
-      "provenanceP1": "RootLens supports editing content after capture (crop, mask, trim). When content is edited, the C2PA standard handles this by creating a new manifest that references the original manifest as an \"ingredient.\" This forms a {provenanceGraph} — a chain of signatures that traces the content's full history from capture through each edit.",
       "provenanceScenario": "Scenario",
       "provenanceChain": "C2PA Chain",
       "provenanceDisplay": "Display",
@@ -644,39 +658,90 @@
       "prov4scenario": "RootLens capture → edit → publish",
       "prov4chain": "RootLens signature (captured) → RootLens signature (edited)",
       "prov4display": "\"Shot on RootLens\" (with edit history)",
-      "provenanceP2": "When you edit a photo in RootLens, the app takes the original file as an \"ingredient\" and creates a new C2PA manifest recording the edit. The original manufacturer's signature is preserved in the provenance graph, so the verification pipeline can trace the full history — from the original camera capture through each subsequent edit."
+      "provenanceP2": "When you edit a photo in RootLens, the app takes the original file as an \"ingredient\" and creates a new C2PA manifest recording the edit. The original manufacturer's signature is preserved in the provenance graph, so the verification pipeline can trace the full history — from the original camera capture through each subsequent edit.",
+      "hwTrustBasisLabel": "Trust basis:",
+      "hwTrustBasisText": " The device manufacturer binds a signing key to the secure chip at the factory and signs the device certificate with their own Root CA. The entire path from sensor to signature is controlled by the manufacturer's hardware.",
+      "hwRulesOutLabel": "What it rules out:",
+      "hwRulesOutText": " Virtual cameras, screen capture injection. The manufacturer's hardware architecture protects the signing key and attests that the signature was produced on that specific device. The exact boundary of hardware protection varies by manufacturer.",
+      "appAttestationAndroidLabel": "Android:",
+      "appAttestationAndroidText": " Key Attestation (proves the key was generated inside the TEE) + Play Integrity (proves the device is not rooted or running a debug build)",
+      "appAttestationIosLabel": "iOS:",
+      "appAttestationIosBefore": " App Attest (proves the app is the genuine RootLens binary running on genuine Apple hardware), with ",
+      "appAttestationIosCode": "clientDataHash = SHA-256(CSR)",
+      "appAttestationIosAfter": " binding the attestation to the specific key",
+      "appPkiLinkBefore": "See the ",
+      "appPkiLinkAfter": " page for the full certificate profile and issuance flow.",
+      "provenanceP1before": "RootLens supports editing content after capture (crop, mask, trim). When content is edited, the C2PA standard handles this by creating a new manifest that references the original manifest as an \"ingredient.\" This forms a ",
+      "provenanceP1bold": "provenance graph",
+      "provenanceP1after": " — a chain of signatures that traces the content's full history from capture through each edit."
     },
     "titleProtocol": {
       "title": "Title Protocol",
       "subtitle": "An open protocol that extracts verifiable facts from content — without showing the content to anyone.",
       "whatTitle": "What Title Protocol Is",
-      "whatP1": "Title Protocol is a general-purpose protocol for extracting {verifiable} from C2PA-signed content. It processes content inside a TEE, seals the extracted results with a TEE signature, and links them to cNFTs on Solana.",
-      "whatP2": "The key property is that {nobodySees}. The entire pipeline — from ingestion to result output — runs end-to-end encrypted. The TEE receives encrypted content, decrypts it internally, extracts the requested attributes, signs the results, and returns them encrypted. Only the extracted facts (e.g., \"this certificate chain is valid,\" \"the perceptual hash is X\") are shared — never the content itself.",
       "whatP3": "The TEE ensures the node operator never sees the raw content — only the extracted, signed facts leave the enclave. The trust comes from TEE hardware isolation: the signing key cannot be extracted, and the verification code (WASM) is pinned by an on-chain hash, so its correctness is publicly auditable.",
       "agnosticTitle": "Content-Origin Agnostic",
-      "agnosticP1": "The protocol does not care who signed the content. A Google Pixel photo and a RootLens photo enter the same pipeline. The difference is which {cert} processor verifies the certificate chain — the core extraction and signing logic is identical.",
       "rlAppTitle": "RootLens as an Application",
       "rlAppP1": "RootLens is the first application built on Title Protocol. It uses the protocol to extract provenance information, certificate verification results, and perceptual hashes from camera content — then publishes the results as a shareable link. But Title Protocol itself is not limited to camera content or to RootLens.",
       "e2eTitle": "End-to-End Encrypted Channel",
       "e2eIntro": "No one — not the network, not the node operator, not RootLens — can see the raw content. Before sending content to a TEE node, the app establishes an end-to-end encrypted channel:",
       "e2eConclusion": "The result is that the content travels encrypted at every stage. The TEE node operator, the network, and RootLens never see the raw content. Only the extracted facts leave the TEE — sealed with the TEE's signature.",
       "processorTitle": "Processor Selection",
-      "processorIntro": "Every C2PA manifest contains a {signerOrg} field — the name of the organization whose certificate signed the content (e.g., \"Google\" for a Pixel photo, \"RootLens\" for an app-signed photo). The app reads this field and tells the TEE which processors to run:",
       "processorCalloutLabel": "Important",
-      "processorCallout": "Each {cert} processor verifies the C2PA certificate chain against {rootCa}, not RootLens's CA. When a Google Pixel photo is verified, the TEE checks the certificate chain against Google's Root CA — hardcoded inside a WASM binary whose hash is registered on-chain.",
       "producesTitle": "What the TEE Produces",
-      "producesP1": "For each processor, the TEE produces a {signedJson} — a JSON object containing the verification result, signed with the TEE's private key (currently Ed25519; the protocol is designed to migrate to post-quantum algorithms as they mature):",
-      "producesP2": "The signature covers {jcs} with a domain tag {domainTag}. JCS (JSON Canonicalization Scheme) ensures that the JSON is serialized in exactly one way — otherwise, logically identical data could produce different bytes and break the signature. The signature is trustworthy because the private key is locked inside TEE hardware (it cannot be extracted), and the TEE will only sign data produced by the approved verification code (whose hash is pinned on-chain). Both the key isolation and the code integrity are necessary for the guarantee.",
       "wasmTitle": "WASM Trust",
-      "wasmP1": "The verification logic (including Root CA public keys) is compiled into WASM binaries that run inside the TEE. The SHA-256 hash of each WASM binary is registered in the on-chain GlobalConfig under {trustedWasm}.",
-      "wasmP2": "When a browser verifies a cNFT, it checks that the {wasmHash} in the payload matches a hash registered on-chain. This ensures the TEE ran a known, unmodified verification binary — not one with a backdoor or weakened Root CA.",
       "mintTitle": "cNFT Minting",
       "mintP1": "After verification, the TEE mints cNFTs on Solana. Each content item produces:",
-      "mintCore": "{label} ({code}) — the C2PA provenance graph",
-      "mintCert": "{label} ({code}) — certificate chain verification result",
-      "mintPdq": "{label} ({code} or {code2}) — visual fingerprint",
-      "mintP2": "All cNFTs are minted into the official collections defined in GlobalConfig. The {jsonUri} of each cNFT points to the off-chain {signedJson}.",
-      "mintLink": "See the {link} page for the detailed payload format of each cNFT type."
+      "whatP1before": "Title Protocol is a general-purpose protocol for extracting ",
+      "whatP1bold": "objective, verifiable attributes",
+      "whatP1after": " from C2PA-signed content. It processes content inside a TEE, seals the extracted results with a TEE signature, and links them to cNFTs on Solana.",
+      "whatP2before": "The key property is that ",
+      "whatP2bold": "nobody sees the raw content",
+      "whatP2after": ". The entire pipeline — from ingestion to result output — runs end-to-end encrypted. The TEE receives encrypted content, decrypts it internally, extracts the requested attributes, signs the results, and returns them encrypted. Only the extracted facts (e.g., \"this certificate chain is valid,\" \"the perceptual hash is X\") are shared — never the content itself.",
+      "agnosticP1before": "The protocol does not care who signed the content. A Google Pixel photo and a RootLens photo enter the same pipeline. The difference is which ",
+      "agnosticP1code": "cert-*",
+      "agnosticP1after": " processor verifies the certificate chain — the core extraction and signing logic is identical.",
+      "processorIntroBefore": "Every C2PA manifest contains a ",
+      "processorIntroCode": "signer_org",
+      "processorIntroAfter": " field — the name of the organization whose certificate signed the content (e.g., \"Google\" for a Pixel photo, \"RootLens\" for an app-signed photo). The app reads this field and tells the TEE which processors to run:",
+      "processorCalloutA": "Each ",
+      "processorCalloutCode1": "cert-*",
+      "processorCalloutB": " processor verifies the C2PA certificate chain against ",
+      "processorCalloutBold": "the corresponding manufacturer's Root CA public key",
+      "processorCalloutC": ", not RootLens's CA. When a Google Pixel photo is verified, the TEE checks the certificate chain against Google's Root CA — hardcoded inside a WASM binary whose hash is registered on-chain.",
+      "producesP1before": "For each processor, the TEE produces a ",
+      "producesP1code": "signed_json",
+      "producesP1after": " — a JSON object containing the verification result, signed with the TEE's private key (currently Ed25519; the protocol is designed to migrate to post-quantum algorithms as they mature):",
+      "producesP2a": "The signature covers ",
+      "producesP2code1": "JCS({ payload, attributes })",
+      "producesP2b": " with a domain tag ",
+      "producesP2code2": "title-protocol-v1",
+      "producesP2c": ". JCS (JSON Canonicalization Scheme) ensures that the JSON is serialized in exactly one way — otherwise, logically identical data could produce different bytes and break the signature. The signature is trustworthy because the private key is locked inside TEE hardware (it cannot be extracted), and the TEE will only sign data produced by the approved verification code (whose hash is pinned on-chain). Both the key isolation and the code integrity are necessary for the guarantee.",
+      "wasmP1before": "The verification logic (including Root CA public keys) is compiled into WASM binaries that run inside the TEE. The SHA-256 hash of each WASM binary is registered in the on-chain GlobalConfig under ",
+      "wasmP1code": "trusted_wasm_modules",
+      "wasmP1after": ".",
+      "wasmP2before": "When a browser verifies a cNFT, it checks that the ",
+      "wasmP2code": "wasm_hash",
+      "wasmP2after": " in the payload matches a hash registered on-chain. This ensures the TEE ran a known, unmodified verification binary — not one with a backdoor or weakened Root CA.",
+      "mintCoreLabel": "1 Core cNFT",
+      "mintCoreCode": "core-c2pa",
+      "mintCoreText": ": the C2PA provenance graph",
+      "mintCertLabel": "1 Cert Extension cNFT",
+      "mintCertCode": "cert-*",
+      "mintCertText": ": certificate chain verification result",
+      "mintPdqLabel": "1 Perceptual Hash Extension cNFT",
+      "mintPdqCode1": "image-pdq",
+      "mintPdqOr": " or ",
+      "mintPdqCode2": "video-vpdq",
+      "mintPdqText": ": visual fingerprint",
+      "mintP2a": "All cNFTs are minted into the official collections defined in GlobalConfig. The ",
+      "mintP2code1": "json_uri",
+      "mintP2b": " of each cNFT points to the off-chain ",
+      "mintP2code2": "signed_json",
+      "mintP2c": ".",
+      "mintLinkBefore": "See the ",
+      "mintLinkText": "cNFT Structure",
+      "mintLinkAfter": " page for the detailed payload format of each cNFT type."
     },
     "cnftStructure": {
       "title": "cNFT Structure",
@@ -697,11 +762,6 @@
       "coreLinks": "Relationships between nodes (parent → child)",
       "coreTsa": "RFC 3161 timestamp (Unix seconds), if available",
       "attrAssurance": "(hardware) or (app)",
-      "checkCollection": "{label} — belongs to GlobalConfig's core collection",
-      "checkTeeSig": "{label} — hardware-isolated key signature (currently Ed25519) over JCS-canonicalized payload",
-      "checkBinding": "{label} — payload.content_hash matches the query",
-      "checkProvenance": "{label} — at least one node exists in the C2PA graph",
-      "checkOriginality": "{label} — this is the earliest Core cNFT for this content_hash",
       "certTitle": "Cert Extension (cert-*)",
       "certP1": "Records whether the C2PA certificate chain was verified against the appropriate manufacturer's Root CA. The extension ID indicates which Root CA was used:",
       "certGoogle": "verified against Google's Root CA public key",
@@ -713,9 +773,6 @@
       "certWasmHash": "SHA-256 of the WASM binary that ran the verification",
       "certVerified": "Whether the certificate chain passed verification",
       "certRootCa": "Name of the Root CA used for verification",
-      "checkExtCollection": "{label} — belongs to GlobalConfig's ext collection",
-      "checkWasm": "{label} — wasm_hash is registered in GlobalConfig",
-      "checkCertVerified": "{label} — verified === true",
       "pdqTitle": "Image PDQ Extension (image-pdq)",
       "pdqP1": "A 256-bit perceptual hash of the image, computed using the PDQ algorithm (Meta ThreatExchange compatible). This serves as a \"visual fingerprint\" that survives re-encoding and minor resizing.",
       "pdqContentHash": "Same content_hash",
@@ -724,46 +781,57 @@
       "pdqHowTitle": "How PDQ Works (Simplified)",
       "pdqHowP1": "The algorithm converts the image to grayscale, shrinks it to a small grid, extracts the dominant visual patterns using a frequency transform, and quantizes the result into a compact 256-bit hash. The key property is that re-encoding (e.g., JPEG compression) or minor resizing produces a very similar hash, while a substantially different image produces a very different one.",
       "pdqVerifyTitle": "Verification (browser)",
-      "pdqVerifyP1": "The browser recomputes the PDQ hash from the displayed image using a pure TypeScript implementation of the same algorithm. It then compares the result to the on-chain hash using {hammingDistance} — the number of bit positions where the two hashes differ. If the distance is ≤ 31 (out of 256 bits), the images are considered a match.",
       "vpdqTitle": "Video vPDQ Extension (video-vpdq)",
       "vpdqP1": "For videos, PDQ hashes are computed per keyframe (I-frame). Only frames with quality ≥ 50 (gradient energy metric) are included.",
       "vpdqFrames": "Per-keyframe PDQ data",
       "vpdqPdqhash": "256-bit PDQ hash for that frame",
       "vpdqQuality": "Gradient energy (≥ 50 to be included)",
       "vpdqKeyframe": "Keyframe index",
-      "vpdqVerifyP1": "The browser uses WebCodecs + mp4box.js to extract keyframes, computes PDQ for each, and matches by keyframe index. Verification passes if ≥ 80% of on-chain keyframes match within the Hamming distance threshold."
+      "vpdqVerifyP1": "The browser uses WebCodecs + mp4box.js to extract keyframes, computes PDQ for each, and matches by keyframe index. Verification passes if ≥ 80% of on-chain keyframes match within the Hamming distance threshold.",
+      "checkCollectionLabel": "Collection",
+      "checkCollectionText": "belongs to GlobalConfig's core collection",
+      "checkTeeSigLabel": "TEE Signature",
+      "checkTeeSigText": "hardware-isolated key signature (currently Ed25519) over JCS-canonicalized payload",
+      "checkBindingLabel": "Content Binding",
+      "checkBindingText": "payload.content_hash matches the query",
+      "checkProvenanceLabel": "Provenance",
+      "checkProvenanceText": "at least one node exists in the C2PA graph",
+      "checkOriginalityLabel": "Originality",
+      "checkOriginalityText": "this is the earliest Core cNFT for this content_hash",
+      "checkExtCollectionLabel": "Collection",
+      "checkExtCollectionText": "belongs to GlobalConfig's ext collection",
+      "checkWasmLabel": "WASM Trusted",
+      "checkWasmText": "wasm_hash is registered in GlobalConfig",
+      "checkCertVerifiedLabel": "Cert Verified",
+      "checkCertVerifiedText": "verified === true",
+      "pdqVerifyP1before": "The browser recomputes the PDQ hash from the displayed image using a pure TypeScript implementation of the same algorithm. It then compares the result to the on-chain hash using ",
+      "pdqVerifyP1bold": "Hamming distance",
+      "pdqVerifyP1after": " — the number of bit positions where the two hashes differ. If the distance is ≤ 31 (out of 256 bits), the images are considered a match."
     },
     "verification": {
       "title": "Client-Side Verification",
       "subtitle": "Every verification check runs in the viewer's browser. The server provides an initial content lookup but is not involved in any trust-bearing verification step.",
       "flowTitle": "What Happens When You Open a Link",
-      "flowIntro": "When someone shares a RootLens link (e.g., {link}), the {shortId} part is a short ID that identifies the published content. Here is what the browser does, step by step:",
       "commonTitle": "Common Checks (All cNFTs)",
       "commonIntro": "Every cNFT — Core and Extension alike — goes through the same three common checks:",
       "check1Title": "1. Collection",
       "check1P1": "The cNFT's collection address must match the official collection defined in the on-chain GlobalConfig. The browser fetches GlobalConfig directly from Solana RPC — never from the RootLens server, never hardcoded.",
       "check2Title": "2. TEE Signature",
-      "check2P1": "The {signedJson}'s {payloadAttrs} is canonicalized using JCS, prepended with a domain tag ({domainTag}), and verified against the {teePubkey} using the TEE's signature algorithm (currently Ed25519).",
       "check2P2": "This is the most critical check. The TEE signature is what makes the proof unforgeable — the private key exists only inside TEE hardware and cannot be extracted by anyone. The browser re-verifies this signature entirely via the Web Crypto API, with no external service involved.",
       "check3Title": "3. Content Binding",
-      "check3P1": "{payloadHash} must equal the {contentHash} used to find the cNFT. This prevents a signed_json from one content being reused for another.",
       "coreChecksTitle": "Core-Specific Checks",
       "check4Title": "4. Provenance",
       "check4P1": "The C2PA provenance graph must contain at least one node. An empty graph means no provenance information was recorded.",
       "check5Title": "5. Originality",
-      "check5P1": "The browser queries all Core cNFTs with the same {contentHash} and checks whether this one is the earliest. If someone else registers the same content later, the original registration takes precedence.",
       "extChecksTitle": "Extension-Specific Checks",
       "check6Title": "6. WASM Trusted",
-      "check6P1": "The {wasmHash} in the payload must be registered in the on-chain GlobalConfig under {trustedWasm}. This ensures the TEE ran a known, unmodified verification binary.",
       "check7Title": "7. Cert Verified (cert-* only)",
-      "check7P1": "The payload's {verified} field must be {true_val}. This indicates that the TEE's WASM successfully verified the C2PA certificate chain against the appropriate Root CA public key.",
       "check8Title": "8. PDQ Match (image-pdq only)",
       "check8P1": "The browser recomputes the PDQ hash from the currently displayed image using a pure TypeScript implementation of the PDQ algorithm. The Hamming distance between the on-chain hash and the recomputed hash must be ≤ 31 out of 256 bits.",
       "check8P2": "This proves the image you are looking at is the same image that was verified by the TEE — independent of any server.",
       "check9Title": "9. vPDQ Match (video-vpdq only)",
       "check9P1": "The browser extracts keyframes from the video using WebCodecs + mp4box.js, computes PDQ for each keyframe, and compares against the on-chain per-frame hashes. At least 80% of keyframes must match within the Hamming distance threshold.",
       "verdictTitle": "Overall Verdict",
-      "verdictP1": "The overall result is {verified} only if {everyCheck}. A single failure in any check sets the overall result to {failed}.",
       "attackTitle": "Attack Scenarios",
       "attackHeader": "Attack",
       "defenseHeader": "Defense",
@@ -780,17 +848,53 @@
       "attack6": "Compromise the RootLens server",
       "defense6": "Server does not participate in trust-bearing verification steps",
       "consoleTitle": "Developer Console",
-      "consoleP1": "When viewing a content page, open the browser's developer console to see the full verification log. Every check is logged with pass/fail status, data sources, Solana addresses, and a summary line confirming that the RootLens server was not consulted."
+      "consoleP1": "When viewing a content page, open the browser's developer console to see the full verification log. Every check is logged with pass/fail status, data sources, Solana addresses, and a summary line confirming that the RootLens server was not consulted.",
+      "flowIntroBefore": "When someone shares a RootLens link (e.g., ",
+      "flowIntroLink": "rootlens.io/p/abc123",
+      "flowIntroMid": "), the ",
+      "flowIntroCode": "abc123",
+      "flowIntroAfter": " part is a short ID that identifies the published content. Here is what the browser does, step by step:",
+      "check2P1a": "The ",
+      "check2P1code1": "signed_json",
+      "check2P1b": "'s ",
+      "check2P1code2": "{ payload, attributes }",
+      "check2P1c": " is canonicalized using JCS, prepended with a domain tag (",
+      "check2P1code3": "title-protocol-v1",
+      "check2P1d": "), and verified against the ",
+      "check2P1code4": "tee_pubkey",
+      "check2P1e": " using the TEE's signature algorithm (currently Ed25519).",
+      "check3P1code1": "payload.content_hash",
+      "check3P1mid": " must equal the ",
+      "check3P1code2": "content_hash",
+      "check3P1after": " used to find the cNFT. This prevents a signed_json from one content being reused for another.",
+      "check5P1before": "The browser queries all Core cNFTs with the same ",
+      "check5P1code": "content_hash",
+      "check5P1after": " and checks whether this one is the earliest. If someone else registers the same content later, the original registration takes precedence.",
+      "check6P1a": "The ",
+      "check6P1code1": "wasm_hash",
+      "check6P1b": " in the payload must be registered in the on-chain GlobalConfig under ",
+      "check6P1code2": "trusted_wasm_modules",
+      "check6P1c": ". This ensures the TEE ran a known, unmodified verification binary.",
+      "check7P1a": "The payload's ",
+      "check7P1code1": "verified",
+      "check7P1b": " field must be ",
+      "check7P1code2": "true",
+      "check7P1c": ". This indicates that the TEE's WASM successfully verified the C2PA certificate chain against the appropriate Root CA public key.",
+      "verdictP1a": "The overall result is ",
+      "verdictP1code1": "verified",
+      "verdictP1b": " only if ",
+      "verdictP1bold": "every check across all processors passes",
+      "verdictP1c": ". A single failure in any check sets the overall result to ",
+      "verdictP1code2": "failed",
+      "verdictP1d": "."
     },
     "pki": {
       "title": "PKI Architecture",
       "subtitle": "RootLens's three-layer certificate hierarchy for app-level content signing.",
       "scopeLabel": "Scope",
-      "scopeText": "This page describes the PKI used for {rootlensSigning}. Hardware-level signers (Google, Sony, Leica) use their own PKI managed by the respective manufacturer.",
       "hierarchyTitle": "Certificate Hierarchy",
       "designTitle": "Design Decisions",
       "isolationTitle": "Platform Isolation",
-      "isolationP1": "iOS and Android have separate Intermediate CAs, each with its own KMS key. If one platform's ICA is compromised, it can be revoked without affecting the other platform. The {pathLen} on each ICA prevents further delegation.",
       "shortLivedTitle": "Short-Lived Device Certificates",
       "shortLivedP1": "Device Certificates are valid for only 90 days. This limits the window of exposure if a device is compromised. Certificates are renewed automatically 14 days before expiry in the background, without blocking the user.",
       "kmsTitle": "KMS for Root and Intermediate CAs",
@@ -801,12 +905,24 @@
       "platformHeader": "Platform",
       "methodHeader": "Binding Method",
       "androidKeyAttest": "The attestation certificate chain's leaf certificate contains the public key that was generated in the TEE. The server compares this public key with the CSR's public key. A match proves the CSR key lives in the TEE.",
-      "androidPlayIntegrity": "The nonce in the integrity token is {hash}, binding the token to the specific CSR.",
-      "iosAppAttest": "{hash} is passed to the attestation API, binding the attestation to the CSR.",
       "crlTitle": "Certificate Revocation",
-      "crlP1": "A CRL (Certificate Revocation List) is published at {endpoint}. Revoked certificates are tracked by serial number in the database. The 90-day validity of Device Certificates provides a natural expiry mechanism — even without explicit revocation, a compromised certificate becomes unusable within 90 days.",
       "rotationTitle": "PKI Rotation Detection",
-      "rotationP1": "The app periodically checks whether the stored Device Certificate was signed by the current Intermediate CA. If the ICA has been rotated (e.g., due to a security incident), the check fails and the app re-provisions a new Device Certificate."
+      "rotationP1": "The app periodically checks whether the stored Device Certificate was signed by the current Intermediate CA. If the ICA has been rotated (e.g., due to a security incident), the check fails and the app re-provisions a new Device Certificate.",
+      "scopeTextBefore": "This page describes the PKI used for ",
+      "scopeTextBold": "RootLens app-level signing",
+      "scopeTextAfter": ". Hardware-level signers (Google, Sony, Leica) use their own PKI managed by the respective manufacturer.",
+      "isolationP1before": "iOS and Android have separate Intermediate CAs, each with its own KMS key. If one platform's ICA is compromised, it can be revoked without affecting the other platform. The ",
+      "isolationP1code": "pathLenConstraint: 0",
+      "isolationP1after": " on each ICA prevents further delegation.",
+      "androidPlayIntegrityBefore": "The nonce in the integrity token is ",
+      "androidPlayIntegrityCode": "SHA-256(CSR)",
+      "androidPlayIntegrityAfter": ", binding the token to the specific CSR.",
+      "iosAppAttestBefore": "",
+      "iosAppAttestCode": "clientDataHash = SHA-256(CSR)",
+      "iosAppAttestAfter": " is passed to the attestation API, binding the attestation to the CSR.",
+      "crlP1before": "A CRL (Certificate Revocation List) is published at ",
+      "crlP1code": "/api/v1/crl",
+      "crlP1after": ". Revoked certificates are tracked by serial number in the database. The 90-day validity of Device Certificates provides a natural expiry mechanism — even without explicit revocation, a compromised certificate becomes unusable within 90 days."
     }
   }
 }

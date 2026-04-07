@@ -60,22 +60,22 @@ export default async function TitleProtocolPage() {
 
       <h2 className={s.h2}>{t("whatTitle")}</h2>
       <p className={s.p}>
-        {t.rich("whatP1", {
-          verifiable: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("whatP1before")}
+        <span className={s.strong}>{t("whatP1bold")}</span>
+        {t("whatP1after")}
       </p>
       <p className={s.p}>
-        {t.rich("whatP2", {
-          nobodySees: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("whatP2before")}
+        <span className={s.strong}>{t("whatP2bold")}</span>
+        {t("whatP2after")}
       </p>
       <p className={s.p}>{t("whatP3")}</p>
 
       <h3 className={s.h3}>{t("agnosticTitle")}</h3>
       <p className={s.p}>
-        {t.rich("agnosticP1", {
-          cert: () => <code className={s.code}>cert-*</code>,
-        })}
+        {t("agnosticP1before")}
+        <code className={s.code}>{t("agnosticP1code")}</code>
+        {t("agnosticP1after")}
       </p>
 
       <h3 className={s.h3}>{t("rlAppTitle")}</h3>
@@ -88,9 +88,9 @@ export default async function TitleProtocolPage() {
 
       <h2 className={s.h2}>{t("processorTitle")}</h2>
       <p className={s.p}>
-        {t.rich("processorIntro", {
-          signerOrg: () => <code className={s.code}>signer_org</code>,
-        })}
+        {t("processorIntroBefore")}
+        <code className={s.code}>{t("processorIntroCode")}</code>
+        {t("processorIntroAfter")}
       </p>
 
       <table className={s.table}>
@@ -117,71 +117,72 @@ export default async function TitleProtocolPage() {
 
       <div className={s.callout}>
         <div className={s.calloutLabel}>{t("processorCalloutLabel")}</div>
-        {t.rich("processorCallout", {
-          cert: () => <code className={s.code}>cert-*</code>,
-          rootCa: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("processorCalloutA")}
+        <code className={s.code}>{t("processorCalloutCode1")}</code>
+        {t("processorCalloutB")}
+        <span className={s.strong}>{t("processorCalloutBold")}</span>
+        {t("processorCalloutC")}
       </div>
 
       <h2 className={s.h2}>{t("producesTitle")}</h2>
       <p className={s.p}>
-        {t.rich("producesP1", {
-          signedJson: () => <code className={s.code}>signed_json</code>,
-        })}
+        {t("producesP1before")}
+        <code className={s.code}>{t("producesP1code")}</code>
+        {t("producesP1after")}
       </p>
       <div className={s.codeBlock}>{SIGNED_JSON_EXAMPLE}</div>
       <p className={s.p}>
-        {t.rich("producesP2", {
-          jcs: () => <code className={s.code}>{"JCS({ payload, attributes })"}</code>,
-          domainTag: () => <code className={s.code}>title-protocol-v1</code>,
-        })}
+        {t("producesP2a")}
+        <code className={s.code}>{t("producesP2code1")}</code>
+        {t("producesP2b")}
+        <code className={s.code}>{t("producesP2code2")}</code>
+        {t("producesP2c")}
       </p>
 
       <h2 className={s.h2}>{t("wasmTitle")}</h2>
       <p className={s.p}>
-        {t.rich("wasmP1", {
-          trustedWasm: () => <code className={s.code}>trusted_wasm_modules</code>,
-        })}
+        {t("wasmP1before")}
+        <code className={s.code}>{t("wasmP1code")}</code>
+        {t("wasmP1after")}
       </p>
       <p className={s.p}>
-        {t.rich("wasmP2", {
-          wasmHash: () => <code className={s.code}>wasm_hash</code>,
-        })}
+        {t("wasmP2before")}
+        <code className={s.code}>{t("wasmP2code")}</code>
+        {t("wasmP2after")}
       </p>
 
       <h2 className={s.h2}>{t("mintTitle")}</h2>
       <p className={s.p}>{t("mintP1")}</p>
       <ul className={s.list}>
         <li>
-          {t.rich("mintCore", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            code: () => <code className={s.code}>core-c2pa</code>,
-          })}
+          <span className={s.strong}>{t("mintCoreLabel")}</span>
+          {" "}(<code className={s.code}>{t("mintCoreCode")}</code>)
+          {t("mintCoreText")}
         </li>
         <li>
-          {t.rich("mintCert", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            code: () => <code className={s.code}>cert-*</code>,
-          })}
+          <span className={s.strong}>{t("mintCertLabel")}</span>
+          {" "}(<code className={s.code}>{t("mintCertCode")}</code>)
+          {t("mintCertText")}
         </li>
         <li>
-          {t.rich("mintPdq", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            code: () => <code className={s.code}>image-pdq</code>,
-            code2: () => <code className={s.code}>video-vpdq</code>,
-          })}
+          <span className={s.strong}>{t("mintPdqLabel")}</span>
+          {" "}(<code className={s.code}>{t("mintPdqCode1")}</code>
+          {t("mintPdqOr")}
+          <code className={s.code}>{t("mintPdqCode2")}</code>)
+          {t("mintPdqText")}
         </li>
       </ul>
       <p className={s.p}>
-        {t.rich("mintP2", {
-          jsonUri: () => <code className={s.code}>json_uri</code>,
-          signedJson: () => <code className={s.code}>signed_json</code>,
-        })}
+        {t("mintP2a")}
+        <code className={s.code}>{t("mintP2code1")}</code>
+        {t("mintP2b")}
+        <code className={s.code}>{t("mintP2code2")}</code>
+        {t("mintP2c")}
       </p>
       <p className={s.p}>
-        {t.rich("mintLink", {
-          link: () => <a href="/docs/cnft-structure" className={s.link}>cNFT Structure</a>,
-        })}
+        {t("mintLinkBefore")}
+        <a href="/docs/cnft-structure" className={s.link}>{t("mintLinkText")}</a>
+        {t("mintLinkAfter")}
       </p>
 
       <DocsNav

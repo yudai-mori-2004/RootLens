@@ -27,47 +27,48 @@ export default async function TrustModelPage() {
       {/* Where Does Trust Come From? */}
       <h2 className={s.h2}>{t("originTitle")}</h2>
       <p className={s.p}>
-        {t.rich("originP1", {
-          teeHardware: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("originP1before")}
+        <span className={s.strong}>{t("originP1bold")}</span>
+        {t("originP1after")}
       </p>
       <p className={s.p}>
-        {t.rich("originP2", {
-          nobodyCanExtract: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("originP2before")}
+        <span className={s.strong}>{t("originP2bold")}</span>
+        {t("originP2after")}
       </p>
       <p className={s.p}>
-        {t.rich("originP3", {
-          signedJson: () => <code className={s.code}>signed_json</code>,
-        })}
+        {t("originP3before")}
+        <code className={s.code}>{t("originP3code")}</code>
+        {t("originP3after")}
       </p>
 
       {/* What You Must Trust */}
       <h2 className={s.h2}>{t("mustTrustTitle")}</h2>
       <p className={s.p}>
-        {t.rich("mustTrustP1", {
-          teeWorking: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("mustTrustP1before")}
+        <span className={s.strong}>{t("mustTrustP1bold")}</span>
+        {t("mustTrustP1after")}
       </p>
       <p className={s.p}>
-        {t.rich("mustTrustP2", {
-          rules: (c) => <span className={s.strong}>{c}</span>,
-          globalConfig: () => <code className={s.code}>GlobalConfig</code>,
-        })}
+        {t("mustTrustP2a")}
+        <span className={s.strong}>{t("mustTrustP2rulesBold")}</span>
+        {t("mustTrustP2b")}
+        <code className={s.code}>{t("mustTrustP2gcCode")}</code>
+        {t("mustTrustP2c")}
       </p>
       <p className={s.p}>{t("mustTrustP3")}</p>
       <p className={s.p}>
-        {t.rich("mustTrustP4", {
-          openSource: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("mustTrustP4before")}
+        <span className={s.strong}>{t("mustTrustP4bold")}</span>
+        {t("mustTrustP4after")}
       </p>
 
       {/* Trust Layers */}
       <h2 className={s.h2}>{t("layersTitle")}</h2>
       <p className={s.p}>
-        {t.rich("layersIntro", {
-          doNotNeedTrust: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("layersIntroBefore")}
+        <span className={s.strong}>{t("layersIntroBold")}</span>
+        {t("layersIntroAfter")}
       </p>
 
       <table className={s.table}>
@@ -96,36 +97,37 @@ export default async function TrustModelPage() {
       <p className={s.p}>{t("serverIntro")}</p>
       <ul className={s.list}>
         <li>
-          {t.rich("serverRouting", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            link: () => <code className={s.code}>rootlens.io/p/abc123</code>,
-            contentHash: () => <code className={s.code}>content_hash</code>,
-          })}
+          <span className={s.strong}>{t("serverRoutingLabel")}</span>
+          {" "}{t("serverRoutingText")}
+          <code className={s.code}>{t("serverRoutingLink")}</code>
+          {t("serverRoutingText2")}
+          <code className={s.code}>{t("serverRoutingCode")}</code>
+          {t("serverRoutingText3")}
         </li>
         <li>
-          {t.rich("serverIndexer", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            contentHash: () => <code className={s.code}>content_hash</code>,
-          })}
+          <span className={s.strong}>{t("serverIndexerLabel")}</span>
+          {" "}{t("serverIndexerText")}
+          <code className={s.code}>{t("serverIndexerCode")}</code>
+          {t("serverIndexerText2")}
         </li>
       </ul>
       <p className={s.p}>
-        {t.rich("serverAttackIntro", {
-          contentHash: () => <code className={s.code}>content_hash</code>,
-        })}
+        {t("serverAttackBefore")}
+        <code className={s.code}>{t("serverAttackCode")}</code>
+        {t("serverAttackAfter")}
       </p>
       <ul className={s.list}>
         <li>
-          {t.rich("serverDefensePdq", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-          })}
+          <span className={s.strong}>{t("serverDefensePdqLabel")}</span>
+          {" "}{t("serverDefensePdqText")}
         </li>
         <li>
-          {t.rich("serverDefenseBinding", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            contentHash: () => <code className={s.code}>content_hash</code>,
-            contentHash2: () => <code className={s.code}>content_hash</code>,
-          })}
+          <span className={s.strong}>{t("serverDefenseBindingLabel")}</span>
+          {" "}{t("serverDefenseBindingText")}
+          <code className={s.code}>{t("serverDefenseBindingCode")}</code>
+          {t("serverDefenseBindingText2")}
+          <code className={s.code}>{t("serverDefenseBindingCode2")}</code>
+          {t("serverDefenseBindingText3")}
         </li>
       </ul>
       <p className={s.p}>{t("serverConclusion")}</p>
@@ -135,15 +137,14 @@ export default async function TrustModelPage() {
       <p className={s.p}>{t("attestationIntro")}</p>
       <ul className={s.list}>
         <li>
-          {t.rich("attestationCollection", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-          })}
+          <span className={s.strong}>{t("attestationCollectionLabel")}</span>
+          {" "}{t("attestationCollectionText")}
         </li>
         <li>
-          {t.rich("attestationData", {
-            label: (c) => <span className={s.strong}>{c}</span>,
-            signedJson: () => <code className={s.code}>signed_json</code>,
-          })}
+          <span className={s.strong}>{t("attestationDataLabel")}</span>
+          {" "}{t("attestationDataText")}
+          <code className={s.code}>{t("attestationDataCode")}</code>
+          {t("attestationDataText2")}
         </li>
       </ul>
       <p className={s.p}>{t("attestationConclusion")}</p>
@@ -151,10 +152,11 @@ export default async function TrustModelPage() {
       {/* Self-Proving Data */}
       <h2 className={s.h2}>{t("selfProvingTitle")}</h2>
       <p className={s.p}>
-        {t.rich("selfProvingP1", {
-          signedJson: () => <code className={s.code}>signed_json</code>,
-          selfProving: (c) => <span className={s.strong}>{c}</span>,
-        })}
+        {t("selfProvingP1a")}
+        <code className={s.code}>{t("selfProvingP1code")}</code>
+        {t("selfProvingP1b")}
+        <span className={s.strong}>{t("selfProvingP1bold")}</span>
+        {t("selfProvingP1c")}
       </p>
       <p className={s.p}>{t("selfProvingP2")}</p>
 
