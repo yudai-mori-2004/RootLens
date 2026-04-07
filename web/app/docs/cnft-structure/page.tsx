@@ -4,21 +4,20 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "cNFT Structure" };
 
-const OVERVIEW_DIAGRAM = `                        ┌─────────────────────────┐
-                        │     Core cNFT           │
-content_hash ──────────→│     (core-c2pa)          │
-                        │     Provenance graph     │
-                        └─────────────────────────┘
-                                    │
-                     ┌──────────────┼──────────────┐
-                     ▼              ▼              ▼
-              ┌────────────┐ ┌────────────┐ ┌────────────┐
-              │ cert-*     │ │ image-pdq  │ │ video-vpdq │
-              │ Extension  │ │ Extension  │ │ Extension  │
-              │            │ │            │ │            │
-              │ Cert chain │ │ 256-bit    │ │ Per-frame  │
-              │ verified?  │ │ PDQ hash   │ │ PDQ hashes │
-              └────────────┘ └────────────┘ └────────────┘
+const OVERVIEW_DIAGRAM = `                    ┌───────────────────────┐
+                    │      Core cNFT        │
+content_hash ──▶   │      (core-c2pa)      │
+                    │      Provenance graph  │
+                    └───────────┬───────────┘
+                    ┌───────────┼───────────┐
+                    ▼           ▼           ▼
+             ┌───────────┐┌───────────┐┌───────────┐
+             │ cert-*    ││ image-pdq ││ video-vpdq│
+             │ Extension ││ Extension ││ Extension │
+             │           ││           ││           │
+             │ Cert chain││ 256-bit   ││ Per-frame │
+             │ verified? ││ PDQ hash  ││ PDQ hashes│
+             └───────────┘└───────────┘└───────────┘
 
 All cNFTs share the same content_hash.
 Core cNFT belongs to core_collection_mint.

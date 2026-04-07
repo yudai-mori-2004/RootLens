@@ -4,36 +4,40 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "PKI Architecture" };
 
-const HIERARCHY_DIAGRAM = `Root CA  ─────────────────────────────────────────────────
-  Algorithm:  ECDSA P-256 (ES256)  [current; PQC migration planned]
-  Storage:    AWS KMS  (FIPS 140-2 Level 2)
-  Validity:   20 years
-  Constraints: CA:TRUE, pathLenConstraint:1
-  Key Usage:  keyCertSign, cRLSign
-  ──────────────────────────────────────────────────────
-       │                              │
-       │ signs                        │ signs
-       ▼                              ▼
-  iOS Intermediate CA            Android Intermediate CA
-  ──────────────────             ──────────────────────
-  Storage:  AWS KMS              Storage:  AWS KMS
-  pathLen:  0                    pathLen:  0
-  Cryptographically              Cryptographically
-  independent                    independent
-       │                              │
-       │ signs                        │ signs
-       ▼                              ▼
-  Device Certificate             Device Certificate
-  ──────────────────             ──────────────────
-  Validity:   90 days            Validity:   90 days
-  Constraints: CA:FALSE          Constraints: CA:FALSE
-  Key Usage:  digitalSignature   Key Usage:  digitalSignature
-  EKU: documentSigning           EKU: documentSigning
-  Public key: from TEE           Public key: from TEE
-  (Secure Enclave)               (StrongBox)`;
+const HIERARCHY_DIAGRAM = `Root CA
+──────────────────────────────────────────
+  Algorithm:   ECDSA P-256 (ES256)
+               [current; PQC planned]
+  Storage:     AWS KMS (FIPS 140-2 L2)
+  Validity:    20 years
+  Constraints: CA:TRUE, pathLen:1
+  Key Usage:   keyCertSign, cRLSign
+──────────────────────────────────────────
+       │                        │
+       │ signs                  │ signs
+       ▼                        ▼
+  iOS Intermediate CA     Android Intermediate CA
+  ─────────────────────   ─────────────────────
+  Storage:  AWS KMS       Storage:  AWS KMS
+  pathLen:  0             pathLen:  0
+  Cryptographically       Cryptographically
+  independent             independent
+       │                        │
+       │ signs                  │ signs
+       ▼                        ▼
+  Device Certificate      Device Certificate
+  ─────────────────────   ─────────────────────
+  Validity:    90 days    Validity:    90 days
+  Constraints: CA:FALSE   Constraints: CA:FALSE
+  Key Usage:              Key Usage:
+    digitalSignature        digitalSignature
+  EKU:                    EKU:
+    documentSigning         documentSigning
+  Public key: from TEE    Public key: from TEE
+  (Secure Enclave)        (StrongBox)`;
 
-const ISSUANCE_DIAGRAM = `Device                                 Server
-──────                                 ──────
+const ISSUANCE_DIAGRAM = `Device                              Server
+──────                              ──────
 
 1. Generate EC P-256 key pair
    inside TEE
@@ -45,35 +49,46 @@ const ISSUANCE_DIAGRAM = `Device                                 Server
 
 3. Obtain Platform Attestation
    iOS:     App Attest
-            clientDataHash = SHA-256(CSR)
+            clientDataHash
+            = SHA-256(CSR)
    Android: Key Attestation chain
             + Play Integrity
             nonce = SHA-256(CSR)
-                    │
-4. Send CSR + Attestation ──────────→  5. Verify CSR self-signature
-                                           (Proof of Possession)
+              │
+4. Send CSR  │
+ + Attestation ─────────────▶  5. Verify CSR
+                                  self-signature
+                                  (Proof of Possession)
 
-                                       6. Verify public key algorithm
-                                           (must be EC P-256)
+                               6. Verify public key
+                                  algorithm
+                                  (must be EC P-256)
 
-                                       7. Verify Platform Attestation
-                                          iOS:  clientDataHash matches CSR
-                                          Android: CSR pubkey == attestation
-                                                   cert[0] pubkey
+                               7. Verify Platform
+                                  Attestation
+                                  iOS:  clientDataHash
+                                        matches CSR
+                                  Android: CSR pubkey
+                                  == attestation
+                                     cert[0] pubkey
 
-                                       8. Sign Device Certificate
-                                          with ICA key (via KMS)
+                               8. Sign Device Cert
+                                  with ICA key
+                                  (via KMS)
 
-                                       9. Record issuance in DB
-                                          (for CRL & audit)
-                                                    │
-10. Receive certs ◀─────────────────  Device Cert + ICA Cert + Root Cert
+                               9. Record issuance
+                                  in DB
+                                  (for CRL & audit)
+                                        │
+10. Receive certs  ◀────────────────────┘
+    Device Cert + ICA Cert + Root Cert
 
 11. Store 3-layer cert chain
     in TEE alongside key pair
 
 12. Use for C2PA signing
-    Renewal: 14 days before expiry (background, non-blocking)`;
+    Renewal: 14 days before expiry
+    (background, non-blocking)`;
 
 export default async function PkiPage() {
   const t = await getTranslations("docs.pki");
