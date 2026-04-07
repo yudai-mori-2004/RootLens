@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/v1/indexer/poll",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
