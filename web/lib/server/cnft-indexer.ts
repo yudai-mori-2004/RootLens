@@ -163,24 +163,28 @@ const RETRY_INTERVAL = 2000;
  * 全asset_idが登録できなければエラーを投げる。
  */
 export async function indexFromTransaction(txSignature: string): Promise<number> {
-  // Phase 1: getTransaction をリトライ（TX確認待ち）
+  // Phase 1: getTransaction をリトライ（TX確認待ち + ネットワークエラー耐性）
   let tx: any = null;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_INTERVAL));
 
-    const txRes = await fetch(DAS_RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "indexer",
-        method: "getTransaction",
-        params: [txSignature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
-      }),
-    });
-    const txJson = await txRes.json();
-    tx = txJson.result;
-    if (tx) break;
+    try {
+      const txRes = await fetch(DAS_RPC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: "indexer",
+          method: "getTransaction",
+          params: [txSignature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
+        }),
+      });
+      const txJson = await txRes.json();
+      tx = txJson.result;
+      if (tx) break;
+    } catch {
+      // ネットワークエラー → 次のリトライへ
+    }
   }
 
   if (!tx) throw new Error(`TX not found after ${MAX_RETRIES} retries: ${txSignature}`);
@@ -205,29 +209,33 @@ export async function indexFromTransaction(txSignature: string): Promise<number>
     if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_INTERVAL));
 
     for (const assetId of [...pending]) {
-      const asset = await dasGetAsset(assetId);
-      if (!asset) continue;
+      try {
+        const asset = await dasGetAsset(assetId);
+        if (!asset) continue;
 
-      const contentHash = getAttribute(asset, "content_hash");
-      if (!contentHash) continue;
+        const contentHash = getAttribute(asset, "content_hash");
+        if (!contentHash) continue;
 
-      const processorId = deriveProcessorId(asset);
+        const processorId = deriveProcessorId(asset);
 
-      const { error } = await supabase.from("cnft_assets").upsert(
-        {
-          asset_id: assetId,
-          content_hash: contentHash,
-          processor_id: processorId,
-          network: NETWORK,
-          solana_block_time: blockTime,
-          tsa_timestamp: null,
-        },
-        { onConflict: "asset_id" },
-      );
+        const { error } = await supabase.from("cnft_assets").upsert(
+          {
+            asset_id: assetId,
+            content_hash: contentHash,
+            processor_id: processorId,
+            network: NETWORK,
+            solana_block_time: blockTime,
+            tsa_timestamp: null,
+          },
+          { onConflict: "asset_id" },
+        );
 
-      if (!error) {
-        indexed++;
-        pending.delete(assetId);
+        if (!error) {
+          indexed++;
+          pending.delete(assetId);
+        }
+      } catch {
+        // ネットワークエラー → 次のリトライへ
       }
     }
   }
