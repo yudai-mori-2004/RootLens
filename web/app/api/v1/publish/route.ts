@@ -50,22 +50,32 @@ export async function POST(req: NextRequest) {
     });
 
     // cNFTインデクサ登録（txSignatureがあれば）
-    // 失敗してもページ作成は成功とする（Pollが補完する）
     const txSignatures = contents
       .map((c: any) => c.txSignature)
       .filter((s: any): s is string => !!s);
 
+    const indexErrors: string[] = [];
     for (const sig of [...new Set(txSignatures)]) {
       try {
         const count = await indexFromTransaction(sig);
         console.log(`[publish] indexed ${count} assets from TX ${sig}`);
       } catch (e) {
-        console.error("[publish] indexer insert failed for", sig, e);
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[publish] indexer failed:", msg);
+        indexErrors.push(msg);
       }
     }
 
     const baseUrl = process.env.PUBLIC_PAGE_URL || "https://www.rootlens.io";
     const pageUrl = `${baseUrl}/p/${record.shortId}`;
+
+    if (indexErrors.length > 0) {
+      return NextResponse.json({
+        shortId: record.shortId,
+        pageUrl,
+        indexerErrors: indexErrors,
+      }, { status: 207 }); // Multi-Status: ページ作成OK、インデクサ一部失敗
+    }
 
     return NextResponse.json({
       shortId: record.shortId,

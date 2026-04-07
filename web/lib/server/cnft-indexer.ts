@@ -154,24 +154,37 @@ export async function indexOneAsset(asset: DasAsset): Promise<boolean> {
 // TX署名からインデックス（publish API用リアルタイム登録）
 // ---------------------------------------------------------------------------
 
+const MAX_RETRIES = 15;
+const RETRY_INTERVAL = 2000;
+
 /**
  * txSignatureからミントされたcNFTを抽出しインデクサに登録する。
- * ログから "Leaf asset ID: ..." を探し、DASにインデックスされるまでリトライして登録。
+ * TX確認待ち + DASインデックス待ちの両方をリトライする。
+ * 全asset_idが登録できなければエラーを投げる。
  */
 export async function indexFromTransaction(txSignature: string): Promise<number> {
-  const txRes = await fetch(DAS_RPC_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: "indexer",
-      method: "getTransaction",
-      params: [txSignature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
-    }),
-  });
-  const txJson = await txRes.json();
-  const tx = txJson.result;
-  if (!tx || tx.meta?.err) return 0;
+  // Phase 1: getTransaction をリトライ（TX確認待ち）
+  let tx: any = null;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_INTERVAL));
+
+    const txRes = await fetch(DAS_RPC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "indexer",
+        method: "getTransaction",
+        params: [txSignature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
+      }),
+    });
+    const txJson = await txRes.json();
+    tx = txJson.result;
+    if (tx) break;
+  }
+
+  if (!tx) throw new Error(`TX not found after ${MAX_RETRIES} retries: ${txSignature}`);
+  if (tx.meta?.err) throw new Error(`TX failed on-chain: ${JSON.stringify(tx.meta.err)}`);
 
   const blockTime: number = tx.blockTime;
 
@@ -182,16 +195,14 @@ export async function indexFromTransaction(txSignature: string): Promise<number>
     if (match) assetIds.push(match[1]);
   }
 
-  if (assetIds.length === 0) return 0;
+  if (assetIds.length === 0) throw new Error(`No Leaf asset IDs in TX logs: ${txSignature}`);
 
-  // DASインデックス遅延に対応: 全asset_idが取得できるまでリトライ
-  const maxRetries = 10;
-  const retryInterval = 2000; // 2秒
+  // Phase 2: 各asset_idをDASから取得してDB登録（DASインデックス待ち）
   let indexed = 0;
   const pending = new Set(assetIds);
 
-  for (let attempt = 0; attempt < maxRetries && pending.size > 0; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, retryInterval));
+  for (let attempt = 0; attempt < MAX_RETRIES && pending.size > 0; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_INTERVAL));
 
     for (const assetId of [...pending]) {
       const asset = await dasGetAsset(assetId);
@@ -222,7 +233,7 @@ export async function indexFromTransaction(txSignature: string): Promise<number>
   }
 
   if (pending.size > 0) {
-    console.warn(`[indexer] ${pending.size} assets not indexed after ${maxRetries} retries:`, [...pending]);
+    throw new Error(`${pending.size}/${assetIds.length} assets not indexed after ${MAX_RETRIES} retries: ${[...pending].join(", ")}`);
   }
 
   return indexed;
