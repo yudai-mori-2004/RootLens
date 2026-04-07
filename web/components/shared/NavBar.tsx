@@ -20,6 +20,12 @@ export default function NavBar() {
         >
           Technology
         </a>
+        <a
+          href="/docs"
+          className={`${s.navLink} ${pathname.startsWith("/docs") ? s.navLinkActive : ""}`}
+        >
+          Docs
+        </a>
       </div>
     </nav>
   );

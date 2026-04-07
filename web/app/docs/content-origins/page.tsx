@@ -1,0 +1,190 @@
+import { getTranslations } from "next-intl/server";
+import s from "../../../components/docs/docs.module.css";
+import DocsNav from "../../../components/docs/DocsNav";
+
+export const metadata = { title: "How Content Is Signed" };
+
+const HW_DIAGRAM = `Camera Sensor ──→ Image Processing ──→ Secure Chip ──→ C2PA Signature
+                    (ISP, etc.)          (Titan M2, etc.)
+
+                                         Signing key is factory-bound
+                                         and cannot be extracted`;
+
+const APP_DIAGRAM = `Camera API (OS) ──→ TEE ──→ C2PA Signature
+                      (Secure Enclave / StrongBox)
+
+                      Private key generated in TEE, never exported
+                      But: sensor → TEE path goes through the OS`;
+
+const PKI_DIAGRAM = `Root CA  (AWS KMS, 20-year validity)
+  └── iOS Intermediate CA  (AWS KMS, platform-isolated)
+  │     └── Device Certificate  (90-day validity, TEE public key)
+  │
+  └── Android Intermediate CA  (AWS KMS, platform-isolated)
+        └── Device Certificate  (90-day validity, TEE public key)`;
+
+export default async function ContentOriginsPage() {
+  const t = await getTranslations("docs.contentOrigins");
+  const tn = await getTranslations("docs.nav");
+  const ts = await getTranslations("docs.sidebar");
+
+  const COMP_ROWS = [
+    { key: "TrustOrigin", label: t("compTrustOrigin") },
+    { key: "Sensor", label: t("compSensor") },
+    { key: "Key", label: t("compKey") },
+    { key: "Cert", label: t("compCert") },
+  ] as const;
+
+  const PROV_ROWS = [1, 2, 3, 4] as const;
+
+  return (
+    <article className={s.article}>
+      <h1 className={s.title}>{t("title")}</h1>
+      <p className={s.subtitle}>{t("subtitle")}</p>
+
+      {/* Hardware */}
+      <h2 className={s.h2} id="hardware">{t("hwTitle")}</h2>
+      <p className={s.p}>{t("hwP1")}</p>
+      <div className={s.diagram}>{HW_DIAGRAM}</div>
+
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th>{t("hwDeviceHeader")}</th>
+            <th>{t("hwChipHeader")}</th>
+            <th>{t("hwProvesHeader")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Google Pixel</td><td>Titan M2</td><td>{t("hwPixel")}</td></tr>
+          <tr><td>Sony / Leica</td><td>Vendor secure element</td><td>{t("hwSony")}</td></tr>
+        </tbody>
+      </table>
+
+      <p className={s.p}>
+        {t.rich("hwTrustBasis", {
+          label: (c) => <span className={s.strong}>{c}</span>,
+        })}
+      </p>
+      <p className={s.p}>
+        {t.rich("hwRulesOut", {
+          label: (c) => <span className={s.strong}>{c}</span>,
+        })}
+      </p>
+
+      {/* App-Level */}
+      <h2 className={s.h2} id="app">{t("appTitle")}</h2>
+      <p className={s.p}>{t("appP1")}</p>
+      <div className={s.diagram}>{APP_DIAGRAM}</div>
+      <p className={s.p}>{t("appMechanisms")}</p>
+
+      <h3 className={s.h3}>{t("appAttestation")}</h3>
+      <p className={s.p}>{t("appAttestationP1")}</p>
+      <ul className={s.list}>
+        <li>
+          {t.rich("appAttestationAndroid", {
+            label: (c) => <span className={s.strong}>{c}</span>,
+          })}
+        </li>
+        <li>
+          {t.rich("appAttestationIos", {
+            label: (c) => <span className={s.strong}>{c}</span>,
+            hash: () => <code className={s.code}>clientDataHash = SHA-256(CSR)</code>,
+          })}
+        </li>
+      </ul>
+
+      <h3 className={s.h3}>{t("appTeeTitle")}</h3>
+      <p className={s.p}>{t("appTeeP1")}</p>
+
+      <h3 className={s.h3}>{t("appPkiTitle")}</h3>
+      <p className={s.p}>{t("appPkiP1")}</p>
+      <div className={s.diagram}>{PKI_DIAGRAM}</div>
+      <p className={s.p}>
+        {t.rich("appPkiLink", {
+          link: () => <a href="/docs/pki" className={s.link}>{t("appPkiLinkText")}</a>,
+        })}
+      </p>
+
+      <h3 className={s.h3}>{t("tradeoffTitle")}</h3>
+      <div className={s.callout}>
+        <div className={s.calloutLabel}>{t("tradeoffLabel")}</div>
+        {t("tradeoffText")}
+      </div>
+
+      {/* Comparison */}
+      <h2 className={s.h2}>{t("comparisonTitle")}</h2>
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th>{t("compAspect")}</th>
+            <th>{t("compHw")}</th>
+            <th>{t("compApp")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {COMP_ROWS.map(({ key, label }) => (
+            <tr key={key}>
+              <td>{label}</td>
+              <td>{t(`comp${key}Hw` as any)}</td>
+              <td>{t(`comp${key}App` as any)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td>Cert extension</td>
+            <td><code className={s.code}>cert-google</code>, <code className={s.code}>cert-sony</code></td>
+            <td><code className={s.code}>cert-rootlens</code></td>
+          </tr>
+          {["Pipeline", "Display"].map((row) => (
+            <tr key={row}>
+              <td>{t(`comp${row}` as any)}</td>
+              <td>{row === "Pipeline" ? t("compSame") : t("compDisplayHw")}</td>
+              <td>{row === "Pipeline" ? t("compSame") : t("compDisplayApp")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className={s.callout}>
+        <div className={s.calloutLabel}>{t("keyPointLabel")}</div>
+        {t("keyPointText")}
+      </div>
+
+      {/* Provenance */}
+      <h2 className={s.h2} id="provenance">{t("provenanceTitle")}</h2>
+      <p className={s.p}>
+        {t.rich("provenanceP1", {
+          provenanceGraph: (c) => <span className={s.strong}>{c}</span>,
+        })}
+      </p>
+
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th>{t("provenanceScenario")}</th>
+            <th>{t("provenanceChain")}</th>
+            <th>{t("provenanceDisplay")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PROV_ROWS.map((n) => (
+            <tr key={n}>
+              <td>{t(`prov${n}scenario` as any)}</td>
+              <td>{t(`prov${n}chain` as any)}</td>
+              <td>{t(`prov${n}display` as any)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p className={s.p}>{t("provenanceP2")}</p>
+
+      <DocsNav
+        prev={{ href: "/docs/trust-model", title: ts("trustModel") }}
+        next={{ href: "/docs/title-protocol", title: ts("titleProtocol") }}
+        prevLabel={tn("prev")}
+        nextLabel={tn("next")}
+      />
+    </article>
+  );
+}
