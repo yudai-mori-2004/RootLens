@@ -4,24 +4,32 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "How Content Is Signed" };
 
-const HW_DIAGRAM = `Camera Sensor ──→ Image Processing ──→ Secure Chip ──→ C2PA Signature
-                    (ISP, etc.)          (Titan M2, etc.)
+const HW_DIAGRAM = `
+  Camera     Image        Secure       C2PA
+  Sensor ──→ Processing ──→ Chip ──→ Signature
+              (ISP)       (Titan M2)
 
-                                         Signing key is factory-bound
-                                         and cannot be extracted`;
+  * Signing key is factory-bound
+  * Cannot be extracted from the chip
+`.trim();
 
-const APP_DIAGRAM = `Camera API (OS) ──→ TEE ──→ C2PA Signature
-                      (Secure Enclave / StrongBox)
+const APP_DIAGRAM = `
+  Camera        TEE              C2PA
+  API (OS) ──→ (Secure Enclave / ──→ Signature
+                StrongBox)
 
-                      Private key generated in TEE, never exported
-                      But: sensor → TEE path goes through the OS`;
+  * Private key generated in TEE, never exported
+  * Sensor → TEE path goes through the OS
+`.trim();
 
-const PKI_DIAGRAM = `Root CA  (AWS KMS, 20-year validity)
-  └── iOS Intermediate CA  (AWS KMS, platform-isolated)
-  │     └── Device Certificate  (90-day validity, TEE public key)
+const PKI_DIAGRAM = `
+  Root CA (AWS KMS, 20-year validity)
+  ├── iOS Intermediate CA (AWS KMS)
+  │   └── Device Certificate (90-day, TEE public key)
   │
-  └── Android Intermediate CA  (AWS KMS, platform-isolated)
-        └── Device Certificate  (90-day validity, TEE public key)`;
+  └── Android Intermediate CA (AWS KMS)
+      └── Device Certificate (90-day, TEE public key)
+`.trim();
 
 export default async function ContentOriginsPage() {
   const t = await getTranslations("docs.contentOrigins");
