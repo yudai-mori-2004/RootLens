@@ -5,34 +5,34 @@ import DocsNav from "../../../components/docs/DocsNav";
 export const metadata = { title: "Client-Side Verification" };
 
 const FLOW_DIAGRAM = `Viewer's Browser
-──────────────────────────────────────────────
+----------------------------------------------
 
-1. Short ID ──▶ content_hash
+1. Short ID --> content_hash
    The server resolves the short ID to a
    content_hash. This is a convenience
    lookup, not a trust-bearing step.
 
-2. content_hash ──▶ cNFT candidates
+2. content_hash --> cNFT candidates
    The indexer cache returns candidate
-   cNFT IDs. These are NOT trusted ──
+   cNFT IDs. These are NOT trusted --
    every candidate is re-verified.
 
-3. cNFT ID ──▶ on-chain verification
+3. cNFT ID --> on-chain verification
    For each candidate, the browser queries
    the Solana blockchain directly:
-   ├── Belongs to official collection?
-   │   (on-chain GlobalConfig) ──▶ NO: reject
-   ├── content_hash matches? ──▶ NO: reject
-   └── Fetch signed_json from cNFT's URI
+   |-- Belongs to official collection?
+   |   (on-chain GlobalConfig) --> NO: reject
+   |-- content_hash matches? --> NO: reject
+   \`-- Fetch signed_json from cNFT's URI
 
-4. signed_json ──▶ browser verification
-   ├── TEE signature check (Ed25519)
-   ├── Collection membership
-   ├── Content binding
-   ├── Processor-specific checks
-   └── Perceptual hash recomputation
+4. signed_json --> browser verification
+   |-- TEE signature check (Ed25519)
+   |-- Collection membership
+   |-- Content binding
+   |-- Processor-specific checks
+   \`-- Perceptual hash recomputation
 
-──────────────────────────────────────────────
+----------------------------------------------
 Steps 3 and 4 do not contact the
 RootLens server.`;
 

@@ -5,39 +5,17 @@ import DocsNav from "../../../components/docs/DocsNav";
 export const metadata = { title: "PKI Architecture" };
 
 const HIERARCHY_DIAGRAM = `Root CA
-──────────────────────────────────────────
-  Algorithm:   ECDSA P-256 (ES256)
-               [current; PQC planned]
-  Storage:     AWS KMS (FIPS 140-2 L2)
-  Validity:    20 years
-  Constraints: CA:TRUE, pathLen:1
-  Key Usage:   keyCertSign, cRLSign
-──────────────────────────────────────────
-       │                        │
-       │ signs                  │ signs
-       ▼                        ▼
-  iOS Intermediate CA     Android Intermediate CA
-  ─────────────────────   ─────────────────────
-  Storage:  AWS KMS       Storage:  AWS KMS
-  pathLen:  0             pathLen:  0
-  Cryptographically       Cryptographically
-  independent             independent
-       │                        │
-       │ signs                  │ signs
-       ▼                        ▼
-  Device Certificate      Device Certificate
-  ─────────────────────   ─────────────────────
-  Validity:    90 days    Validity:    90 days
-  Constraints: CA:FALSE   Constraints: CA:FALSE
-  Key Usage:              Key Usage:
-    digitalSignature        digitalSignature
-  EKU:                    EKU:
-    documentSigning         documentSigning
-  Public key: from TEE    Public key: from TEE
-  (Secure Enclave)        (StrongBox)`;
+  |
+  +-- iOS Intermediate CA
+  |     |
+  |     +-- Device Cert (iOS)
+  |
+  +-- Android Intermediate CA
+        |
+        +-- Device Cert (Android)`;
 
 const ISSUANCE_DIAGRAM = `Device                              Server
-──────                              ──────
+------                              ------
 
 1. Generate EC P-256 key pair
    inside TEE
@@ -54,9 +32,9 @@ const ISSUANCE_DIAGRAM = `Device                              Server
    Android: Key Attestation chain
             + Play Integrity
             nonce = SHA-256(CSR)
-              │
-4. Send CSR  │
- + Attestation ─────────────▶  5. Verify CSR
+              |
+4. Send CSR  |
+ + Attestation ------------->  5. Verify CSR
                                   self-signature
                                   (Proof of Possession)
 
@@ -79,8 +57,8 @@ const ISSUANCE_DIAGRAM = `Device                              Server
                                9. Record issuance
                                   in DB
                                   (for CRL & audit)
-                                        │
-10. Receive certs  ◀────────────────────┘
+                                        |
+10. Receive certs  <--------------------+
     Device Cert + ICA Cert + Root Cert
 
 11. Store 3-layer cert chain
@@ -109,6 +87,49 @@ export default async function PkiPage() {
 
       <h2 className={s.h2}>{t("hierarchyTitle")}</h2>
       <div className={s.diagram}>{HIERARCHY_DIAGRAM}</div>
+
+      <table className={s.table}>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Root CA</th>
+            <th>Intermediate CA</th>
+            <th>Device Cert</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span className={s.strong}>Algorithm</span></td>
+            <td>ECDSA P-256</td>
+            <td>ECDSA P-256</td>
+            <td>ECDSA P-256</td>
+          </tr>
+          <tr>
+            <td><span className={s.strong}>Storage</span></td>
+            <td>AWS KMS</td>
+            <td>AWS KMS</td>
+            <td>Device TEE</td>
+          </tr>
+          <tr>
+            <td><span className={s.strong}>Validity</span></td>
+            <td>20 years</td>
+            <td>—</td>
+            <td>90 days</td>
+          </tr>
+          <tr>
+            <td><span className={s.strong}>CA</span></td>
+            <td>TRUE, pathLen:1</td>
+            <td>TRUE, pathLen:0</td>
+            <td>FALSE</td>
+          </tr>
+          <tr>
+            <td><span className={s.strong}>Key Usage</span></td>
+            <td>keyCertSign, cRLSign</td>
+            <td>keyCertSign</td>
+            <td>digitalSignature</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h2 className={s.h2}>{t("designTitle")}</h2>
 

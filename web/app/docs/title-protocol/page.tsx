@@ -5,30 +5,30 @@ import DocsNav from "../../../components/docs/DocsNav";
 export const metadata = { title: "Title Protocol" };
 
 const E2E_DIAGRAM = `App                                TEE Node
-────                               ────────
+----                               --------
 
 1. Look up the TEE node's public key
    (from on-chain GlobalConfig)
 
 2. Establish a shared secret
-   (ephemeral key exchange ── provides
+   (ephemeral key exchange -- provides
     forward secrecy: even if a key is
     later compromised, past sessions
     remain protected)
 
 3. Derive separate encryption keys
    for each direction
-   (app ──▶ TEE, TEE ──▶ app)
+   (app --> TEE, TEE --> app)
 
 4. Encrypt the content locally
    and upload the ciphertext
-        │
-        └──────────────────────▶  5. Decrypt inside TEE
+        |
+        \`---------------------->  5. Decrypt inside TEE
                                      Verify C2PA chain
                                      Run processors
                                      Sign results
-  6. Receive encrypted results       │
-     Decrypt locally          ◀──────┘`;
+  6. Receive encrypted results       |
+     Decrypt locally          <------+`;
 
 const SIGNED_JSON_EXAMPLE = `{
   "protocol": "Title-v1",

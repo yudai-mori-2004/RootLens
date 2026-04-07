@@ -4,24 +4,23 @@ import DocsNav from "../../../components/docs/DocsNav";
 
 export const metadata = { title: "cNFT Structure" };
 
-const OVERVIEW_DIAGRAM = `                    ┌───────────────────────┐
-                    │      Core cNFT        │
-content_hash ──▶   │      (core-c2pa)      │
-                    │      Provenance graph  │
-                    └───────────┬───────────┘
-                    ┌───────────┼───────────┐
-                    ▼           ▼           ▼
-             ┌───────────┐┌───────────┐┌───────────┐
-             │ cert-*    ││ image-pdq ││ video-vpdq│
-             │ Extension ││ Extension ││ Extension │
-             │           ││           ││           │
-             │ Cert chain││ 256-bit   ││ Per-frame │
-             │ verified? ││ PDQ hash  ││ PDQ hashes│
-             └───────────┘└───────────┘└───────────┘
+const OVERVIEW_DIAGRAM = `content_hash
+  |
+  +-- Core cNFT (core-c2pa)
+  |     Provenance graph
+  |
+  +-- cert-* Extension
+  |     Certificate chain verified?
+  |
+  +-- image-pdq Extension
+  |     256-bit PDQ hash
+  |
+  +-- video-vpdq Extension
+        Per-frame PDQ hashes
 
-All cNFTs share the same content_hash.
-Core cNFT belongs to core_collection_mint.
-Extension cNFTs belong to ext_collection_mint.`;
+* All cNFTs share the same content_hash
+* Core --> core_collection_mint
+* Extensions --> ext_collection_mint`;
 
 export default async function CnftStructurePage() {
   const t = await getTranslations("docs.cnftStructure");

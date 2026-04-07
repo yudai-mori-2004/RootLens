@@ -223,9 +223,13 @@
 
 /* ---- Diagram (monospace pre block, light bg) ---- */
 .diagram {
-  font-family: var(--font-lp-mono, var(--font-geist-mono, monospace));
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
   font-size: 0.78rem;
-  line-height: 1.55;
+  line-height: 1.6;
+  letter-spacing: 0;
+  font-variant-ligatures: none;
+  -webkit-font-feature-settings: "liga" 0, "calt" 0;
+  font-feature-settings: "liga" 0, "calt" 0;
   background: var(--docs-bg-alt);
   border: 1px solid var(--docs-border);
   padding: 24px 28px;
@@ -234,6 +238,7 @@
   margin: 24px 0;
   white-space: pre;
   color: var(--docs-text);
+  tab-size: 4;
 }
 
 /* ---- Table ---- */
