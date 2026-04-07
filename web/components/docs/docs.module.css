@@ -46,22 +46,28 @@
 }
 
 .sidebarSection {
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+}
+
+.sidebarSection + .sidebarSection {
+  padding-top: 16px;
+  border-top: 1px solid var(--docs-border);
 }
 
 .sidebarSectionTitle {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--docs-text-tertiary);
+  color: var(--docs-accent);
+  opacity: 0.6;
   padding: 0 12px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .sidebarLink {
   display: block;
-  padding: 6px 12px;
+  padding: 5px 12px;
   font-size: 0.85rem;
   color: var(--docs-text-secondary);
   text-decoration: none;
