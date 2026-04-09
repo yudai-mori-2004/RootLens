@@ -38,7 +38,7 @@ export default async function PrivacyPolicyPage() {
             When you capture or import photos and videos, the App embeds
             cryptographic signatures (C2PA) to prove authenticity. Published
             content is uploaded to cloud storage (Cloudflare R2) and its metadata
-            is recorded on the Solana blockchain and Arweave. Published content
+            is recorded on the Solana blockchain and off-chain storage. Published content
             is publicly accessible by design.
           </p>
 
@@ -68,7 +68,7 @@ export default async function PrivacyPolicyPage() {
           <ul className={s.prose}>
             <li>Signing content with C2PA cryptographic proofs</li>
             <li>Publishing verified content to public pages</li>
-            <li>Recording content metadata on blockchain (Solana / Arweave)</li>
+            <li>Recording content metadata on blockchain (Solana) and off-chain storage</li>
             <li>Issuing and renewing device certificates</li>
             <li>Displaying your profile on published content pages</li>
           </ul>
@@ -80,7 +80,7 @@ export default async function PrivacyPolicyPage() {
               <strong>Privy</strong> — authentication and wallet management
             </li>
             <li>
-              <strong>Solana / Arweave</strong> — public blockchain recording
+              <strong>Solana</strong> — public blockchain recording
             </li>
             <li>
               <strong>Cloudflare R2</strong> — content storage

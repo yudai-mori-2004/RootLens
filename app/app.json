@@ -2,6 +2,7 @@
   "expo": {
     "name": "RootLens",
     "slug": "rootlens",
+    "scheme": "io.rootlens.app",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

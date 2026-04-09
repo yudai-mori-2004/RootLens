@@ -44,3 +44,4 @@ native/c2pa-bridge/target/
 *.tsbuildinfo
 .expo/
 native/jarosz-wasm/target/
+.claude

@@ -104,7 +104,7 @@
 | §7.1 URL構造 | Public Page | 一部実装（短縮URL `/p/[shortId]` のみ。正規URL `/{walletAddress}/{pageId}` およびクリエイターページ `/@{username}` は未実装） |
 | §7.2 コンテンツページの表示内容 | Public Page | 実装済み（Trust row + NFTトグル + GlobalConfig全フィールド + CSVダウンロード） |
 | §7.3 OGP | Public Page | 実装済み（generateMetadata でOGタグ + Twitterカード設定） |
-| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 実装済み（DAS API → Arweave → Ed25519署名検証 → PDQ再計算。GlobalConfig/コレクション/TEE署名/Content Hash一致/重複解決/WASMハッシュ/PDQ同一性/cert検証結果表示。§7.4.4 コンソールログ: %c CSSスタイリング + groupCollapsed） |
+| §7.4 クライアントサイド検証アーキテクチャ | Public Page | 実装済み（DAS API → オフチェーンストレージ → Ed25519署名検証 → PDQ再計算。GlobalConfig/コレクション/TEE署名/Content Hash一致/重複解決/WASMハッシュ/PDQ同一性/cert検証結果表示。§7.4.4 コンソールログ: %c CSSスタイリング + groupCollapsed） |
 | §7.5 データの削除・非公開 | App / Server | 未着手 |
 
 ---

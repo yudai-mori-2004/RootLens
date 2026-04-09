@@ -300,31 +300,7 @@ export default function ContentPage({ page }: Props) {
               </div>
             </section>
 
-            {/* --- 2. チェック結果 --- */}
-            <section className={styles.techGroup}>
-              {verification.processors.map((proc, procIdx) => {
-                const isCore = proc.processorId === "core-c2pa";
-                const label = isCore ? `Core: C2PA` : `Extension: ${proc.processorId}`;
-                const checks = [...proc.common, ...proc.specific];
-
-                return (
-                  <NftToggle key={proc.processorId + procIdx} label={label} defaultOpen={isCore}>
-                    <div className={styles.verifyList}>
-                      {checks.map((check, checkIdx) => (
-                        <VerifyItem
-                          key={checkIdx}
-                          status={check.status}
-                          label={check.id}
-                          detail={check.detail || ""}
-                        />
-                      ))}
-                    </div>
-                  </NftToggle>
-                );
-              })}
-            </section>
-
-            {/* --- 3. Title Protocol 導入 + コンテンツ来歴 --- */}
+            {/* --- 2. Title Protocol 導入 + コンテンツ来歴 --- */}
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{t("tech.intro.title")}</h3>
               <p className={styles.techDesc}>{t("tech.intro.desc")}</p>
@@ -433,6 +409,30 @@ export default function ContentPage({ page }: Props) {
             {/* --- 5. 検証に使用したデータ --- */}
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{tField("rawData")}</h3>
+
+              {/* チェック結果（各cNFTのチェック項目） */}
+              {verification.processors.map((proc, procIdx) => {
+                const isCore = proc.processorId === "core-c2pa";
+                const label = isCore ? `Core: C2PA` : `Extension: ${proc.processorId}`;
+                const checks = [...proc.common, ...proc.specific];
+
+                return (
+                  <NftToggle key={"check-" + proc.processorId + procIdx} label={label} defaultOpen={isCore}>
+                    <div className={styles.verifyList}>
+                      {checks.map((check, checkIdx) => (
+                        <VerifyItem
+                          key={checkIdx}
+                          status={check.status}
+                          label={check.id}
+                          detail={check.detail || ""}
+                        />
+                      ))}
+                    </div>
+                  </NftToggle>
+                );
+              })}
+
+              <div className={styles.rawDataDivider} />
 
               {/* 検証環境 */}
               <NftToggle label={tField("rawDataEnv")} defaultOpen={false}>

@@ -19,7 +19,7 @@ RootLens: カメラで撮影された「本物のコンテンツ」であるこ�
   Title Protocol SDK            R2 / Supabase
   Privy auth                    Privy auth
        |                             |                            |
-       +-------- Title Protocol -----+------- Solana / Arweave ---+
+       +-------- Title Protocol -----+----------- Solana ----------+
 ```
 
 ### Components
@@ -89,4 +89,9 @@ Title Protocolでは事前に全37タスクを設計したが、RootLensでは�
 
 ## Key Design Decisions
 
-(開発の進行に伴い追記)
+### オフチェーンストレージについて
+
+- signed_json の保存先に言及する場合は「オフチェーンストレージ」「json_uri の指す先」等の一般名称を使う。特定のストレージサービス名を推測で挙げない。
+- ストレージの種類は検証の信頼性に影響しない（TEE署名で自己証明的な設計）。
+
+(その他の設計判断は開発の進行に伴い追記)
