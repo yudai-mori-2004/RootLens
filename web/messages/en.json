@@ -168,7 +168,8 @@
           "label": "Security considerations",
           "text": "TEEs are not infallible. Side-channel attacks have been demonstrated against some implementations (e.g., Foreshadow against SGX). Title Protocol mitigates this through multiple layers: (1) Stateless operation: no persistent keys or state survive across requests, so even if an instance is compromised, the impact is limited to processing during that instance's lifetime. (2) Wallet key separation: the TEE never holds the user's wallet key; it only partially signs transactions. (3) Client-side encryption: even if the TEE host is compromised, the node operator still cannot read content because encryption happens on the user's device. (4) Remote attestation: clients verify TEE integrity before submitting content. (5) All TEE enclave code is open source and independently auditable. The protocol also explicitly does not prevent provenance laundering (re-registering someone else's content). Similarity-based deduplication at registration time would destroy the low-cost design, so duplicate detection is handled at query time by applications. Content semantics (legality, appropriateness) are also outside protocol scope and are application-layer responsibilities."
         }
-      }
+      },
+      "docsLink": "Learn more about the trust model →"
     },
     "comparison": {
       "title": "What exists today and what remains unsolved",
@@ -199,7 +200,8 @@
       "step3": "Publish. Title Protocol extracts and records the proof",
       "step4": "Share the link anywhere. Anyone can verify it",
       "permanence": "The proof outlives the app. If RootLens disappears tomorrow, the verification records remain linked to on-chain NFTs. Other applications built on Title Protocol can access the same records.",
-      "targets": "For creators who face AI-generation accusations, journalists who need verifiable evidence, and anyone whose content is worth proving real."
+      "targets": "For creators who face AI-generation accusations, journalists who need verifiable evidence, and anyone whose content is worth proving real.",
+      "docsLink": "How content signing and verification work →"
     },
     "openSource": {
       "title": "Open source. Open protocol.",
@@ -501,7 +503,13 @@
       "phase3step2": "Re-verifies TEE signature locally",
       "phase3step3": "Recomputes visual fingerprint to compare",
       "phase3question": "Viewer re-verifies in their own browser",
-      "phase3trustShort": "No server trust required"
+      "phase3trustShort": "No server trust required",
+      "bgTitle": "Background: Why C2PA Alone Is Not Enough",
+      "bgP1": "C2PA (Coalition for Content Provenance and Authenticity) is an open standard that embeds a camera's cryptographic signature into content at capture time. Devices like Google Pixel, Sony, and Nikon cameras support it, and it is becoming the foundation for proving content provenance.",
+      "bgP2": "But C2PA has a structural limitation. Verification requires both the complete original content data and the manifest — if even one byte changes, the hash no longer matches and verification fails. Nearly every social media platform and messaging app strips C2PA data and recompresses content on upload, so the proof disappears the moment content is shared. Title Protocol solves this by separating the proof from the content and recording it in a form that can be verified without the original file.",
+      "bgP3": "For a deeper look at this problem and the solution, see the ",
+      "bgTechLink": "Technology page",
+      "bgP3after": "."
     },
     "trustModel": {
       "title": "Trust Model",

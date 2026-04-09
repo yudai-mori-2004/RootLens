@@ -108,6 +108,10 @@ export default async function TechnologyPage() {
               ))}
             </div>
           </TechToggle>
+
+          <p className={s.prose} style={{ marginTop: 32 }}>
+            <a href="/docs/trust-model" className={s.link}>{tTp("docsLink")}</a>
+          </p>
         </div>
       </section>
 
@@ -148,6 +152,9 @@ export default async function TechnologyPage() {
           </p>
           <p className={s.prose}>
             <span className={s.emphasis}>{tRl("targets")}</span>
+          </p>
+          <p className={s.prose} style={{ marginTop: 32 }}>
+            <a href="/docs/content-origins" className={s.link}>{tRl("docsLink")}</a>
           </p>
         </div>
       </section>

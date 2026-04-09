@@ -42,6 +42,15 @@ export default async function DocsOverview() {
       <h1 className={s.title}>{t("title")}</h1>
       <p className={s.subtitle}>{t("subtitle")}</p>
 
+      <h2 className={s.h2}>{t("bgTitle")}</h2>
+      <p className={s.p}>{t("bgP1")}</p>
+      <p className={s.p}>{t("bgP2")}</p>
+      <p className={s.p}>
+        {t("bgP3")}
+        <a href="/technology" className={s.link}>{t("bgTechLink")}</a>
+        {t("bgP3after")}
+      </p>
+
       <h2 className={s.h2}>{t("whatTitle")}</h2>
       <p className={s.p}>
         {t("whatP1before")}
