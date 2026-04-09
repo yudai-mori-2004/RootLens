@@ -19,7 +19,22 @@ Pod::Spec.new do |s|
   }
 
   s.vendored_libraries = 'lib/libc2pa_rs.a'
+  s.preserve_paths = 'c2pa_bridge.h', 'module.modulemap', 'lib/libc2pa_rs_device.a', 'lib/libc2pa_rs_sim.a'
   s.frameworks = 'Photos'
+
+  # シミュレータ / 実機でリンクする .a を切り替える
+  s.script_phase = {
+    :name => 'Select c2pa_rs for SDK',
+    :script => <<~SCRIPT,
+      LIB_DIR="${PODS_TARGET_SRCROOT}/lib"
+      if [ "${PLATFORM_NAME}" = "iphonesimulator" ]; then
+        cp -f "${LIB_DIR}/libc2pa_rs_sim.a" "${LIB_DIR}/libc2pa_rs.a"
+      else
+        cp -f "${LIB_DIR}/libc2pa_rs_device.a" "${LIB_DIR}/libc2pa_rs.a"
+      fi
+    SCRIPT
+    :execution_position => :before_compile
+  }
 
   s.dependency 'ExpoModulesCore'
 end
