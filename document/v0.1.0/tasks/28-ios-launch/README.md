@@ -5,6 +5,39 @@
 RootLens iOS アプリを App Store 審査に提出できる状態にする。
 Android では動作している機能のうち、iOS で未実装・未確認の部分を完成させる。
 
+## 事前に読むべき資料
+
+### 仕様書
+- `document/v0.1.0/SPECS_JA.md` §6.1（Title Protocol 登録パイプライン、E2EE フロー）
+
+### AES-GCM 実装（Android = iOS 移植元）
+- `app/android/app/src/main/java/io/rootlens/app/AesGcmModule.kt` — **全文読むこと**
+  - L40-86: `buildAndEncryptPayload()` — ペイロード構築 + AES-256-GCM 暗号化
+  - L56-66: ペイロードフォーマット `[4B meta_len BE][metadata][content]`
+  - L67-77: ワイヤーフォーマット v1 `[suite_id(1B)][encap_key_len(2B BE)][encap_key][nonce(12B)][ct+tag]`
+  - suite_id 0x01 = X25519-AES-256-GCM, nonce 12B, GCM tag 128bit
+- `app/android/app/src/main/java/io/rootlens/app/AesGcmPackage.kt` — モジュール登録パターン
+
+### JS ブリッジ（呼び出し側）
+- `app/src/services/nativeCryptoProvider.ts` — `AesGcmBridge` の呼び出しインターフェース
+- `app/src/services/titleProtocol.ts` L85-186 — AES-GCM が使われる E2E フロー全体
+  - L106-112: X25519 ECDH + HKDF で方向別鍵導出
+  - L122-129: `AesGcmBridge.buildAndEncryptPayload()` 呼び出し
+
+### iOS ネイティブモジュールのパターン（既存実装）
+- `app/modules/c2pa-bridge/ios/C2paBridgeModule.swift` L1-22 — Expo Module の定義パターン
+  - `Name("C2paBridge")`, `AsyncFunction("methodName") { ... }` の書き方
+- `app/src/native/c2paBridge.ts` L57-71 — TypeScript インターフェース定義
+
+### Privy
+- `app/src/hooks/useAuth.ts` — Privy Expo SDK の使い方
+- `app/App.tsx` — `<PrivyProvider>` の設定
+- `app/app.json` L16-26 — iOS bundleIdentifier, permissions
+
+### signContentWithParent（後続タスク用の参考）
+- `app/src/native/c2paBridge.ts` L96-113 — TS ラッパー（宣言はあるが iOS 未実装）
+- `app/modules/c2pa-bridge/ios/C2paBridgeModule.swift` — 現状 `signContentWithParent` 未実装
+
 ## 背景
 
 Android 版は実機で撮影→署名→Title Protocol 登録→公開ページ検証まで動作済み。
