@@ -12,8 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePrivy, useEmbeddedSolanaWallet } from '@privy-io/expo';
-import { useLogin } from '@privy-io/expo/ui';
+import { usePrivy, useEmbeddedSolanaWallet, useLoginWithOAuth } from '@privy-io/expo';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
@@ -39,7 +38,7 @@ export default function RegistrationScreen() {
 
   const { isReady, user, logout } = usePrivy();
   const isAuthenticated = !!user;
-  const { login } = useLogin();
+  const { login: loginOAuth } = useLoginWithOAuth();
   const wallet = useEmbeddedSolanaWallet();
   const walletAddress = wallet?.wallets?.[0]?.address ?? null;
 
@@ -84,11 +83,13 @@ export default function RegistrationScreen() {
       return;
     }
 
-    // 未ログイン → ログイン開始
+    // 未ログイン → Google OAuth headless ログイン
+    // useLogin (PrivyElements UI) は iOS でモーダルが表示されないため、
+    // useLoginWithOAuth で直接ブラウザ OAuth を使用する
     if (!isAuthenticated) {
       setPhase('logging-in');
       try {
-        await login({ loginMethods: ['google', 'email'] });
+        await loginOAuth({ provider: 'google' });
       } catch (e: any) {
         const msg = e?.message || String(e);
         if (!msg.toLowerCase().includes('already logged in') && !msg.toLowerCase().includes('already_logged_in')) {
