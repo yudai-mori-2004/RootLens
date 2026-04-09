@@ -1,4 +1,4 @@
-import TechnologyPage from "../../../components/lp/TechnologyPage";
+import IntroductionPage from "../../../components/lp/IntroductionPage";
 
 export const metadata = {
   title: "Introduction",
@@ -7,5 +7,5 @@ export const metadata = {
 };
 
 export default async function DocsIntroduction() {
-  return <TechnologyPage />;
+  return <IntroductionPage />;
 }

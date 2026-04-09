@@ -1,5 +1,5 @@
 /**
- * /technology — full story as a "reading" page.
+ * /docs/introduction — "why this system exists" story page.
  * Server component for SSR (bot/AI readable).
  * Only the tech details toggle is a client component.
  */
@@ -20,7 +20,7 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-export default async function TechnologyPage() {
+export default async function IntroductionPage() {
   const tPage = await getTranslations("pages.technology");
   const tC2pa = await getTranslations("lp.c2pa");
   const tGap = await getTranslations("lp.gap");
