@@ -305,11 +305,9 @@ export default function ContentPage({ page }: Props) {
               <h3 className={styles.techGroupTitle}>{t("tech.intro.title")}</h3>
               <p className={styles.techDesc}>{t("tech.intro.desc")}</p>
               <p className={styles.techDesc}>{t("tech.intro.trustChain")}</p>
-              <div className={styles.dataBlock}>
-                <DataField label="Program" value={truncate(protocolAddr.programId, 10)} full={protocolAddr.programId} />
-                <DataField label="GlobalConfig" value={truncate(protocolAddr.globalConfigPda, 10)} full={protocolAddr.globalConfigPda} />
-                <DataField label="Network" value="Solana devnet" />
-              </div>
+              <p className={styles.techDescSmall}>
+                {t("tech.dyn.protocolContext", { program: truncate(protocolAddr.programId, 6), pda: truncate(protocolAddr.globalConfigPda, 6), network: "Solana devnet" })}
+              </p>
             </section>
 
             <section className={styles.techGroup}>
@@ -317,23 +315,23 @@ export default function ContentPage({ page }: Props) {
               <p className={styles.techDesc}>{t("tech.core.desc")}</p>
               {coreSj && corePayload && (
                 <>
-                  <div className={styles.dataBlock}>
-                    <DataField label="content_hash" value={truncate(currentContent.contentHash, 14)} full={currentContent.contentHash} />
-                    <DataField label="content_type" value={corePayload.content_type} />
-                    {record?.signingAlgorithm && <DataField label="C2PA" value={record.signingAlgorithm} />}
-                    <DataField label={tField("provenanceNodes")} value={String(corePayload.nodes?.length ?? 0)} />
-                  </div>
-                  <p className={styles.techDescSmall}>
-                    {t("tech.dyn.teeVerifiedShort", {
-                      teeType: coreSj.tee_type,
+                  <p className={styles.techDesc}>
+                    {t("tech.dyn.coreSummary", {
+                      hash: truncate(currentContent.contentHash, 8),
+                      type: corePayload.content_type,
+                      signing: record?.signingAlgorithm ? t("tech.dyn.coreSigning", { algo: record.signingAlgorithm }) : "",
+                      nodes: String(corePayload.nodes?.length ?? 0),
+                      links: corePayload.links && corePayload.links.length > 0 ? t("tech.dyn.coreLinks", { count: String(corePayload.links.length) }) : "",
                     })}
                   </p>
-                  <div className={styles.dataBlock}>
-                    <DataField label="TEE pubkey" value={truncate(coreSj.tee_pubkey, 12)} full={coreSj.tee_pubkey} />
-                    <DataField label="signed_json" value={truncate(resolved?.signedJsonUri ?? "", 18)} full={resolved?.signedJsonUri} />
-                    <DataField label="NFT" value={truncate(resolved?.assetId ?? "", 12)} full={resolved?.assetId} />
-                    <DataField label={tField("owner")} value={truncate(corePayload.creator_wallet || "", 10)} full={corePayload.creator_wallet} />
-                  </div>
+                  <p className={styles.techDesc}>
+                    {t("tech.dyn.teeVerified", {
+                      teeType: coreSj.tee_type,
+                      pubkey: truncate(coreSj.tee_pubkey, 6),
+                      uri: truncate(resolved?.signedJsonUri ?? "", 12),
+                      assetId: truncate(resolved?.assetId ?? "", 6),
+                    })}
+                  </p>
                   {record?.tsaProvider && (
                     <p className={styles.techDescSmall}>
                       {t("tech.dyn.tsaCertified", {
@@ -342,6 +340,13 @@ export default function ContentPage({ page }: Props) {
                       })}
                     </p>
                   )}
+                  <p className={styles.techDescSmall}>
+                    {resolved?.ownerWallet && corePayload.creator_wallet === resolved.ownerWallet
+                      ? t("tech.dyn.ownerSame", { wallet: truncate(corePayload.creator_wallet, 6) })
+                      : resolved?.ownerWallet
+                        ? t("tech.dyn.ownerTransferred", { creator: truncate(corePayload.creator_wallet, 6), owner: truncate(resolved.ownerWallet, 6) })
+                        : t("tech.dyn.ownerSame", { wallet: truncate(corePayload.creator_wallet, 6) })}
+                  </p>
                   <p className={styles.techDescSmall}>{t("tech.core.offchainDesc")}</p>
                 </>
               )}
@@ -367,13 +372,13 @@ export default function ContentPage({ page }: Props) {
                     <h5 className={styles.extTitle}>{t("tech.pdq.title")}</h5>
                     <p className={styles.techDescSmall}>{t("tech.pdq.desc")}</p>
                     {!!pdqPayload?.pdqhash && (
-                      <>
-                        <p className={styles.techDescSmall}>{pdqCheck?.detail ?? ""}</p>
-                        <div className={styles.dataBlock}>
-                          <DataField label="PDQ (on-chain)" value={truncate(String(pdqPayload.pdqhash), 16)} full={String(pdqPayload.pdqhash)} />
-                          <DataField label="WASM" value={truncate(String(pdqPayload.wasm_hash ?? ""), 14)} full={String(pdqPayload.wasm_hash ?? "")} />
-                        </div>
-                      </>
+                      <p className={styles.techDesc}>
+                        {t("tech.dyn.pdqResult", {
+                          hash: truncate(String(pdqPayload.pdqhash), 8),
+                          detail: pdqCheck?.detail ?? "",
+                          wasmHash: truncate(String(pdqPayload.wasm_hash ?? ""), 8),
+                        })}
+                      </p>
                     )}
                   </div>
                 ) : null;
