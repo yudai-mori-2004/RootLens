@@ -19,6 +19,18 @@
   --docs-border: #d8d8d4;
   --docs-code-bg: #eeeee9;
 
+  /* LP component compatibility (GapDiagram, TechToggle) */
+  --lp-accent: #1E3A5F;
+  --lp-accent-light: #2d5a8a;
+  --lp-text: #1a1c1e;
+  --lp-text-secondary: #4a4e54;
+  --lp-text-tertiary: #6e7279;
+  --lp-border: #d8d8d4;
+  --lp-bg: #fafaf8;
+  --lp-bg-alt: #f0f0ec;
+  --lp-fail: #9a6458;
+  --lp-fail-muted: #c4a49c;
+
   display: flex;
   min-height: calc(100vh - 52px); /* navbar height */
   background: var(--docs-bg);
