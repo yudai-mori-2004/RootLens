@@ -39,30 +39,34 @@ export default async function CnftStructurePage() {
         </li>
       </ul>
 
-      {/* Core cNFT */}
+      {/* ---- Core cNFT ---- */}
       <h2 className={s.h2}>{t("coreTitle")}</h2>
       <p className={s.p}>{t("coreP1")}</p>
 
+      <h3 className={s.h3}>{t("onchainTitle")}</h3>
+      <p className={s.p}>{t("onchainIntro")}</p>
+      <table className={s.table}>
+        <thead><tr><th>trait_type</th><th>{t("exampleHeader")}</th></tr></thead>
+        <tbody>
+          <tr><td><code className={s.code}>protocol</code></td><td><code className={s.code}>Title-v1</code></td></tr>
+          <tr><td><code className={s.code}>content_hash</code></td><td><code className={s.code}>0x3a7f...</code></td></tr>
+          <tr><td><code className={s.code}>content_type</code></td><td><code className={s.code}>image/jpeg</code></td></tr>
+        </tbody>
+      </table>
+
       <h3 className={s.h3}>{t("payloadTitle")}</h3>
+      <p className={s.p}>{t("payloadIntro")}</p>
       <table className={s.table}>
         <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
         <tbody>
           <tr><td><code className={s.code}>content_hash</code></td><td>string</td><td>{t("coreContentHash")}</td></tr>
+          <tr><td><code className={s.code}>content_type</code></td><td>string</td><td>{t("coreContentType")}</td></tr>
+          <tr><td><code className={s.code}>creator_wallet</code></td><td>string</td><td>{t("coreCreatorWallet")}</td></tr>
           <tr><td><code className={s.code}>nodes[]</code></td><td>array</td><td>{t("coreNodes")}</td></tr>
           <tr><td><code className={s.code}>links[]</code></td><td>array</td><td>{t("coreLinks")}</td></tr>
           <tr><td><code className={s.code}>tsa_timestamp</code></td><td>number?</td><td>{t("coreTsa")}</td></tr>
-        </tbody>
-      </table>
-
-      <h3 className={s.h3}>{t("attrTitle")}</h3>
-      <table className={s.table}>
-        <thead><tr><th>{t("attrHeader")}</th><th>{t("exampleHeader")}</th></tr></thead>
-        <tbody>
-          <tr><td><code className={s.code}>content_hash</code></td><td><code className={s.code}>a1b2c3d4...</code></td></tr>
-          <tr><td><code className={s.code}>device_name</code></td><td><code className={s.code}>Pixel 8 Pro</code></td></tr>
-          <tr><td><code className={s.code}>captured_at</code></td><td><code className={s.code}>2025-01-15T10:30:00Z</code></td></tr>
-          <tr><td><code className={s.code}>assurance_level</code></td><td><code className={s.code}>2</code> {t("attrAssurance")}</td></tr>
-          <tr><td><code className={s.code}>content_type</code></td><td><code className={s.code}>image/jpeg</code></td></tr>
+          <tr><td><code className={s.code}>tsa_pubkey_hash</code></td><td>string?</td><td>{t("coreTsaPubkey")}</td></tr>
+          <tr><td><code className={s.code}>tsa_token_data</code></td><td>string?</td><td>{t("coreTsaToken")}</td></tr>
         </tbody>
       </table>
 
@@ -73,7 +77,37 @@ export default async function CnftStructurePage() {
         ))}
       </ul>
 
-      {/* Cert Extension */}
+      {/* ---- Extension cNFTs (shared structure) ---- */}
+      <h2 className={s.h2}>{t("extTitle")}</h2>
+      <p className={s.p}>{t("extP1")}</p>
+
+      <h3 className={s.h3}>{t("onchainTitle")}</h3>
+      <table className={s.table}>
+        <thead><tr><th>trait_type</th><th>{t("exampleHeader")}</th></tr></thead>
+        <tbody>
+          <tr><td><code className={s.code}>protocol</code></td><td><code className={s.code}>Title-Extension-v1</code></td></tr>
+          <tr><td><code className={s.code}>content_hash</code></td><td><code className={s.code}>0x3a7f...</code></td></tr>
+          <tr><td><code className={s.code}>extension_id</code></td><td><code className={s.code}>image-pdq</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3 className={s.h3}>{t("payloadTitle")}</h3>
+      <p className={s.p}>{t("extPayloadIntro")}</p>
+      <table className={s.table}>
+        <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
+        <tbody>
+          <tr><td><code className={s.code}>content_hash</code></td><td>string</td><td>{t("extContentHash")}</td></tr>
+          <tr><td><code className={s.code}>content_type</code></td><td>string</td><td>{t("extContentType")}</td></tr>
+          <tr><td><code className={s.code}>creator_wallet</code></td><td>string</td><td>{t("extCreatorWallet")}</td></tr>
+          <tr><td><code className={s.code}>extension_id</code></td><td>string</td><td>{t("extExtId")}</td></tr>
+          <tr><td><code className={s.code}>wasm_source</code></td><td>string</td><td>{t("extWasmSource")}</td></tr>
+          <tr><td><code className={s.code}>wasm_hash</code></td><td>string</td><td>{t("extWasmHash")}</td></tr>
+          <tr><td><code className={s.code}>extension_input_hash</code></td><td>string?</td><td>{t("extInputHash")}</td></tr>
+          <tr><td className={s.strong}>{t("extResultLabel")}</td><td></td><td>{t("extResultDesc")}</td></tr>
+        </tbody>
+      </table>
+
+      {/* ---- cert-* specifics ---- */}
       <h2 className={s.h2}>{t("certTitle")}</h2>
       <p className={s.p}>{t("certP1")}</p>
       <ul className={s.list}>
@@ -82,40 +116,12 @@ export default async function CnftStructurePage() {
         <li><code className={s.code}>cert-leica</code> — {t("certLeica")}</li>
         <li><code className={s.code}>cert-rootlens</code> — {t("certRootlens")}</li>
       </ul>
+      <p className={s.p}>{t("certResultDesc")}</p>
 
-      <h3 className={s.h3}>{t("payloadTitle")}</h3>
-      <table className={s.table}>
-        <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
-        <tbody>
-          <tr><td><code className={s.code}>content_hash</code></td><td>string</td><td>{t("certContentHash")}</td></tr>
-          <tr><td><code className={s.code}>extension_id</code></td><td>string</td><td>{t("certExtId")}</td></tr>
-          <tr><td><code className={s.code}>wasm_hash</code></td><td>string</td><td>{t("certWasmHash")}</td></tr>
-          <tr><td><code className={s.code}>verified</code></td><td>boolean</td><td>{t("certVerified")}</td></tr>
-          <tr><td><code className={s.code}>root_ca</code></td><td>string?</td><td>{t("certRootCa")}</td></tr>
-        </tbody>
-      </table>
-
-      <h3 className={s.h3}>{t("checksTitle")}</h3>
-      <ul className={s.list}>
-        {(["checkExtCollection", "checkTeeSig", "checkBinding", "checkWasm", "checkCertVerified"] as const).map((k) => (
-          <li key={k}><span className={s.strong}>{t(`${k}Label` as any)}</span> — {t(`${k}Text` as any)}</li>
-        ))}
-      </ul>
-
-      {/* Image PDQ */}
+      {/* ---- image-pdq ---- */}
       <h2 className={s.h2}>{t("pdqTitle")}</h2>
       <p className={s.p}>{t("pdqP1")}</p>
-
-      <h3 className={s.h3}>{t("payloadTitle")}</h3>
-      <table className={s.table}>
-        <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
-        <tbody>
-          <tr><td><code className={s.code}>content_hash</code></td><td>string</td><td>{t("pdqContentHash")}</td></tr>
-          <tr><td><code className={s.code}>extension_id</code></td><td>string</td><td><code className={s.code}>image-pdq</code></td></tr>
-          <tr><td><code className={s.code}>wasm_hash</code></td><td>string</td><td>{t("pdqWasmHash")}</td></tr>
-          <tr><td><code className={s.code}>pdqhash</code></td><td>string</td><td>{t("pdqHash")}</td></tr>
-        </tbody>
-      </table>
+      <p className={s.p}>{t("pdqResultDesc")}</p>
 
       <h3 className={s.h3}>{t("pdqHowTitle")}</h3>
       <p className={s.p}>{t("pdqHowP1")}</p>
@@ -127,25 +133,21 @@ export default async function CnftStructurePage() {
         {t("pdqVerifyP1after")}
       </p>
 
-      {/* Video vPDQ */}
+      {/* ---- video-vpdq ---- */}
       <h2 className={s.h2}>{t("vpdqTitle")}</h2>
       <p className={s.p}>{t("vpdqP1")}</p>
-
-      <h3 className={s.h3}>{t("payloadTitle")}</h3>
-      <table className={s.table}>
-        <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
-        <tbody>
-          <tr><td><code className={s.code}>extension_id</code></td><td>string</td><td><code className={s.code}>video-vpdq</code></td></tr>
-          <tr><td><code className={s.code}>wasm_hash</code></td><td>string</td><td>{t("vpdqWasmHash")}</td></tr>
-          <tr><td><code className={s.code}>frames[]</code></td><td>array</td><td>{t("vpdqFrames")}</td></tr>
-          <tr><td><code className={s.code}>frames[].pdqhash</code></td><td>string</td><td>{t("vpdqPdqhash")}</td></tr>
-          <tr><td><code className={s.code}>frames[].quality</code></td><td>number</td><td>{t("vpdqQuality")}</td></tr>
-          <tr><td><code className={s.code}>frames[].keyframe</code></td><td>number</td><td>{t("vpdqKeyframe")}</td></tr>
-        </tbody>
-      </table>
+      <p className={s.p}>{t("vpdqResultDesc")}</p>
 
       <h3 className={s.h3}>{t("pdqVerifyTitle")}</h3>
       <p className={s.p}>{t("vpdqVerifyP1")}</p>
+
+      {/* ---- Verification checks (shared) ---- */}
+      <h2 className={s.h2}>{t("extChecksTitle")}</h2>
+      <ul className={s.list}>
+        {(["checkExtCollection", "checkTeeSig", "checkBinding", "checkWasm"] as const).map((k) => (
+          <li key={k}><span className={s.strong}>{t(`${k}Label` as any)}</span> — {t(`${k}Text` as any)}</li>
+        ))}
+      </ul>
 
       <DocsNav
         prev={{ href: "/docs/title-protocol", title: ts("titleProtocol") }}
