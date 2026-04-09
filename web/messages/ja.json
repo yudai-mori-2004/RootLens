@@ -1019,7 +1019,9 @@
       "issuanceStep8Desc": "ICA鍵（KMS経由）",
       "issuanceArrow2": "← 9. Device Cert + ICA Cert + Root Cert",
       "issuanceStep10Label": "10. TEEに証明書チェーンを保存",
-      "issuanceStep10Desc": "有効期限14日前に自動更新"
+      "issuanceStep10Desc": "有効期限14日前に自動更新",
+      "actorDevice": "デバイス",
+      "actorServer": "サーバー"
     }
   }
 }

@@ -547,66 +547,73 @@
   font-size: 0.82rem;
 }
 
-/* ---- Sequence (device <-> server) ---- */
+/* ---- Sequence (actor-labeled step list) ---- */
 .sequence {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0;
   margin: 24px 0;
   border: 1px solid var(--docs-border);
   border-radius: 6px;
   overflow: hidden;
 }
 
-.sequenceHeader {
-  padding: 10px 16px;
-  font-size: 0.78rem;
+.seqStep {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--docs-border);
+}
+
+.seqStep:last-child {
+  border-bottom: none;
+}
+
+.seqActor {
+  flex-shrink: 0;
+  width: 80px;
+  padding: 10px 12px;
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--docs-text-tertiary);
   background: var(--docs-bg-alt);
-  border-bottom: 1px solid var(--docs-border);
+  border-right: 1px solid var(--docs-border);
+  display: flex;
+  align-items: flex-start;
 }
 
-.sequenceHeader:nth-child(2) {
-  border-left: 1px solid var(--docs-border);
-}
-
-.sequenceRow {
-  display: contents;
-}
-
-.sequenceCell {
+.seqContent {
+  flex: 1;
   padding: 10px 16px;
   font-size: 0.82rem;
   line-height: 1.5;
   color: var(--docs-text-secondary);
-  border-bottom: 1px solid var(--docs-border);
 }
 
-.sequenceCell:nth-child(2) {
-  border-left: 1px solid var(--docs-border);
-}
-
-.sequenceRow:last-child .sequenceCell {
-  border-bottom: none;
-}
-
-.sequenceCellLabel {
+.seqContentLabel {
   font-weight: 600;
   color: var(--docs-text);
 }
 
-.sequenceArrow {
-  grid-column: 1 / -1;
+.seqArrow {
   padding: 6px 16px;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--docs-accent);
   font-weight: 600;
   background: rgba(30, 58, 95, 0.03);
   border-bottom: 1px solid var(--docs-border);
   text-align: center;
+}
+
+@media (max-width: 640px) {
+  .seqActor {
+    width: 60px;
+    font-size: 0.65rem;
+    padding: 8px;
+  }
+
+  .seqContent {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
 }
 
 /* ---- Phase cards ---- */
@@ -776,29 +783,6 @@
     padding: 28px 20px 64px;
   }
 
-  /* Sequence: single column with labels */
-  .sequence {
-    grid-template-columns: 1fr;
-  }
-
-  .sequenceHeader:nth-child(2) {
-    display: none;
-  }
-
-  /* Show all cells, but add actor label to non-empty ones */
-  .sequenceCell {
-    border-left: none;
-  }
-
-  /* Hide empty spacer cells */
-  .sequenceCell:empty {
-    display: none;
-  }
-
-  .sequenceArrow {
-    font-size: 0.8rem;
-    padding: 8px 16px;
-  }
 
   /* Table: horizontal scroll */
   .table {

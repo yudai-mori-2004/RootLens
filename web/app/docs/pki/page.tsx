@@ -105,48 +105,50 @@ export default async function PkiPage() {
 
       <h2 className={s.h2}>{t("issuanceTitle")}</h2>
       <div className={s.sequence}>
-        <div className={s.sequenceHeader}>{t("issuanceDevice")}</div>
-        <div className={s.sequenceHeader}>{t("issuanceServer")}</div>
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("issuanceStep1Label")}</div>
-          {t("issuanceStep1Desc")}
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>{t("actorDevice")}</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("issuanceStep1Label")}</div>
+            {t("issuanceStep1Desc")}
+          </div>
         </div>
-        <div className={s.sequenceCell} />
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("issuanceStep2Label")}</div>
-          {t("issuanceStep2Desc")}
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>{t("actorDevice")}</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("issuanceStep2Label")}</div>
+            {t("issuanceStep2Desc")}
+          </div>
         </div>
-        <div className={s.sequenceCell} />
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("issuanceStep3Label")}</div>
-          {t("issuanceStep3Desc")}
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>{t("actorDevice")}</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("issuanceStep3Label")}</div>
+            {t("issuanceStep3Desc")}
+          </div>
         </div>
-        <div className={s.sequenceCell} />
-
-        <div className={s.sequenceArrow}>{t("issuanceArrow1")}</div>
-
-        <div className={s.sequenceCell} />
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("issuanceStep5Label")}</div>
-          {t("issuanceStep5Desc")}
+        <div className={s.seqArrow}>{t("issuanceArrow1")}</div>
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>{t("actorServer")}</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("issuanceStep5Label")}</div>
+            {t("issuanceStep5Desc")}
+          </div>
         </div>
-
-        <div className={s.sequenceCell} />
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("issuanceStep8Label")}</div>
-          {t("issuanceStep8Desc")}
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>{t("actorServer")}</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("issuanceStep8Label")}</div>
+            {t("issuanceStep8Desc")}
+          </div>
         </div>
-
-        <div className={s.sequenceArrow}>{t("issuanceArrow2")}</div>
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("issuanceStep10Label")}</div>
-          {t("issuanceStep10Desc")}
+        <div className={s.seqArrow}>{t("issuanceArrow2")}</div>
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>{t("actorDevice")}</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("issuanceStep10Label")}</div>
+            {t("issuanceStep10Desc")}
+          </div>
         </div>
-        <div className={s.sequenceCell} />
       </div>
 
       <h2 className={s.h2}>{t("bindingTitle")}</h2>

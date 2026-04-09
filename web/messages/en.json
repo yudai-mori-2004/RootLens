@@ -1019,7 +1019,9 @@
       "issuanceStep8Desc": "ICA key via KMS",
       "issuanceArrow2": "← 9. Device Cert + ICA Cert + Root Cert",
       "issuanceStep10Label": "10. Store cert chain in TEE",
-      "issuanceStep10Desc": "Auto-renewal 14 days before expiry"
+      "issuanceStep10Desc": "Auto-renewal 14 days before expiry",
+      "actorDevice": "Device",
+      "actorServer": "Server"
     }
   }
 }

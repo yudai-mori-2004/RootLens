@@ -59,41 +59,42 @@ export default async function TitleProtocolPage() {
       <h2 className={s.h2}>{t("e2eTitle")}</h2>
       <p className={s.p}>{t("e2eIntro")}</p>
       <div className={s.sequence}>
-        <div className={s.sequenceHeader}>{t("e2eHeaderApp")}</div>
-        <div className={s.sequenceHeader}>{t("e2eHeaderTee")}</div>
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("e2eStep1Label")}</div>
-          {t("e2eStep1Desc")}
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>App</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("e2eStep1Label")}</div>
+            {t("e2eStep1Desc")}
+          </div>
         </div>
-        <div className={s.sequenceCell} />
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("e2eStep2Label")}</div>
-          {t("e2eStep2Desc")}
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>App</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("e2eStep2Label")}</div>
+            {t("e2eStep2Desc")}
+          </div>
         </div>
-        <div className={s.sequenceCell} />
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("e2eStep3Label")}</div>
-          {t("e2eStep3Desc")}
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>App</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("e2eStep3Label")}</div>
+            {t("e2eStep3Desc")}
+          </div>
         </div>
-        <div className={s.sequenceCell} />
-
-        <div className={s.sequenceArrow}>{t("e2eArrow1")}</div>
-
-        <div className={s.sequenceCell} />
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("e2eStep5Label")}</div>
-          {t("e2eStep5Desc")}
+        <div className={s.seqArrow}>{t("e2eArrow1")}</div>
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>TEE</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("e2eStep5Label")}</div>
+            {t("e2eStep5Desc")}
+          </div>
         </div>
-
-        <div className={s.sequenceArrow}>{t("e2eArrow2")}</div>
-
-        <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>{t("e2eStep7Label")}</div>
+        <div className={s.seqArrow}>{t("e2eArrow2")}</div>
+        <div className={s.seqStep}>
+          <div className={s.seqActor}>App</div>
+          <div className={s.seqContent}>
+            <div className={s.seqContentLabel}>{t("e2eStep7Label")}</div>
+          </div>
         </div>
-        <div className={s.sequenceCell} />
       </div>
       <p className={s.p}>{t("e2eConclusion")}</p>
 
