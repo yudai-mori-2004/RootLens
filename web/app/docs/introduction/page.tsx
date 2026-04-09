@@ -54,7 +54,7 @@ export default async function DocsIntroduction() {
       <h2 className={s.h2}>{tGap("title")}</h2>
       <p className={s.p}>{tGap("p1")}</p>
       <p className={s.p}>{tGap("p2")}</p>
-      <div style={{ margin: "24px 0" }}>
+      <div style={{ margin: "24px 0", maxWidth: "100%", overflow: "hidden" }}>
         <GapDiagram />
       </div>
       <p className={s.p}>{tGap("p3")}</p>
