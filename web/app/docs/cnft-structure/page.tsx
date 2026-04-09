@@ -40,23 +40,26 @@ export default async function CnftStructurePage() {
         </li>
       </ul>
 
-      {/* ---- Core cNFT ---- */}
+      {/* On-chain vs off-chain */}
+      <h2 className={s.h2}>{t("onchainTitle")}</h2>
+      <p className={s.p}>{t("onchainP1")}</p>
+      <table className={s.table}>
+        <thead><tr><th>{t("fieldHeader")}</th><th>{t("descHeader")}</th></tr></thead>
+        <tbody>
+          <tr><td><code className={s.code}>name</code></td><td>{t("onchainName")}</td></tr>
+          <tr><td><code className={s.code}>symbol</code></td><td><code className={s.code}>TITLE</code></td></tr>
+          <tr><td><code className={s.code}>uri</code></td><td>{t("onchainUri")}</td></tr>
+          <tr><td><code className={s.code}>collection</code></td><td>{t("onchainCollection")}</td></tr>
+          <tr><td><code className={s.code}>creators</code></td><td>{t("onchainCreators")}</td></tr>
+        </tbody>
+      </table>
+      <p className={s.p}>{t("onchainP2")}</p>
+
+      {/* Core cNFT payload */}
       <h2 className={s.h2}>{t("coreTitle")}</h2>
       <p className={s.p}>{t("coreP1")}</p>
 
-      <h3 className={s.h3}>{t("onchainTitle")}</h3>
-      <p className={s.p}>{t("onchainIntro")}</p>
-      <table className={s.table}>
-        <thead><tr><th>trait_type</th><th>{t("exampleHeader")}</th></tr></thead>
-        <tbody>
-          <tr><td><code className={s.code}>protocol</code></td><td><code className={s.code}>Title-v1</code></td></tr>
-          <tr><td><code className={s.code}>content_hash</code></td><td><code className={s.code}>0x3a7f...</code></td></tr>
-          <tr><td><code className={s.code}>content_type</code></td><td><code className={s.code}>image/jpeg</code></td></tr>
-        </tbody>
-      </table>
-
       <h3 className={s.h3}>{t("payloadTitle")}</h3>
-      <p className={s.p}>{t("payloadIntro")}</p>
       <table className={s.table}>
         <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
         <tbody>
@@ -78,22 +81,11 @@ export default async function CnftStructurePage() {
         ))}
       </ul>
 
-      {/* ---- Extension cNFTs (shared structure) ---- */}
+      {/* Extension cNFT payload */}
       <h2 className={s.h2}>{t("extTitle")}</h2>
       <p className={s.p}>{t("extP1")}</p>
 
-      <h3 className={s.h3}>{t("onchainTitle")}</h3>
-      <table className={s.table}>
-        <thead><tr><th>trait_type</th><th>{t("exampleHeader")}</th></tr></thead>
-        <tbody>
-          <tr><td><code className={s.code}>protocol</code></td><td><code className={s.code}>Title-Extension-v1</code></td></tr>
-          <tr><td><code className={s.code}>content_hash</code></td><td><code className={s.code}>0x3a7f...</code></td></tr>
-          <tr><td><code className={s.code}>extension_id</code></td><td><code className={s.code}>image-pdq</code></td></tr>
-        </tbody>
-      </table>
-
       <h3 className={s.h3}>{t("payloadTitle")}</h3>
-      <p className={s.p}>{t("extPayloadIntro")}</p>
       <table className={s.table}>
         <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
         <tbody>
@@ -108,7 +100,14 @@ export default async function CnftStructurePage() {
         </tbody>
       </table>
 
-      {/* ---- cert-* specifics ---- */}
+      <h3 className={s.h3}>{t("extChecksTitle")}</h3>
+      <ul className={s.list}>
+        {(["checkExtCollection", "checkTeeSig", "checkBinding", "checkWasm"] as const).map((k) => (
+          <li key={k}><span className={s.strong}>{t(`${k}Label` as any)}</span> — {t(`${k}Text` as any)}</li>
+        ))}
+      </ul>
+
+      {/* cert-* */}
       <h2 className={s.h2}>{t("certTitle")}</h2>
       <p className={s.p}>{t("certP1")}</p>
       <ul className={s.list}>
@@ -119,7 +118,7 @@ export default async function CnftStructurePage() {
       </ul>
       <p className={s.p}>{t("certResultDesc")}</p>
 
-      {/* ---- image-pdq ---- */}
+      {/* image-pdq */}
       <h2 className={s.h2}>{t("pdqTitle")}</h2>
       <p className={s.p}>{t("pdqP1")}</p>
       <p className={s.p}>{t("pdqResultDesc")}</p>
@@ -134,21 +133,13 @@ export default async function CnftStructurePage() {
         {t("pdqVerifyP1after")}
       </p>
 
-      {/* ---- video-vpdq ---- */}
+      {/* video-vpdq */}
       <h2 className={s.h2}>{t("vpdqTitle")}</h2>
       <p className={s.p}>{t("vpdqP1")}</p>
       <p className={s.p}>{t("vpdqResultDesc")}</p>
 
       <h3 className={s.h3}>{t("pdqVerifyTitle")}</h3>
       <p className={s.p}>{t("vpdqVerifyP1")}</p>
-
-      {/* ---- Verification checks (shared) ---- */}
-      <h2 className={s.h2}>{t("extChecksTitle")}</h2>
-      <ul className={s.list}>
-        {(["checkExtCollection", "checkTeeSig", "checkBinding", "checkWasm"] as const).map((k) => (
-          <li key={k}><span className={s.strong}>{t(`${k}Label` as any)}</span> — {t(`${k}Text` as any)}</li>
-        ))}
-      </ul>
 
       <DocsNav
         prev={{ href: "/docs/title-protocol", title: ts("titleProtocol") }}

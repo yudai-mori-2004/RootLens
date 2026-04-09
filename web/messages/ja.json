@@ -810,8 +810,7 @@
       "overviewVpdqSub": "フレーム別PDQハッシュ",
       "coreTitle": "Core cNFT（core-c2pa）",
       "coreP1": "Core cNFTはC2PA来歴グラフを記録します。これはコンテンツを誰が作成し、どのように変更したかを示す署名の連鎖です。",
-      "onchainTitle": "オンチェーン属性",
-      "onchainIntro": "Solana上のcNFTメタデータに格納される属性は3つだけです。詳細データはすべてオフチェーンのsigned_jsonに格納されます。",
+      "onchainTitle": "オンチェーンに記録されるもの",
       "payloadTitle": "signed_json payload（オフチェーン）",
       "payloadIntro": "cNFTのURIが指すsigned_jsonに含まれるペイロードです。TEE署名で保護されています。",
       "fieldHeader": "フィールド",
@@ -874,7 +873,13 @@
       "checkExtCollectionText": "GlobalConfigのext_collection_mintに所属",
       "checkWasmLabel": "WASM Trusted",
       "checkWasmText": "wasm_hashがGlobalConfigに登録済み",
-      "overviewP1": "すべてのcNFTは本質的に同じ構造を持ちます。違いはプロトコル上の役割（CoreかExtensionか）と、TEE内で実行されるプロセッサの種類だけです。1つのコンテンツに対して、1つのCore cNFTと複数のExtension cNFTが生成されます。"
+      "overviewP1": "すべてのcNFTは本質的に同じ構造を持ちます。違いはプロトコル上の役割（CoreかExtensionか）と、TEE内で実行されるプロセッサの種類だけです。1つのコンテンツに対して、1つのCore cNFTと複数のExtension cNFTが生成されます。",
+      "onchainP1": "Solana上のcNFTメタデータはMetaplex Bubblegum標準に従います。オンチェーンに記録されるのは最小限の識別情報のみで、検証データ自体はオフチェーンのsigned_jsonに格納されます。",
+      "onchainName": "\"Title #\" + content_hashの先頭8文字",
+      "onchainUri": "signed_jsonへのURI（オフチェーンストレージ）",
+      "onchainCollection": "Core or Extension コレクション（GlobalConfigで定義）",
+      "onchainCreators": "コンテンツ所有者のウォレットアドレス",
+      "onchainP2": "検証に必要な情報（content_hash、来歴グラフ、WASM出力など）はすべて、URIが指すsigned_json内にあり、TEE署名で保護されています。"
     },
     "verification": {
       "title": "クライアントサイド検証",

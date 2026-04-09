@@ -810,8 +810,7 @@
       "overviewVpdqSub": "Per-frame PDQ hashes",
       "coreTitle": "Core cNFT (core-c2pa)",
       "coreP1": "The Core cNFT records the C2PA provenance graph — the chain of signatures showing who created the content and how it was modified.",
-      "onchainTitle": "On-Chain Attributes",
-      "onchainIntro": "Only 3 attributes are stored in the Solana cNFT metadata. All detailed data is in the off-chain signed_json.",
+      "onchainTitle": "What Goes On-Chain",
       "payloadTitle": "signed_json Payload (Off-Chain)",
       "payloadIntro": "The payload contained in the signed_json pointed to by the cNFT's URI. Protected by TEE signature.",
       "fieldHeader": "Field",
@@ -874,7 +873,13 @@
       "checkExtCollectionText": "Belongs to GlobalConfig's ext_collection_mint",
       "checkWasmLabel": "WASM Trusted",
       "checkWasmText": "wasm_hash is registered in GlobalConfig",
-      "overviewP1": "All cNFTs share the same fundamental structure. The only difference is their protocol role (Core or Extension) and which processor ran inside the TEE. Each content item produces one Core cNFT and multiple Extension cNFTs."
+      "overviewP1": "All cNFTs share the same fundamental structure. The only difference is their protocol role (Core or Extension) and which processor ran inside the TEE. Each content item produces one Core cNFT and multiple Extension cNFTs.",
+      "onchainP1": "The cNFT metadata on Solana follows the Metaplex Bubblegum standard. Only minimal identification is stored on-chain — the actual verification data lives in the off-chain signed_json.",
+      "onchainName": "\"Title #\" + first 8 chars of content_hash",
+      "onchainUri": "URI pointing to the signed_json (off-chain storage)",
+      "onchainCollection": "Core or Extension collection (defined in GlobalConfig)",
+      "onchainCreators": "Content owner's wallet address",
+      "onchainP2": "All data needed for verification (content_hash, provenance graph, WASM output, etc.) is in the signed_json at the URI, protected by the TEE signature."
     },
     "verification": {
       "title": "Client-Side Verification",
