@@ -386,11 +386,49 @@
   .flow {
     flex-direction: column;
     align-items: stretch;
+    gap: 0;
+    position: relative;
+    padding-left: 24px;
   }
+
+  /* Vertical connector line */
+  .flow::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 12px;
+    bottom: 12px;
+    width: 1px;
+    background: var(--docs-border);
+  }
+
   .flowArrow {
-    justify-content: center;
-    padding: 4px 0;
-    transform: rotate(90deg);
+    display: none;
+  }
+
+  .flowNode {
+    position: relative;
+    border: none;
+    background: none;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--docs-border);
+    border-radius: 0;
+  }
+
+  .flowNode:last-child {
+    border-bottom: none;
+  }
+
+  /* Dot marker */
+  .flowNode::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 14px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--docs-accent);
   }
 }
 
@@ -738,24 +776,7 @@
     padding: 28px 20px 64px;
   }
 
-  /* Flow: stack vertically */
-  .flow {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .flowArrow {
-    justify-content: center;
-    padding: 4px 0;
-    font-size: 0.7rem;
-    transform: rotate(90deg);
-  }
-
-  .flowNode {
-    padding: 10px 14px;
-  }
-
-  /* Sequence: 1-column stack */
+  /* Sequence: single column with labels */
   .sequence {
     grid-template-columns: 1fr;
   }
@@ -764,12 +785,14 @@
     display: none;
   }
 
-  .sequenceCell:nth-child(even) {
-    display: none;
+  /* Show all cells, but add actor label to non-empty ones */
+  .sequenceCell {
+    border-left: none;
   }
 
-  .sequenceCell:nth-child(odd) {
-    border-left: none;
+  /* Hide empty spacer cells */
+  .sequenceCell:empty {
+    display: none;
   }
 
   .sequenceArrow {
