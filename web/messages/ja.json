@@ -438,7 +438,8 @@
       "pkiArchitecture": "PKIアーキテクチャ",
       "contentSigning": "コンテンツの署名",
       "verificationAndRecord": "検証と記録",
-      "browserVerification": "閲覧者による検証"
+      "browserVerification": "閲覧者による検証",
+      "introduction": "はじめに"
     },
     "overview": {
       "title": "RootLens ドキュメント",
@@ -508,7 +509,7 @@
       "bgP1": "C2PA（Coalition for Content Provenance and Authenticity）は、撮影時にカメラの暗号署名をコンテンツに埋め込むオープン標準です。Google Pixel、Sony、Nikonなどのデバイスが対応しており、コンテンツの出自を証明する基盤として確立されつつあります。",
       "bgP2": "しかしC2PAには構造的な制約があります。検証には元のコンテンツデータとマニフェストの両方が完全に必要で、1バイトでも変わればハッシュが一致せず検証が失敗します。ほぼすべてのSNSやメッセージアプリがアップロード時にC2PAデータを除去し、コンテンツを再圧縮するため、コンテンツが共有された時点で証明が消失します。Title Protocolは、この証明をコンテンツから分離し、元ファイルなしでも検証可能な形で記録することでこの問題を解決します。",
       "bgP3": "この問題の詳しい背景については",
-      "bgTechLink": "Technologyページ",
+      "bgTechLink": "Introduction",
       "bgP3after": "をご覧ください。"
     },
     "trustModel": {

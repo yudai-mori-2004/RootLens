@@ -20,6 +20,7 @@ const NAV: NavSection[] = [
   {
     titleKey: "gettingStarted",
     items: [
+      { href: "/docs/introduction", labelKey: "introduction" },
       { href: "/docs", labelKey: "overview" },
       { href: "/docs/trust-model", labelKey: "trustModel" },
     ],

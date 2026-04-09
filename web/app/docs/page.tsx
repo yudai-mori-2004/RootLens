@@ -47,7 +47,7 @@ export default async function DocsOverview() {
       <p className={s.p}>{t("bgP2")}</p>
       <p className={s.p}>
         {t("bgP3")}
-        <a href="/technology" className={s.link}>{t("bgTechLink")}</a>
+        <a href="/docs/introduction" className={s.link}>{t("bgTechLink")}</a>
         {t("bgP3after")}
       </p>
 

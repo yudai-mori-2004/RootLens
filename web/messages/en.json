@@ -438,7 +438,8 @@
       "pkiArchitecture": "PKI Architecture",
       "contentSigning": "Content Signing",
       "verificationAndRecord": "Verification & Record",
-      "browserVerification": "Browser Verification"
+      "browserVerification": "Browser Verification",
+      "introduction": "Introduction"
     },
     "overview": {
       "title": "RootLens Documentation",
@@ -508,7 +509,7 @@
       "bgP1": "C2PA (Coalition for Content Provenance and Authenticity) is an open standard that embeds a camera's cryptographic signature into content at capture time. Devices like Google Pixel, Sony, and Nikon cameras support it, and it is becoming the foundation for proving content provenance.",
       "bgP2": "But C2PA has a structural limitation. Verification requires both the complete original content data and the manifest — if even one byte changes, the hash no longer matches and verification fails. Nearly every social media platform and messaging app strips C2PA data and recompresses content on upload, so the proof disappears the moment content is shared. Title Protocol solves this by separating the proof from the content and recording it in a form that can be verified without the original file.",
       "bgP3": "For a deeper look at this problem and the solution, see the ",
-      "bgTechLink": "Technology page",
+      "bgTechLink": "Introduction",
       "bgP3after": "."
     },
     "trustModel": {

@@ -15,12 +15,6 @@ export default function NavBar() {
         </a>
         <div className={s.navSpacer} />
         <a
-          href="/technology"
-          className={`${s.navLink} ${pathname === "/technology" ? s.navLinkActive : ""}`}
-        >
-          Technology
-        </a>
-        <a
           href="/docs"
           className={`${s.navLink} ${pathname.startsWith("/docs") ? s.navLinkActive : ""}`}
         >
