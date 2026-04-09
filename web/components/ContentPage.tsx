@@ -410,27 +410,30 @@ export default function ContentPage({ page }: Props) {
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{tField("rawData")}</h3>
 
-              {/* チェック結果（各cNFTのチェック項目） */}
-              {verification.processors.map((proc, procIdx) => {
-                const isCore = proc.processorId === "core-c2pa";
-                const label = isCore ? `Core: C2PA` : `Extension: ${proc.processorId}`;
-                const checks = [...proc.common, ...proc.specific];
+              {/* チェック結果（全cNFTまとめて1アコーディオン） */}
+              <NftToggle label={tField("checkResults")} defaultOpen={true}>
+                <div className={styles.verifyList}>
+                  {verification.processors.map((proc, procIdx) => {
+                    const isCore = proc.processorId === "core-c2pa";
+                    const label = isCore ? "Core: C2PA" : `Extension: ${proc.processorId}`;
+                    const checks = [...proc.common, ...proc.specific];
 
-                return (
-                  <NftToggle key={"check-" + proc.processorId + procIdx} label={label} defaultOpen={isCore}>
-                    <div className={styles.verifyList}>
-                      {checks.map((check, checkIdx) => (
-                        <VerifyItem
-                          key={checkIdx}
-                          status={check.status}
-                          label={check.id}
-                          detail={check.detail || ""}
-                        />
-                      ))}
-                    </div>
-                  </NftToggle>
-                );
-              })}
+                    return (
+                      <div key={"check-" + proc.processorId + procIdx}>
+                        <div className={styles.checkGroupLabel}>{label}</div>
+                        {checks.map((check, checkIdx) => (
+                          <VerifyItem
+                            key={checkIdx}
+                            status={check.status}
+                            label={check.id}
+                            detail={check.detail || ""}
+                          />
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </NftToggle>
 
               <div className={styles.rawDataDivider} />
 

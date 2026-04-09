@@ -385,7 +385,8 @@
     "hammingDistance": "ハミング距離",
     "download": "検証データをダウンロード (.csv)",
     "rawData": "検証に使用したデータ",
-    "rawDataEnv": "検証環境"
+    "rawDataEnv": "検証環境",
+    "checkResults": "チェック結果"
   },
   "check": {
     "c2pa_chain": "C2PA来歴チェーン",

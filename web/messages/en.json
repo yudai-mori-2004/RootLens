@@ -385,7 +385,8 @@
     "hammingDistance": "Hamming Distance",
     "download": "Download verification data (.csv)",
     "rawData": "Verification data",
-    "rawDataEnv": "Verification environment"
+    "rawDataEnv": "Verification environment",
+    "checkResults": "Check Results"
   },
   "check": {
     "c2pa_chain": "C2PA Provenance Chain",
