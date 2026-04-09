@@ -410,33 +410,6 @@ export default function ContentPage({ page }: Props) {
             <section className={styles.techGroup}>
               <h3 className={styles.techGroupTitle}>{tField("rawData")}</h3>
 
-              {/* チェック結果（全cNFTまとめて1アコーディオン） */}
-              <NftToggle label={tField("checkResults")} defaultOpen={true}>
-                <div className={styles.verifyList}>
-                  {verification.processors.map((proc, procIdx) => {
-                    const isCore = proc.processorId === "core-c2pa";
-                    const label = isCore ? "Core: C2PA" : `Extension: ${proc.processorId}`;
-                    const checks = [...proc.common, ...proc.specific];
-
-                    return (
-                      <div key={"check-" + proc.processorId + procIdx}>
-                        <div className={styles.checkGroupLabel}>{label}</div>
-                        {checks.map((check, checkIdx) => (
-                          <VerifyItem
-                            key={checkIdx}
-                            status={check.status}
-                            label={check.id}
-                            detail={check.detail || ""}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              </NftToggle>
-
-              <div className={styles.rawDataDivider} />
-
               {/* 検証環境 */}
               <NftToggle label={tField("rawDataEnv")} defaultOpen={false}>
                 <div className={styles.dataBlock}>
@@ -467,12 +440,11 @@ export default function ContentPage({ page }: Props) {
                 </div>
               </NftToggle>
 
-              <div className={styles.rawDataDivider} />
-
-              {/* NFTごとのデータ */}
+              {/* cNFTごと: チェック結果 + 生データを1つのアコーディオンに */}
               {verification.processors.map((proc, procIdx) => {
                 const isCore = proc.processorId === "core-c2pa";
                 const label = isCore ? "Core: C2PA" : `Extension: ${proc.processorId}`;
+                const checks = [...proc.common, ...proc.specific];
                 const sjData = isCore
                   ? resolved?.coreSignedJson
                   : resolved?.extensionNfts.find(n => {
@@ -492,7 +464,20 @@ export default function ContentPage({ page }: Props) {
                   : [];
 
                 return (
-                  <NftToggle key={proc.processorId + procIdx} label={label} defaultOpen={false}>
+                  <NftToggle key={proc.processorId + procIdx} label={label} defaultOpen={isCore}>
+                    {/* チェック結果 */}
+                    <div className={styles.verifyList}>
+                      {checks.map((check, checkIdx) => (
+                        <VerifyItem
+                          key={checkIdx}
+                          status={check.status}
+                          label={check.id}
+                          detail={check.detail || ""}
+                        />
+                      ))}
+                    </div>
+
+                    {/* 生データ */}
                     <div className={styles.dataBlock}>
                       {nftCollection && <DataField label="collection" value={truncate(nftCollection, 16)} full={nftCollection} />}
                       {nftAssetId && <DataField label="assetId" value={truncate(nftAssetId, 16)} full={nftAssetId} />}
