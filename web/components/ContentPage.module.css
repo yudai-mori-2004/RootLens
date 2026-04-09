@@ -600,6 +600,57 @@
   padding-top: 0;
 }
 
+/* ---- CodeValue (inline code block with copy) ---- */
+.codeValue {
+  margin: 8px 0;
+}
+
+.codeValueLabel {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-tertiary, #6e7279);
+  margin-bottom: 4px;
+  letter-spacing: 0.02em;
+}
+
+.codeValueRow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-code, #1a1c1e);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.codeValueCode {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #d4d4d8;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.codeValueCopy {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.codeValueCopy:hover {
+  color: #fff;
+}
+
 .verifyItem {
   padding: 10px 0;
   border-bottom: 1px solid var(--border-light);

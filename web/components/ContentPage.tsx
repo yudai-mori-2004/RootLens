@@ -316,22 +316,19 @@ export default function ContentPage({ page }: Props) {
               {coreSj && corePayload && (
                 <>
                   <p className={styles.techDesc}>
-                    {t("tech.dyn.coreSummary", {
-                      hash: truncate(currentContent.contentHash, 8),
+                    {t("tech.dyn.coreSummaryText", {
                       type: corePayload.content_type,
-                      signing: record?.signingAlgorithm ? t("tech.dyn.coreSigning", { algo: record.signingAlgorithm }) : "",
+                      signing: record?.signingAlgorithm || "",
                       nodes: String(corePayload.nodes?.length ?? 0),
-                      links: corePayload.links && corePayload.links.length > 0 ? t("tech.dyn.coreLinks", { count: String(corePayload.links.length) }) : "",
                     })}
                   </p>
+                  <CodeValue label="content_hash" value={currentContent.contentHash} />
                   <p className={styles.techDesc}>
-                    {t("tech.dyn.teeVerified", {
-                      teeType: coreSj.tee_type,
-                      pubkey: truncate(coreSj.tee_pubkey, 6),
-                      uri: truncate(resolved?.signedJsonUri ?? "", 12),
-                      assetId: truncate(resolved?.assetId ?? "", 6),
-                    })}
+                    {t("tech.dyn.teeVerifiedText", { teeType: coreSj.tee_type })}
                   </p>
+                  <CodeValue label="TEE pubkey" value={coreSj.tee_pubkey} />
+                  <CodeValue label="signed_json" value={resolved?.signedJsonUri ?? ""} />
+                  <CodeValue label="NFT asset" value={resolved?.assetId ?? ""} />
                   {record?.tsaProvider && (
                     <p className={styles.techDescSmall}>
                       {t("tech.dyn.tsaCertified", {
@@ -341,11 +338,7 @@ export default function ContentPage({ page }: Props) {
                     </p>
                   )}
                   <p className={styles.techDescSmall}>
-                    {resolved?.ownerWallet && corePayload.creator_wallet === resolved.ownerWallet
-                      ? t("tech.dyn.ownerSame", { wallet: truncate(corePayload.creator_wallet, 6) })
-                      : resolved?.ownerWallet
-                        ? t("tech.dyn.ownerTransferred", { creator: truncate(corePayload.creator_wallet, 6), owner: truncate(resolved.ownerWallet, 6) })
-                        : t("tech.dyn.ownerSame", { wallet: truncate(corePayload.creator_wallet, 6) })}
+                    {t("tech.dyn.ownerText", { wallet: corePayload.creator_wallet || "" })}
                   </p>
                   <p className={styles.techDescSmall}>{t("tech.core.offchainDesc")}</p>
                 </>
@@ -372,13 +365,11 @@ export default function ContentPage({ page }: Props) {
                     <h5 className={styles.extTitle}>{t("tech.pdq.title")}</h5>
                     <p className={styles.techDescSmall}>{t("tech.pdq.desc")}</p>
                     {!!pdqPayload?.pdqhash && (
-                      <p className={styles.techDesc}>
-                        {t("tech.dyn.pdqResult", {
-                          hash: truncate(String(pdqPayload.pdqhash), 8),
-                          detail: pdqCheck?.detail ?? "",
-                          wasmHash: truncate(String(pdqPayload.wasm_hash ?? ""), 8),
-                        })}
-                      </p>
+                      <>
+                        <p className={styles.techDescSmall}>{pdqCheck?.detail ?? ""}</p>
+                        <CodeValue label="PDQ (on-chain)" value={String(pdqPayload.pdqhash)} />
+                        <CodeValue label="WASM hash" value={String(pdqPayload.wasm_hash ?? "")} />
+                      </>
                     )}
                   </div>
                 ) : null;
@@ -562,6 +553,28 @@ function VerifyItem({ status, label, detail }: { status: VerifyStatus; label: st
         <span className={styles.verifyItemLabel}>{label}</span>
       </div>
       <p className={styles.verifyItemDetail}>{detail}</p>
+    </div>
+  );
+}
+
+/** Inline code block with optional label and copy button. Used for hashes/addresses in prose. */
+function CodeValue({ label, value }: { label?: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className={styles.codeValue}>
+      {label && <span className={styles.codeValueLabel}>{label}</span>}
+      <div className={styles.codeValueRow}>
+        <code className={styles.codeValueCode}>{value}</code>
+        <button className={styles.codeValueCopy} onClick={handleCopy} title="Copy">
+          {copied ? "✓" : "⧉"}
+        </button>
+      </div>
     </div>
   );
 }

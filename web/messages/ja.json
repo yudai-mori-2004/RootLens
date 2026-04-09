@@ -330,7 +330,10 @@
         "teeSigValid": "有効 ✓",
         "teeSigPending": "検証中",
         "tsaResult": "このコンテンツ: {provider}、{time}",
-        "teeVerifiedShort": "TEE ({teeType}) がC2PA署名チェーンを検証し、結果にEd25519署名を付与しました。"
+        "teeVerifiedShort": "TEE ({teeType}) がC2PA署名チェーンを検証し、結果にEd25519署名を付与しました。",
+        "coreSummaryText": "コンテンツ種別: {type}、C2PA署名: {signing}、来歴ノード: {nodes}件。",
+        "teeVerifiedText": "TEE ({teeType}) がC2PA署名チェーンを検証し、結果にEd25519署名を付与しました。",
+        "ownerText": "登録者: {wallet}"
       },
       "why": {
         "title": "なぜこの検証を信頼できるのか",

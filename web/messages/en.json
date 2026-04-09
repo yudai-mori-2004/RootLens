@@ -330,7 +330,10 @@
         "teeSigValid": "valid ✓",
         "teeSigPending": "verification pending",
         "tsaResult": "This content: {provider}, {time}",
-        "teeVerifiedShort": "TEE ({teeType}) verified the C2PA signature chain and signed the result with Ed25519."
+        "teeVerifiedShort": "TEE ({teeType}) verified the C2PA signature chain and signed the result with Ed25519.",
+        "coreSummaryText": "Content type: {type}, C2PA signing: {signing}, provenance nodes: {nodes}.",
+        "teeVerifiedText": "TEE ({teeType}) verified the C2PA signature chain and signed the result with Ed25519.",
+        "ownerText": "Registered by: {wallet}"
       },
       "why": {
         "title": "Why You Can Trust This Verification",
