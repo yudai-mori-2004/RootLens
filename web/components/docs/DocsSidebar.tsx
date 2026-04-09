@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import s from "./docs.module.css";
@@ -48,13 +49,39 @@ const NAV: NavSection[] = [
   },
 ];
 
+/** Find the label of the currently active page */
+function findCurrentLabel(pathname: string, t: (key: string) => string): string {
+  for (const section of NAV) {
+    for (const item of section.items) {
+      if (!item.sub && item.href === pathname) {
+        return t(item.labelKey);
+      }
+    }
+  }
+  return "Docs";
+}
+
 export default function DocsSidebar() {
   const pathname = usePathname();
   const t = useTranslations("docs.sidebar");
+  const [open, setOpen] = useState(false);
+
+  const currentLabel = findCurrentLabel(pathname, t);
 
   return (
     <aside className={s.sidebar}>
-      <nav className={s.sidebarInner}>
+      {/* Mobile toggle */}
+      <button
+        className={s.sidebarToggle}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
+        <span className={s.sidebarToggleLabel}>{currentLabel}</span>
+        <span className={`${s.sidebarToggleIcon} ${open ? s.sidebarToggleIconOpen : ""}`} />
+      </button>
+
+      {/* Nav links */}
+      <nav className={`${s.sidebarInner} ${open ? s.sidebarInnerOpen : ""}`}>
         {NAV.map((section) => (
           <div key={section.titleKey} className={s.sidebarSection}>
             <div className={s.sidebarSectionTitle}>{t(section.titleKey)}</div>
@@ -66,6 +93,7 @@ export default function DocsSidebar() {
                 <a
                   key={item.href}
                   href={item.href}
+                  onClick={() => setOpen(false)}
                   className={[
                     s.sidebarLink,
                     isActive ? s.sidebarLinkActive : "",

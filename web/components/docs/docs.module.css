@@ -670,6 +670,31 @@
   }
 }
 
+/* ---- Mobile toggle (hidden on desktop) ---- */
+.sidebarToggle {
+  display: none;
+}
+
+.sidebarToggleLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--docs-text);
+}
+
+.sidebarToggleIcon {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--docs-text-tertiary);
+  border-bottom: 2px solid var(--docs-text-tertiary);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sidebarToggleIconOpen {
+  transform: rotate(-135deg);
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
   .docsLayout {
@@ -679,39 +704,114 @@
   .sidebar {
     width: 100%;
     height: auto;
-    position: static;
+    position: sticky;
+    top: 52px;
+    z-index: 50;
     border-right: none;
     border-bottom: 1px solid var(--docs-border);
-    padding: 16px 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .sidebarToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 20px;
+    background: var(--docs-bg);
+    border: none;
+    cursor: pointer;
   }
 
   .sidebarInner {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 0;
-    padding: 0 16px;
+    display: none;
+    padding: 0 20px 16px;
+    background: var(--docs-bg);
+    border-bottom: 1px solid var(--docs-border);
+  }
+
+  .sidebarInnerOpen {
+    display: block;
   }
 
   .sidebarSection {
-    margin-bottom: 0;
-    width: 100%;
+    margin-bottom: 12px;
   }
 
-  .sidebarSectionTitle {
-    display: none;
+  .sidebarSection + .sidebarSection {
+    padding-top: 8px;
   }
 
   .sidebarLink {
-    display: inline-block;
-    padding: 6px 10px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    padding: 6px 12px;
   }
 
   .sidebarLinkSub {
-    padding-left: 10px;
+    padding-left: 24px;
   }
 
   .main {
-    padding: 32px 20px 64px;
+    padding: 28px 20px 64px;
+  }
+
+  /* Flow: stack vertically */
+  .flow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .flowArrow {
+    justify-content: center;
+    padding: 4px 0;
+    font-size: 0.7rem;
+    transform: rotate(90deg);
+  }
+
+  .flowNode {
+    padding: 10px 14px;
+  }
+
+  /* Sequence: 1-column stack */
+  .sequence {
+    grid-template-columns: 1fr;
+  }
+
+  .sequenceHeader:nth-child(2) {
+    display: none;
+  }
+
+  .sequenceCell:nth-child(even) {
+    display: none;
+  }
+
+  .sequenceCell:nth-child(odd) {
+    border-left: none;
+  }
+
+  .sequenceArrow {
+    font-size: 0.8rem;
+    padding: 8px 16px;
+  }
+
+  /* Table: horizontal scroll */
+  .table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Phase cards: already 1-column via earlier media query */
+
+  /* Typography: tighter */
+  .title {
+    font-size: 1.6rem;
+  }
+
+  .h2 {
+    font-size: 1.2rem;
+    margin-top: 40px;
   }
 }
