@@ -329,7 +329,8 @@
         "teeSigResult": "This content: TEE signature by {pubkey} — {result}",
         "teeSigValid": "valid ✓",
         "teeSigPending": "verification pending",
-        "tsaResult": "This content: {provider}, {time}"
+        "tsaResult": "This content: {provider}, {time}",
+        "teeVerifiedShort": "TEE ({teeType}) verified the C2PA signature chain and signed the result with Ed25519."
       },
       "why": {
         "title": "Why You Can Trust This Verification",
@@ -386,7 +387,8 @@
     "download": "Download verification data (.csv)",
     "rawData": "Verification data",
     "rawDataEnv": "Verification environment",
-    "checkResults": "Check Results"
+    "checkResults": "Check Results",
+    "provenanceNodes": "Provenance nodes"
   },
   "check": {
     "c2pa_chain": "C2PA Provenance Chain",

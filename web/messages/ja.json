@@ -329,7 +329,8 @@
         "teeSigResult": "このコンテンツ: TEE署名 {pubkey} — {result}",
         "teeSigValid": "有効 ✓",
         "teeSigPending": "検証中",
-        "tsaResult": "このコンテンツ: {provider}、{time}"
+        "tsaResult": "このコンテンツ: {provider}、{time}",
+        "teeVerifiedShort": "TEE ({teeType}) がC2PA署名チェーンを検証し、結果にEd25519署名を付与しました。"
       },
       "why": {
         "title": "なぜこの検証を信頼できるのか",
@@ -386,7 +387,8 @@
     "download": "検証データをダウンロード (.csv)",
     "rawData": "検証に使用したデータ",
     "rawDataEnv": "検証環境",
-    "checkResults": "チェック結果"
+    "checkResults": "チェック結果",
+    "provenanceNodes": "来歴ノード数"
   },
   "check": {
     "c2pa_chain": "C2PA来歴チェーン",
