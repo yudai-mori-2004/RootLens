@@ -25,20 +25,20 @@ export default async function PkiPage() {
       <ul className={s.tree}>
         <li>
           <span className={s.treeLabel}>Root CA</span>
-          <span className={s.treeSub}>AWS KMS, 20 years</span>
+          <span className={s.treeSub}>{t("pkiTreeRootSub")}</span>
           <ul>
             <li>
               <span className={s.treeLabel}>iOS Intermediate CA</span>
               <span className={s.treeSub}>AWS KMS</span>
               <ul>
-                <li>Device Certificate <span className={s.treeSub}>90-day, TEE key</span></li>
+                <li>{t("pkiTreeDeviceCert")} <span className={s.treeSub}>{t("pkiTreeDeviceSub")}</span></li>
               </ul>
             </li>
             <li>
               <span className={s.treeLabel}>Android Intermediate CA</span>
               <span className={s.treeSub}>AWS KMS</span>
               <ul>
-                <li>Device Certificate <span className={s.treeSub}>90-day, TEE key</span></li>
+                <li>{t("pkiTreeDeviceCert")} <span className={s.treeSub}>{t("pkiTreeDeviceSub")}</span></li>
               </ul>
             </li>
           </ul>
@@ -56,22 +56,22 @@ export default async function PkiPage() {
         </thead>
         <tbody>
           <tr>
-            <td><span className={s.strong}>Algorithm</span></td>
+            <td><span className={s.strong}>{t("tableAlgorithm")}</span></td>
             <td>ECDSA P-256</td>
             <td>ECDSA P-256</td>
             <td>ECDSA P-256</td>
           </tr>
           <tr>
-            <td><span className={s.strong}>Storage</span></td>
+            <td><span className={s.strong}>{t("tableStorage")}</span></td>
             <td>AWS KMS</td>
             <td>AWS KMS</td>
-            <td>Device TEE</td>
+            <td>{t("tableDeviceTee")}</td>
           </tr>
           <tr>
-            <td><span className={s.strong}>Validity</span></td>
-            <td>20 years</td>
+            <td><span className={s.strong}>{t("tableValidity")}</span></td>
+            <td>{t("table20years")}</td>
             <td>—</td>
-            <td>90 days</td>
+            <td>{t("table90days")}</td>
           </tr>
           <tr>
             <td><span className={s.strong}>CA</span></td>
@@ -80,7 +80,7 @@ export default async function PkiPage() {
             <td>FALSE</td>
           </tr>
           <tr>
-            <td><span className={s.strong}>Key Usage</span></td>
+            <td><span className={s.strong}>{t("tableKeyUsage")}</span></td>
             <td>keyCertSign, cRLSign</td>
             <td>keyCertSign</td>
             <td>digitalSignature</td>
@@ -105,50 +105,46 @@ export default async function PkiPage() {
 
       <h2 className={s.h2}>{t("issuanceTitle")}</h2>
       <div className={s.sequence}>
-        <div className={s.sequenceHeader}>Device</div>
-        <div className={s.sequenceHeader}>Server</div>
+        <div className={s.sequenceHeader}>{t("issuanceDevice")}</div>
+        <div className={s.sequenceHeader}>{t("issuanceServer")}</div>
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>1. Generate key pair in TEE</div>
-          EC P-256 (Secure Enclave / StrongBox)
+          <div className={s.sequenceCellLabel}>{t("issuanceStep1Label")}</div>
+          {t("issuanceStep1Desc")}
         </div>
         <div className={s.sequenceCell} />
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>2. Create CSR</div>
-          Self-signed = Proof of Possession
+          <div className={s.sequenceCellLabel}>{t("issuanceStep2Label")}</div>
+          {t("issuanceStep2Desc")}
         </div>
         <div className={s.sequenceCell} />
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>3. Platform Attestation</div>
-          iOS: App Attest / Android: Key Attestation + Play Integrity
+          <div className={s.sequenceCellLabel}>{t("issuanceStep3Label")}</div>
+          {t("issuanceStep3Desc")}
         </div>
         <div className={s.sequenceCell} />
 
-        <div className={s.sequenceArrow}>
-          4. CSR + Attestation &rarr;
-        </div>
+        <div className={s.sequenceArrow}>{t("issuanceArrow1")}</div>
 
         <div className={s.sequenceCell} />
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>5-7. Verify</div>
-          CSR signature, key algorithm, Platform Attestation
+          <div className={s.sequenceCellLabel}>{t("issuanceStep5Label")}</div>
+          {t("issuanceStep5Desc")}
         </div>
 
         <div className={s.sequenceCell} />
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>8. Sign Device Certificate</div>
-          ICA key via KMS
+          <div className={s.sequenceCellLabel}>{t("issuanceStep8Label")}</div>
+          {t("issuanceStep8Desc")}
         </div>
 
-        <div className={s.sequenceArrow}>
-          &larr; 9. Device Cert + ICA Cert + Root Cert
-        </div>
+        <div className={s.sequenceArrow}>{t("issuanceArrow2")}</div>
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>10. Store cert chain in TEE</div>
-          Auto-renewal 14 days before expiry
+          <div className={s.sequenceCellLabel}>{t("issuanceStep10Label")}</div>
+          {t("issuanceStep10Desc")}
         </div>
         <div className={s.sequenceCell} />
       </div>

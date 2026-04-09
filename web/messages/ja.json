@@ -693,7 +693,21 @@
       "appPkiLinkAfter": "ページを参照してください。",
       "provenanceP1before": "RootLensは撮影後のコンテンツ編集（クロップ、マスク、トリム）に対応しています。コンテンツが編集されると、C2PA標準は元のマニフェストを「素材（ingredient）」として参照する新しいマニフェストを作成します。これにより",
       "provenanceP1bold": "来歴グラフ",
-      "provenanceP1after": "（撮影から各編集に至るコンテンツの全履歴を辿れる署名の連鎖）が形成されます。"
+      "provenanceP1after": "（撮影から各編集に至るコンテンツの全履歴を辿れる署名の連鎖）が形成されます。",
+      "hwFlowSensor": "カメラセンサー",
+      "hwFlowProcessing": "画像処理",
+      "hwFlowChip": "セキュアチップ",
+      "hwFlowChipSub": "Titan M2 etc.",
+      "hwFlowSig": "C2PA署名",
+      "hwFlowNote": "署名鍵は工場出荷時にバインドされ、チップから取り出せません",
+      "hwSonyChip": "メーカーのセキュアエレメント",
+      "appFlowCamera": "カメラAPI",
+      "appFlowSig": "C2PA署名",
+      "appFlowNote1": "秘密鍵はTEE内で生成され、外部に出ません",
+      "appFlowNote2": "センサーからTEEまでの経路はOSを経由します",
+      "pkiTreeRootSub": "AWS KMS, 有効期間20年",
+      "pkiTreeDeviceCert": "Device Certificate",
+      "pkiTreeDeviceSub": "90日, TEE公開鍵"
     },
     "titleProtocol": {
       "title": "Title Protocol",
@@ -761,7 +775,23 @@
       "mintP2c": "を指します。",
       "mintLinkBefore": "各cNFTタイプの詳細なペイロード形式については、",
       "mintLinkText": "cNFTの構造",
-      "mintLinkAfter": "ページを参照してください。"
+      "mintLinkAfter": "ページを参照してください。",
+      "e2eHeaderApp": "App",
+      "e2eHeaderTee": "TEEノード",
+      "e2eStep1Label": "1. TEE公開鍵の取得",
+      "e2eStep1Desc": "オンチェーンのGlobalConfigから",
+      "e2eStep2Label": "2. 鍵交換",
+      "e2eStep2Desc": "エフェメラルECDH → 共有秘密（前方秘匿性）",
+      "e2eStep3Label": "3. 方向別鍵の導出",
+      "e2eStep3Desc": "App→TEEとTEE→Appで別の鍵",
+      "e2eArrow1": "4. 暗号化コンテンツ →",
+      "e2eStep5Label": "5. TEE内で処理",
+      "e2eStep5Desc": "復号、C2PA検証、プロセッサ実行、結果に署名",
+      "e2eArrow2": "← 6. 暗号化された結果",
+      "e2eStep7Label": "7. ローカルで復号",
+      "processorTableOrg": "signer_org",
+      "processorTableIds": "processor_ids",
+      "processorAnyVideo": "（任意, 動画の場合）"
     },
     "cnftStructure": {
       "title": "cNFTの構造",
@@ -826,7 +856,12 @@
       "checkCertVerifiedText": "verified === true",
       "pdqVerifyP1before": "ブラウザは同一アルゴリズムの純粋TypeScript実装を使って、表示されている画像からPDQハッシュを再計算します。次に",
       "pdqVerifyP1bold": "ハミング距離",
-      "pdqVerifyP1after": "（2つのハッシュが異なるビット位置の数）を使ってオンチェーンのハッシュと比較します。距離が31以下（256bit中）であれば、画像は一致と判定されます。"
+      "pdqVerifyP1after": "（2つのハッシュが異なるビット位置の数）を使ってオンチェーンのハッシュと比較します。距離が31以下（256bit中）であれば、画像は一致と判定されます。",
+      "overviewCoreSub": "core-c2pa / 来歴グラフ",
+      "overviewCertSub": "証明書チェーンの検証結果",
+      "overviewPdqSub": "256bit PDQハッシュ",
+      "overviewVpdqSub": "フレーム別PDQハッシュ",
+      "vpdqWasmHash": "vPDQ WASMバイナリのSHA-256"
     },
     "verification": {
       "title": "クライアントサイド検証",
@@ -911,7 +946,11 @@
       "flowStep2": "インデクサキャッシュが候補のcNFT IDを返します。これらは信頼されず、すべて再検証されます。",
       "flowStep3": "各候補について、ブラウザがSolanaブロックチェーンに直接問い合わせます。公式コレクションに所属しているか、content_hashが一致するかを確認し、cNFTのURIからsigned_jsonを取得します。",
       "flowStep4": "TEE署名、コレクション所属、コンテンツバインディング、プロセッサ固有チェック、知覚ハッシュの再計算と照合を実行します。",
-      "flowNote": "ステップ3と4はRootLensサーバーに問い合わせません"
+      "flowNote": "ステップ3と4はRootLensサーバーに問い合わせません",
+      "flowStep1Label": "Short ID → content_hash",
+      "flowStep2Label": "content_hash → cNFT candidates",
+      "flowStep3Label": "cNFT ID → オンチェーン検証",
+      "flowStep4Label": "signed_json → ブラウザ検証"
     },
     "pki": {
       "title": "PKIアーキテクチャ",
@@ -947,7 +986,33 @@
       "iosAppAttestAfter": "がアテステーションAPIに渡され、アテステーションをCSRにバインドします。",
       "crlP1before": "CRL（Certificate Revocation List）は",
       "crlP1code": "/api/v1/crl",
-      "crlP1after": "で公開されます。失効した証明書はデータベースでシリアル番号により追跡されます。Device Certificateの90日の有効期間が自然な失効メカニズムを提供しており、明示的な失効がなくても、侵害された証明書は90日以内に使用不可能になります。"
+      "crlP1after": "で公開されます。失効した証明書はデータベースでシリアル番号により追跡されます。Device Certificateの90日の有効期間が自然な失効メカニズムを提供しており、明示的な失効がなくても、侵害された証明書は90日以内に使用不可能になります。",
+      "pkiTreeRootSub": "AWS KMS, 有効期間20年",
+      "pkiTreeDeviceCert": "Device Certificate",
+      "pkiTreeDeviceSub": "90日, TEE鍵",
+      "tableAlgorithm": "アルゴリズム",
+      "tableStorage": "保管場所",
+      "tableValidity": "有効期間",
+      "tableKeyUsage": "鍵用途",
+      "tableDeviceTee": "デバイスTEE",
+      "table20years": "20年",
+      "table90days": "90日",
+      "issuanceDevice": "デバイス",
+      "issuanceServer": "サーバー",
+      "issuanceStep1Label": "1. TEE内で鍵ペア生成",
+      "issuanceStep1Desc": "EC P-256 (Secure Enclave / StrongBox)",
+      "issuanceStep2Label": "2. CSR作成",
+      "issuanceStep2Desc": "自己署名 = 所持証明",
+      "issuanceStep3Label": "3. Platform Attestation取得",
+      "issuanceStep3Desc": "iOS: App Attest / Android: Key Attestation + Play Integrity",
+      "issuanceArrow1": "4. CSR + Attestation →",
+      "issuanceStep5Label": "5-7. 検証",
+      "issuanceStep5Desc": "CSR署名、鍵アルゴリズム、Platform Attestation",
+      "issuanceStep8Label": "8. Device Certificate署名",
+      "issuanceStep8Desc": "ICA鍵（KMS経由）",
+      "issuanceArrow2": "← 9. Device Cert + ICA Cert + Root Cert",
+      "issuanceStep10Label": "10. TEEに証明書チェーンを保存",
+      "issuanceStep10Desc": "有効期限14日前に自動更新"
     }
   }
 }

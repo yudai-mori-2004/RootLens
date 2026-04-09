@@ -28,26 +28,24 @@ export default async function ContentOriginsPage() {
       <p className={s.p}>{t("hwP1")}</p>
       <div className={s.flow}>
         <div className={s.flowNode}>
-          <div className={s.flowNodeLabel}>Camera Sensor</div>
+          <div className={s.flowNodeLabel}>{t("hwFlowSensor")}</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
-          <div className={s.flowNodeLabel}>Image Processing</div>
+          <div className={s.flowNodeLabel}>{t("hwFlowProcessing")}</div>
           <div className={s.flowNodeSub}>ISP</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
-          <div className={s.flowNodeLabel}>Secure Chip</div>
-          <div className={s.flowNodeSub}>Titan M2 etc.</div>
+          <div className={s.flowNodeLabel}>{t("hwFlowChip")}</div>
+          <div className={s.flowNodeSub}>{t("hwFlowChipSub")}</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
-          <div className={s.flowNodeLabel}>C2PA Signature</div>
+          <div className={s.flowNodeLabel}>{t("hwFlowSig")}</div>
         </div>
       </div>
-      <p className={s.flowNote}>
-        * Signing key is factory-bound and cannot be extracted from the chip
-      </p>
+      <p className={s.flowNote}>{t("hwFlowNote")}</p>
 
       <table className={s.table}>
         <thead>
@@ -59,7 +57,7 @@ export default async function ContentOriginsPage() {
         </thead>
         <tbody>
           <tr><td>Google Pixel</td><td>Titan M2</td><td>{t("hwPixel")}</td></tr>
-          <tr><td>Sony / Leica</td><td>Vendor secure element</td><td>{t("hwSony")}</td></tr>
+          <tr><td>Sony / Leica</td><td>{t("hwSonyChip")}</td><td>{t("hwSony")}</td></tr>
         </tbody>
       </table>
 
@@ -77,7 +75,7 @@ export default async function ContentOriginsPage() {
       <p className={s.p}>{t("appP1")}</p>
       <div className={s.flow}>
         <div className={s.flowNode}>
-          <div className={s.flowNodeLabel}>Camera API</div>
+          <div className={s.flowNodeLabel}>{t("appFlowCamera")}</div>
           <div className={s.flowNodeSub}>OS</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
@@ -87,12 +85,12 @@ export default async function ContentOriginsPage() {
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
-          <div className={s.flowNodeLabel}>C2PA Signature</div>
+          <div className={s.flowNodeLabel}>{t("appFlowSig")}</div>
         </div>
       </div>
       <p className={s.flowNote}>
-        * Private key generated in TEE, never exported<br />
-        * Sensor-to-TEE path goes through the OS
+        {t("appFlowNote1")}<br />
+        {t("appFlowNote2")}
       </p>
       <p className={s.p}>{t("appMechanisms")}</p>
 
@@ -119,20 +117,20 @@ export default async function ContentOriginsPage() {
       <ul className={s.tree}>
         <li>
           <span className={s.treeLabel}>Root CA</span>
-          <span className={s.treeSub}>AWS KMS, 20-year validity</span>
+          <span className={s.treeSub}>{t("pkiTreeRootSub")}</span>
           <ul>
             <li>
               <span className={s.treeLabel}>iOS Intermediate CA</span>
               <span className={s.treeSub}>AWS KMS</span>
               <ul>
-                <li>Device Certificate <span className={s.treeSub}>90-day, TEE public key</span></li>
+                <li>{t("pkiTreeDeviceCert")} <span className={s.treeSub}>{t("pkiTreeDeviceSub")}</span></li>
               </ul>
             </li>
             <li>
               <span className={s.treeLabel}>Android Intermediate CA</span>
               <span className={s.treeSub}>AWS KMS</span>
               <ul>
-                <li>Device Certificate <span className={s.treeSub}>90-day, TEE public key</span></li>
+                <li>{t("pkiTreeDeviceCert")} <span className={s.treeSub}>{t("pkiTreeDeviceSub")}</span></li>
               </ul>
             </li>
           </ul>

@@ -21,19 +21,19 @@ export default async function CnftStructurePage() {
           <ul>
             <li>
               <span className={s.treeLabel}>Core cNFT</span>
-              <span className={s.treeSub}>core-c2pa / Provenance graph</span>
+              <span className={s.treeSub}>{t("overviewCoreSub")}</span>
             </li>
             <li>
               <span className={s.treeLabel}>cert-* Extension</span>
-              <span className={s.treeSub}>Certificate chain verified?</span>
+              <span className={s.treeSub}>{t("overviewCertSub")}</span>
             </li>
             <li>
               <span className={s.treeLabel}>image-pdq Extension</span>
-              <span className={s.treeSub}>256-bit PDQ hash</span>
+              <span className={s.treeSub}>{t("overviewPdqSub")}</span>
             </li>
             <li>
               <span className={s.treeLabel}>video-vpdq Extension</span>
-              <span className={s.treeSub}>Per-frame PDQ hashes</span>
+              <span className={s.treeSub}>{t("overviewVpdqSub")}</span>
             </li>
           </ul>
         </li>
@@ -136,7 +136,7 @@ export default async function CnftStructurePage() {
         <thead><tr><th>{t("fieldHeader")}</th><th>{t("typeHeader")}</th><th>{t("descHeader")}</th></tr></thead>
         <tbody>
           <tr><td><code className={s.code}>extension_id</code></td><td>string</td><td><code className={s.code}>video-vpdq</code></td></tr>
-          <tr><td><code className={s.code}>wasm_hash</code></td><td>string</td><td>SHA-256</td></tr>
+          <tr><td><code className={s.code}>wasm_hash</code></td><td>string</td><td>{t("vpdqWasmHash")}</td></tr>
           <tr><td><code className={s.code}>frames[]</code></td><td>array</td><td>{t("vpdqFrames")}</td></tr>
           <tr><td><code className={s.code}>frames[].pdqhash</code></td><td>string</td><td>{t("vpdqPdqhash")}</td></tr>
           <tr><td><code className={s.code}>frames[].quality</code></td><td>number</td><td>{t("vpdqQuality")}</td></tr>

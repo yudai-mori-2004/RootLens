@@ -26,33 +26,31 @@ export default async function VerificationPage() {
       </p>
       <ol className={s.steps}>
         <li>
-          <div className={s.stepLabel}>Short ID &rarr; content_hash</div>
+          <div className={s.stepLabel}>{t("flowStep1Label")}</div>
           <div className={s.stepSub}>
             {t("flowStep1")}
           </div>
         </li>
         <li>
-          <div className={s.stepLabel}>content_hash &rarr; cNFT candidates</div>
+          <div className={s.stepLabel}>{t("flowStep2Label")}</div>
           <div className={s.stepSub}>
             {t("flowStep2")}
           </div>
         </li>
         <li>
-          <div className={s.stepLabel}>cNFT ID &rarr; on-chain verification</div>
+          <div className={s.stepLabel}>{t("flowStep3Label")}</div>
           <div className={s.stepSub}>
             {t("flowStep3")}
           </div>
         </li>
         <li>
-          <div className={s.stepLabel}>signed_json &rarr; browser verification</div>
+          <div className={s.stepLabel}>{t("flowStep4Label")}</div>
           <div className={s.stepSub}>
             {t("flowStep4")}
           </div>
         </li>
       </ol>
-      <div className={s.callout}>
-        <div className={s.calloutLabel}>{t("flowNote")}</div>
-      </div>
+      <p className={s.flowNote}>{t("flowNote")}</p>
 
       <h2 className={s.h2}>{t("commonTitle")}</h2>
       <p className={s.p}>{t("commonIntro")}</p>

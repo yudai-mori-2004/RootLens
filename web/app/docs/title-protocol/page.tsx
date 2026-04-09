@@ -59,43 +59,39 @@ export default async function TitleProtocolPage() {
       <h2 className={s.h2}>{t("e2eTitle")}</h2>
       <p className={s.p}>{t("e2eIntro")}</p>
       <div className={s.sequence}>
-        <div className={s.sequenceHeader}>App</div>
-        <div className={s.sequenceHeader}>TEE Node</div>
+        <div className={s.sequenceHeader}>{t("e2eHeaderApp")}</div>
+        <div className={s.sequenceHeader}>{t("e2eHeaderTee")}</div>
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>1. Look up TEE public key</div>
-          from on-chain GlobalConfig
+          <div className={s.sequenceCellLabel}>{t("e2eStep1Label")}</div>
+          {t("e2eStep1Desc")}
         </div>
         <div className={s.sequenceCell} />
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>2. Key exchange</div>
-          Ephemeral ECDH &rarr; shared secret (forward secrecy)
+          <div className={s.sequenceCellLabel}>{t("e2eStep2Label")}</div>
+          {t("e2eStep2Desc")}
         </div>
         <div className={s.sequenceCell} />
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>3. Derive directional keys</div>
-          Separate keys for app&rarr;TEE and TEE&rarr;app
+          <div className={s.sequenceCellLabel}>{t("e2eStep3Label")}</div>
+          {t("e2eStep3Desc")}
         </div>
         <div className={s.sequenceCell} />
 
-        <div className={s.sequenceArrow}>
-          4. Encrypted content &rarr;
-        </div>
+        <div className={s.sequenceArrow}>{t("e2eArrow1")}</div>
 
         <div className={s.sequenceCell} />
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>5. Process inside TEE</div>
-          Decrypt, verify C2PA, run processors, sign results
+          <div className={s.sequenceCellLabel}>{t("e2eStep5Label")}</div>
+          {t("e2eStep5Desc")}
         </div>
 
-        <div className={s.sequenceArrow}>
-          &larr; 6. Encrypted results
-        </div>
+        <div className={s.sequenceArrow}>{t("e2eArrow2")}</div>
 
         <div className={s.sequenceCell}>
-          <div className={s.sequenceCellLabel}>7. Decrypt locally</div>
+          <div className={s.sequenceCellLabel}>{t("e2eStep7Label")}</div>
         </div>
         <div className={s.sequenceCell} />
       </div>
@@ -110,7 +106,7 @@ export default async function TitleProtocolPage() {
 
       <table className={s.table}>
         <thead>
-          <tr><th>signer_org</th><th>processor_ids</th></tr>
+          <tr><th>{t("processorTableOrg")}</th><th>{t("processorTableIds")}</th></tr>
         </thead>
         <tbody>
           {PROCESSORS.map(({ org, ids }) => (
@@ -122,7 +118,7 @@ export default async function TitleProtocolPage() {
             </tr>
           ))}
           <tr>
-            <td>(any, video)</td>
+            <td>{t("processorAnyVideo")}</td>
             <td>
               <code className={s.code}>image-pdq</code> → <code className={s.code}>video-vpdq</code>
             </td>
