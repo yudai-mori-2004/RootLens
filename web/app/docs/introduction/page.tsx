@@ -1,8 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import s from "../../../components/docs/docs.module.css";
 import DocsNav from "../../../components/docs/DocsNav";
+import DocsAccordion from "../../../components/docs/DocsAccordion";
 import GapDiagram from "../../../components/lp/GapDiagram";
-import TechToggle from "../../../components/lp/TechToggle";
 
 export const metadata = {
   title: "Introduction",
@@ -76,16 +76,16 @@ export default async function DocsIntroduction() {
         ))}
       </ol>
 
-      <TechToggle title={tTp("techDetails.title")}>
+      <DocsAccordion title={tTp("techDetails.title")}>
         <div>
           {techItems.map((key) => (
-            <div key={key} style={{ padding: "12px 0", borderBottom: "1px solid var(--docs-border, #d8d8d4)" }}>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, fontFamily: "var(--font-lp-mono, monospace)" }}>{tTp(`techDetails.${key}.label`)}</div>
-              <div style={{ fontSize: "0.85rem", lineHeight: 1.7, color: "var(--docs-text-secondary, #4a4e54)", marginTop: 4 }}>{tTp(`techDetails.${key}.text`)}</div>
+            <div key={key} className={s.accordionItem}>
+              <div className={s.accordionItemLabel}>{tTp(`techDetails.${key}.label`)}</div>
+              <div className={s.accordionItemText}>{tTp(`techDetails.${key}.text`)}</div>
             </div>
           ))}
         </div>
-      </TechToggle>
+      </DocsAccordion>
 
       <p className={s.p} style={{ marginTop: 24 }}>
         <a href="/docs/trust-model" className={s.link}>{tTp("docsLink")}</a>
