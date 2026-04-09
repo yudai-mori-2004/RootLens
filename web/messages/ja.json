@@ -707,7 +707,14 @@
       "appFlowNote2": "センサーからTEEまでの経路はOSを経由します",
       "pkiTreeRootSub": "AWS KMS, 有効期間20年",
       "pkiTreeDeviceCert": "Device Certificate",
-      "pkiTreeDeviceSub": "90日, TEE公開鍵"
+      "pkiTreeDeviceSub": "90日, TEE公開鍵",
+      "hwFlowSensorDesc": "光をデジタルデータに変換",
+      "hwFlowProcessingDesc": "ノイズ除去、HDR合成などを処理",
+      "hwFlowChipDesc": "取り出せない鍵で処理済み画像に署名",
+      "hwFlowSigDesc": "来歴データが画像に埋め込まれる",
+      "appFlowCameraDesc": "OSのカメラAPIから撮影データを取得",
+      "appFlowTeeDesc": "TEE内の鍵で署名。鍵はOSからもアクセス不可",
+      "appFlowSigDesc": "来歴データが画像に埋め込まれる"
     },
     "titleProtocol": {
       "title": "Title Protocol",

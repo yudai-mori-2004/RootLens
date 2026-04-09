@@ -707,7 +707,14 @@
       "appFlowNote2": "Sensor-to-TEE path goes through the OS",
       "pkiTreeRootSub": "AWS KMS, 20-year validity",
       "pkiTreeDeviceCert": "Device Certificate",
-      "pkiTreeDeviceSub": "90-day, TEE public key"
+      "pkiTreeDeviceSub": "90-day, TEE public key",
+      "hwFlowSensorDesc": "Converts light to digital data",
+      "hwFlowProcessingDesc": "Noise reduction, HDR stacking, etc.",
+      "hwFlowChipDesc": "Signs the processed image with a key that cannot be extracted",
+      "hwFlowSigDesc": "Provenance data embedded in the image",
+      "appFlowCameraDesc": "Captures image data via OS camera API",
+      "appFlowTeeDesc": "Signs with a key inside the TEE. Even the OS cannot access it",
+      "appFlowSigDesc": "Provenance data embedded in the image"
     },
     "titleProtocol": {
       "title": "Title Protocol",

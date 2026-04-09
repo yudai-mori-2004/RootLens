@@ -29,20 +29,22 @@ export default async function ContentOriginsPage() {
       <div className={s.flow}>
         <div className={s.flowNode}>
           <div className={s.flowNodeLabel}>{t("hwFlowSensor")}</div>
+          <div className={s.flowNodeSub}>{t("hwFlowSensorDesc")}</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
           <div className={s.flowNodeLabel}>{t("hwFlowProcessing")}</div>
-          <div className={s.flowNodeSub}>ISP</div>
+          <div className={s.flowNodeSub}>{t("hwFlowProcessingDesc")}</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
           <div className={s.flowNodeLabel}>{t("hwFlowChip")}</div>
-          <div className={s.flowNodeSub}>{t("hwFlowChipSub")}</div>
+          <div className={s.flowNodeSub}>{t("hwFlowChipDesc")}</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
           <div className={s.flowNodeLabel}>{t("hwFlowSig")}</div>
+          <div className={s.flowNodeSub}>{t("hwFlowSigDesc")}</div>
         </div>
       </div>
       <p className={s.flowNote}>{t("hwFlowNote")}</p>
@@ -76,16 +78,17 @@ export default async function ContentOriginsPage() {
       <div className={s.flow}>
         <div className={s.flowNode}>
           <div className={s.flowNodeLabel}>{t("appFlowCamera")}</div>
-          <div className={s.flowNodeSub}>OS</div>
+          <div className={s.flowNodeSub}>{t("appFlowCameraDesc")}</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
           <div className={s.flowNodeLabel}>TEE</div>
-          <div className={s.flowNodeSub}>Secure Enclave / StrongBox</div>
+          <div className={s.flowNodeSub}>{t("appFlowTeeDesc")}</div>
         </div>
         <div className={s.flowArrow}>&rarr;</div>
         <div className={s.flowNode}>
           <div className={s.flowNodeLabel}>{t("appFlowSig")}</div>
+          <div className={s.flowNodeSub}>{t("appFlowSigDesc")}</div>
         </div>
       </div>
       <p className={s.flowNote}>
