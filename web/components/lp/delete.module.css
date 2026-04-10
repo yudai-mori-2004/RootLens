@@ -1,0 +1,55 @@
+/* Delete Account page — matches LP tone & spacing */
+
+.stepList {
+  padding-left: 24px;
+  margin: 16px 0 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stepList li {
+  font-family: var(--font-lp-body);
+  font-size: 1rem;
+  line-height: 1.72;
+  color: var(--text-primary);
+}
+
+.dataList {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dataList li {
+  font-family: var(--font-lp-body);
+  font-size: 1rem;
+  line-height: 1.72;
+  color: var(--text-primary);
+  padding-left: 20px;
+  position: relative;
+}
+
+.dataList li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 11px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link:hover {
+  color: #2d5a8a;
+}

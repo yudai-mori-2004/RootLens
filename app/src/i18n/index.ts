@@ -192,6 +192,15 @@ const ja: TranslationDict = {
   'settings.languageJa': '日本語',
   'settings.languageEn': 'English',
 
+  // ── アカウント削除 ──
+  'settings.deleteAccount': 'アカウントを削除',
+  'settings.deleteConfirmTitle': 'アカウントを削除しますか？',
+  'settings.deleteConfirmMessage': '公開ページ・保存データが完全に削除されます。ブロックチェーン上の記録は残ります。',
+  'settings.deleteConfirmFinal': 'この操作は取り消せません。本当に削除しますか？',
+  'settings.deleteConfirmButton': '完全に削除する',
+  'settings.deleteSuccess': 'アカウントを削除しました',
+  'settings.deleteError': 'アカウント削除に失敗しました',
+
   // ── 設定: 端末セキュリティ ──
   'settings.security': 'セキュリティ',
   'settings.teeStatus': 'TEE署名',
@@ -386,6 +395,15 @@ const en: TranslationDict = {
   'settings.language': 'Language',
   'settings.languageJa': '日本語',
   'settings.languageEn': 'English',
+
+  // ── Account deletion ──
+  'settings.deleteAccount': 'Delete account',
+  'settings.deleteConfirmTitle': 'Delete your account?',
+  'settings.deleteConfirmMessage': 'All published pages and stored data will be permanently deleted. Blockchain records will remain.',
+  'settings.deleteConfirmFinal': 'This cannot be undone. Are you sure?',
+  'settings.deleteConfirmButton': 'Delete permanently',
+  'settings.deleteSuccess': 'Account deleted',
+  'settings.deleteError': 'Failed to delete account',
 
   // ── Settings: device security ──
   'settings.security': 'Security',

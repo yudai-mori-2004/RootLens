@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Keyboard,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -28,6 +29,7 @@ export default function SettingsScreen() {
   const { login } = useLogin();
   const loggedIn = isAuthenticated === true;
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -37,6 +39,60 @@ export default function SettingsScreen() {
       console.warn('[Settings] logout error:', e);
     }
     setLoggingOut(false);
+  };
+
+  const handleDeleteAccount = () => {
+    // 2段階確認
+    Alert.alert(
+      t('settings.deleteConfirmTitle'),
+      t('settings.deleteConfirmMessage'),
+      [
+        { text: t('editTool.cancel'), style: 'cancel' },
+        {
+          text: t('settings.deleteConfirmButton'),
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              t('settings.deleteConfirmFinal'),
+              '',
+              [
+                { text: t('editTool.cancel'), style: 'cancel' },
+                {
+                  text: t('settings.deleteConfirmButton'),
+                  style: 'destructive',
+                  onPress: executeDeleteAccount,
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
+  const executeDeleteAccount = async () => {
+    if (!solanaAddress) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        'https://www.rootlens.io/api/v1/delete-account',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: solanaAddress }),
+        },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      await logout();
+      Alert.alert(t('settings.deleteSuccess'));
+    } catch (e: any) {
+      Alert.alert(t('settings.deleteError'), e?.message || String(e));
+    } finally {
+      setDeleting(false);
+    }
   };
   const [camSettings, setCamSettings] = useState<CameraSettings | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -227,22 +283,34 @@ export default function SettingsScreen() {
 
       {/* ログイン / ログアウト */}
       {(loggedIn || solanaAddress) ? (
-        <TouchableOpacity
-          style={[styles.logoutButton, loggingOut && { opacity: 0.5 }]}
-          onPress={handleLogout}
-          disabled={loggingOut}
-        >
-          {loggingOut ? (
-            <ActivityIndicator size="small" color={colors.error} />
-          ) : (
-            <Text style={styles.logoutText}>{t('settings.logout')}</Text>
-          )}
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity
+            style={[styles.logoutButton, loggingOut && { opacity: 0.5 }]}
+            onPress={handleLogout}
+            disabled={loggingOut || deleting}
+          >
+            {loggingOut ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Text style={styles.logoutText}>{t('settings.logout')}</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.deleteAccountButton, deleting && { opacity: 0.5 }]}
+            onPress={handleDeleteAccount}
+            disabled={loggingOut || deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Text style={styles.deleteAccountText}>{t('settings.deleteAccount')}</Text>
+            )}
+          </TouchableOpacity>
+        </>
       ) : (
         <TouchableOpacity
           style={styles.loginButton}
           onPress={() => {
-            // RegistrationScreenと同じPrivy loginを呼ぶ
             login({ loginMethods: ['google', 'email'] }).catch(() => {});
           }}
         >
@@ -402,6 +470,16 @@ const styles = StyleSheet.create({
   logoutText: {
     ...typography.body,
     color: colors.error,
+  },
+  deleteAccountButton: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  deleteAccountText: {
+    ...typography.caption,
+    color: colors.textHint,
   },
   saveButton: {
     marginHorizontal: spacing.lg,
