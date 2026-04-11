@@ -67,8 +67,6 @@ export default function RegistrationScreen() {
   }, [navigation, signedUris]);
 
   const handleRegister = async () => {
-    console.log('[Reg] isReady:', isReady, 'isAuthenticated:', isAuthenticated, 'walletAddress:', walletAddress);
-
     // Privy初期化を待つ
     if (!isReady) {
       setPhase('waiting-wallet');

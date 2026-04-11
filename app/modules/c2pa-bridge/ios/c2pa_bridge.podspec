@@ -18,11 +18,16 @@ Pod::Spec.new do |s|
     'LIBRARY_SEARCH_PATHS' => '"${PODS_TARGET_SRCROOT}/lib"',
   }
 
+  # Expose C2paBridgeFFI modulemap to the main app target
+  s.user_target_xcconfig = {
+    'SWIFT_INCLUDE_PATHS' => '"${PODS_ROOT}/../../modules/c2pa-bridge/ios"',
+  }
+
   s.vendored_libraries = 'lib/libc2pa_rs.a'
   s.preserve_paths = 'c2pa_bridge.h', 'module.modulemap', 'lib/libc2pa_rs_device.a', 'lib/libc2pa_rs_sim.a'
   s.frameworks = 'Photos'
 
-  # シミュレータ / 実機でリンクする .a を切り替える
+  # Swap device/simulator static library at build time
   s.script_phase = {
     :name => 'Select c2pa_rs for SDK',
     :script => <<~SCRIPT,
