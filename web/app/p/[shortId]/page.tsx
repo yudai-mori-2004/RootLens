@@ -4,7 +4,8 @@
  */
 
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, getTranslations } from "next-intl/server";
 import { resolvePageMeta } from "@/lib/data";
 import ContentPage from "@/components/ContentPage";
 
@@ -47,7 +48,15 @@ export default async function ContentPageRoute({ params }: Props) {
     return <NotFound />;
   }
 
-  return <ContentPage page={page} />;
+  const messages = await getMessages();
+  const m = messages as { content?: unknown; field?: unknown; footer?: unknown };
+  const clientMessages = { content: m.content, field: m.field, footer: m.footer };
+
+  return (
+    <NextIntlClientProvider messages={clientMessages}>
+      <ContentPage page={page} />
+    </NextIntlClientProvider>
+  );
 }
 
 async function NotFound() {
