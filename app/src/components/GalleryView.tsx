@@ -14,7 +14,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList, MediaItem } from '../navigation/types';
+import type { RootStackParamList } from '../navigation/types';
 import { useC2paCache, isTrustedAsset, getSignerLabel } from '../hooks/useC2paCache';
 import { colors, typography, spacing, radii, shadows } from '../theme';
 import { t } from '../i18n';
@@ -93,12 +93,11 @@ export default function GalleryView({ onClose }: GalleryViewProps) {
     const selectedAssets = selected
       .map((id) => assets.find((a) => a.id === id))
       .filter((a): a is MediaLibrary.Asset => a != null);
-    const mediaItems: MediaItem[] = selectedAssets.map((a) => ({
-      uri: a.uri,
-      type: a.mediaType === 'video' ? 'video' as const : 'image' as const,
-    }));
-    if (mediaItems.length > 0) {
-      navigation.navigate('Edit', { mediaItems });
+    // v0.1.1: EditScreen 撤去 — カメラロール選択は Registration に直結。
+    // 選択ファイルが既に C2PA 署名済みかどうかの判定は Task 05 で扱う (Registration 側)。
+    const uris = selectedAssets.map((a) => a.uri);
+    if (uris.length > 0) {
+      navigation.navigate('Registration', { signedUris: uris });
       setSelected([]);
     }
   };

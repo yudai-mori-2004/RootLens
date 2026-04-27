@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- v0.1.1 Task 02: 抽象センサー層 -->
+  <!-- Camera は app 側 manifest で既に android.permission.CAMERA を宣言済み (Phase 5 で確認) -->
+
+  <!-- Phase 3 で IMU 200Hz 超 sampling 用に必要 (Android 12+) -->
+  <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+
+</manifest>

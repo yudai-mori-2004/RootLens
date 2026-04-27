@@ -40,8 +40,14 @@ app/dev-certs/
 # Native build artifacts
 native/c2pa-bridge/target/
 
+# Progress deck (local only)
+progress
+
 # Misc
 *.tsbuildinfo
 .expo/
 native/jarosz-wasm/target/
 .claude
+
+# Sensor session module build artifacts
+app/modules/sensor-session/android/build/

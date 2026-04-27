@@ -16,7 +16,6 @@ export type RootStackParamList = {
   Main: undefined;
   Camera: undefined;
   CameraGallery: undefined;
-  Edit: { mediaItems: MediaItem[] };
   Publishing: { signedUris: string[]; address: string };
   Preview: { contentIds: string[]; thumbnailUrl?: string };
   Registration: { signedUris: string[] };

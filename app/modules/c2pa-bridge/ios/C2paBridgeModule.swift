@@ -21,9 +21,12 @@ public class C2paBridgeModule: Module {
   public func definition() -> ModuleDefinition {
     Name("C2paBridge")
 
-    AsyncFunction("signContent") { (imagePath: String, promise: Promise) in
+    // v0.1.1: signContent は assertions: [{label, data}, ...] を受け取り、
+    //         c2pa-bridge に JSON 配列として渡す。c2pa.actions.created と並ぶ追加 assertion になる。
+    //         assertions が省略されるとレガシー (assertion なし) で署名する。
+    AsyncFunction("signContent") { (imagePath: String, assertions: [Any]?, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
-        NSLog("[C2paBridge] signContent called with: \(imagePath)")
+        NSLog("[C2paBridge] signContent called with: \(imagePath), assertions=\(assertions?.count ?? 0)")
 
         Self.resolveToFile(imagePath) { inputPath in
           guard let inputPath = inputPath else {
@@ -38,10 +41,23 @@ public class C2paBridgeModule: Module {
           let ext = (inputPath as NSString).pathExtension.isEmpty ? "jpg" : (inputPath as NSString).pathExtension
           let outputPath = NSTemporaryDirectory() + "c2pa_signed_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
 
+          // assertions を JSON 文字列にシリアライズ (nil または空配列なら送らない)
+          var assertionsJson: String? = nil
+          if let arr = assertions, !arr.isEmpty {
+            do {
+              let data = try JSONSerialization.data(withJSONObject: arr, options: [])
+              assertionsJson = String(data: data, encoding: .utf8)
+            } catch {
+              NSLog("[C2paBridge] assertions serialization failed: \(error)")
+              promise.reject("ASSERTIONS_ERROR", "assertions のシリアライズに失敗: \(error.localizedDescription)")
+              return
+            }
+          }
+
           // TEE証明書があればTEE署名
           // レガシーPEM署名はDEBUGビルドでのみ許可（§4.6）
           if Self.hasStoredCertificate() {
-            let result = Self.signWithTee(inputPath: inputPath, outputPath: outputPath)
+            let result = Self.signWithTee(inputPath: inputPath, outputPath: outputPath, assertionsJson: assertionsJson)
             if result == 0 {
               let outSize = (try? FileManager.default.attributesOfItem(atPath: outputPath)[.size] as? Int) ?? 0
               NSLog("[C2paBridge] TEE sign success: \(outputPath) (\(outSize) bytes)")
@@ -585,7 +601,8 @@ public class C2paBridgeModule: Module {
   }
 
   /// TEE署名でC2PAマニフェストを付与 (§4.6)
-  private static func signWithTee(inputPath: String, outputPath: String) -> Int32 {
+  /// v0.1.1: assertionsJson (任意 assertion の JSON 配列) を受け取り、c2pa-bridge に渡す。
+  private static func signWithTee(inputPath: String, outputPath: String, assertionsJson: String?) -> Int32 {
     guard let privateKey = loadTeePrivateKey() else {
       NSLog("[C2paBridge] TEE private key not found")
       return -10
@@ -618,7 +635,8 @@ public class C2paBridgeModule: Module {
           certCount,
           teeSignCallbackFn,
           keyPtr,
-          tsaUrl.cString(using: .utf8)
+          tsaUrl.cString(using: .utf8),
+          assertionsJson?.cString(using: .utf8)
         )
       }
     }

@@ -7,94 +7,77 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
-  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
-import { signContent } from '../native/c2paBridge';
+import { signContent, type C2paAssertion } from '../native/c2paBridge';
 import { saveToGallery } from '../utils/saveMedia';
-import { colors, typography, spacing, radii } from '../theme';
+import { colors, spacing } from '../theme';
 import { t } from '../i18n';
-import { loadCameraSettings, type CameraSettings } from '../store/cameraSettings';
+import { SensorPreviewView } from '../components/SensorPreviewView';
+import {
+  buildAssertionsFromResults,
+  findCapturedPhotoPath,
+  getDefaultSensorSession,
+  makeStaticPhotoWindow,
+  startVideoStream,
+  stopVideoStream,
+} from '../sensors/captureFlow';
+import type { StreamHandle } from '../sensors/types';
+import { nativeSwitchCamera } from '../native/sensorSession';
 
-// 仕様書 §3.4 カメラ
+// v0.1.1: Plan C 撮影スタック (AVCaptureSession / Camera2 を独自に駆動)。
+// 旧 expo-camera の CameraView は撤去。flash/timer/zoom/grid/mirror 等の UX は
+// Task 05 で SensorSession の Camera ISensor のプロパティとして再実装する。
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type CameraMode = 'photo' | 'video';
-type FlashMode = 'off' | 'on' | 'auto';
-type TimerMode = 0 | 3 | 10;
-
-const FLASH_CYCLE: FlashMode[] = ['off', 'on', 'auto'];
-const FLASH_ICONS: Record<FlashMode, string> = {
-  off: 'flash-off-outline',
-  on: 'flash-outline',
-  auto: 'flash-outline',
-};
-const FLASH_LABELS: Record<FlashMode, string> = {
-  off: 'OFF',
-  on: 'ON',
-  auto: 'AUTO',
-};
 
 export default function CameraScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
-  const cameraRef = useRef<CameraView>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
-  const [facing, setFacing] = useState<'front' | 'back'>('back');
-  const [flash, setFlash] = useState<FlashMode>('off');
-  const [mode, setMode] = useState<CameraMode>('photo');
+
   const [capturing, setCapturing] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
   const [signingCount, setSigningCount] = useState(0);
-  const [zoom, setZoom] = useState(0);
-
-  // 新機能
-  const [showGrid, setShowGrid] = useState(false);
-  const [timer, setTimer] = useState<TimerMode>(0);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [mirror, setMirror] = useState(false);
-  const [shutterSound, setShutterSound] = useState(false);
-
-  // 動画録画状態
-  const [recording, setRecording] = useState(false);
-  const [recordDuration, setRecordDuration] = useState(0);
-  const recordTimer = useRef<ReturnType<typeof setInterval>>();
-  const shutterScale = useRef(new Animated.Value(1)).current;
   const [lastAssetUri, setLastAssetUri] = useState<string | null>(null);
+  const shutterScale = useRef(new Animated.Value(1)).current;
 
-  // 設定読み込み（カメラが開くたびに最新を取得）
-  useFocusEffect(
-    useCallback(() => {
-      loadCameraSettings().then((s) => {
-        setShowGrid(s.grid);
-        setMirror(s.mirror);
-        setShutterSound(s.shutterSound);
-      });
-    }, []),
-  );
+  // 動画モード (Task 03)
+  const [mode, setMode] = useState<'photo' | 'video'>('photo');
+  const [recording, setRecording] = useState(false);
+  const [recordDurationMs, setRecordDurationMs] = useState(0);
+  const streamHandleRef = useRef<StreamHandle | null>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ピンチズーム
-  const lastPinchDistance = useRef<number | null>(null);
-  const handleTouchMove = useCallback((e: any) => {
-    if (e.nativeEvent.touches.length === 2) {
-      const [t1, t2] = e.nativeEvent.touches;
-      const dist = Math.hypot(t1.pageX - t2.pageX, t1.pageY - t2.pageY);
-      if (lastPinchDistance.current !== null) {
-        const delta = (dist - lastPinchDistance.current) * 0.002;
-        setZoom((z) => Math.min(1, Math.max(0, z + delta)));
-      }
-      lastPinchDistance.current = dist;
+  // カメラ切替 (Task 05)
+  const [facing, setFacing] = useState<'back' | 'front'>('back');
+  const [switching, setSwitching] = useState(false);
+  const toggleFacing = useCallback(async () => {
+    if (recording || switching) return;
+    const next = facing === 'back' ? 'front' : 'back';
+    setSwitching(true);
+    try {
+      await nativeSwitchCamera(next);
+      setFacing(next);
+    } catch (e) {
+      console.warn('[CameraScreen] switchCamera error:', e);
+    } finally {
+      setSwitching(false);
     }
+  }, [facing, recording, switching]);
+
+  // SensorSession を起動時に lazy 初期化
+  useEffect(() => {
+    getDefaultSensorSession().catch((e) =>
+      console.warn('[CameraScreen] sensor session init error:', e)
+    );
   }, []);
-  const handleTouchEnd = useCallback(() => { lastPinchDistance.current = null; }, []);
 
   const fetchLastAsset = useCallback(async () => {
     try {
@@ -104,36 +87,109 @@ export default function CameraScreen() {
         mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
       });
       setLastAssetUri(result.assets[0]?.uri ?? null);
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { fetchLastAsset(); }, [fetchLastAsset]));
 
-  const allPermissionsGranted =
-    cameraPermission?.granted && micPermission?.granted && mediaPermission?.granted;
+  const allPermissionsGranted = cameraPermission?.granted && mediaPermission?.granted;
 
   const requestAllPermissions = useCallback(async () => {
     await requestCameraPermission();
-    await requestMicPermission();
     await requestMediaPermission();
-  }, [requestCameraPermission, requestMicPermission, requestMediaPermission]);
+  }, [requestCameraPermission, requestMediaPermission]);
 
-  const signAndSave = useCallback(async (photoUri: string) => {
+  // 動画録画開始 / 停止 (Task 03)
+  const startRecording = useCallback(async () => {
+    if (recording) return;
+    try {
+      const handle = await startVideoStream({ lookbackMs: 1000 });
+      streamHandleRef.current = handle;
+      setRecording(true);
+      setRecordDurationMs(0);
+      const t0 = Date.now();
+      recordTimerRef.current = setInterval(() => {
+        setRecordDurationMs(Date.now() - t0);
+      }, 100);
+    } catch (e) {
+      console.warn('[CameraScreen] startRecording error:', e);
+      Alert.alert(t('camera.signErrorTitle'), String(e));
+    }
+  }, [recording]);
+
+  const stopRecording = useCallback(async () => {
+    if (!recording) return;
+    const handle = streamHandleRef.current;
+    if (!handle) return;
+    streamHandleRef.current = null;
+    if (recordTimerRef.current) {
+      clearInterval(recordTimerRef.current);
+      recordTimerRef.current = null;
+    }
+    setRecording(false);
     setSigningCount((c) => c + 1);
     try {
-      const signedPath = await signContent(photoUri);
+      const { videoPath, assertions } = await stopVideoStream(handle);
+      const signedPath = await signContent(videoPath, assertions);
       const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
       await saveToGallery(signedUri);
       fetchLastAsset();
     } catch (e) {
-      console.warn('本物証明エラー:', e);
+      console.warn('[CameraScreen] stopRecording+sign error:', e);
       Alert.alert(t('camera.signErrorTitle'), t('camera.signError'));
     } finally {
       setSigningCount((c) => c - 1);
+      setRecordDurationMs(0);
     }
-  }, [fetchLastAsset]);
+  }, [recording, fetchLastAsset]);
 
-  if (!cameraPermission || !micPermission || !mediaPermission) {
+  // 撮影 + 署名フロー (静止画)
+  const captureAndSign = useCallback(async () => {
+    if (capturing) return;
+    setCapturing(true);
+    setSigningCount((c) => c + 1);
+
+    Animated.sequence([
+      Animated.timing(shutterScale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
+      Animated.timing(shutterScale, { toValue: 1, duration: 80, useNativeDriver: true }),
+    ]).start();
+
+    try {
+      const session = await getDefaultSensorSession();
+      const window = makeStaticPhotoWindow(1000); // ±1秒の IMU lookback
+      const sessionResult = await session.capture(window);
+
+      const photoPath = findCapturedPhotoPath(sessionResult.results);
+      if (!photoPath) {
+        const cameraResult = sessionResult.results.find((r) => r.api_path.includes('camera'));
+        const reason =
+          cameraResult?.unavailable_reason ??
+          (cameraResult ? 'camera result has no output_path' : 'no camera result');
+        throw new Error(`camera capture failed: ${reason}`);
+      }
+
+      const assertions: C2paAssertion[] = buildAssertionsFromResults(sessionResult.results, {
+        startNs: window.startNs,
+        durationMs: window.durationMs,
+        lookbackMs: window.lookbackMs ?? 0,
+      });
+
+      const signedPath = await signContent(photoPath, assertions);
+      const signedUri = signedPath.startsWith('file://') ? signedPath : `file://${signedPath}`;
+      await saveToGallery(signedUri);
+      fetchLastAsset();
+    } catch (e) {
+      console.warn('[CameraScreen] capture+sign error:', e);
+      Alert.alert(t('camera.signErrorTitle'), t('camera.signError'));
+    } finally {
+      setSigningCount((c) => c - 1);
+      setCapturing(false);
+    }
+  }, [capturing, fetchLastAsset, shutterScale]);
+
+  if (!cameraPermission || !mediaPermission) {
     return <View style={styles.container} />;
   }
 
@@ -159,197 +215,88 @@ export default function CameraScreen() {
     );
   }
 
-  const doCapture = async () => {
-    if (!cameraRef.current || capturing || !cameraReady) return;
-    setCapturing(true);
-
-    Animated.sequence([
-      Animated.timing(shutterScale, { toValue: 0.85, duration: 80, useNativeDriver: true }),
-      Animated.timing(shutterScale, { toValue: 1, duration: 80, useNativeDriver: true }),
-    ]).start();
-
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
-        skipProcessing: Platform.OS === 'android',
-        shutterSound: shutterSound,
-      });
-      if (photo) signAndSave(photo.uri);
-    } catch (e) {
-      console.warn('撮影エラー:', e);
-    } finally {
-      setCapturing(false);
-    }
-  };
-
-  const takePicture = () => {
-    if (timer === 0) {
-      doCapture();
-      return;
-    }
-    // タイマー撮影
-    let remaining = timer;
-    setCountdown(remaining);
-    const interval = setInterval(() => {
-      remaining -= 1;
-      if (remaining <= 0) {
-        clearInterval(interval);
-        setCountdown(null);
-        doCapture();
-      } else {
-        setCountdown(remaining);
-      }
-    }, 1000);
-  };
-
-  const toggleRecording = async () => {
-    if (!cameraRef.current || !cameraReady) return;
-    if (recording) { cameraRef.current.stopRecording(); return; }
-
-    setRecording(true);
-    setRecordDuration(0);
-    recordTimer.current = setInterval(() => setRecordDuration((d) => d + 1), 1000);
-
-    try {
-      const video = await cameraRef.current.recordAsync();
-      if (video) signAndSave(video.uri);
-    } catch (e) {
-      console.warn('録画エラー:', e);
-    } finally {
-      setRecording(false);
-      if (recordTimer.current) clearInterval(recordTimer.current);
-      setRecordDuration(0);
-    }
-  };
-
-  const formatDuration = (sec: number) => {
-    const m = Math.floor(sec / 60).toString().padStart(2, '0');
-    const s = (sec % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
-
-  const handleShutter = () => {
-    if (mode === 'photo') takePicture();
-    else toggleRecording();
-  };
-
-  const cycleFlash = () => {
-    const idx = FLASH_CYCLE.indexOf(flash);
-    setFlash(FLASH_CYCLE[(idx + 1) % FLASH_CYCLE.length]);
-  };
-
-  const cycleTimer = () => {
-    const cycle: TimerMode[] = [0, 3, 10];
-    const idx = cycle.indexOf(timer);
-    setTimer(cycle[(idx + 1) % cycle.length]);
-  };
-
   return (
     <View style={styles.container}>
       {/* トップバー */}
       <View style={[styles.topBar, { paddingTop: insets.top }]}>
-        <TouchableOpacity style={styles.topButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={28} color={colors.darkText} />
+        <TouchableOpacity style={styles.topButton} onPress={() => navigation.goBack()} disabled={recording}>
+          <Ionicons name="close" size={28} color={recording ? colors.darkTextSecondary : colors.darkText} />
         </TouchableOpacity>
 
         {recording ? (
-          <View style={styles.recordingIndicator}>
-            <View style={styles.recordingDot} />
-            <Text style={styles.recordingText}>{formatDuration(recordDuration)}</Text>
+          <View style={styles.recIndicator}>
+            <View style={styles.recDot} />
+            <Text style={styles.recText}>
+              {(() => {
+                const totalSec = Math.floor(recordDurationMs / 1000);
+                const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+                const s = (totalSec % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+              })()}
+            </Text>
           </View>
         ) : (
-          <View style={styles.topCenter}>
-            {/* フラッシュ */}
-            <TouchableOpacity style={styles.topChip} onPress={cycleFlash}>
-              <Ionicons name={FLASH_ICONS[flash] as any} size={16} color={flash === 'off' ? colors.darkTextSecondary : colors.darkText} />
-              <Text style={[styles.topChipText, flash === 'off' && styles.topChipTextDim]}>{FLASH_LABELS[flash]}</Text>
-            </TouchableOpacity>
-
-            {/* タイマー */}
-            <TouchableOpacity style={styles.topChip} onPress={cycleTimer}>
-              <Ionicons name="timer-outline" size={16} color={timer === 0 ? colors.darkTextSecondary : colors.darkText} />
-              <Text style={[styles.topChipText, timer === 0 && styles.topChipTextDim]}>
-                {timer === 0 ? t('camera.timerOff') : `${timer}s`}
-              </Text>
-            </TouchableOpacity>
-
-            {/* グリッド */}
-            <TouchableOpacity style={styles.topChip} onPress={() => setShowGrid(!showGrid)}>
-              <Ionicons name="grid-outline" size={16} color={showGrid ? colors.darkText : colors.darkTextSecondary} />
-            </TouchableOpacity>
-          </View>
+          <View style={{ flex: 1 }} />
         )}
 
-        <TouchableOpacity style={styles.topButton} onPress={() => setFacing(facing === 'back' ? 'front' : 'back')}>
-          <Ionicons name="camera-reverse-outline" size={24} color={colors.darkText} />
+        <TouchableOpacity
+          style={styles.topButton}
+          onPress={toggleFacing}
+          disabled={recording || switching}
+        >
+          <Ionicons
+            name="camera-reverse-outline"
+            size={26}
+            color={(recording || switching) ? colors.darkTextSecondary : colors.darkText}
+          />
         </TouchableOpacity>
       </View>
 
-      {/* カメラプレビュー */}
-      <View
-        style={styles.cameraContainer}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      >
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing={facing}
-          flash={flash}
-          zoom={zoom}
-          mirror={facing === 'front' ? mirror : false}
-          mode={mode === 'video' ? 'video' : 'picture'}
-          onCameraReady={() => setCameraReady(true)}
-        />
-
-        {/* グリッドオーバーレイ */}
-        {showGrid && (
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <View style={[styles.gridLine, styles.gridH, { top: '33.33%' }]} />
-            <View style={[styles.gridLine, styles.gridH, { top: '66.66%' }]} />
-            <View style={[styles.gridLine, styles.gridV, { left: '33.33%' }]} />
-            <View style={[styles.gridLine, styles.gridV, { left: '66.66%' }]} />
-          </View>
-        )}
-
-        {/* カウントダウン */}
-        {countdown !== null && (
-          <View style={styles.countdownOverlay}>
-            <Text style={styles.countdownText}>{countdown}</Text>
-          </View>
-        )}
+      {/* カメラプレビュー (Plan C ネイティブビュー) */}
+      <View style={styles.cameraContainer}>
+        <SensorPreviewView style={styles.camera} />
 
         {/* 署名インジケーター */}
-        {signingCount > 0 && !recording && (
+        {signingCount > 0 && (
           <View style={styles.signingIndicator}>
             <Ionicons name="checkmark-circle" size={14} color={colors.accent} />
-            <Text style={styles.signingText}>{t('camera.signing')} ({signingCount})</Text>
-          </View>
-        )}
-
-        {/* ズームレベル */}
-        {zoom > 0.01 && (
-          <View style={styles.zoomBadge}>
-            <Text style={styles.zoomText}>{(1 + zoom * 9).toFixed(1)}x</Text>
+            <Text style={styles.signingText}>
+              {t('camera.signing')} ({signingCount})
+            </Text>
           </View>
         )}
       </View>
 
       {/* ボトム */}
       <View style={[styles.bottomArea, { paddingBottom: insets.bottom + 12 }]}>
-        <View style={styles.modeSelector}>
-          <TouchableOpacity style={styles.modeButton} onPress={() => setMode('photo')}>
-            <Text style={[styles.modeText, mode === 'photo' && styles.modeTextActive]}>{t('camera.photo')}</Text>
-            {mode === 'photo' && <View style={styles.modeIndicator} />}
+        {/* モード切替 (録画中は無効) */}
+        <View style={styles.modeRow}>
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'photo' && styles.modeButtonActive]}
+            onPress={() => !recording && setMode('photo')}
+            disabled={recording}
+          >
+            <Text style={[styles.modeText, mode === 'photo' && styles.modeTextActive]}>
+              {t('camera.photo')}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.modeButton} onPress={() => setMode('video')}>
-            <Text style={[styles.modeText, mode === 'video' && styles.modeTextActive]}>{t('camera.video')}</Text>
-            {mode === 'video' && <View style={styles.modeIndicator} />}
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'video' && styles.modeButtonActive]}
+            onPress={() => !recording && setMode('video')}
+            disabled={recording}
+          >
+            <Text style={[styles.modeText, mode === 'video' && styles.modeTextActive]}>
+              {t('camera.video')}
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.shutterRow}>
-          <TouchableOpacity style={styles.galleryThumb} onPress={() => navigation.navigate('CameraGallery')}>
+          <TouchableOpacity
+            style={styles.galleryThumb}
+            onPress={() => navigation.navigate('CameraGallery')}
+            disabled={recording}
+          >
             {lastAssetUri ? (
               <Image source={{ uri: lastAssetUri }} style={styles.galleryThumbImage} />
             ) : (
@@ -363,18 +310,24 @@ export default function CameraScreen() {
             <TouchableOpacity
               style={[
                 styles.shutterOuter,
-                !cameraReady && styles.shutterDisabled,
+                capturing && styles.shutterDisabled,
                 recording && styles.shutterRecording,
               ]}
-              onPress={handleShutter}
+              onPress={() => {
+                if (mode === 'photo') captureAndSign();
+                else if (recording) stopRecording();
+                else startRecording();
+              }}
               activeOpacity={0.7}
-              disabled={!cameraReady || countdown !== null}
+              disabled={capturing && !recording}
             >
-              <View style={[
-                styles.shutterInner,
-                mode === 'video' && styles.shutterInnerVideo,
-                recording && styles.shutterInnerStop,
-              ]} />
+              <View
+                style={[
+                  styles.shutterInner,
+                  mode === 'video' && !recording && styles.shutterInnerVideo,
+                  recording && styles.shutterInnerStop,
+                ]}
+              />
             </TouchableOpacity>
           </Animated.View>
 
@@ -390,138 +343,124 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   cameraContainer: { flex: 1, overflow: 'hidden' },
   camera: { flex: 1 },
-  // トップバー
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.darkBg,
   },
-  topCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  topButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.sm,
-  },
-  topChipText: {
-    color: colors.darkText,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  topChipTextDim: {
-    color: colors.darkTextSecondary,
-  },
+  topButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   closeButtonTop: {
     position: 'absolute',
     top: spacing.lg,
-    left: spacing.lg,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.overlayMedium,
+    right: spacing.lg,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
-  // パーミッション
+  bottomArea: {
+    backgroundColor: colors.darkBg,
+    paddingTop: spacing.md,
+  },
+  shutterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+  },
+  shutterOuter: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 4,
+    borderColor: colors.darkText,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shutterInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.darkText,
+  },
+  shutterInnerVideo: { backgroundColor: colors.recording },
+  shutterInnerStop: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: colors.recording,
+  },
+  shutterRecording: { borderColor: colors.recording },
+  shutterDisabled: { opacity: 0.5 },
+  modeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  modeButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 16,
+  },
+  modeButtonActive: { backgroundColor: 'rgba(255,255,255,0.15)' },
+  modeText: { color: colors.darkTextSecondary, fontSize: 13, fontWeight: '500' },
+  modeTextActive: { color: colors.darkText, fontWeight: '600' },
+  recIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
+    gap: 6,
+  },
+  recDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.recording,
+  },
+  recText: { color: colors.darkText, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  galleryThumb: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.overlayWhiteFaint,
+  },
+  galleryThumbImage: { width: '100%', height: '100%' },
+  galleryThumbEmpty: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  signingIndicator: {
+    position: 'absolute',
+    top: spacing.lg,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 12,
+    gap: 6,
+  },
+  signingText: { color: colors.darkText, fontSize: 12, fontWeight: '500' },
   permissionContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     gap: spacing.lg,
   },
-  permissionText: { color: colors.textHint, ...typography.body, textAlign: 'center' },
+  permissionText: { color: colors.darkText, fontSize: 16, textAlign: 'center', lineHeight: 22 },
   permissionButton: {
     backgroundColor: colors.accent,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    borderRadius: radii.md,
-    marginTop: spacing.sm,
+    borderRadius: 24,
+    marginTop: spacing.md,
   },
-  permissionButtonText: { color: colors.white, ...typography.title },
-  // グリッド
-  gridLine: { position: 'absolute', backgroundColor: colors.overlayWhiteGrid },
-  gridH: { left: 0, right: 0, height: StyleSheet.hairlineWidth },
-  gridV: { top: 0, bottom: 0, width: StyleSheet.hairlineWidth },
-  // カウントダウン
-  countdownOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  countdownText: {
-    fontSize: 72,
-    fontWeight: '200',
-    color: colors.darkText,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  // ズームバッジ
-  zoomBadge: {
-    position: 'absolute',
-    top: spacing.sm,
-    alignSelf: 'center',
-    backgroundColor: colors.overlayDark,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.sm,
-  },
-  zoomText: {
-    color: colors.darkText,
-    fontSize: 12,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-  },
-  // 署名インジケーター
-  signingIndicator: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.overlayDark,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.lg,
-    gap: spacing.xs,
-  },
-  signingText: { color: colors.darkText, ...typography.captionMedium },
-  // ボトム
-  bottomArea: { paddingTop: spacing.lg, backgroundColor: colors.darkBg },
-  modeSelector: { flexDirection: 'row', justifyContent: 'center', gap: spacing.xl, marginBottom: spacing.xl },
-  modeButton: { alignItems: 'center', gap: spacing.xs },
-  modeText: { color: colors.overlayWhiteHalf, ...typography.bodyMedium },
-  modeTextActive: { color: colors.darkText },
-  modeIndicator: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.darkText },
-  shutterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: spacing.xxl },
-  galleryThumb: { width: 48, height: 48, borderRadius: radii.sm, overflow: 'hidden' },
-  galleryThumbImage: { width: 48, height: 48, borderRadius: radii.sm, borderWidth: 2, borderColor: colors.overlayWhiteHalf },
-  galleryThumbEmpty: { width: 48, height: 48, borderRadius: radii.sm, backgroundColor: colors.overlayWhite, alignItems: 'center', justifyContent: 'center' },
-  shutterOuter: { width: 80, height: 80, borderRadius: 40, borderWidth: 4, borderColor: colors.darkText, alignItems: 'center', justifyContent: 'center' },
-  shutterDisabled: { opacity: 0.4 },
-  shutterInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: colors.darkText },
-  shutterInnerVideo: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.recording },
-  shutterRecording: { borderColor: colors.recording },
-  shutterInnerStop: { width: 24, height: 24, borderRadius: 4, backgroundColor: colors.recording },
-  recordingIndicator: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.overlayDark, paddingVertical: spacing.sm, paddingHorizontal: 14, borderRadius: radii.lg, gap: spacing.sm },
-  recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.recording },
-  recordingText: { color: colors.darkText, ...typography.bodyMedium, fontVariant: ['tabular-nums'] },
+  permissionButtonText: { color: colors.darkText, fontWeight: '600', fontSize: 14 },
 });

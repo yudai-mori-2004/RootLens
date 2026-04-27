@@ -61,24 +61,15 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
     ): Int
 
     // JNI宣言 (TEEコールバック)
+    // v0.1.1: assertionsJson を追加 (任意 assertion の JSON 配列。null/空文字列なら追加なし)
     private external fun nativeSignImageTee(
         inputPath: String,
         outputPath: String,
         certsDer: ByteArray,
         certSizes: IntArray,
         certCount: Int,
-        tsaUrl: String?
-    ): Int
-
-    // JNI宣言 (TEEコールバック + 親マニフェスト参照)
-    private external fun nativeSignImageTeeWithParent(
-        inputPath: String,
-        outputPath: String,
-        certsDer: ByteArray,
-        certSizes: IntArray,
-        certCount: Int,
         tsaUrl: String?,
-        parentPath: String?
+        assertionsJson: String?
     ): Int
 
     private external fun nativeReadManifest(inputPath: String): String
@@ -354,9 +345,10 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
     }
 
     /**
-     * 保存済みDER証明書を取得し、TEEコールバック経由で署名する内部メソッド
+     * 保存済みDER証明書を取得し、TEEコールバック経由で署名する内部メソッド。
+     * v0.1.1: assertionsJson を c2pa-bridge に渡す (null/空なら追加なし)。
      */
-    private fun signWithTee(inputFile: File, outputFile: File): Int {
+    private fun signWithTee(inputFile: File, outputFile: File, assertionsJson: String?): Int {
         val prefs = reactApplicationContext.getSharedPreferences("rootlens_certs", 0)
         val deviceCertBase64 = prefs.getString("device_cert_der", null)
             ?: throw IllegalStateException("Device certificate not found")
@@ -382,15 +374,20 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             certsDer,
             certSizes,
             3,
-            tsaUrl
+            tsaUrl,
+            assertionsJson
         )
     }
 
+    /**
+     * v0.1.1: assertions ([{label, data}, ...] の配列) を JSON にして c2pa-bridge に渡す。
+     * 配列が null / 空なら追加 assertion なし (c2pa.actions.created のみ)。
+     */
     @ReactMethod
-    fun signContent(imagePath: String, promise: Promise) {
+    fun signContent(imagePath: String, assertions: ReadableArray?, promise: Promise) {
         try {
             val context = reactApplicationContext
-            Log.d(TAG, "signContent called with: $imagePath")
+            Log.d(TAG, "signContent called with: $imagePath, assertions=${assertions?.size() ?: 0}")
 
             // 入力ファイルを実パスに変換（content:// URI対応）
             val inputFile = resolveToFile(imagePath)
@@ -405,6 +402,11 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
             val ext = inputFile.extension.ifEmpty { "jpg" }
             val outputFile = File(context.cacheDir, "c2pa_signed_${System.currentTimeMillis()}.$ext")
 
+            // assertions を JSON 文字列に変換 (null / 空配列なら null を渡す)
+            val assertionsJson: String? = if (assertions != null && assertions.size() > 0) {
+                readableArrayToJsonString(assertions)
+            } else null
+
             // TEE証明書があればTEEコールバック署名
             // レガシーPEM署名はDEBUGビルドでのみ許可（§4.6）
             val prefs = context.getSharedPreferences("rootlens_certs", 0)
@@ -412,9 +414,13 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
 
             val result = if (hasTeeCert) {
                 Log.d(TAG, "Using TEE callback signing")
-                signWithTee(inputFile, outputFile)
+                signWithTee(inputFile, outputFile, assertionsJson)
             } else if (BuildConfig.DEBUG) {
                 Log.d(TAG, "Using legacy PEM signing (dev certs) — DEBUG only")
+                // レガシー PEM 署名は assertion を受け取れないため警告
+                if (assertionsJson != null) {
+                    Log.w(TAG, "legacy PEM signing does not support assertions; they will be ignored")
+                }
                 val certChain = loadAssetAsString("dev-certs/dev-chain.pem")
                 val privateKey = loadAssetAsString("dev-certs/dev-device-key.pem")
                 if (certChain == null || privateKey == null) {
@@ -444,58 +450,46 @@ class C2paBridgeModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    @ReactMethod
-    fun signContentWithParent(imagePath: String, parentPath: String, promise: Promise) {
-        try {
-            val context = reactApplicationContext
-            val inputFile = resolveToFile(imagePath)
-            val parentFile = resolveToFile(parentPath)
-            if (inputFile == null || !inputFile.exists()) {
-                promise.reject("FILE_ERROR", "入力ファイルが見つかりません: $imagePath")
-                return
+    /**
+     * ReadableArray (RN bridge) → org.json で文字列化。
+     * シンプル変換: array/map/primitive のみ対応 (RN ↔ JS で来るのはこの型だけ)。
+     */
+    private fun readableArrayToJsonString(arr: ReadableArray): String =
+        readableToJson(arr).toString()
+
+    private fun readableToJson(value: Any?): Any? = when (value) {
+        is ReadableArray -> {
+            val out = org.json.JSONArray()
+            val sz = value.size()
+            for (i in 0 until sz) {
+                when (value.getType(i)) {
+                    com.facebook.react.bridge.ReadableType.Null -> out.put(JSONObject.NULL)
+                    com.facebook.react.bridge.ReadableType.Boolean -> out.put(value.getBoolean(i))
+                    com.facebook.react.bridge.ReadableType.Number -> out.put(value.getDouble(i))
+                    com.facebook.react.bridge.ReadableType.String -> out.put(value.getString(i))
+                    com.facebook.react.bridge.ReadableType.Map -> out.put(readableToJson(value.getMap(i)))
+                    com.facebook.react.bridge.ReadableType.Array -> out.put(readableToJson(value.getArray(i)))
+                }
             }
-            if (parentFile == null || !parentFile.exists()) {
-                promise.reject("FILE_ERROR", "親ファイルが見つかりません: $parentPath")
-                return
-            }
-
-            val ext = inputFile.extension.ifEmpty { "jpg" }
-            val outputFile = File(context.cacheDir, "c2pa_edited_${System.currentTimeMillis()}.$ext")
-
-            val prefs = context.getSharedPreferences("rootlens_certs", 0)
-            val deviceCertBase64 = prefs.getString("device_cert_der", null)
-                ?: run { promise.reject("CERT_ERROR", "Device Certificate未取得"); return }
-            val intermediateCaBase64 = prefs.getString("intermediate_ca_cert_der", null)
-                ?: run { promise.reject("CERT_ERROR", "Intermediate CA未取得"); return }
-            val rootCaBase64 = prefs.getString("root_ca_cert_der", null)
-                ?: run { promise.reject("CERT_ERROR", "Root CA未取得"); return }
-
-            val deviceCertDer = android.util.Base64.decode(deviceCertBase64, android.util.Base64.NO_WRAP)
-            val intermediateCaDer = android.util.Base64.decode(intermediateCaBase64, android.util.Base64.NO_WRAP)
-            val rootCaDer = android.util.Base64.decode(rootCaBase64, android.util.Base64.NO_WRAP)
-            val certsDer = deviceCertDer + intermediateCaDer + rootCaDer
-            val certSizes = intArrayOf(deviceCertDer.size, intermediateCaDer.size, rootCaDer.size)
-            val tsaUrl = "http://timestamp.digicert.com"
-
-            val result = nativeSignImageTeeWithParent(
-                inputFile.absolutePath,
-                outputFile.absolutePath,
-                certsDer,
-                certSizes,
-                3,
-                tsaUrl,
-                parentFile.absolutePath
-            )
-
-            when (result) {
-                0 -> promise.resolve(outputFile.absolutePath)
-                -1 -> promise.reject("ARG_ERROR", "引数エラー")
-                -2 -> promise.reject("SIGN_ERROR", "署名エラー (code: $result)")
-                else -> promise.reject("UNKNOWN_ERROR", "不明なエラー: $result")
-            }
-        } catch (e: Exception) {
-            promise.reject("EXCEPTION", e.message, e)
+            out
         }
+        is com.facebook.react.bridge.ReadableMap -> {
+            val out = JSONObject()
+            val it = value.keySetIterator()
+            while (it.hasNextKey()) {
+                val k = it.nextKey()
+                when (value.getType(k)) {
+                    com.facebook.react.bridge.ReadableType.Null -> out.put(k, JSONObject.NULL)
+                    com.facebook.react.bridge.ReadableType.Boolean -> out.put(k, value.getBoolean(k))
+                    com.facebook.react.bridge.ReadableType.Number -> out.put(k, value.getDouble(k))
+                    com.facebook.react.bridge.ReadableType.String -> out.put(k, value.getString(k))
+                    com.facebook.react.bridge.ReadableType.Map -> out.put(k, readableToJson(value.getMap(k)))
+                    com.facebook.react.bridge.ReadableType.Array -> out.put(k, readableToJson(value.getArray(k)))
+                }
+            }
+            out
+        }
+        else -> value
     }
 
     @ReactMethod

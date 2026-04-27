@@ -20,6 +20,7 @@ typedef int32_t (*c2pa_sign_fn)(
     void *context
 );
 
+// v0.1.1: assertions_json を追加。with_parent 系は撤廃。
 extern int32_t c2pa_sign_image_tee(
     const char *input_path,
     const char *output_path,
@@ -28,19 +29,8 @@ extern int32_t c2pa_sign_image_tee(
     uint32_t cert_count,
     c2pa_sign_fn sign_fn,
     void *sign_ctx,
-    const char *tsa_url
-);
-
-extern int32_t c2pa_sign_image_tee_with_parent(
-    const char *input_path,
-    const char *output_path,
-    const uint8_t *certs_der,
-    const uint32_t *cert_sizes,
-    uint32_t cert_count,
-    c2pa_sign_fn sign_fn,
-    void *sign_ctx,
     const char *tsa_url,
-    const char *parent_path
+    const char *assertions_json
 );
 
 extern char *c2pa_read_manifest(const char *input_path);
@@ -109,6 +99,7 @@ static int32_t tee_sign_callback(
 
 // --- JNI: TEEコールバック署名 ---
 
+// v0.1.1: assertions_json 引数を追加。c2pa_sign_image_tee_with_parent は撤廃。
 JNIEXPORT jint JNICALL
 Java_io_rootlens_app_C2paBridgeModule_nativeSignImageTee(
     JNIEnv *env,
@@ -118,7 +109,8 @@ Java_io_rootlens_app_C2paBridgeModule_nativeSignImageTee(
     jbyteArray certs_der,
     jintArray cert_sizes,
     jint cert_count,
-    jstring tsa_url
+    jstring tsa_url,
+    jstring assertions_json
 ) {
     const char *input = (*env)->GetStringUTFChars(env, input_path, NULL);
     const char *output = (*env)->GetStringUTFChars(env, output_path, NULL);
@@ -127,6 +119,12 @@ Java_io_rootlens_app_C2paBridgeModule_nativeSignImageTee(
     const char *tsa = NULL;
     if (tsa_url != NULL) {
         tsa = (*env)->GetStringUTFChars(env, tsa_url, NULL);
+    }
+
+    // assertions_json (NULL なら追加なし)
+    const char *aj = NULL;
+    if (assertions_json != NULL) {
+        aj = (*env)->GetStringUTFChars(env, assertions_json, NULL);
     }
 
     // DER証明書バイト列
@@ -148,72 +146,15 @@ Java_io_rootlens_app_C2paBridgeModule_nativeSignImageTee(
         input, output,
         (const uint8_t *)certs_bytes, u_sizes, (uint32_t)cert_count,
         tee_sign_callback, &ctx,
-        tsa
+        tsa,
+        aj
     );
 
     free(u_sizes);
     (*env)->ReleaseIntArrayElements(env, cert_sizes, sizes, JNI_ABORT);
     (*env)->ReleaseByteArrayElements(env, certs_der, certs_bytes, JNI_ABORT);
-    if (tsa != NULL) {
-        (*env)->ReleaseStringUTFChars(env, tsa_url, tsa);
-    }
-    (*env)->ReleaseStringUTFChars(env, output_path, output);
-    (*env)->ReleaseStringUTFChars(env, input_path, input);
-
-    return result;
-}
-
-// --- JNI: TEEコールバック署名（親マニフェスト参照あり） ---
-
-JNIEXPORT jint JNICALL
-Java_io_rootlens_app_C2paBridgeModule_nativeSignImageTeeWithParent(
-    JNIEnv *env,
-    jobject thiz,
-    jstring input_path,
-    jstring output_path,
-    jbyteArray certs_der,
-    jintArray cert_sizes,
-    jint cert_count,
-    jstring tsa_url,
-    jstring parent_path
-) {
-    const char *input = (*env)->GetStringUTFChars(env, input_path, NULL);
-    const char *output = (*env)->GetStringUTFChars(env, output_path, NULL);
-
-    const char *tsa = NULL;
-    if (tsa_url != NULL) {
-        tsa = (*env)->GetStringUTFChars(env, tsa_url, NULL);
-    }
-
-    const char *parent = NULL;
-    if (parent_path != NULL) {
-        parent = (*env)->GetStringUTFChars(env, parent_path, NULL);
-    }
-
-    jbyte *certs_bytes = (*env)->GetByteArrayElements(env, certs_der, NULL);
-    jint *sizes = (*env)->GetIntArrayElements(env, cert_sizes, NULL);
-
-    uint32_t *u_sizes = (uint32_t *)malloc(cert_count * sizeof(uint32_t));
-    for (int i = 0; i < cert_count; i++) {
-        u_sizes[i] = (uint32_t)sizes[i];
-    }
-
-    TeeSignContext ctx;
-    ctx.env = env;
-    ctx.module_ref = thiz;
-
-    int32_t result = c2pa_sign_image_tee_with_parent(
-        input, output,
-        (const uint8_t *)certs_bytes, u_sizes, (uint32_t)cert_count,
-        tee_sign_callback, &ctx,
-        tsa, parent
-    );
-
-    free(u_sizes);
-    (*env)->ReleaseIntArrayElements(env, cert_sizes, sizes, JNI_ABORT);
-    (*env)->ReleaseByteArrayElements(env, certs_der, certs_bytes, JNI_ABORT);
-    if (parent != NULL) {
-        (*env)->ReleaseStringUTFChars(env, parent_path, parent);
+    if (aj != NULL) {
+        (*env)->ReleaseStringUTFChars(env, assertions_json, aj);
     }
     if (tsa != NULL) {
         (*env)->ReleaseStringUTFChars(env, tsa_url, tsa);

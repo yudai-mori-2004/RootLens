@@ -20,6 +20,12 @@ typedef int32_t (*c2pa_sign_fn)(
 
 /**
  * TEEコールバックを使用したC2PA署名（§4.6）
+ *
+ * v0.1.1 で `assertions_json` を追加:
+ *   - ネイティブ層から任意の C2PA assertion (label + data) を JSON 配列で渡し、
+ *     `c2pa.actions` (c2pa.created) と並べて manifest に埋め込む。
+ *   - 形式: `[{"label":"io.rootlens.capture...", "data":{...}}, ...]`
+ *   - NULL または空文字列なら追加なし。
  */
 int32_t c2pa_sign_image_tee(
     const char *input_path,
@@ -29,7 +35,8 @@ int32_t c2pa_sign_image_tee(
     uint32_t cert_count,
     c2pa_sign_fn sign_fn,
     void *sign_ctx,
-    const char *tsa_url
+    const char *tsa_url,
+    const char *assertions_json
 );
 
 /**

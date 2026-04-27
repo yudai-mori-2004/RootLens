@@ -6,8 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, typography, spacing } from '../theme';
 
 /**
- * 共通の動画シークバーコンポーネント
- * SwipeGalleryView と EditScreen で共用
+ * 動画シークバーコンポーネント (SwipeGalleryView で使用)
  */
 interface VideoSeekBarProps {
   posMs: number;

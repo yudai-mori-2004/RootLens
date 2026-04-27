@@ -70,6 +70,13 @@ pub type CSignFn = extern "C" fn(
 /// 秘密鍵をRust側に渡さず、コールバック関数経由でTEE内で署名する。
 /// 仕様書 §4.6: Signerトレイトのカスタム実装 → TEE API
 ///
+/// 関数名に「image」が残っているが、内部では `mime_from_path()` で input_path の
+/// 拡張子から MIME を決定するため、JPEG (image/jpeg) でも MP4 (video/mp4) でも同じ FFI で署名できる。
+/// MP4 / MOV では c2pa-rs が自動的に BMFF v3 hash + uuid box JUMBF を埋め込む (Task 03)。
+///
+/// v0.1.1 で `assertions_json` を追加: ネイティブ層から任意の C2PA assertion
+/// (label + data) を JSON 配列で渡し、c2pa.actions.created に追加する形で manifest に注入する。
+///
 /// # Arguments
 /// * `input_path` - 入力メディアファイルのパス
 /// * `output_path` - 出力先パス
@@ -79,6 +86,8 @@ pub type CSignFn = extern "C" fn(
 /// * `sign_fn` - TEE署名コールバック
 /// * `sign_ctx` - コールバック用コンテキスト
 /// * `tsa_url` - RFC 3161 TSAのURL（NULLの場合タイムスタンプなし）
+/// * `assertions_json` - 追加 assertion の JSON 配列 (`[{"label":..., "data":...}, ...]`).
+///                       NULL または空配列なら追加なし。
 ///
 /// # Returns
 /// * 0: 成功, -1: 引数エラー, -2: 署名エラー, -3: その他
@@ -92,10 +101,12 @@ pub extern "C" fn c2pa_sign_image_tee(
     sign_fn: CSignFn,
     sign_ctx: *mut std::ffi::c_void,
     tsa_url: *const c_char,
+    assertions_json: *const c_char,
 ) -> i32 {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         sign_image_tee_inner(
-            input_path, output_path, certs_der, cert_sizes, cert_count, sign_fn, sign_ctx, tsa_url,
+            input_path, output_path, certs_der, cert_sizes, cert_count,
+            sign_fn, sign_ctx, tsa_url, assertions_json,
         )
     }));
     match result {
@@ -113,6 +124,7 @@ fn sign_image_tee_inner(
     sign_fn: CSignFn,
     sign_ctx: *mut std::ffi::c_void,
     tsa_url: *const c_char,
+    assertions_json: *const c_char,
 ) -> i32 {
     let input = match unsafe_cstr_to_str(input_path) {
         Some(s) => s,
@@ -141,7 +153,23 @@ fn sign_image_tee_inner(
 
     let tsa = unsafe_cstr_to_str(tsa_url);
 
-    match do_sign_tee(&input, &output, certs, sign_fn, sign_ctx, tsa) {
+    // assertions_json をパース (NULL / 空文字列は空配列扱い)
+    let extra_assertions: Vec<serde_json::Value> = match unsafe_cstr_to_str(assertions_json) {
+        Some(s) if !s.is_empty() => match serde_json::from_str::<serde_json::Value>(&s) {
+            Ok(serde_json::Value::Array(arr)) => arr,
+            Ok(_) => {
+                eprintln!("c2pa_sign_image_tee: assertions_json is not a JSON array");
+                return -1;
+            }
+            Err(e) => {
+                eprintln!("c2pa_sign_image_tee: assertions_json parse error: {e}");
+                return -1;
+            }
+        },
+        _ => Vec::new(),
+    };
+
+    match do_sign_tee(&input, &output, certs, sign_fn, sign_ctx, tsa, extra_assertions) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("c2pa_sign_image_tee error: {e}");
@@ -256,6 +284,16 @@ impl c2pa::Signer for CallbackSigner {
     }
 }
 
+/// C2PA署名の実行 (撮影時署名)
+///
+/// v0.1.1 で `extra_assertions` を追加:
+///   - ネイティブ層から渡された任意の assertion (`io.rootlens.capture.*` 等) を
+///     `c2pa.actions` (c2pa.created) と並べて manifest に埋め込む。
+///   - manifest は serde_json::Value で動的構築する (文字列テンプレートではない)。
+///
+/// v0.1.1 で signContentWithParent / parent_path 対応を撤去:
+///   - EditScreen が削除されたため、編集時の親マニフェスト参照は不要。
+///   - 撮影時署名のみが c2pa-bridge の責務になる。
 fn do_sign_tee(
     input_path: &str,
     output_path: &str,
@@ -263,70 +301,40 @@ fn do_sign_tee(
     sign_fn: CSignFn,
     sign_ctx: *mut std::ffi::c_void,
     tsa_url: Option<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    do_sign_tee_with_parent(input_path, output_path, certs, sign_fn, sign_ctx, tsa_url, None)
-}
-
-/// C2PA署名の実行（parent_path対応）
-///
-/// parent_path が Some の場合:
-///   - 元ファイルを ingredient として来歴グラフに組み込む
-///   - アクションは c2pa.edited
-///   - 来歴チェーン: 撮影時マニフェスト → 編集マニフェスト
-///
-/// parent_path が None の場合:
-///   - 新規マニフェストを作成（c2pa.created）
-///   - 撮影時の署名用
-fn do_sign_tee_with_parent(
-    input_path: &str,
-    output_path: &str,
-    certs: Vec<Vec<u8>>,
-    sign_fn: CSignFn,
-    sign_ctx: *mut std::ffi::c_void,
-    tsa_url: Option<String>,
-    parent_path: Option<&str>,
+    extra_assertions: Vec<serde_json::Value>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use c2pa::Builder;
+    use serde_json::{json, Value};
 
-    let action = if parent_path.is_some() { "c2pa.edited" } else { "c2pa.created" };
+    // c2pa.actions (c2pa.created) を先頭に置き、追加 assertion を後続させる
+    let mut assertions: Vec<Value> = vec![json!({
+        "label": "c2pa.actions",
+        "data": {
+            "actions": [
+                {
+                    "action": "c2pa.created",
+                    "softwareAgent": {
+                        "name": "RootLens",
+                        "version": "0.1.1"
+                    }
+                }
+            ]
+        }
+    })];
+    assertions.extend(extra_assertions);
 
-    let manifest_json = format!(r#"{{
+    let manifest = json!({
         "claim_generator_info": [
-            {{
+            {
                 "name": "RootLens",
-                "version": "0.1.0"
-            }}
+                "version": "0.1.1"
+            }
         ],
-        "assertions": [
-            {{
-                "label": "c2pa.actions",
-                "data": {{
-                    "actions": [
-                        {{
-                            "action": "{}",
-                            "softwareAgent": {{
-                                "name": "RootLens",
-                                "version": "0.1.0"
-                            }}
-                        }}
-                    ]
-                }}
-            }}
-        ]
-    }}"#, action);
+        "assertions": assertions
+    });
 
+    let manifest_json = manifest.to_string();
     let mut builder = Builder::from_json(&manifest_json)?;
-
-    // 親マニフェストがある場合、ingredient として追加
-    if let Some(parent) = parent_path {
-        let parent_mime = mime_from_path(parent);
-        let mut parent_stream = fs::File::open(parent)?;
-        builder.add_ingredient_from_stream(
-            r#"{"relationship": "parentOf"}"#,
-            parent_mime,
-            &mut parent_stream,
-        )?;
-    }
 
     let signer = CallbackSigner {
         certs,
@@ -347,46 +355,6 @@ fn do_sign_tee_with_parent(
     builder.sign(&signer, mime, &mut source, &mut dest)?;
 
     Ok(())
-}
-
-/// 編集署名用FFI（親マニフェスト参照あり）
-#[no_mangle]
-pub extern "C" fn c2pa_sign_image_tee_with_parent(
-    input_path: *const c_char,
-    output_path: *const c_char,
-    certs_der: *const u8,
-    cert_sizes: *const u32,
-    cert_count: u32,
-    sign_fn: CSignFn,
-    sign_ctx: *mut std::ffi::c_void,
-    tsa_url: *const c_char,
-    parent_path: *const c_char,
-) -> i32 {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let input = match unsafe_cstr_to_str(input_path) { Some(s) => s, None => return -1 };
-        let output = match unsafe_cstr_to_str(output_path) { Some(s) => s, None => return -1 };
-        let parent = unsafe_cstr_to_str(parent_path);
-
-        if certs_der.is_null() || cert_sizes.is_null() || cert_count == 0 { return -1; }
-
-        let mut certs: Vec<Vec<u8>> = Vec::new();
-        let sizes = unsafe { std::slice::from_raw_parts(cert_sizes, cert_count as usize) };
-        let mut offset: usize = 0;
-        for &size in sizes {
-            let s = size as usize;
-            let cert_data = unsafe { std::slice::from_raw_parts(certs_der.add(offset), s) };
-            certs.push(cert_data.to_vec());
-            offset += s;
-        }
-
-        let tsa = unsafe_cstr_to_str(tsa_url);
-
-        match do_sign_tee_with_parent(&input, &output, certs, sign_fn, sign_ctx, tsa, parent.as_deref()) {
-            Ok(()) => 0,
-            Err(e) => { eprintln!("c2pa_sign_image_tee_with_parent error: {e}"); -2 }
-        }
-    }));
-    match result { Ok(r) => r, Err(_) => -3 }
 }
 
 // --- レガシー署名（PEMベース、dev/テスト用） ---

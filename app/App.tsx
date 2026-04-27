@@ -22,7 +22,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import TabNavigator from './src/navigation/TabNavigator';
 import CameraScreen from './src/screens/CameraScreen';
 import CameraGalleryScreen from './src/screens/CameraGalleryScreen';
-import EditScreen from './src/screens/EditScreen';
 import PublishingScreen from './src/screens/PublishingScreen';
 import PreviewScreen from './src/screens/PreviewScreen';
 import RegistrationScreen from './src/screens/RegistrationScreen';
@@ -131,11 +130,6 @@ function AppContent() {
             presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
           }}
-        />
-        <RootStack.Screen
-          name="Edit"
-          component={EditScreen}
-          options={{ headerShown: false, presentation: 'fullScreenModal' }}
         />
         <RootStack.Screen
           name="Publishing"

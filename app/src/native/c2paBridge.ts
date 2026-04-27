@@ -54,9 +54,19 @@ export interface DeviceCredentials {
   };
 }
 
+/**
+ * C2PA Custom Assertion (v0.1.1)。
+ *  - label: assertion ラベル (例: "io.rootlens.capture.ios.core_motion.gyro")
+ *  - data: assertion 本体 (任意 JSON-serializable; sensor 取得結果をそのまま入れる)
+ */
+export interface C2paAssertion {
+  label: string;
+  data: unknown;
+}
+
 interface C2paBridgeInterface {
-  signContent(imagePath: string): Promise<string>;
-  signContentWithParent(imagePath: string, parentPath: string): Promise<string>;
+  // v0.1.1: assertions 配列を受け取る (省略可。空 / undefined なら追加なし)
+  signContent(imagePath: string, assertions?: C2paAssertion[]): Promise<string>;
   readManifest(imagePath: string): Promise<string>;
   applyMasks(imagePath: string, masks: MaskRect[]): Promise<string>;
   processVideo(inputPath: string, optionsJson: string): Promise<string>;
@@ -80,36 +90,29 @@ try {
 }
 
 /**
- * C2PA署名を実行する
+ * C2PA 署名を実行する。
+ *
+ * v0.1.1 で `assertions` を追加: 撮影時に取得した sensor 取得結果などを
+ * 任意の C2PA assertion として注入できる。`c2pa.actions.created` と並ぶ追加 assertion になる。
+ * undefined / 空配列を渡せば従来同様 `c2pa.actions.created` のみで署名する。
+ *
+ * v0.1.1 で signContentWithParent (parent ingredient 参照) を完全削除。
+ * EditScreen 撤去に伴い来歴チェーンの編集アクションは v0.1.1 では発生しない。
+ *
  * @param imagePath 入力画像のパス
+ * @param assertions 追加 assertion 配列 (省略可)
  * @returns 署名済みファイルのパス
  */
-export async function signContent(imagePath: string): Promise<string> {
+export async function signContent(
+  imagePath: string,
+  assertions?: C2paAssertion[]
+): Promise<string> {
   if (!C2paBridge) {
     throw new Error(
       `C2paBridge native module is not available on ${Platform.OS}`,
     );
   }
-  return C2paBridge.signContent(imagePath);
-}
-
-/**
- * 編集済みコンテンツにC2PA署名を付与する（親マニフェスト参照あり）
- *
- * 元ファイルのC2PAマニフェストをingredientとして来歴グラフに組み込み、
- * c2pa.edited アクションで再署名する。
- *
- * @param imagePath 編集後のファイルパス
- * @param parentPath 元ファイル（撮影時のC2PA署名付き）のパス
- * @returns 署名済みファイルのパス
- */
-export async function signContentWithParent(imagePath: string, parentPath: string): Promise<string> {
-  if (!C2paBridge) {
-    throw new Error(
-      `C2paBridge native module is not available on ${Platform.OS}`,
-    );
-  }
-  return C2paBridge.signContentWithParent(imagePath, parentPath);
+  return C2paBridge.signContent(imagePath, assertions);
 }
 
 /**

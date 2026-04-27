@@ -18,7 +18,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList, MediaItem } from '../navigation/types';
+import type { RootStackParamList } from '../navigation/types';
 import { useC2paCache, isTrustedAsset } from '../hooks/useC2paCache';
 import { colors, typography, spacing, radii } from '../theme';
 import { t } from '../i18n';
@@ -73,9 +73,12 @@ export default function SwipeGalleryView({ onClose }: Props) {
 
   const toggleSelect = useCallback((id: string) => setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]), []);
   const handleShare = useCallback(() => {
-    const items: MediaItem[] = selected.map(id => assets.find(a => a.id === id)).filter((a): a is MediaLibrary.Asset => !!a)
-      .map(a => ({ uri: a.uri, type: a.mediaType === 'video' ? 'video' as const : 'image' as const }));
-    if (items.length > 0) { nav.navigate('Edit', { mediaItems: items }); setSelected([]); }
+    // v0.1.1: EditScreen 撤去 — カメラロール選択は Registration へ直結。
+    const uris = selected
+      .map(id => assets.find(a => a.id === id))
+      .filter((a): a is MediaLibrary.Asset => !!a)
+      .map(a => a.uri);
+    if (uris.length > 0) { nav.navigate('Registration', { signedUris: uris }); setSelected([]); }
   }, [selected, assets, nav]);
 
   const indexRef = useRef(index);
