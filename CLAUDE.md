@@ -2,36 +2,33 @@
 
 ## Project Overview
 
-RootLens: カメラで撮影された「本物のコンテンツ」であることを証明し、SNS等で共有可能なリンクとして発行するモバイルアプリケーション。Title Protocol上に構築される最初のアプリケーション。
+RootLens: Physical AI (ヒューマノイドロボット / VLA モデル) の訓練データとして、家庭内の家事映像をモバイルデバイスで収集し売買するプラットフォーム。撮影来歴の署名 (C2PA + sensor 同梱) で出自を明確化する。
 
-- 仕様書: `document/v0.1.0/SPECS_JA.md` (Source of Truth)
-- カバレッジ: `document/v0.1.0/COVERAGE.md`
-- タスク: `document/v0.1.0/tasks/NN-name/` (段階的に追加)
+- 現行フェーズ: `document/v0.1.2/` — Sandbox 検証フェーズ (仕様策定前)
+- 過去仕様: `document/v0.1.0/SPECS_JA.md`, `document/v0.1.1/tasks/`
+- 退避済み旧コード: `legacy/v0.1.1/app-src/`
 - Title Protocol: `../title-protocol/` (別リポジトリ)
 
-## Architecture
+## Current Phase (v0.1.2)
 
-```
-[React Native App]           [RootLens Server]           [Public Page (rootlens.io)]
-  Camera / Gallery              CA (Device Cert)            Client-side verification
-  C2PA signing (TEE)            Page ID management          Solana RPC direct
-  Editing                       Whitelist API               pHash recomputation
-  Title Protocol SDK            R2 / Supabase
-  Privy auth                    Privy auth
-       |                             |                            |
-       +-------- Title Protocol -----+----------- Solana ----------+
-```
+各パーツが実機で動くかの独立検証。詳細は `document/v0.1.2/README.md` 参照。
 
-### Components
+| Sandbox | 内容 | 場所 |
+|---|---|---|
+| 01 Hand Pose + Gesture | 21 関節取得 + ジェスチャー検出 | `app/src/sandboxes/01-hand-pose-gesture/` |
+| 02 VLM Task Gate | Gemini Robotics-ER 1.6 による条件判定 | `app/src/sandboxes/02-vlm-task-gate/` |
+| 03 Video-IMU Consistency | GTSAM ImuFactor による整合性検証 | サーバーサイド Python |
 
-| Component | Tech | Role | Spec |
-|-----------|------|------|------|
-| Mobile App | React Native + Kotlin/Swift + c2pa-rs | 撮影・署名・編集・公開 | §2-6 |
-| Native Module | c2pa-rs (FFI) + TEE API | C2PA署名・TEE鍵操作 | §4 |
-| Server | Next.js API Routes | CA・ページ管理・ストレージ | §4.4, §7, §10 |
-| Public Page | rootlens.io (static + JS) | トラストレス検証・表示 | §7 |
-| Database | Supabase (PostgreSQL) | ページ・コンテンツ・ユーザー管理 | §10.4 |
-| Storage | Cloudflare R2 (2 buckets) | バイナリデータ保存 | §6.2 |
+## Architecture (v0.1.2 時点)
+
+検証フェーズのため、統合アーキテクチャは未確定。以下は確定済みのパーツ:
+
+- **Mobile App**: React Native (Expo 52) + Expo Modules (ネイティブモジュール)
+- **Hand pose**: iOS Vision / Android MediaPipe HandLandmarker
+- **VLM**: Gemini Robotics-ER 1.6 API
+- **Video-IMU consistency**: GTSAM ImuFactor + OpenCV KLT (サーバーサイド)
+- **C2PA 署名**: c2pa-rs FFI + TEE (v0.1.1 既存資産)
+- **出力形式**: MP4 + JSON sidecar + LeRobot v3 / RLDS converter
 
 ## Development Methodology
 
@@ -41,15 +38,9 @@ Title Protocolと同じ三本柱を採用するが、モバイル開発の特性
 
 ### 仕様書 = Source of Truth
 
-- `document/v0.1.0/SPECS_JA.md` が唯一の仕様定義
+- v0.1.2 は仕様策定前の検証フェーズ。仕様書 (SPECS_JA) / COVERAGE は統合実装フェーズで起こす
+- 過去仕様: `document/v0.1.0/SPECS_JA.md` (v0.1.0 の定義。変更不可)
 - コード内のdoc commentから仕様書セクションを参照する (例: `// 仕様書 §4.3 PKI構造`)
-- 仕様と実装の乖離が生じた場合、仕様を先に更新してから実装を修正する
-
-### COVERAGE.md
-
-- 仕様書の各セクションに対する実装状況を追跡する
-- タスク完了時に更新する
-- 凡例: 実装済み / 型のみ / スタブ / 未着手 / 対象外
 
 ### タスク設計は段階的に
 
