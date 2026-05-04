@@ -1,11 +1,10 @@
 import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
-import PhoneCarousel from "./PhoneCarousel";
 
-const DEMO_URL = "/p/BatH5xy";
+const WAITLIST_URL = "https://forms.gle/vKWyPLY9dQot6xq9A";
 
 export default async function HomePage() {
-  const t = await getTranslations("lp.hero");
+  const tProblem = await getTranslations("lp.problem");
   const tFlow = await getTranslations("lp.appFlow");
   const tIssues = await getTranslations("lp.issues");
   const tHome = await getTranslations("pages.home");
@@ -17,45 +16,49 @@ export default async function HomePage() {
   return (
     <div className={s.page}>
       {/* Hero */}
-      <section className={s.heroSplit}>
-        <div className={s.heroSplitInner}>
-          <div>
-            <h1 className={s.heroTitle}>{t("title")}</h1>
-            <p className={s.heroTagline}>{t("tagline")}</p>
-            <p className={s.heroDescription}>{t("description")}</p>
-            <div className={s.storeBadges}>
-              <div className={s.storeBadge}>
-                <AppleIcon />
-                <div className={s.storeBadgeText}>
-                  <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
-                  <span className={s.storeBadgeName}>App Store</span>
-                </div>
-              </div>
-              <div className={s.storeBadge}>
-                <PlayIcon />
-                <div className={s.storeBadgeText}>
-                  <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
-                  <span className={s.storeBadgeName}>Google Play</span>
-                </div>
+      <section className={s.hero}>
+        <div className={s.heroInner}>
+          <p className={s.heroEyebrow}>The camera app</p>
+          <h1 className={s.heroTitle}>Film your day.<br />Train home robots.<br />Get paid.</h1>
+          <p className={s.heroDescription}>RootLens is a marketplace where anyone can record household tasks and sell that data to home robot companies.</p>
+          <a href={WAITLIST_URL} className={s.ctaPrimary} target="_blank" rel="noopener noreferrer">
+            Join the early waitlist →
+          </a>
+          <div className={s.storeBadges} style={{ marginTop: 16 }}>
+            <div className={s.storeBadge}>
+              <AppleIcon />
+              <div className={s.storeBadgeText}>
+                <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
+                <span className={s.storeBadgeName}>App Store</span>
               </div>
             </div>
-            <div className={s.heroCtas}>
-              <a href={DEMO_URL} className={s.ctaSecondary}>
-                {tc("seeVerifiedPhoto")}
-              </a>
-              <a href="/technology" className={s.ctaSecondary}>
-                {t("ctaHow")}
-              </a>
-            </div>
-          </div>
-          <div className={s.heroPhoneWrap}>
-            <div className={s.phoneFrame}>
-              <div className={s.phoneDynamicIsland} />
-              <div className={s.phoneScreen}>
-                <img src="/app-verify.png" alt="RootLens verification page" className={s.phoneSlide} style={{ opacity: 1 }} />
+            <div className={s.storeBadge}>
+              <PlayIcon />
+              <div className={s.storeBadgeText}>
+                <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
+                <span className={s.storeBadgeName}>Google Play</span>
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Problem */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h2 className={s.sectionTitle}>{tProblem("title")}</h2>
+          <p className={s.prose}>{tProblem("p1")}</p>
+          <p className={s.prose}>{tProblem("p2")}</p>
+          <p className={s.prose}>{tProblem("p3")}</p>
+          <p className={s.prose} style={{ marginTop: 24 }}>
+            <span className={s.emphasis}>{tProblem("example")}</span>
+          </p>
+          <p className={s.prose}>{tProblem("p4")}</p>
+          <p className={s.prose}>{tProblem("p5")}</p>
+          <p className={s.prose}>{tProblem("p6")}</p>
+          <p className={s.prose} style={{ marginTop: 24 }}>
+            <span className={s.emphasis}>{tProblem("p7")}</span>
+          </p>
         </div>
       </section>
 
@@ -63,11 +66,6 @@ export default async function HomePage() {
       <section className={s.section}>
         <div className={s.sectionInner}>
           <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
-          <PhoneCarousel slides={[
-            { src: "/app-camera.png", alt: "RootLens camera", label: tFlow("step1.label") },
-            { src: "/app-verify.png", alt: "Verified content", label: tFlow("step2.label") },
-            { src: "/app-gallery.png", alt: "Published gallery", label: tFlow("step3.label") },
-          ]} />
           <div className={s.steps}>
             {flowSteps.map((key, i) => (
               <div key={key} className={s.step}>
@@ -82,13 +80,10 @@ export default async function HomePage() {
           <p className={s.prose} style={{ marginTop: 24 }}>
             <span className={s.emphasis}>{tFlow("editing")}</span>
           </p>
-          <a href={DEMO_URL} className={s.demoLink}>
-            {tc("demoLink")} &rarr;
-          </a>
         </div>
       </section>
 
-      {/* Social issues */}
+      {/* What makes the data valuable */}
       <section className={s.section}>
         <div className={s.sectionInner}>
           <h2 className={s.sectionTitle}>{tIssues("title")}</h2>
@@ -110,11 +105,8 @@ export default async function HomePage() {
           <div className={s.closingCtaTitle}>{tHome("closingTitle")}</div>
           <div className={s.closingCtaDesc}>{tHome("closingDesc")}</div>
           <div className={s.closingCtaButtons}>
-            <a href={DEMO_URL} className={s.ctaPrimary}>
-              {tc("seeVerifiedPhoto")}
-            </a>
-            <a href="/technology" className={s.ctaSecondary}>
-              {tHome("closingCtaWhy")}
+            <a href={WAITLIST_URL} className={s.ctaPrimary} target="_blank" rel="noopener noreferrer">
+              Join the early waitlist →
             </a>
           </div>
         </div>

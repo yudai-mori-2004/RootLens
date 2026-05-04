@@ -23,9 +23,9 @@
   },
   "pages": {
     "home": {
-      "closingTitle": "See the proof for yourself",
-      "closingDesc": "Open a real verified photo. Or find out why this matters now.",
-      "closingCtaWhy": "Read more"
+      "closingTitle": "Start recording. Start earning.",
+      "closingDesc": "Join the waitlist for early access. Home robot companies are waiting for data like yours.",
+      "closingCtaWhy": "Learn more"
     },
     "technology": {
       "heroTitle": "Proof of capture that survives social media.",
@@ -66,46 +66,57 @@
   },
   "lp": {
     "hero": {
-      "title": "Prove it's real.",
-      "tagline": "Take a photo. Get a tamper-proof record that it was really captured. Share a link anyone can check.",
-      "description": "RootLens is a camera app that proves your photo or video was actually captured by a real camera. Share a link, and anyone can verify it.",
-      "ctaDemo": "See a verified photo",
-      "ctaHow": "How it works"
+      "title": "Train home robots.\nGet paid.",
+      "tagline": "Film your day. Train home robots. Get paid.",
+      "description": "RootLens is a marketplace where anyone can record household tasks and sell that data to home robot companies.",
+      "ctaDemo": "See how it works",
+      "ctaHow": "Learn more"
+    },
+    "problem": {
+      "title": "Robots can move. But they can't work.",
+      "p1": "AI has made humanoid robots move almost like humans. Today, you can already buy a home robot for around $20,000.",
+      "p2": "But there is one big problem. These robots still cannot do most household tasks by themselves. Many tasks still require humans to control the robot remotely.",
+      "p3": "Why? Because robots know how to move, but they do not know how to use things in real homes.",
+      "example": "Think about a dishwasher.",
+      "p4": "Every home is different. Every model is different. Where do you put the dishes? Where does the detergent go? Which button do you press? Even humans get confused at first.",
+      "p5": "But once we watch someone do it, we understand. Robots learn the same way.",
+      "p6": "They need real videos of people doing real household tasks — dishwashing, cooking, laundry, cleaning.",
+      "p7": "That data does not exist at scale. So we are building RootLens."
     },
     "appFlow": {
       "title": "How it works",
       "step1": {
-        "label": "Capture",
-        "text": "Take a photo or video with RootLens. A digital signature is attached instantly."
+        "label": "Record",
+        "text": "Open the app and record yourself doing a household task. RootLens guides you to keep hands and objects in frame."
       },
       "step2": {
-        "label": "Prove",
-        "text": "Title Protocol verifies the signature and saves the proof as a permanent record, separate from the file itself."
+        "label": "Get verified",
+        "text": "Object detection scores the video automatically. Faces and personal text are blurred. The video is signed to prove it is real."
       },
       "step3": {
-        "label": "Share",
-        "text": "Get a link. Post it anywhere. Anyone who opens it can verify that the content was captured by a real camera."
+        "label": "Get paid",
+        "text": "Your verified recording enters the marketplace. Robot companies purchase the data they need. You earn."
       },
-      "editing": "You can still crop, mask, or trim before sharing. RootLens tracks every edit, so viewers can see exactly what was changed and confirm the original is real."
+      "editing": "Every submission is focused, verified, and ready to use — not random video scraped from the web."
     },
     "issues": {
-      "title": "Why this matters",
-      "intro": "Across industries, the same crisis is unfolding: nobody can tell what's real anymore.",
+      "title": "What makes RootLens data valuable",
+      "intro": "Robot companies cannot use random video. They need focused, verified, hand-level task data.",
       "sns": {
-        "label": "Social media & creators",
-        "text": "Deepfake videos go viral with fabricated news logos. Creators face accusations that real content is AI-generated. Unauthorized reposting is the norm, and revenue goes to the copier, not the original creator."
+        "label": "Hand-level focus",
+        "text": "Every video is centered on three things: hands, objects, and actions. How people grab, how they move, how they touch, how they use tools. The narrow scope lets us control quality automatically."
       },
       "media": {
-        "label": "News & journalism",
-        "text": "Reporters face accusations that real footage was AI-generated. Video evidence, once considered conclusive, is now questioned by default. The speed of misinformation structurally outpaces correction."
+        "label": "Automatic quality scoring",
+        "text": "RootLens uses object detection to recognize hands and target objects. This allows us to guide users while recording, score the quality of each video, and classify the data automatically."
       },
       "insurance": {
-        "label": "Insurance & finance",
-        "text": "An estimated 10% of insurance claims involve fraud. Damage photos, medical documents, and property listings can be fabricated with increasing sophistication. Recipients have no independent way to verify authenticity."
+        "label": "Privacy by default",
+        "text": "Faces and text are automatically blurred before any video leaves your device. Recorders stay anonymous. Buyers get clean, usable data."
       },
       "ai": {
-        "label": "AI, courts, healthcare, academia",
-        "text": "AI companies face billion-dollar lawsuits over training data rights. Forged documents challenge court evidence. Telemedicine images lack tamper verification. Research retractions rise as image fabrication becomes trivial."
+        "label": "Deepfake-proof verification",
+        "text": "When a video is recorded, the app signs it. This proves the video is real and blocks AI-generated fake data from entering the marketplace."
       }
     },
     "c2pa": {
