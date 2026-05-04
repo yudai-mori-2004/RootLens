@@ -64,10 +64,10 @@
 }
 
 .sectionSubtitle {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   color: var(--lp-text-secondary);
   margin-bottom: 40px;
-  line-height: 1.7;
+  line-height: 1.75;
 }
 
 .subsectionTitle {
@@ -92,8 +92,8 @@
 }
 
 .prose {
-  font-size: 1rem;
-  line-height: 1.72;
+  font-size: 1.05rem;
+  line-height: 1.75;
   color: var(--lp-text-secondary);
 }
 
@@ -117,6 +117,15 @@
   margin: 0 auto;
 }
 
+.heroEyebrow {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--lp-text-tertiary);
+  margin-bottom: 16px;
+}
+
 .heroTitle {
   font-family: var(--font-lp-heading, var(--font-geist-sans, sans-serif));
   font-size: clamp(2.2rem, 6vw, 3.2rem);
@@ -136,8 +145,8 @@
 }
 
 .heroDescription {
-  font-size: 1rem;
-  line-height: 1.72;
+  font-size: 1.1rem;
+  line-height: 1.75;
   color: var(--lp-text-secondary);
   margin-bottom: 40px;
 }
@@ -220,7 +229,7 @@
 }
 
 .issueLabel {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -229,8 +238,8 @@
 }
 
 .issueText {
-  font-size: 0.95rem;
-  line-height: 1.7;
+  font-size: 1.05rem;
+  line-height: 1.75;
   color: var(--lp-text-secondary);
 }
 
@@ -269,15 +278,15 @@
 }
 
 .stepLabel {
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--lp-text);
   margin-bottom: 4px;
 }
 
 .stepText {
-  font-size: 0.95rem;
-  line-height: 1.7;
+  font-size: 1.05rem;
+  line-height: 1.75;
   color: var(--lp-text-secondary);
 }
 
@@ -438,7 +447,7 @@
 }
 
 .footerBuiltBy {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: var(--lp-text-secondary);
 }
 
@@ -462,6 +471,7 @@
   font-size: 0.8rem;
   color: var(--lp-text-tertiary);
 }
+
 
 /* ---- Placeholder / Mockup ---- */
 .placeholder {

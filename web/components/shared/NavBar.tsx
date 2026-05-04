@@ -14,12 +14,6 @@ export default function NavBar() {
           <span className={s.navLogoText}>RootLens</span>
         </a>
         <div className={s.navSpacer} />
-        <a
-          href="/docs"
-          className={`${s.navLink} ${pathname.startsWith("/docs") ? s.navLinkActive : ""}`}
-        >
-          Docs
-        </a>
       </div>
     </nav>
   );
