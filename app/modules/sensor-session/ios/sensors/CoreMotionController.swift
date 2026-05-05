@@ -158,7 +158,7 @@ final class CoreMotionController {
         mx: mag.field.x.isFinite ? mag.field.x : nil,
         my: mag.field.y.isFinite ? mag.field.y : nil,
         mz: mag.field.z.isFinite ? mag.field.z : nil,
-        mAccuracy: mag.accuracy.rawValue
+        mAccuracy: Int(mag.accuracy.rawValue)
       ))
     }
   }

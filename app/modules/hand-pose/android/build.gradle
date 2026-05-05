@@ -1,0 +1,48 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+group = 'io.rootlens.handpose'
+version = '0.1.0'
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useExpoPublishing()
+
+android {
+  namespace 'io.rootlens.handpose'
+  compileSdkVersion safeExtGet("compileSdkVersion", 35)
+
+  defaultConfig {
+    minSdkVersion safeExtGet("minSdkVersion", 24)
+    targetSdkVersion safeExtGet("targetSdkVersion", 35)
+    versionCode 1
+    versionName "0.1.0"
+  }
+
+  // MediaPipe HandLandmarker は .task model を assets から読む。
+  // assets/hand_landmarker.task は手動配置 (README 参照)。
+  // .task は既に圧縮済みなので追加圧縮を切る。
+  androidResources {
+    noCompress 'task'
+  }
+
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  implementation project(':expo-modules-core')
+
+  // CameraX — preview + image analysis 用
+  def camerax_version = "1.4.1"
+  implementation "androidx.camera:camera-core:$camerax_version"
+  implementation "androidx.camera:camera-camera2:$camerax_version"
+  implementation "androidx.camera:camera-lifecycle:$camerax_version"
+  implementation "androidx.camera:camera-view:$camerax_version"
+
+  // MediaPipe Tasks Vision (HandLandmarker)
+  implementation 'com.google.mediapipe:tasks-vision:0.10.20'
+}

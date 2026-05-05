@@ -50,7 +50,7 @@ final class CoreMotionAccelerometerSensor: NativeSensor {
     ]
     return SensorResult(
       sensorId: id, apiPath: id, kind: "point",
-      payload: payload, startNs: startNs, endNs: endNs
+      payload: payload, startNs: startNs, endNs: endNs, unavailableReason: nil
     )
   }
 
@@ -96,7 +96,7 @@ final class CoreMotionGyroSensor: NativeSensor {
     ]
     return SensorResult(
       sensorId: id, apiPath: id, kind: "point",
-      payload: payload, startNs: startNs, endNs: endNs
+      payload: payload, startNs: startNs, endNs: endNs, unavailableReason: nil
     )
   }
 }
@@ -135,7 +135,7 @@ final class CoreMotionMagnetometerSensor: NativeSensor {
     ]
     return SensorResult(
       sensorId: id, apiPath: id, kind: "point",
-      payload: payload, startNs: startNs, endNs: endNs
+      payload: payload, startNs: startNs, endNs: endNs, unavailableReason: nil
     )
   }
 }
@@ -175,7 +175,7 @@ final class CoreMotionDeviceMotionSensor: NativeSensor {
     ]
     return SensorResult(
       sensorId: id, apiPath: id, kind: "point",
-      payload: payload, startNs: startNs, endNs: endNs
+      payload: payload, startNs: startNs, endNs: endNs, unavailableReason: nil
     )
   }
 
@@ -243,7 +243,7 @@ final class CoreMotionAltimeterSensor: NativeSensor {
     ]
     return SensorResult(
       sensorId: id, apiPath: id, kind: "point",
-      payload: payload, startNs: startNs, endNs: endNs
+      payload: payload, startNs: startNs, endNs: endNs, unavailableReason: nil
     )
   }
 }

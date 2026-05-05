@@ -51,3 +51,8 @@ native/jarosz-wasm/target/
 
 # Sensor session module build artifacts
 app/modules/sensor-session/android/build/
+
+# Python pipeline build artifacts
+pipeline/**/__pycache__/
+pipeline/**/.venv/
+pipeline/**/*.pyc

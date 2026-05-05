@@ -1,0 +1,12 @@
+{
+  "_comment": "IMU sidecar schema sample. timestamp_ns は string (bigint 互換)。video の CAP_PROP_POS_MSEC と同じ origin で記録。",
+  "device": {
+    "model": "iPhone13,2",
+    "sample_rate_hz": 200
+  },
+  "samples": [
+    { "timestamp_ns": "0",         "accel": [0.01, -0.05, 9.79],  "gyro": [0.001,  0.002, -0.0005] },
+    { "timestamp_ns": "5000000",   "accel": [0.02, -0.04, 9.80],  "gyro": [0.002,  0.001, -0.0003] },
+    { "timestamp_ns": "10000000",  "accel": [0.03, -0.06, 9.78],  "gyro": [0.003,  0.000, -0.0002] }
+  ]
+}
