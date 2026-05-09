@@ -15,7 +15,7 @@ import UIKit
 class HandPosePreviewView: ExpoView, HandPoseFrameConsumer {
   let onHandPose = EventDispatcher()
 
-  private let cameraController = HandPoseCameraController()
+  private let cameraController = HandPoseCameraController.shared
   private let detector = HandPoseDetector()
   private var previewLayer: AVCaptureVideoPreviewLayer?
 
