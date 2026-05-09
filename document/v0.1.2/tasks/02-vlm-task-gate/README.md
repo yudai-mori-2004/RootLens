@@ -14,16 +14,34 @@ VLM がスナップショットを見て「散らかった洗濯物と両手が�
 
 セキュリティ機構ではなく品質ガイド。本気のスプーフィングは reputation や他の軸で対応する。
 
-### なぜ Gemini Robotics-ER 1.6 か
+### モデル選定 (実機検証で 2 回見直し)
 
-2026/4/14 リリース。数千時間の egocentric manipulation デモで訓練済みで、タスク進行判定 (「このタスクは完了したか?」) がネイティブ capability。散らかった / 片付いた等の状態遷移判定、物体認識、手の存在確認を 1 call で処理できる。
+#### 1 回目: Robotics-ER → generic Gemini
 
-- API: Google AI Studio / Vertex AI
-- コスト: ~$0.001-0.003/call (画像入力 ~560 tokens)
-- thinking budget 調整可能 (簡単な判定は低 budget で 1-2 秒)
-- fallback: Gemini 2.5 Flash (~$0.0002/call、egocentric 特化訓練なし)
+当初 `gemini-robotics-er-1.6` を default に想定していたが、実用途を再検討して **generic Gemini が適切**と判断した。Robotics-ER は VLA 前段の embodied reasoning モデル (3D 把持点座標、action planning 生成) で、「画像 + 条件文 → match bool」の単純 VQA には特化機能の大半が遊休。
 
-参照: https://deepmind.google/blog/gemini-robotics-er-1-6/ , https://ai.google.dev/gemini-api/docs/robotics-overview
+#### 2 回目: flash → flash-lite (high-demand 503 対策)
+
+実機テスト中に `gemini-2.5-flash` が high-demand 時間帯で 503 (model is overloaded) を頻発。free tier の flash は最も人気で混む。実 API で latency / 可用性を比較:
+
+| Model | 状態 | latency | 備考 |
+|---|---|---|---|
+| **gemini-2.5-flash-lite** | ✅ stable | **1.51 s** | 採用。プール負荷軽い |
+| gemini-2.5-flash | ✅ stable | 1.76 s | high-demand 時 503 多発 |
+| gemini-flash-latest (alias) | ✅ alias | 2.27 s | flash-latest = 現状 flash 系の最新 |
+| gemini-3.1-flash-lite-preview | ✅ preview | 1.79 s | 新世代 lite, preview 廃止リスク |
+| gemini-3-flash-preview | ✅ preview | 3.21 s | 重い |
+| gemini-2.5-pro / pro-latest / 3-pro-preview | ❌ 429 | — | free tier 範囲外 |
+
+→ **default は `gemini-2.5-flash-lite`**。さらに `geminiClient.ts` で 503/429 の **指数 backoff retry** (3 回, 600ms / 1.2s / 2.4s) を入れて transient error も回避。
+
+切替したい場合は画面の model フィールドで上書き:
+
+- `gemini-2.5-flash` — 標準 flash
+- `gemini-3.1-flash-lite-preview` — 新世代 lite
+- `gemini-robotics-er-1.6-preview` — Robotics-ER (preview suffix 必要)
+
+参照: https://ai.google.dev/gemini-api/docs/vision , https://ai.google.dev/gemini-api/docs/structured-output
 
 ## 検証内容
 
