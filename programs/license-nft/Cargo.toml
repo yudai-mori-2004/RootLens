@@ -1,0 +1,32 @@
+[package]
+name = "license-nft"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/yudai-mori-2004/root-lens"
+authors = ["RootLens Contributors"]
+description = "RootLens License NFT Anchor program (SPECS_JA §5)"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "license_nft"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+# Anchor 0.31.1: solana-program 2.x 系統との型整合が取れた最新 0.x stable
+anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-spl = "0.31.1"
+
+# Bubblegum cNFT — Root NFT proof 検証 + License NFT mint
+mpl-bubblegum = "2.1.1"
+# Bubblegum V2 trees は新 mpl-account-compression program (mcmt6Y...) で管理される。
+# 旧 spl-account-compression (cmtDvX...) ではないので注意。
+mpl-account-compression = { version = "1.0.0", features = ["cpi"] }
+# 新 noop (Bubblegum V2 event log 用)
+mpl-noop = "1.0"
