@@ -1,0 +1,32 @@
+{
+  "name": "license-nft-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx/esm --experimental-vm-modules ./node_modules/mocha/bin/mocha.js --timeout 60000 './*.spec.ts'"
+  },
+  "dependencies": {
+    "@metaplex-foundation/digital-asset-standard-api": "^2.0.0",
+    "@metaplex-foundation/mpl-bubblegum": "^5.0.2",
+    "@metaplex-foundation/mpl-core": "^1.10.0",
+    "@metaplex-foundation/umi": "^1.5.1",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.5.1",
+    "@metaplex-foundation/umi-signer-wallet-adapters": "^1.5.1",
+    "@metaplex-foundation/umi-web3js-adapters": "^1.5.1",
+    "@noble/hashes": "^2.2.0",
+    "@solana/spl-account-compression": "^0.4.1",
+    "@solana/spl-token": "^0.4.10",
+    "@solana/web3.js": "^1.98.0",
+    "bs58": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.0",
+    "chai": "^5.1.2",
+    "mocha": "^11.0.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
