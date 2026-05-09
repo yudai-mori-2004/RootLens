@@ -18,9 +18,11 @@
     "@ffmpeg/util": "^0.12.2",
     "@peculiar/asn1-schema": "^2.6.0",
     "@peculiar/x509": "^1.14.3",
+    "@solana/web3.js": "^1.95.0",
     "@supabase/supabase-js": "^2.99.1",
     "@title-protocol/sdk": "^0.1.12",
     "asn1js": "^3.0.7",
+    "bs58": "^6.0.0",
     "canonicalize": "^2.1.0",
     "cbor-x": "^1.6.4",
     "mp4box": "^2.3.0",
@@ -28,7 +30,8 @@
     "next-intl": "^4.8.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "yaml": "^2.6.0"
   },
   "devDependencies": {
     "@types/node": "^20",
