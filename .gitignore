@@ -56,3 +56,25 @@ app/modules/sensor-session/android/build/
 pipeline/**/__pycache__/
 pipeline/**/.venv/
 pipeline/**/*.pyc
+
+# Solana / Anchor (Unit D 以降)
+/target/
+/.anchor/
+test-ledger/
+**/*.so
+# program keypair はローカル保管。本番デプロイ前にチームで共有 keypair を作る
+/target/deploy/*-keypair.json
+# License Collection / USDC mint keypair も同じくローカル保管
+keys/
+# Anchor / license-cli が生成する bootstrap config (環境ローカル)
+network.json
+# License tree 等の後続作成 fixtures (テスト用)
+tests/license-nft/fixtures.json
+tests/license-nft/node_modules/
+
+# Hand-pose module build artifacts
+app/modules/hand-pose/android/build/
+
+# Pipeline node_modules
+pipeline/**/node_modules/
+
