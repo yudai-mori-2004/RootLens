@@ -1,0 +1,102 @@
+RootLens License — Non-Commercial Use (v1.0)
+license_type_id: non-commercial-v1
+=========================================================================
+
+This license grants the holder of a specific License NFT a unilateral,
+non-exclusive, royalty-free copyright license to use the Subject Content
+**solely for non-commercial purposes**. This is a unilateral grant, not
+a contract (§10).
+
+
+§1 Definitions
+
+(1)–(7) Same as commercial-v1.
+
+(8) "Non-commercial use" means use that is not directed to commercial
+    advantage or monetary compensation, including:
+
+    a. Academic research (basic research, paper publication, conference
+       presentation at universities and public research institutions);
+    b. Personal viewing or learning;
+    c. Educational use by non-profit organizations;
+    d. Use in open-source or public-benefit projects, provided that the
+       project does not engage in direct monetization.
+
+(9) Where the boundary between commercial and non-commercial is unclear
+    (e.g., research at an institution that contemplates future
+    commercialization, free services supported by advertising revenue),
+    Licensee is encouraged either to confirm in writing with Licensor in
+    advance, or to obtain a separate commercial license (commercial-v1).
+
+
+§2 Grant of license
+
+Licensor grants Licensee, with respect to the Subject Content, the
+following rights on a non-exclusive, worldwide, royalty-free basis,
+strictly within the scope of non-commercial use under §3:
+
+(1) The right to reproduce, display, perform, transmit to the public, or
+    otherwise technologically use the Subject Content for non-commercial
+    purposes.
+
+(2) The right to use the Subject Content for non-commercial AI or
+    machine-learning training, evaluation, and benchmarking.
+
+(3) The right to create, use, and distribute derivative works of the
+    Subject Content, strictly within non-commercial scope.
+
+
+§3 Restrictions
+
+(1) Licensee shall not use the Subject Content for any purpose directed
+    to commercial advantage or monetary compensation. Commercial use
+    requires a separate commercial license (e.g., commercial-v1).
+
+(2) Where Licensee creates derivative works of the Subject Content and
+    distributes them, Licensee shall impose at least as restrictive
+    non-commercial terms on such derivative works (a Share-Alike-style
+    obligation).
+
+(3) Licensee shall not sublicense, assign, or rent out the right to use
+    the Subject Content to a third party in a manner that severs use
+    rights from the License NFT itself. (Transfer of the License NFT
+    itself is governed by §5.)
+
+
+§4 Term
+
+Perpetual, subject to commercial-v1 §4-style termination events
+(material breach, burn).
+
+
+§5 Transfer of license with NFT
+
+(Same as commercial-v1 §5.)
+
+
+§6 Legal-Authoritative
+
+(Same as commercial-v1 §6.)
+
+
+§7–§9
+
+(Same as commercial-v1 §7–§9: warranty disclaimer, limitation of liability,
+governing law = Singapore, dispute resolution = SIAC arbitration.)
+
+
+§10 Nature of this license (unilateral grant)
+
+(Same as commercial-v1 §10. In particular, the restrictions in §3 are
+not contractual obligations of Licensee but conditions on the scope of
+the grant in §2. Acts outside those conditions—including any commercial
+use—constitute copyright infringement, not contract breach.)
+
+
+§11 Severability
+
+(Same as commercial-v1 §11.)
+
+
+------------------------------------------------------------
+END OF LICENSE TEXT (non-commercial-v1)

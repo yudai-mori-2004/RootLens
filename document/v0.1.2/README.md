@@ -18,11 +18,28 @@ v0.1.2 は仕様策定前の検証フェーズであり、仕様書 (SPECS_JA) /
 
 ## Sandbox 一覧
 
+**Sandbox 検証 (01-05)** — 各パーツが単体で動くか確認するためのもの。実装は throwaway 扱い。
+
 | # | Sandbox | 検証内容 |
 |---|---|---|
 | 01 | [Hand Pose + Gesture](tasks/01-hand-pose-gesture/) | 21 関節リアルタイム取得 + 開始/終了ジェスチャー検出 |
 | 02 | [VLM Task Gate](tasks/02-vlm-task-gate/) | スナップショット → Gemini Robotics-ER 1.6 → 条件マッチ判定 |
 | 03 | [Video-IMU Consistency](tasks/03-video-imu-consistency/) | GTSAM ImuFactor による映像-IMU 整合性 residual 算出 |
+| 04 | [Collection Flow](tasks/04-collection-flow/) | 01 + 02 + 録画を結合した統合デモ (タスク選択 → ジェスチャー連動 → mp4 出力) |
+| 05 | [Title Protocol register (Android port)](tasks/05-tp-register/) | sandbox 04 のクリップを TP に登録 → Solana devnet 上で Core NFT mint。Android 録画ネイティブを iOS と揃える |
+
+**統合ユニット (06+)** — 統合フェーズでそのまま使う production-bound コード。各ユニットは独立して動作し audit grade のテストでガードされる。
+
+| # | Unit | 役割 |
+|---|---|---|
+| 06 | [License NFT Solana program (Unit D)](tasks/06-license-nft-program/) | SPECS §5 — issue_license / claim_revenue。Bubblegum proof 検証 + USDC 95:5 分配を atomic に実行 |
+
+## 仕様 + 設計ドキュメント
+
+- [SPECS_JA.md](SPECS_JA.md) — 全体仕様
+- [QUICKSTART.md](QUICKSTART.md) — License NFT のデプロイ手順 (Phase 1 setup)
+- [architecture/](architecture/) — Unit 単位のアーキテクチャ詳細 (License NFT trust model, troubleshooting 等)
+- [license-templates/](license-templates/) — ライセンス条文テンプレート (commercial-v1, training-only-v1, etc.)
 
 ## 既存資産 (v0.1.1 から継続利用)
 

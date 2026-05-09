@@ -1,0 +1,186 @@
+RootLens License — Commercial Use (v1.0)
+license_type_id: commercial-v1
+=========================================================================
+
+This license grants the holder of a specific License NFT (the "License NFT")
+on the Solana blockchain a unilateral, non-exclusive, royalty-free copyright
+license to use the Subject Content (defined in §1) bound to that License NFT.
+This is a unilateral grant, not a contract (§10).
+
+
+§1 Definitions
+
+(1) "Program" means the `license_nft` Anchor program deployed on the Solana
+    blockchain, whose Program ID is recorded in the JSON wrapper's
+    `issuer.rootlens_program_id` field.
+
+(2) "License Collection" means the MPL Core collection account whose update
+    authority is the Config PDA of the Program (seeds = [b"config"]). Its
+    public key is recorded in the JSON wrapper's `issuer.license_collection`
+    field.
+
+(3) "License NFT" means a Bubblegum compressed NFT belonging to the License
+    Collection, whose `MetadataArgsV2.uri` (a) has, as its base portion
+    excluding query string, the URL of this license's JSON wrapper, and (b)
+    contains the query parameter `?root_mint=<base58>` identifying the asset
+    ID of the Subject Root NFT.
+
+(4) "Subject Root NFT" means the Bubblegum compressed NFT identified by the
+    `root_mint=<base58>` query parameter of the License NFT's URI, which
+    belongs to the TitleCore collection of the Title Protocol.
+
+(5) "Subject Content" means the video content bound to the Subject Root NFT,
+    identified by the `content_hash` recorded in the signed_json (referenced
+    by the Subject Root NFT's `MetadataArgsV2.uri`) issued by the Title
+    Protocol.
+
+(6) "Licensor" means the person or entity that, at the moment the License
+    NFT was issued (i.e., at the time the Program's `issue_license`
+    instruction was executed in a Solana transaction), was the Bubblegum
+    delegate of the Subject Root NFT.
+
+(7) "Licensee" means the person or entity recorded as owner of the License
+    NFT on the Solana blockchain (subject to the Legal-Authoritative
+    provisions of §6).
+
+(8) "Commercial use" means use directed to commercial advantage or monetary
+    compensation, including but not limited to: commercial training and
+    operation of AI models; development, sale, and distribution of products
+    or services; advertising; and revenue-generating activities.
+
+
+§2 Grant of license
+
+Licensor grants Licensee, with respect to the Subject Content, the following
+rights on a non-exclusive, worldwide, royalty-free basis (the consideration
+having been fully discharged by the License NFT's purchase price):
+
+(1) The right to reproduce, display, perform, transmit to the public, or
+    otherwise technologically use the Subject Content.
+
+(2) The right to use the Subject Content for training, inference,
+    evaluation, and fine-tuning of AI or machine-learning models, including
+    for commercial AI model training.
+
+(3) The right to create, use, and distribute derivative works based on the
+    Subject Content. Attribution to Licensor or the original creator is
+    encouraged but not legally required under this license.
+
+(4) The right to use the Subject Content in Licensee's business activities,
+    including for commercial and operational purposes.
+
+
+§3 Restrictions
+
+Licensee shall not:
+
+(1) Sublicense, assign, or rent out the right to use the Subject Content
+    to a third party in a manner that severs use rights from the License
+    NFT itself. (Transfer of the License NFT itself is governed by §5; the
+    license travels with the NFT and is not prohibited.)
+
+(2) Claim ownership of the copyright in the Subject Content. This license
+    does not transfer the copyright itself.
+
+(3) Falsify the Subject Content and present such modified content as
+    Title-Protocol-verified original content (i.e., misappropriate the
+    Title Protocol C2PA signature on modified data).
+
+
+§4 Term
+
+This license is perpetual, subject to the following termination events:
+
+(1) Licensor may terminate this license upon Licensee's material breach of
+    §3. Termination shall be by written notice (whether on-chain or
+    off-chain, addressed to the Licensee's wallet).
+
+(2) The license terminates upon burn of the License NFT via the Bubblegum
+    burn instruction.
+
+
+§5 Transfer of license with NFT
+
+If the License NFT is transferred to another party, this license terminates
+as to the original Licensee and arises anew, on identical terms, in favor
+of the new owner. The new Licensee becomes a Licensee automatically upon
+becoming the owner of the License NFT, without any clickthrough or other
+manifestation of consent.
+
+
+§6 Legal-Authoritative
+
+The license attaches by default to the owner of the License NFT as recorded
+on the Solana blockchain. However, in cases of theft, fraud, leaked private
+keys, or transfer effected under duress, a court or other competent legal
+forum may, notwithstanding the on-chain state, determine the rightful owner
+of the License NFT and adjust the attachment of this license accordingly.
+
+
+§7 Disclaimer of warranty
+
+THIS LICENSE IS PROVIDED ON AN "AS IS" BASIS WITHOUT WARRANTY OF ANY KIND,
+INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, NON-INFRINGEMENT OF THIRD-PARTY RIGHTS, AND ACCURACY
+OR COMPLETENESS OF DATA.
+
+
+§8 Limitation of liability
+
+TO THE FULLEST EXTENT PERMITTED BY LAW, LICENSOR SHALL NOT BE LIABLE FOR
+ANY DAMAGES (INCLUDING DIRECT, INDIRECT, SPECIAL, CONSEQUENTIAL DAMAGES,
+LOST PROFITS, OR DATA LOSS) ARISING FROM THIS LICENSE OR THE USE OF THE
+SUBJECT CONTENT.
+
+
+§9 Governing law and dispute resolution
+
+(1) This license shall be governed by, and construed in accordance with,
+    the laws of the Republic of Singapore, without regard to its
+    conflict-of-laws principles.
+
+(2) Any dispute arising out of or in connection with this license shall be
+    referred to and finally resolved by arbitration administered by the
+    Singapore International Arbitration Centre ("SIAC") in accordance with
+    the Arbitration Rules of SIAC for the time being in force. The seat of
+    arbitration shall be Singapore. The tribunal shall consist of one
+    arbitrator. The language of the arbitration shall be English.
+
+(3) Notwithstanding subsection (2), either Licensor or Licensee may, at
+    its sole option, seek interim or injunctive relief from any court of
+    competent jurisdiction. This includes, without limitation, urgent
+    relief sought to preserve the status quo of License NFT ownership in
+    cases of theft, fraud, key compromise, or transfer effected under
+    duress, consistent with the Legal-Authoritative principle in §6.
+
+
+§10 Nature of this license (unilateral grant)
+
+This license is a unilateral grant of copyright permission, not a contract.
+The Licensee assumes no obligations under this license, and acceptance by
+the Licensee is therefore not required. The Licensee becomes a Licensee
+automatically upon becoming the owner of the License NFT.
+
+This structure is intentionally adopted to address the absence of any
+practical clickthrough-consent mechanism on the blockchain, and the
+possibility that a secondary-market acquirer of the License NFT may never
+visit the issuer's web page (cf. J. Grimmelmann et al., "The Token-Bound
+NFT License", 2022).
+
+The restrictions in §3 are not contractual obligations of the Licensee
+toward the Licensor; rather, they are conditions on the scope of the
+grant in §2. An act by Licensee that falls outside those conditions is
+not a breach of contract, but rather a use of the Subject Content for
+which Licensee never received permission, and therefore constitutes
+copyright infringement by Licensee against Licensor.
+
+
+§11 Severability
+
+If any provision of this license is held to be invalid, illegal, or
+unenforceable, the remaining provisions shall remain in full force and
+effect.
+
+
+------------------------------------------------------------
+END OF LICENSE TEXT (commercial-v1)

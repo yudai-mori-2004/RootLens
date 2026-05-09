@@ -1,0 +1,133 @@
+RootLens License — Commercial + Redistribution (v1.0)
+license_type_id: redistribution-v1
+=========================================================================
+
+This license grants the holder of a specific License NFT a unilateral,
+non-exclusive, royalty-free copyright license to use the Subject Content
+for **commercial purposes including redistribution**, subject to the
+attached redistribution conditions. This is a unilateral grant, not a
+contract (§10).
+
+
+§1 Definitions
+
+(1)–(8) Same as commercial-v1.
+
+(9) "Redistribution" means distributing, publishing, transmitting, or
+    making accessible the Subject Content or any copy thereof to any
+    third party outside Licensee's organization.
+
+(10) "Downstream Licensee" means a third party that, as a result of
+    Licensee's redistribution, obtains a copy of the Subject Content.
+
+
+§2 Grant of license
+
+Licensor grants Licensee, with respect to the Subject Content, the
+following rights on a non-exclusive, worldwide, royalty-free basis:
+
+(1) All rights granted under commercial-v1 §2 (1)–(4).
+
+(2) The right to redistribute the Subject Content, subject to the
+    redistribution conditions in §3.
+
+
+§3 Restrictions and redistribution conditions
+
+(1) All restrictions of commercial-v1 §3.
+
+(2) **Mandatory redistribution conditions.** When redistributing the
+    Subject Content, Licensee shall comply with all of the following:
+
+    a. **License reference.** Include in the redistribution payload (e.g.,
+       README, LICENSE file, metadata, accompanying manifest) the URL
+       (`license_text_url`) and `keccak256` hash (`license_text_hash`)
+       of this license, in human-readable form. The following content
+       is illustrative and acceptable:
+
+       ```
+       This data is licensed under RootLens redistribution-v1 license.
+       Original License NFT URI: <URI of the originating License NFT>
+       License text URL: <license_text_url>
+       License text hash (keccak256): <license_text_hash>
+       ```
+
+    b. **Subject Root NFT reference.** Include in the redistribution
+       payload the asset ID (b58) of the Subject Root NFT, so that
+       Downstream Licensees can independently verify content authenticity
+       via the Title Protocol.
+
+    c. **Automatic sublicense to Downstream Licensees.** Downstream
+       Licensees automatically receive, with respect to the redistributed
+       Subject Content, a sublicense from Licensor on terms identical to
+       this license (commercial + redistribution + same conditions). A
+       Downstream Licensee need not hold the License NFT, and need not
+       perform any verification act; obtaining a redistribution payload
+       that includes the license reference required by §3(2)(a) is
+       sufficient. This structure is analogous to the Creative Commons
+       Share-Alike "viral propagation" mechanism.
+
+    d. **Distribution without modification.** The bytes of the
+       redistributed Subject Content shall match the `content_hash`
+       recorded by the Title Protocol. Edited or modified versions are
+       treated as derivative works (§3(3)); the redistribution
+       conditions in this clause apply only to the unmodified original.
+
+(3) **Distribution of derivative works.** Where Licensee creates and
+    redistributes derivative works of the Subject Content, the copyright
+    in the derivative work itself belongs to Licensee. However, where
+    the derivative work contains a substantial portion of the Subject
+    Content, use of the derivative remains subject to the restrictions
+    of this license.
+
+
+§4 Term
+
+Perpetual, subject to commercial-v1 §4-style termination events.
+
+Termination of Licensee's rights does **not** affect the rights of
+Downstream Licensees with respect to copies they have already received
+under §3(2)c. Downstream Licensees hold sublicenses directly from
+Licensor and are independent of Licensee's continuing license.
+
+
+§5 Transfer of license with NFT
+
+(Same as commercial-v1 §5.)
+
+
+§6 Legal-Authoritative
+
+(Same as commercial-v1 §6.)
+
+
+§7–§9
+
+(Same as commercial-v1 §7–§9: warranty disclaimer, limitation of liability,
+governing law = Singapore, dispute resolution = SIAC arbitration.)
+
+
+§10 Nature of this license (unilateral grant)
+
+This license is a unilateral grant of copyright permission. Both Licensee
+and any Downstream Licensee are made licensees by Licensor's unilateral
+act, without any clickthrough or other manifestation of consent on their
+part: Licensee by becoming the owner of the License NFT, Downstream
+Licensees by obtaining a redistribution payload conforming to §3(2).
+
+Notwithstanding the foregoing, a Licensee that exercises the
+redistribution right under §2(2) must comply with the redistribution
+conditions in §3(2). These conditions are not contractual obligations of
+the Licensee toward the Licensor; rather, they are conditions on the
+scope of the grant. A redistribution that does not satisfy these
+conditions falls outside the grant and constitutes copyright infringement
+by the Licensee against the Licensor.
+
+
+§11 Severability
+
+(Same as commercial-v1 §11.)
+
+
+------------------------------------------------------------
+END OF LICENSE TEXT (redistribution-v1)

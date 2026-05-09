@@ -1,0 +1,132 @@
+RootLens License — AI Training Only (v1.0)
+license_type_id: training-only-v1
+=========================================================================
+
+This license grants the holder of a specific License NFT a unilateral,
+non-exclusive, royalty-free copyright license to use the Subject Content
+**solely for the purpose of AI / machine-learning model training**.
+This is a unilateral grant, not a contract (§10).
+
+
+§1 Definitions
+
+(1)–(7) The terms "Program", "License Collection", "License NFT", "Subject
+    Root NFT", "Subject Content", "Licensor", and "Licensee" have the same
+    meanings as in the commercial-v1 license and are not repeated here.
+
+(8) "AI training use" means the use of Subject Content as part of a training
+    or evaluation dataset for the purpose of optimizing the parameters of
+    a machine-learning model. This includes:
+
+    a. Use as training data in supervised, self-supervised, or reinforcement
+       learning;
+    b. Use as source data for fine-tuning, transfer learning, or knowledge
+       distillation;
+    c. Use as benchmark data for model evaluation, validation, or testing;
+    d. Use as a source for data augmentation.
+
+
+§2 Grant of license
+
+Licensor grants Licensee, with respect to the Subject Content, the following
+rights on a non-exclusive, worldwide, royalty-free basis (consideration
+fully discharged by the License NFT's purchase price):
+
+(1) The right to copy, store on local infrastructure, transfer between
+    internal systems, and otherwise technologically use the Subject Content
+    for the purpose of Licensee's own AI training use.
+
+(2) The right of Licensee or its affiliated parties to use, on a commercial
+    or non-commercial basis, AI models (parameters, weight files, inference
+    servers, hosted services, etc.) resulting from such training. The
+    trained model is not subject to this license; Licensee retains
+    independent ownership of it.
+
+
+§3 Restrictions
+
+Licensee shall not:
+
+(1) Use the Subject Content, or any substantial portion thereof, for any
+    purpose other than AI training use. In particular, this license does
+    not permit use of the Subject Content for product or service
+    promotion, end-user playback, social-media posting, or sale or
+    distribution of the data as a product.
+
+(2) Distribute, publish, transmit, or make accessible the Subject Content
+    or any copy thereof to any third party outside Licensee's organization,
+    except:
+
+    a. To Licensee's contractors who are under Licensee's legal control
+       and bound by confidentiality obligations at least as protective as
+       those in this license, and only insofar as necessary to perform
+       training tasks for Licensee; or
+
+    b. As required by applicable law or court order.
+
+(3) Train AI models in a manner intended to cause the model to memorize and
+    output the Subject Content, in substantially reproducible form, in
+    response to inferences (i.e., training methods aimed at deliberate
+    overfitting / regurgitation are prohibited).
+
+(4) Create derivative works of the Subject Content. This license does not
+    permit derivative works. Learned representations that arise as
+    incidental byproducts of AI training are not deemed derivative works
+    for purposes of this clause.
+
+(5) Sublicense, assign, or rent out the right to use the Subject Content
+    to a third party in a manner that severs use rights from the License
+    NFT itself. (Transfer of the License NFT itself is governed by §5.)
+
+
+§4 Term
+
+This license is perpetual, subject to the following termination events:
+
+(1) Licensor may terminate this license upon Licensee's material breach of §3.
+
+(2) The license terminates upon burn of the License NFT.
+
+Upon termination, Licensee shall destroy all copies of the Subject Content.
+However, AI models (parameters, weight files, derivative models, etc.) for
+which training was completed prior to termination may continue to be held
+and used by Licensee after termination. This reflects that this license
+grants only the right to access and train upon the data, and does not
+extend its termination effect to the resulting model.
+
+
+§5 Transfer of license with NFT
+
+If the License NFT is transferred to another party, this license terminates
+as to the original Licensee and arises anew, on identical terms, in favor
+of the new owner. AI models for which training was completed by the
+original Licensee survive transfer pursuant to §4.
+
+
+§6 Legal-Authoritative
+
+(Same as commercial-v1 §6: courts may correct ownership in cases of theft,
+fraud, key compromise, or duress.)
+
+
+§7–§9
+
+(Same as commercial-v1 §7–§9: warranty disclaimer, limitation of liability,
+governing law = Singapore, dispute resolution = SIAC arbitration.)
+
+
+§10 Nature of this license (unilateral grant)
+
+(Same as commercial-v1 §10. In particular, the restrictions in §3 are
+not contractual obligations of Licensee but conditions on the scope of
+the grant in §2. Acts outside those conditions constitute copyright
+infringement, not contract breach.)
+
+
+§11 Severability
+
+(Same as commercial-v1 §11.)
+
+
+------------------------------------------------------------
+END OF LICENSE TEXT (training-only-v1)
