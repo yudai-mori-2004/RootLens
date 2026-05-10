@@ -33,6 +33,11 @@ v0.1.2 は仕様策定前の検証フェーズであり、仕様書 (SPECS_JA) /
 | # | Unit | 役割 |
 |---|---|---|
 | 06 | [License NFT Solana program (Unit D)](tasks/06-license-nft-program/) | SPECS §5 — issue_license / claim_revenue。Bubblegum proof 検証 + USDC 95:5 分配を atomic に実行 |
+| 07 | [Co-sign API server (Unit E)](tasks/07-co-sign-api/) | SPECS §5.3 / §6.3 — KMS で守られた hot wallet が delegate co-sign を提供。catalog/price 等のポリシー検証は web 側、on-chain 検証は D に委ねる |
+| 08 | [Staking client (Unit G)](tasks/08-staking-client/) | SPECS §4.2 / §4.5 — Bubblegum delegate 命令の TS ラッパー。Root NFT の delegate を E の cosign authority に切替/解除する |
+| 09 | [TEE + C2PA 撮影署名 (Unit A)](tasks/09-tee-c2pa/) | SPECS §2.7 / §4.4 / §4.6 — Secure Enclave / StrongBox 内で生成した鍵で C2PA 署名。**iOS のみ verified。Android は意図的に空、後続タスク** |
+| 10 | [TP register client (Unit B)](tasks/10-unit-b-tp-register/) | SPECS §3 — 任意のメディア + owner wallet を受け取り Solana devnet 上で Root NFT を発行。クライアント側に永続鍵を持たない。本番 consumer = sandbox 04 MintView |
+| 11 | [R2 upload + dedup (Unit F)](tasks/11-unit-f-r2-upload/) | SPECS §4.3 — TP から得た content_hash を R2 object key にして HEAD ベースで dedup。新規アップロードのみ presigned PUT URL を発行する |
 
 ## 仕様 + 設計ドキュメント
 
