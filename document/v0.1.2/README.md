@@ -38,6 +38,7 @@ v0.1.2 は仕様策定前の検証フェーズであり、仕様書 (SPECS_JA) /
 | 09 | [TEE + C2PA 撮影署名 (Unit A)](tasks/09-tee-c2pa/) | SPECS §2.7 / §4.4 / §4.6 — Secure Enclave / StrongBox 内で生成した鍵で C2PA 署名。**iOS のみ verified。Android は意図的に空、後続タスク** |
 | 10 | [TP register client (Unit B)](tasks/10-unit-b-tp-register/) | SPECS §3 — 任意のメディア + owner wallet を受け取り Solana devnet 上で Root NFT を発行。クライアント側に永続鍵を持たない。本番 consumer = sandbox 04 MintView |
 | 11 | [R2 upload + dedup (Unit F)](tasks/11-unit-f-r2-upload/) | SPECS §4.3 — TP から得た content_hash を R2 object key にして HEAD ベースで dedup。新規アップロードのみ presigned PUT URL を発行する |
+| 12 | [VLM gate server (Unit H)](tasks/12-unit-h-vlm-gate/) | SPECS §2.3 step 3 / step 6 — 撮影 frame + 条件文を受けて Claude Sonnet で `{score, match, reason}` を返す server-side endpoint。API key を device から取り上げ、prompt injection 耐性を持たせる |
 
 ## 仕様 + 設計ドキュメント
 
