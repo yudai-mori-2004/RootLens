@@ -16,6 +16,8 @@ export const config = {
   uploadUrlEndpoint: `${SERVER_URL}/api/v1/upload-url`,
   /** パイプラインB: ページ作成 — 仕様書 §6.4 */
   publishUrl: `${SERVER_URL}/api/v1/publish`,
+  /** Unit H: VLM gate 判定 — 仕様書 §2.3 step 3 / step 6 */
+  vlmGateUrl: `${SERVER_URL}/api/v1/vlm-gate`,
   /** 証明書発行API */
   deviceCertificateUrl: `${SERVER_URL}/api/v1/device-certificate`,
   /** 証明書更新API */

@@ -119,17 +119,39 @@ client 側 (sandbox 04) も 30 秒以内に応答しない場合は採点なし�
 
 ## 完了条件
 
-- [ ] `web/lib/server/vlm-gate.ts` で 3 provider 判定ロジックを実装 (pure, fetch だけ依存)
-- [ ] `web/app/api/v1/vlm-gate/route.ts` で endpoint を提供
-- [ ] system prompt に injection 耐性 rule を明記
-- [ ] taskName / conditionText / imageBase64 の上限長 + 形式 validation
-- [ ] vitest test (pure + route) が all green
-- [ ] `RUN_LIVE_VLM=1 npx vitest run vlm-gate.live.test.ts` で実 Claude が動作する
-- [ ] `web/.env.example` に `ANTHROPIC_API_KEY` 追記 (まだ無ければ)
+- [x] `web/lib/server/vlm-gate.ts` で 3 provider 判定ロジックを実装 (pure, fetch だけ依存)
+- [x] `web/app/api/v1/vlm-gate/route.ts` で endpoint を提供
+- [x] `app/src/services/vlmGate.ts` で mobile SDK ラッパーを提供 (image manipulator + fetch)
+- [x] `app/src/config.ts` に `vlmGateUrl` を追加
+- [x] system prompt に injection 耐性 rule を明記
+- [x] taskName / conditionText / imageBase64 の上限長 + 形式 validation
+- [x] vitest test (pure + route) が all green (48 test, full suite 196 pass)
+- [x] `RUN_LIVE_VLM=1 npx vitest run vlm-gate.live.test.ts` で実 Claude が動作する (5.5s で 2 件 pass: 黒画像 → score=0、injection 攻撃 → score=0 で reason に "hacked" 含まず)
+- [x] `web/.env.example` に `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY` 追記
+
+## モジュール境界 (= 何を import すれば使えるか)
+
+このユニットは 3 ファイルで完結する。各レイヤーが単独に import 可能:
+
+| import path | 役割 | 想定 caller |
+|---|---|---|
+| `@/lib/server/vlm-gate` | pure 判定ロジック (`evaluateTaskGateRaw`, `parseJsonResponse`, types, errors) | 別 server route / cron / pipeline (HTTP を経由しない直接呼び出し) |
+| `POST /api/v1/vlm-gate` | HTTP endpoint。device 等の untrusted client 向け窓口 | mobile / web frontend / 外部 service |
+| `@/services/vlmGate` (app/) | mobile SDK ラッパー。expo-image-manipulator で前処理→endpoint POST | sandbox 04 CaptureView / 統合フェーズの撮影フロー |
+
+server の pure layer と HTTP layer の関係:
+- HTTP layer は **入力 validation** + **provider/key 解決** + **error mapping** だけを行う
+- 判定ロジックそのものは pure layer に集約されているため、別 server コードが直接 `evaluateTaskGateRaw` を呼ぶことが可能 (例: 動画 batch 処理で frame 抽出後にまとめて判定)
+
+mobile SDK と HTTP の関係:
+- mobile SDK は image URI → base64 圧縮 → endpoint POST → typed response 返却
+- caller は `evaluateTaskGate({imageUri, taskName, conditionText})` を await するだけ
+- AbortSignal 対応 (capture 中断時に propagate できる)
+- API key は SDK にも device にも一切持たない
 
 ## スコープ外 / 後続タスク
 
-- mobile client 側の rewire (sandbox 04 / CaptureView を `EXPO_PUBLIC_ANTHROPIC_API_KEY` 経由から `/api/v1/vlm-gate` 経由に切替) — 統合フェーズで行う
+- sandbox 04 / CaptureView の rewire (legacy `EXPO_PUBLIC_ANTHROPIC_API_KEY` 直叩き → 本 SDK ラッパー経由) — 統合フェーズで行う
 - 認証 (現状 unauthenticated。本番は KYC 済 user の token 必須にする — 別ユニット)
 - rate limit (per-user / per-IP) — 別ユニット
 - prompt の更なる強化 (jailbreak 耐性テスト網羅) — 必要に応じて別 task
