@@ -39,6 +39,7 @@ v0.1.2 は仕様策定前の検証フェーズであり、仕様書 (SPECS_JA) /
 | 10 | [TP register client (Unit B)](tasks/10-unit-b-tp-register/) | SPECS §3 — 任意のメディア + owner wallet を受け取り Solana devnet 上で Root NFT を発行。クライアント側に永続鍵を持たない。本番 consumer = sandbox 04 MintView |
 | 11 | [R2 upload + dedup (Unit F)](tasks/11-unit-f-r2-upload/) | SPECS §4.3 — TP から得た content_hash を R2 object key にして HEAD ベースで dedup。新規アップロードのみ presigned PUT URL を発行する |
 | 12 | [VLM gate server (Unit H)](tasks/12-unit-h-vlm-gate/) | SPECS §2.3 step 3 / step 6 — 撮影 frame + 条件文を受けて Claude Sonnet で `{score, match, reason}` を返す server-side endpoint。API key を device から取り上げ、prompt injection 耐性を持たせる |
+| 13 | [Privacy blur — face only (Unit C)](tasks/13-unit-c-privacy-blur/) | SPECS §2.3 step 7 — 録画済 mp4 の顔を Vision で検出し on-device で Gaussian blur。**iOS のみ。テキスト blur は別ユニット** (Vision OCR は recognizer であり PC 画面等の密集シーンで recall hole / false positive 不可避、DBNet/PP-OCRv5_det CoreML 化を後続タスク化) |
 
 ## 仕様 + 設計ドキュメント
 

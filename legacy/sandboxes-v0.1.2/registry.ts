@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import HandPoseScreen from './01-hand-pose-gesture/HandPoseScreen';
 import TaskGateScreen from './02-vlm-task-gate/TaskGateScreen';
 import CollectionFlowScreen from './04-collection-flow/CollectionFlowScreen';
+import PrivacyBlurScreen from './05-privacy-blur/PrivacyBlurScreen';
 
 export interface SandboxEntry {
   id: string;
@@ -29,5 +30,11 @@ export const sandboxes: SandboxEntry[] = [
     title: '04: Collection Flow',
     description: 'タスク選択 → ジェスチャー連動 VLM 開始判定 → 録画 → 終了判定 (統合デモ)',
     screen: CollectionFlowScreen,
+  },
+  {
+    id: '05-privacy-blur',
+    title: '05: Privacy Blur (Unit C)',
+    description: 'sandbox 内で録画 → 顔をオンデバイス blur (Vision + CoreImage + Metal)。text blur は別ユニットで対応',
+    screen: PrivacyBlurScreen,
   },
 ];
