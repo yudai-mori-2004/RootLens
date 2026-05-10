@@ -118,7 +118,7 @@ export async function fetchAssetWithProof(
   if (!asset.compression?.compressed) {
     throw new Error(`asset ${id} is not a compressed NFT`);
   }
-  // delegate 未設定 (= owner 自身) の場合 helius は null を返す → owner にフォールバック
+  // delegate 未設定 (= owner 自身) の場合 DAS は null を返す → owner にフォールバック
   const leafOwner = new PublicKey(asset.ownership.owner);
   const leafDelegate = asset.ownership.delegate
     ? new PublicKey(asset.ownership.delegate)
@@ -162,7 +162,7 @@ export interface DelegateStatus {
  * 直近 staking 状態を返す。staking ボタン UI 表示判定に使う。
  *
  * @param rootAssetId  Root NFT の asset id
- * @param dasUrl       DAS 対応の RPC endpoint (helius/triton/quicknode)
+ * @param dasUrl       DAS 対応の RPC endpoint (devnet では Solana 公式 api.devnet.solana.com、mainnet では helius/triton/quicknode 等)
  */
 export async function getDelegateStatus(
   rootAssetId: PublicKey,

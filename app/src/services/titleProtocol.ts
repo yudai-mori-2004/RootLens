@@ -15,9 +15,50 @@ import * as FileSystem from 'expo-file-system';
 import { AesGcmBridge, nativeCryptoProvider } from './nativeCryptoProvider';
 
 // Devnet RPC は env で上書き可能 (.env の EXPO_PUBLIC_SOLANA_RPC_URL)。
+// Helius は devnet サポートを縮退したので公式 RPC を default に。DAS API も同 endpoint で出る。
 const SOLANA_RPC_URL =
-  process.env.EXPO_PUBLIC_SOLANA_RPC_URL ??
-  'https://devnet.helius-rpc.com/?api-key=7bdef7b8-8661-4449-840c-aa835168f2b1';
+  process.env.EXPO_PUBLIC_SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
+
+// iOS app から TP gateway (plain HTTP) に直 fetch すると iOS 26.x で
+// "Network request failed" になる (ATS=arbitrary loads でも IP literal + plain HTTP
+// が block される)。Vercel HTTPS proxy 経由で叩く。
+// 動画 blob 本体は presigned URL で直接 S3 (HTTPS) に PUT するので proxy しない。
+import { config } from '../config';
+const TP_PROXY_BASE = `${config.serverUrl}/api/v1/tp-proxy`;
+
+/**
+ * Vercel HTTPS proxy 経由で TP gateway を叩く。
+ * SDK の gatewayPost を完全 bypass。
+ * proxy route: web/app/api/v1/tp-proxy/[...path]/route.ts
+ */
+async function gatewayPostDirect<T>(
+  gatewayUrl: string,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  // path は "/upload-url" 等。proxy も同じ subpath を expect する。
+  const subpath = path.replace(/^\//, '');
+  const proxyUrl = `${TP_PROXY_BASE}/${subpath}`;
+  let res: Response;
+  try {
+    res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // proxy 側で whitelist 内なら header 経由で gateway 切替可能
+        'X-TP-Gateway': gatewayUrl.replace(/\/$/, ''),
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e: any) {
+    throw new Error(`[TP proxy] POST ${proxyUrl} failed: ${e?.message ?? e}`);
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '<no body>');
+    throw new Error(`[TP proxy] ${subpath} → HTTP ${res.status}: ${text.slice(0, 300)}`);
+  }
+  return (await res.json()) as T;
+}
 
 export interface TitleProtocolResult {
   contentHash: string;
@@ -86,8 +127,24 @@ export async function registerOnTitleProtocol(
 
   const client = new TitleClient(globalConfig, { crypto: nativeCryptoProvider });
 
-  const node = await client.selectNode();
-  lap('selectNode done');
+  // SDK の selectNode() は Promise.any + AbortController で health check するが、
+  // iOS の Hermes / RN fetch では何故か silent に hang して "No healthy TEE node found"
+  // で fail する (Mac/web では OK)。on-chain の trusted_tee_nodes から直接 1 件取って
+  // TeeSession 形に組み立てて bypass する。Health check 不要なら EXPO_PUBLIC_TP_GATEWAY_ENDPOINT
+  // で endpoint を強制 pin することも可能。
+  const teeNodes = client.getTrustedTeeNodes();
+  if (teeNodes.length === 0) throw new Error('No TEE nodes registered on-chain');
+  const pinned = (process.env as Record<string, string | undefined>).EXPO_PUBLIC_TP_GATEWAY_ENDPOINT;
+  const picked = pinned
+    ? teeNodes.find((n) => n.gateway_endpoint.replace(/\/$/, '') === pinned.replace(/\/$/, ''))
+    : teeNodes[0];
+  if (!picked) throw new Error(`Pinned endpoint ${pinned} not in on-chain TEE node list`);
+  const node = {
+    gatewayUrl: picked.gateway_endpoint.replace(/\/$/, ''),
+    encryptionPubkey: picked.encryption_pubkey,
+    signingPubkey: picked.signing_pubkey,
+  };
+  lap(`node picked (bypass health-check): ${node.gatewayUrl}`);
 
   // KEM: X25519 ECDH (JS)
   const teeEncPubkey = nativeCryptoProvider.fromBase64(node.encryptionPubkey);
@@ -106,7 +163,7 @@ export async function registerOnTitleProtocol(
   const metadata = JSON.stringify({ owner_wallet: ownerWallet });
   const aad = '/verify';
 
-  await AesGcmBridge.buildAndEncryptPayload(
+  const encryptResult = await AesGcmBridge.buildAndEncryptPayload(
     contentPath,
     metadata,
     toBase64(requestKey),
@@ -114,42 +171,101 @@ export async function registerOnTitleProtocol(
     aad,
     payloadPath,
   );
+  console.log('[TP encrypt] reported size:', encryptResult?.size, 'path:', payloadPath);
   lap('native encrypt done');
 
   // Upload (ファイルから直接送信)
   const fileInfo = await FileSystem.getInfoAsync(`file://${payloadPath}`);
   const payloadSize = (fileInfo as any).size || 0;
+  console.log('[TP encrypt] on-disk size:', payloadSize, 'exists:', fileInfo.exists);
+  if (payloadSize < 64) {
+    throw new Error(`[TP encrypt] payload size suspiciously small (${payloadSize} bytes) — encrypt likely failed`);
+  }
 
-  const { uploadUrl, downloadUrl } = await client.getUploadUrl(
-    node.gatewayUrl,
-    payloadSize,
-    'application/octet-stream',
-  );
+  // SDK の gatewayPost は new URL(path, base) を使ってて iOS で詰まるケースが報告された。
+  // 直 fetch で gateway を叩く helper を使う。
+  const upload = await gatewayPostDirect<{
+    upload_url: string;
+    download_url: string;
+    expires_at?: number;
+  }>(node.gatewayUrl, '/upload-url', {
+    content_size: payloadSize,
+    content_type: 'application/octet-stream',
+  });
+  const uploadUrl = upload.upload_url;
+  const downloadUrl = upload.download_url;
   lap('getUploadUrl done');
 
-  await FileSystem.uploadAsync(uploadUrl, `file://${payloadPath}`, {
+  const uploadResp = await FileSystem.uploadAsync(uploadUrl, `file://${payloadPath}`, {
     httpMethod: 'PUT',
     headers: { 'Content-Type': 'application/octet-stream' },
     uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
   });
+  console.log('[TP upload] S3 status=', uploadResp.status, 'body_len=', uploadResp.body?.length ?? 0);
+  if (uploadResp.status < 200 || uploadResp.status >= 300) {
+    throw new Error(`[TP upload] S3 PUT failed: HTTP ${uploadResp.status} body=${(uploadResp.body ?? '').slice(0, 300)}`);
+  }
   lap('upload done');
 
+  // Sanity check: GET back from S3, verify byte count matches what we PUT.
+  // gateway が "payload too short" を返すのは大抵この段階のサイズ齟齬。
+  try {
+    const verifyHead = await fetch(downloadUrl, { method: 'HEAD' });
+    const lenHdr = verifyHead.headers.get('content-length');
+    console.log('[TP upload verify] S3 HEAD status=', verifyHead.status, 'content-length=', lenHdr);
+    if (verifyHead.ok && lenHdr && Number(lenHdr) !== payloadSize) {
+      throw new Error(
+        `[TP upload verify] S3 stored ${lenHdr} bytes but we PUT ${payloadSize} bytes — upload corrupted`,
+      );
+    }
+  } catch (e: any) {
+    console.warn('[TP upload verify] HEAD failed (continuing):', e?.message ?? e);
+  }
+
   // verify
-  const encryptedResponse = await client.verifyRaw(node.gatewayUrl, {
-    download_url: downloadUrl,
-    processor_ids: buildProcessorIds(signerOrg, mediaType),
-  });
+  const encryptedResponse = await gatewayPostDirect<{ nonce: string; ciphertext: string; [k: string]: unknown }>(
+    node.gatewayUrl,
+    '/verify',
+    {
+      download_url: downloadUrl,
+      processor_ids: buildProcessorIds(signerOrg, mediaType),
+    },
+  );
   lap('verify done');
+  // 診断ログ: gateway が encrypted response 形式で返してきてるか確認 (key 漏洩しない範囲で表示)
+  console.log('[TP verify resp keys]', Object.keys(encryptedResponse).join(','));
+  console.log(
+    `[TP verify resp shape] nonce_len=${encryptedResponse.nonce?.length ?? 'null'} ` +
+      `ct_len=${encryptedResponse.ciphertext?.length ?? 'null'}`,
+  );
+  if (!encryptedResponse.nonce || !encryptedResponse.ciphertext) {
+    throw new Error(
+      `[TP verify] gateway returned non-encrypted body: ${JSON.stringify(encryptedResponse).slice(0, 400)}`,
+    );
+  }
 
   // decrypt (レスポンスは小さいので JS CryptoProvider で十分)
   const verifyAad = new TextEncoder().encode(aad);
-  const responsePlaintext = await decryptResponse(
-    responseKey,
-    encryptedResponse.nonce,
-    encryptedResponse.ciphertext,
-    verifyAad,
-    nativeCryptoProvider,
+  console.log(
+    `[TP decrypt prep] respKey hex16=${Array.from(responseKey.slice(0, 8)).map((b) => b.toString(16).padStart(2, '0')).join('')} ` +
+      `aad_bytes=${verifyAad.length} aad_text="${aad}"`,
   );
+  let responsePlaintext: Uint8Array;
+  try {
+    responsePlaintext = await decryptResponse(
+      responseKey,
+      encryptedResponse.nonce,
+      encryptedResponse.ciphertext,
+      verifyAad,
+      nativeCryptoProvider,
+    );
+  } catch (e: any) {
+    throw new Error(
+      `[TP decrypt failed] ${e?.message ?? e}\n` +
+        `respKey_first8_hex=${Array.from(responseKey.slice(0, 8)).map((b) => b.toString(16).padStart(2, '0')).join('')} ` +
+        `nonce_b64=${encryptedResponse.nonce} ct_len_b64=${encryptedResponse.ciphertext.length}`,
+    );
+  }
   const verifyResponse = JSON.parse(new TextDecoder().decode(responsePlaintext));
   lap('decrypt done');
 
@@ -157,10 +273,14 @@ export async function registerOnTitleProtocol(
   const signRequests = verifyResponse.results.map((r: any) => ({
     signed_json: r.signed_json,
   }));
-  const mintRes = await client.signAndMintRaw(node.gatewayUrl, {
-    recent_blockhash: '',
-    requests: signRequests,
-  });
+  const mintRes = await gatewayPostDirect<{ tx_signatures: string[] }>(
+    node.gatewayUrl,
+    '/sign-and-mint',
+    {
+      recent_blockhash: '',
+      requests: signRequests,
+    },
+  );
   lap('sign-and-mint done');
 
   // cleanup
