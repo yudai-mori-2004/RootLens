@@ -1,9 +1,7 @@
 {
-  "platforms": ["ios", "android"],
+  "platforms": ["ios"],
   "ios": {
     "modules": ["C2paBridgeModule"]
   },
-  "android": {
-    "modules": ["io.rootlens.c2pa.C2paBridgeModule"]
-  }
+  "_android_intentionally_omitted": "Android is not yet implemented. See android/README.md."
 }
