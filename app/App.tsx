@@ -4,88 +4,35 @@ import 'fast-text-encoding';
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import {
-  useFonts,
-  Fraunces_300Light,
-  Fraunces_400Regular,
-  Fraunces_500Medium,
-  Fraunces_600SemiBold,
-} from '@expo-google-fonts/fraunces';
 
-import HomeScreen from './src/sandboxes/HomeScreen';
-import { sandboxes } from './src/sandboxes/registry';
+import { RootNavigator } from './src/app/RootNavigator';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
+import { colors } from './src/theme';
 
-export type SandboxStackParamList = {
-  Home: undefined;
-} & { [K in string]: undefined };
+// 統合フェーズ entry point。
+// CertGate (Unit A の TEE 証明書プロビジョニング) を起動時に解決してから
+// RootNavigator (Login → TaskList → Capture → Review → SignAndMint → Stake → Done) に入る。
 
-const Stack = createNativeStackNavigator<SandboxStackParamList>();
-
-// app 全体の color theme (white-based + navy accent)。
-// React Navigation の header / background も合わせる。
-const appNavTheme = {
+const navTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: '#fafaf7',
-    card: '#ffffff',
-    border: '#dcd8d0',
-    primary: '#0a1f44',
-    text: '#0a1f44',
+    background: colors.background,
+    card: colors.background,
+    border: colors.border,
+    primary: colors.accent,
+    text: colors.textPrimary,
   },
 };
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    Fraunces_300Light,
-    Fraunces_400Regular,
-    Fraunces_500Medium,
-    Fraunces_600SemiBold,
-  });
-
-  if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fafaf7' }}>
-        <ActivityIndicator color="#0a1f44" />
-      </View>
-    );
-  }
-
   return (
     <SafeAreaProvider>
       <CertGate>
-        <NavigationContainer theme={appNavTheme}>
-          <Stack.Navigator
-            screenOptions={{
-              headerStyle: { backgroundColor: '#ffffff' },
-              headerTintColor: '#0a1f44',
-              headerTitleStyle: {
-                fontFamily: 'Fraunces_500Medium',
-                fontSize: 17,
-                color: '#0a1f44',
-              },
-              headerShadowVisible: false,
-              contentStyle: { backgroundColor: '#fafaf7' },
-            }}
-          >
-            <Stack.Screen
-              name="Home"
-              component={HomeScreen}
-              options={{ title: 'RootLens' }}
-            />
-            {sandboxes.map((s) => (
-              <Stack.Screen
-                key={s.id}
-                name={s.id}
-                component={s.screen}
-                options={{ title: 'RootLens' }}
-              />
-            ))}
-          </Stack.Navigator>
+        <NavigationContainer theme={navTheme}>
+          <RootNavigator />
           <StatusBar style="dark" />
         </NavigationContainer>
       </CertGate>
@@ -94,10 +41,9 @@ export default function App() {
 }
 
 /**
- * 起動時の Device Certificate プロビジョニングをブロックゲートにする。
- *   - checking / provisioning : 全画面スピナー (UI ブロック)
- *   - ready / renewing       : children を描画 (renewing は background)
- *   - error                  : DEV では透過、本番ではエラー UI + リトライ
+ * 起動時の Device Certificate プロビジョニング (Unit A) をブロックゲートにする。
+ * checking / provisioning は全画面スピナー、ready / renewing は children を描画。
+ * error は DEV では透過、本番では retry UI。
  */
 const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const cert = useCertificateProvisioning();
@@ -105,7 +51,7 @@ const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (cert.status === 'checking' || cert.status === 'provisioning') {
     return (
       <View style={gateStyles.center}>
-        <ActivityIndicator color="#0a1f44" />
+        <ActivityIndicator color={colors.accent} />
         <Text style={gateStyles.eyebrow}>DEVICE CERTIFICATE</Text>
         <Text style={gateStyles.body}>
           {cert.status === 'checking' ? 'Checking…' : 'Provisioning…'}
@@ -129,45 +75,26 @@ const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   // ready / renewing は children に passthrough。
-  // renewing 中の subtle indicator が欲しければ children の上に薄い banner を載せる手もある。
   return <>{children}</>;
 };
 
 const gateStyles = StyleSheet.create({
   center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 12,
-    backgroundColor: '#fafaf7',
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    padding: 24, gap: 12, backgroundColor: colors.background,
   },
   eyebrow: {
-    fontFamily: 'Menlo',
-    fontSize: 11,
-    letterSpacing: 1.6,
-    fontWeight: '600',
-    color: '#5a6b7c',
-    marginTop: 16,
+    fontSize: 11, letterSpacing: 1.6, fontWeight: '600',
+    color: colors.textSecondary, marginTop: 16,
   },
   body: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#1a2940',
-    textAlign: 'center',
-    maxWidth: 320,
+    fontSize: 14, lineHeight: 20, color: colors.textPrimary,
+    textAlign: 'center', maxWidth: 320,
   },
   retry: {
     marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 4,
-    backgroundColor: '#0a1f44',
+    paddingVertical: 10, paddingHorizontal: 24,
+    borderRadius: 6, backgroundColor: colors.accent,
   },
-  retryLabel: {
-    color: '#fafaf7',
-    fontFamily: 'Fraunces_500Medium',
-    fontSize: 14,
-    letterSpacing: 0.2,
-  },
+  retryLabel: { color: colors.white, fontSize: 14, fontWeight: '600' },
 });
