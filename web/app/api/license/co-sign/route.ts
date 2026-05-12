@@ -46,7 +46,8 @@ function getConnection(): Connection {
 
 function getCatalog() {
   // env が設定されていればそこから YAML を読む (dev / staging で外部編集したい時)。
-  // 未設定なら bundle に焼かれた default catalog を使う (Vercel 等 env を渡せない環境向け)。
+  // 未設定 / ファイル読み失敗 (Vercel 等 YAML を bundle に同梱できない環境) なら
+  // bundle に焼かれた default catalog を使う。
   const path = process.env.COSIGN_CATALOG_PATH;
   if (!path) {
     if (cachedCatalog && cachedCatalogPath === "::default::") return cachedCatalog;
@@ -55,8 +56,14 @@ function getCatalog() {
     return cachedCatalog;
   }
   if (cachedCatalog && cachedCatalogPath === path) return cachedCatalog;
-  cachedCatalog = loadCatalogFromFile(path);
-  cachedCatalogPath = path;
+  try {
+    cachedCatalog = loadCatalogFromFile(path);
+    cachedCatalogPath = path;
+  } catch (e) {
+    console.warn(`[cosign] catalog file at ${path} unreadable (${(e as Error).message}), using inline default`);
+    cachedCatalog = defaultCatalog();
+    cachedCatalogPath = "::default::";
+  }
   return cachedCatalog;
 }
 
