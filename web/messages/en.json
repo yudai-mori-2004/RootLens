@@ -25,7 +25,42 @@
     "home": {
       "closingTitle": "Start recording. Start earning.",
       "closingDesc": "Join the waitlist for early access. Home robot companies are waiting for data like yours.",
-      "closingCtaWhy": "Learn more"
+      "closingCtaWhy": "Learn more",
+      "whyBlockchainLink": "Why we use blockchain →"
+    },
+    "whyBlockchain": {
+      "meta": {
+        "title": "Why Blockchain",
+        "description": "Why RootLens records every license on a public ledger."
+      },
+      "heroTitle": "Why blockchain to sell AI training data",
+      "heroSubtitle": "We are a startup. Buyers have no reason to trust our internal records. So we put the records where anyone can check them.",
+      "s1Title": "AI companies used to not care where the data came from",
+      "s1p1": "For most of AI's recent history, training data lived in a gray area. Models were trained on scraped web content, public datasets with unclear licenses, and purchased data with varying documentation. It worked. Not because the system was rigorous, but because nobody was checking.",
+      "s1p2": "That era is ending. Getty Images sued Stability AI. The New York Times sued OpenAI. Artists filed class actions over image generators. These cases forced a question the industry had been comfortable ignoring. Did you have the right to use this data?",
+      "s1p3": "Regulation followed. The EU AI Act introduces fines starting August 2026 for AI companies that can't document their training data provenance. The timeline is set.",
+      "s2Title": "The big players get by on reputation",
+      "s2p1": "Despite all of this, the current licensing system functions. Scale AI, Appen, TELUS Digital. These companies sell datasets to AI labs, claim proper licensing, and their claims are accepted.",
+      "s2p2": "But notice what the trust is actually resting on. Not documentation. Not independent audits. The company itself. Scale AI has years of enterprise relationships, legal teams, IP indemnification, and a brand worth protecting. Their word is accepted because the cost of that word being false would be catastrophic for them.",
+      "s2p3": "Self-reporting works when the self-reporter has enough to lose.",
+      "s3Title": "We play the same game but get a different result",
+      "s3p1": "RootLens is a startup. We collect egocentric household video for robotic AI training. Our data is real, our licensing is legitimate, and our consent records are thorough.",
+      "s3p2": "But when we sit across from an AI company, every piece of evidence we can offer was created by us. Our terms of service. Our consent database. Our internal records. All of it lives in our systems. If we disappear tomorrow, or if it turns out we cut corners, the buyer has nothing but a contract claim against a company that may no longer exist.",
+      "s3p3": "A risk manager's rational response is to buy from someone established instead. Being small is, by itself, a reason not to trust us.",
+      "s4Title": "We made our licensing records publicly verifiable",
+      "s4p1": "We can't fast-track reputation. So we had to change what the trust rests on entirely.",
+      "s4p2": "Instead of asking buyers to trust our records, we put the records where anyone can check them. Every license issued, every payment to a rights holder, every revenue split. All recorded on Solana. Not in our database. On a public ledger that we cannot edit, delete, or misrepresent.",
+      "s4p3": "An AI company evaluating our data doesn't need to trust us. They can verify the licensing chain themselves. How many licenses exist for a given clip. Whether the rights holder was paid. How much. When.",
+      "s4p4": "This is why we use blockchain. Not as a feature. As the only way a company our size can offer the same level of assurance that an established player provides through reputation alone.",
+      "s5Title": "That puts us at zero. Here's why someone would choose us.",
+      "s5p1": "Everything above just gets us in the door. It doesn't explain why someone would pick us over an established alternative. That comes from how we treat the people who create the data.",
+      "s5p2": "Most data platforms today work on a buy-out model. A contributor films something, gets paid once, and gives up all rights. The platform can then sell that data to as many buyers as it wants. The contributor never sees another dollar, no matter how many times their data is sold. This makes business sense for the platform. Buy once, sell many times. That's how margins grow.",
+      "s5p3": "We chose differently. With RootLens, the person who films the data keeps their rights. Every time an AI company buys a license, revenue goes directly to the creator through a smart contract. If a clip gets licensed ten times, the creator earns ten times.",
+      "s5p4": "If I were the one filming my kitchen and uploading footage, I know which model I'd prefer. One where I get paid once and that's it, or one where my clip sits in my wallet and generates income whenever someone finds it useful.",
+      "s5p5": "We didn't start from \"how do we optimize contributor retention.\" We started from \"each person who films for us is a rights holder, not a data source, and we should treat them that way.\" That's the product we wanted to build.",
+      "s5p6": "Our bet is that when the deal is genuinely good for the person filming, they come back. A notification pops up saying someone licensed your laundry video. That's a reason to film another one. Not because we gamified anything, but because there's real money showing up.",
+      "s5p7": "For a startup that can't match Scale AI's recruitment budget or Appen's managed workforce, this matters. We don't need to hire and train thousands of contributors. The structure does the work. People film because each clip is another asset. They care about quality because better clips get licensed more.",
+      "ctaWaitlist": "Join the early waitlist →"
     },
     "technology": {
       "heroTitle": "Proof of capture that survives social media.",
@@ -66,22 +101,17 @@
   },
   "lp": {
     "hero": {
-      "title": "Train home robots.\nGet paid.",
-      "tagline": "Film your day. Train home robots. Get paid.",
-      "description": "RootLens is a marketplace where anyone can record household tasks and sell that data to home robot companies.",
+      "title": "Train robots.\nGet paid.",
+      "tagline": "Film your day. Train robots. Get paid.",
+      "description": "A camera app where anyone can film household tasks and get paid when robot companies license the footage.",
       "ctaDemo": "See how it works",
       "ctaHow": "Learn more"
     },
     "problem": {
-      "title": "Robots can move. But they can't work.",
-      "p1": "AI has made humanoid robots move almost like humans. Today, you can already buy a home robot for around $20,000.",
-      "p2": "But there is one big problem. These robots still cannot do most household tasks by themselves. Many tasks still require humans to control the robot remotely.",
-      "p3": "Why? Because robots know how to move, but they do not know how to use things in real homes.",
-      "example": "Think about a dishwasher.",
-      "p4": "Every home is different. Every model is different. Where do you put the dishes? Where does the detergent go? Which button do you press? Even humans get confused at first.",
-      "p5": "But once we watch someone do it, we understand. Robots learn the same way.",
-      "p6": "They need real videos of people doing real household tasks — dishwashing, cooking, laundry, cleaning.",
-      "p7": "That data does not exist at scale. So we are building RootLens."
+      "title": "Robots learn by watching people. But the footage barely exists.",
+      "p1": "Robot intelligence is evolving at an incredible pace. AI is going beyond language and images into physical action. Robots are learning to move by watching videos of people performing tasks.",
+      "p2": "But high-quality footage of real household tasks is extremely scarce. Collecting robot training data the traditional way requires expensive hardware, physical environments, and human operators.",
+      "p3": "Human action video is the critical bottleneck. That is why we are building RootLens."
     },
     "appFlow": {
       "title": "How it works",
@@ -95,28 +125,30 @@
       },
       "step3": {
         "label": "Get paid",
-        "text": "Your verified recording enters the marketplace. Robot companies purchase the data they need. You earn."
+        "text": "Your verified recording enters the marketplace. Every time a robot company licenses your clip, you earn. Not once. Every time."
       },
       "editing": "Every submission is focused, verified, and ready to use — not random video scraped from the web."
     },
     "issues": {
-      "title": "What makes RootLens data valuable",
-      "intro": "Robot companies cannot use random video. They need focused, verified, hand-level task data.",
-      "sns": {
-        "label": "Hand-level focus",
-        "text": "Every video is centered on three things: hands, objects, and actions. How people grab, how they move, how they touch, how they use tools. The narrow scope lets us control quality automatically."
+      "title": "Why RootLens data is valuable",
+      "intro1": "Robot companies can't train on random video. They need task-focused, hand-visible footage captured in real environments. And they need a lot of it, from as many different homes as possible.",
+      "intro2": "RootLens collects data from real kitchens, real laundry rooms, and real living spaces. Every home is different. Different layouts, different tools, different habits. This diversity is what helps robots generalize beyond the lab.",
+      "pillarsLead": "Each clip in our dataset is built on four pillars.",
+      "hands": {
+        "label": "Hand-focused capture",
+        "text": "Every video is framed around hands, objects, and actions. How you grip, how you move, how you use a tool. This is the data robots need to learn manipulation."
       },
-      "media": {
-        "label": "Automatic quality scoring",
-        "text": "RootLens uses object detection to recognize hands and target objects. This allows us to guide users while recording, score the quality of each video, and classify the data automatically."
+      "guidance": {
+        "label": "Real-time filming guidance",
+        "text": "Collecting quality data for AI training is harder than it looks. The phone vibrates when hands drift out of frame. AI checks the scene before recording starts. You don't need to be a trained data collector. The app handles it."
       },
-      "insurance": {
+      "scoring": {
+        "label": "Auto quality scoring",
+        "text": "Every clip gets an objective quality score. Buyers can filter by score. Creators see exactly what makes a good clip and what doesn't. Better clips get licensed more, so quality improves on its own."
+      },
+      "privacy": {
         "label": "Privacy by default",
-        "text": "Faces and text are automatically blurred before any video leaves your device. Recorders stay anonymous. Buyers get clean, usable data."
-      },
-      "ai": {
-        "label": "Deepfake-proof verification",
-        "text": "When a video is recorded, the app signs it. This proves the video is real and blocks AI-generated fake data from entering the marketplace."
+        "text": "When data comes from real homes filmed by real people, privacy isn't optional. Faces and text are automatically masked before anything leaves the device. Creators review and approve the blurred version before upload. Buyers receive clean, compliance-ready data."
       }
     },
     "c2pa": {

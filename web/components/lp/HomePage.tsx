@@ -4,6 +4,7 @@ import s from "./lp.module.css";
 const WAITLIST_URL = "https://forms.gle/vKWyPLY9dQot6xq9A";
 
 export default async function HomePage() {
+  const tHero = await getTranslations("lp.hero");
   const tProblem = await getTranslations("lp.problem");
   const tFlow = await getTranslations("lp.appFlow");
   const tIssues = await getTranslations("lp.issues");
@@ -11,84 +12,125 @@ export default async function HomePage() {
   const tc = await getTranslations("common");
 
   const flowSteps = ["step1", "step2", "step3"] as const;
-  const issues = ["sns", "media", "insurance", "ai"] as const;
+  const issues = ["hands", "guidance", "scoring", "privacy"] as const;
 
   return (
     <div className={s.page}>
       {/* Hero */}
       <section className={s.hero}>
         <div className={s.heroInner}>
-          <p className={s.heroEyebrow}>The camera app</p>
-          <h1 className={s.heroTitle}>Film your day.<br />Train home robots.<br />Get paid.</h1>
-          <p className={s.heroDescription}>RootLens is a marketplace where anyone can record household tasks and sell that data to home robot companies.</p>
-          <a href={WAITLIST_URL} className={s.ctaPrimary} target="_blank" rel="noopener noreferrer">
-            Join the early waitlist →
-          </a>
-          <div className={s.storeBadges} style={{ marginTop: 16 }}>
-            <div className={s.storeBadge}>
-              <AppleIcon />
-              <div className={s.storeBadgeText}>
-                <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
-                <span className={s.storeBadgeName}>App Store</span>
+          <div className={s.heroMain}>
+            <div className={s.heroEyebrow}>
+              <span>RootLens</span>
+              <span className={s.heroEyebrowDot}>·</span>
+              <span className={s.heroEyebrowDesc}>Robot training data, sourced from real homes</span>
+            </div>
+            <h1 className={s.heroTitle}>
+              Film your day.<br />
+              Train robots.<br />
+              <span className={s.heroTitleAccent}>Get paid.</span>
+            </h1>
+            <p className={s.heroDescription}>{tHero("description")}</p>
+            <div className={s.heroCtas}>
+              <a href={WAITLIST_URL} className={s.ctaPrimary} target="_blank" rel="noopener noreferrer">
+                Join the early waitlist
+                <span aria-hidden="true">→</span>
+              </a>
+            </div>
+            <div className={s.storeBadges} style={{ marginTop: 24 }}>
+              <div className={s.storeBadge}>
+                <AppleIcon />
+                <div className={s.storeBadgeText}>
+                  <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
+                  <span className={s.storeBadgeName}>App Store</span>
+                </div>
+              </div>
+              <div className={s.storeBadge}>
+                <PlayIcon />
+                <div className={s.storeBadgeText}>
+                  <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
+                  <span className={s.storeBadgeName}>Google Play</span>
+                </div>
               </div>
             </div>
-            <div className={s.storeBadge}>
-              <PlayIcon />
-              <div className={s.storeBadgeText}>
-                <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
-                <span className={s.storeBadgeName}>Google Play</span>
-              </div>
+          </div>
+          <aside className={s.heroMeta}>
+            <div className={s.heroMetaLabel}>STATUS</div>
+            <div className={s.heroMetaValue}>MVP LIVE</div>
+            <div style={{ height: 12 }} />
+            <div className={s.heroMetaLabel}>WAITLIST</div>
+            <div className={s.heroMetaValue}>100+ CREATORS</div>
+            <div style={{ height: 12 }} />
+            <div className={s.heroMetaLabel}>NETWORK</div>
+            <div className={s.heroMetaValue}>SOLANA</div>
+          </aside>
+        </div>
+      </section>
+
+      {/* §01 Problem */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <header className={s.sectionHeader}>
+            <div className={s.sectionNumber}>§01</div>
+            <div>
+              <div className={s.sectionLabel}>The problem</div>
+              <h2 className={s.sectionTitle}>{tProblem("title")}</h2>
+            </div>
+          </header>
+          <div className={s.sectionBody}>
+            <div className={s.sectionBodyContent}>
+              <p className={s.prose}>{tProblem("p1")}</p>
+              <p className={s.prose}>{tProblem("p2")}</p>
+              <p className={s.prose} style={{ marginTop: 28 }}>
+                <span className={s.emphasis}>{tProblem("p3")}</span>
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Problem */}
+      {/* §02 How it works */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{tProblem("title")}</h2>
-          <p className={s.prose}>{tProblem("p1")}</p>
-          <p className={s.prose}>{tProblem("p2")}</p>
-          <p className={s.prose}>{tProblem("p3")}</p>
-          <p className={s.prose} style={{ marginTop: 24 }}>
-            <span className={s.emphasis}>{tProblem("example")}</span>
-          </p>
-          <p className={s.prose}>{tProblem("p4")}</p>
-          <p className={s.prose}>{tProblem("p5")}</p>
-          <p className={s.prose}>{tProblem("p6")}</p>
-          <p className={s.prose} style={{ marginTop: 24 }}>
-            <span className={s.emphasis}>{tProblem("p7")}</span>
-          </p>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className={s.section}>
-        <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
+          <header className={s.sectionHeader}>
+            <div className={s.sectionNumber}>§02</div>
+            <div>
+              <div className={s.sectionLabel}>How it works</div>
+              <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
+            </div>
+          </header>
           <div className={s.steps}>
             {flowSteps.map((key, i) => (
               <div key={key} className={s.step}>
-                <div className={s.stepNumber}>{i + 1}</div>
-                <div>
-                  <div className={s.stepLabel}>{tFlow(`${key}.label`)}</div>
-                  <div className={s.stepText}>{tFlow(`${key}.text`)}</div>
-                </div>
+                <div className={s.stepNumber}>0{i + 1} / 03</div>
+                <div className={s.stepLabel}>{tFlow(`${key}.label`)}</div>
+                <div className={s.stepText}>{tFlow(`${key}.text`)}</div>
               </div>
             ))}
           </div>
-          <p className={s.prose} style={{ marginTop: 24 }}>
-            <span className={s.emphasis}>{tFlow("editing")}</span>
-          </p>
         </div>
       </section>
 
-      {/* What makes the data valuable */}
+      {/* §03 Why the data is valuable */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{tIssues("title")}</h2>
-          <p className={s.sectionSubtitle}>{tIssues("intro")}</p>
-          <div className={s.issuesGrid}>
+          <header className={s.sectionHeader}>
+            <div className={s.sectionNumber}>§03</div>
+            <div>
+              <div className={s.sectionLabel}>What buyers want</div>
+              <h2 className={s.sectionTitle}>{tIssues("title")}</h2>
+            </div>
+          </header>
+          <div className={s.sectionBody}>
+            <div className={s.sectionBodyContent}>
+              <p className={s.prose}>{tIssues("intro1")}</p>
+              <p className={s.prose}>{tIssues("intro2")}</p>
+              <p className={s.prose} style={{ marginTop: 28, marginBottom: 0 }}>
+                <span className={s.emphasis}>{tIssues("pillarsLead")}</span>
+              </p>
+            </div>
+          </div>
+          <div className={s.issuesGrid} style={{ marginTop: 40 }}>
             {issues.map((key) => (
               <div key={key} className={s.issueItem}>
                 <div className={s.issueLabel}>{tIssues(`${key}.label`)}</div>
@@ -99,14 +141,22 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Closing CTA */}
+      {/* §04 Closing CTA */}
       <section className={s.closingCta}>
         <div className={s.closingCtaInner}>
-          <div className={s.closingCtaTitle}>{tHome("closingTitle")}</div>
-          <div className={s.closingCtaDesc}>{tHome("closingDesc")}</div>
+          <div className={s.closingCtaNumber}>§04</div>
+          <div className={s.closingCtaMain}>
+            <div className={s.closingCtaLabel}>Get started</div>
+            <h2 className={s.closingCtaTitle}>{tHome("closingTitle")}</h2>
+            <p className={s.closingCtaDesc}>{tHome("closingDesc")}</p>
+          </div>
           <div className={s.closingCtaButtons}>
             <a href={WAITLIST_URL} className={s.ctaPrimary} target="_blank" rel="noopener noreferrer">
-              Join the early waitlist →
+              Join the early waitlist
+              <span aria-hidden="true">→</span>
+            </a>
+            <a href="/why-blockchain" className={s.ctaSecondary}>
+              {tHome("whyBlockchainLink")}
             </a>
           </div>
         </div>

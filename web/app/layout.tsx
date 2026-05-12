@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Fraunces, Source_Sans_3, JetBrains_Mono } from "next/font/google";
+import { Instrument_Serif, Manrope, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import "./globals.css";
@@ -16,17 +16,18 @@ const geistMono = Geist_Mono({
 });
 
 // LP-specific fonts (anti-average-design: no Inter/Roboto/system defaults)
-const fraunces = Fraunces({
+const instrumentSerif = Instrument_Serif({
   variable: "--font-lp-heading",
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: ["400"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
-const sourceSans = Source_Sans_3({
+const manrope = Manrope({
   variable: "--font-lp-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -54,7 +55,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} ${sourceSans.variable} ${jetbrainsMono.variable}`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
         <NextIntlClientProvider locale={locale} messages={{}}>
           {children}
         </NextIntlClientProvider>
