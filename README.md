@@ -1,76 +1,55 @@
 # RootLens
 
-Proof of authenticity for the content you capture.
+Robot training data, sourced from real homes.
 
-A camera app that proves your photos and videos are real — from capture to on-chain proof in one pipeline.
+A camera app where anyone can film household tasks and get paid when AI companies license the footage.
 
-## What it does
+## Demo
 
-Shoot, edit, publish. One tap records the proof on Solana. A verification page is generated instantly — paste the URL anywhere and anyone can verify it.
+[![RootLens 3-minute demo](https://cdn.loom.com/sessions/thumbnails/4cb5a0bf683f41c8ac4103775894613f-with-play.gif)](https://www.loom.com/share/4cb5a0bf683f41c8ac4103775894613f)
+
+▶ **[Watch the 3-minute demo on Loom](https://www.loom.com/share/4cb5a0bf683f41c8ac4103775894613f)**
+
+## Why
+
+Robot intelligence is evolving fast, and a major reason is human action footage — robots learn how to move by watching people perform tasks. But high-quality footage of real household tasks is massively scarce.
+
+Buyers face their own bottleneck. Starting August 2026, the EU AI Act tightens enforcement on training data. A single clip with unclear rights can trigger massive fines, so AI companies need data at scale with verifiable rights.
+
+RootLens turns everyday filming into a marketplace for that data — with on-chain proof of every rights holder, from capture to license.
 
 ## How it works
 
-There are three points where a proof of authenticity can be forged. RootLens closes all three.
+**Film** — Pick a household task. Film first-person, two-handed. The app tracks 21 hand joints in real time and vibrates if your hand drifts off-frame, since you cannot touch the screen while filming. AI scores and classifies each clip before upload, and bad takes get rejected automatically.
 
-1. **Capture** — The device's security chip signs the content the moment it's shot using [C2PA](https://c2pa.org/) (industry standard by Adobe, Google, Microsoft). No other device can reproduce that signature.
-2. **Registration** — A Trusted Execution Environment verifies the signature and records the result as a compressed NFT on Solana. End-to-end encrypted — nobody sees the raw content, including our servers.
-3. **Verification** — The viewer's browser queries Solana directly. No server in between. The chain is the proof.
+**Prove** — Faces and text are auto-blurred. You confirm the blurred version before anything leaves the device. The clip is signed with C2PA (the content provenance standard backed by Adobe, Google, Microsoft, and others), with the signing key bound to the smartphone's secure enclave. Both the original and the redacted versions are signed.
 
-## Architecture
+**Mint** — A cloud TEE (Trusted Execution Environment, a sealed runtime that even our own team cannot inspect) verifies the C2PA chain and mints a Root NFT on Solana, anchored to your wallet. The Root NFT is your on-chain ownership token for this footage. The TEE code is open source and remote-attestable, so no one can forge a Root NFT.
 
-```
-┌─────────────────────────┐
-│  React Native App       │  Camera · Editor · Publisher
-│  Kotlin/Swift + c2pa-rs │  C2PA signing via device TEE
-└───────────┬─────────────┘
-            │ Title Protocol SDK
-            ▼
-┌─────────────────────────┐
-│  Title Protocol (TEE)   │  E2E encrypted verification
-│  Rust · WASM · Anchor   │  Content-agnostic · Stateless
-└───────────┬─────────────┘
-            │ Verification result only
-            ▼
-┌─────────────────────────┐
-│  Solana (cNFT)          │  Bubblegum + Concurrent Merkle Tree
-│  ~$0.002 per record     │  1M posts < $100
-└───────────┬─────────────┘
-            │
-            ▼
-┌─────────────────────────┐
-│  Public Verification    │  Client-side only
-│  rootlens.io            │  Solana RPC direct query
-└─────────────────────────┘
-```
+**Earn** — Stake your Root NFT to put the footage on the market. When a buyer pays, a smart contract mints them a separate license NFT, which is their on-chain right to use the footage for AI training. Revenue flows back to the Root NFT holder automatically. No platform processing, no payout cycle.
 
-## Built on
+## Status
 
-- **[Title Protocol](https://github.com/yudai-mori-2004/title-protocol)** — Open-source trustless content verification infrastructure. RootLens is the first application built on top of it.
-- **Solana** — Compressed NFTs via Bubblegum for low-cost, high-scale on-chain records.
-- **C2PA** — Content provenance standard co-developed by Adobe, Google, Microsoft, and others.
+- **MVP live** with 40 people on the waitlist
+- **1 enterprise data provider** in early commercial conversations
+- **Pitched in Miami** at Solana Accelerate and EasyA Hackathon at Consensus 2026
+
+Through those conversations, demand for Japanese household video has surfaced as stronger than expected. India and Latin America already have plenty of supply, but Japanese data is simply scarce. Being Japan-based may be our strategic edge.
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Mobile App | React Native (iOS + Android) |
-| Native Modules | Kotlin / Swift + C FFI into c2pa-rs |
-| C2PA Signing | c2pa-rs (Rust static library) via device Secure Enclave / StrongBox |
-| Authentication | Privy (email / social login) |
-| Backend | Title Protocol SDK (TypeScript) |
-| Verification | Client-side Ed25519 + pHash via Solana RPC |
-| On-chain | Solana devnet (Bubblegum cNFT + Anchor program) |
+- **Mobile app** — React Native (Expo), iOS + Android
+- **Hand pose** — iOS Vision / Android MediaPipe HandLandmarker
+- **C2PA signing** — c2pa-rs via device secure enclave
+- **Verification pipeline** — cloud TEE, end-to-end encrypted
+- **On-chain** — Solana (Root NFT + License NFT, Anchor program)
+- **Auth** — Privy
 
-## UX Principles
+## Built on
 
-- **Zero-login start** — Camera and editor work without an account. Sign up only when you want to publish.
-- **No crypto jargon** — "Mint" → "Publish". "cNFT" → "Proof of authenticity". Gas fees are covered by RootLens.
-- **Edit constraints** — Only information-reducing operations allowed (crop, mask, trim). Filters, composites, and color adjustments are intentionally prohibited — they contradict proof of authenticity.
-
-## Links
-
-- [Title Protocol](https://github.com/yudai-mori-2004/title-protocol)
-- [Specification (Japanese)](document/v0.1.0/SPECS_JA.md)
+- **[Title Protocol](https://github.com/yudai-mori-2004/title-protocol)** — the open-source verification layer that handles Root NFT issuance trustlessly. RootLens is the first application built on top of it.
+- **[C2PA](https://c2pa.org/)** — content provenance standard co-developed by Adobe, Google, Microsoft, and others.
+- **Solana** — Root NFT and License NFT are recorded on-chain.
 
 ## License
 
