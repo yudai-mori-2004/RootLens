@@ -45,13 +45,6 @@ export default async function HomePage() {
                   <span className={s.storeBadgeName}>App Store</span>
                 </div>
               </div>
-              <div className={s.storeBadge}>
-                <PlayIcon />
-                <div className={s.storeBadgeText}>
-                  <span className={s.storeBadgeLabel}>{tc("comingSoon")}</span>
-                  <span className={s.storeBadgeName}>Google Play</span>
-                </div>
-              </div>
             </div>
           </div>
           <aside className={s.heroMeta}>
@@ -185,10 +178,3 @@ function AppleIcon() {
   );
 }
 
-function PlayIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3 20.5v-17c0-.83.52-1.28 1.09-1.28.18 0 .37.05.56.15l15.32 8.5c.55.31.72.77.72 1.13s-.17.82-.72 1.13L4.65 21.63c-.19.1-.38.15-.56.15C3.52 21.78 3 21.33 3 20.5z" />
-    </svg>
-  );
-}
