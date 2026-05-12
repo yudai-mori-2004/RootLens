@@ -121,6 +121,17 @@
   overflow-wrap: break-word;
 }
 
+.heroTitleArticle {
+  font-family: var(--font-lp-heading, serif);
+  font-weight: 400;
+  font-size: clamp(2rem, 4.5vw, 3.4rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--lp-accent);
+  margin-bottom: 28px;
+  overflow-wrap: break-word;
+}
+
 .heroTitleAccent {
   font-style: italic;
   color: var(--lp-accent-light);

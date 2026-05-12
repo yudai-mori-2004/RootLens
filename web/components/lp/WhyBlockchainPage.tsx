@@ -11,8 +11,15 @@ export default async function WhyBlockchainPage() {
       {/* Hero */}
       <section className={s.hero}>
         <div className={s.heroInner}>
-          <h1 className={s.heroTitle}>{t("heroTitle")}</h1>
-          <p className={s.heroDescription}>{t("heroSubtitle")}</p>
+          <div className={s.heroMain}>
+            <div className={s.heroEyebrow}>
+              <span>Essay</span>
+              <span className={s.heroEyebrowDot}>·</span>
+              <span className={s.heroEyebrowDesc}>Why we use blockchain</span>
+            </div>
+            <h1 className={s.heroTitleArticle}>{t("heroTitle")}</h1>
+            <p className={s.heroDescription}>{t("heroSubtitle")}</p>
+          </div>
         </div>
       </section>
 
