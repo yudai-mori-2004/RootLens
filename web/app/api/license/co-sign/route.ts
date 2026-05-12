@@ -112,7 +112,9 @@ export async function POST(req: NextRequest) {
 
   // 構築 + sign
   try {
-    const dasUrl = getEnv("DAS_RPC_URL");
+    // DAS API は Solana 公式 devnet RPC でも提供されているので、専用 env が無ければ
+    // SOLANA_RPC_URL を流用する。dev/staging で別 DAS provider に切替えたい時のみ env 設定。
+    const dasUrl = process.env.DAS_RPC_URL || getEnv("SOLANA_RPC_URL");
     const result = await buildAndSignIssueLicenseTx({
       connection: getConnection(),
       fetchProof: (id) => fetchAssetWithProof(dasUrl, id),
