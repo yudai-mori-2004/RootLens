@@ -28,13 +28,6 @@ RootLens turns everyday filming into a marketplace for that data — with on-cha
 
 **Earn** — Stake your Root NFT to put the footage on the market. When a buyer pays, a smart contract mints them a separate license NFT, which is their on-chain right to use the footage for AI training. Revenue flows back to the Root NFT holder automatically. No platform processing, no payout cycle.
 
-## Status
-
-- **MVP live** with 40 people on the waitlist
-- **1 enterprise data provider** in early commercial conversations
-- **Pitched in Miami** at Solana Accelerate and EasyA Hackathon at Consensus 2026
-
-Through those conversations, demand for Japanese household video has surfaced as stronger than expected. India and Latin America already have plenty of supply, but Japanese data is simply scarce. Being Japan-based may be our strategic edge.
 
 ## Stack
 
