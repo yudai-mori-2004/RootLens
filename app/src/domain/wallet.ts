@@ -41,3 +41,23 @@ export function hasFullWallet(): boolean {
   if (!pk || !kp) return false;
   return kp.publicKey.equals(pk);
 }
+
+// ----- Buyer simulator wallet ------------------------------------------
+// 撮影者から見た「AI 企業役」のデモ wallet。Settings → Buyer simulator から license
+// 購入をオンチェーン実行するために使う。SOL + mock USDC を pre-funded で持つ前提。
+
+export function getBuyerPubkey(): PublicKey | null {
+  const addr = ENV.EXPO_PUBLIC_BUYER_WALLET_ADDRESS;
+  if (!addr) return null;
+  try { return new PublicKey(addr); } catch { return null; }
+}
+
+export function getBuyerSigner(): Keypair | null {
+  const sk = ENV.EXPO_PUBLIC_BUYER_KEYPAIR_BASE58;
+  if (!sk) return null;
+  try {
+    const decoded = bs58.decode(sk);
+    if (decoded.length !== 64) return null;
+    return Keypair.fromSecretKey(decoded);
+  } catch { return null; }
+}

@@ -51,7 +51,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             !pubkey && styles.ctaDisabled,
             pressed && pubkey && styles.ctaPressed,
           ]}
-          onPress={() => navigation.replace('TaskList')}
+          onPress={() => navigation.replace('Main')}
           disabled={!pubkey}
         >
           <Text style={styles.ctaLabel}>Continue</Text>

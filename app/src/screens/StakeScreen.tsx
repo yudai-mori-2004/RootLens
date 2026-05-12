@@ -1,31 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../app/types';
 import { buildStakeIx } from '../services/staking';
 import { getDemoSigner, getDemoWalletPubkey } from '../domain/wallet';
-import { colors, typography, spacing, radii } from '../theme';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
-// SPECS_JA §4.5: Root NFT の delegate を RootLens の cosign authority に切替 → 「ステーキング」。
-// 1) DAS で demo wallet 所有の cNFT を列挙し最新を選ぶ (mint 直後を想定)
-// 2) buildStakeIx (Unit G) で delegateV2 IX を組む
-// 3) demo keypair で署名 → broadcast
-//
-// 鍵が無い (DEMO_KEYPAIR 未設定) または cosign authority が無い場合は skip ボタンのみ。
+// 「RootLens に license 販売を任せていいですか？」フェーズ。
+// 内部的には Bubblegum delegateV2 で Root NFT の delegate を切り替えるのが正体だが、
+// 初見ユーザに見せる文言は「お任せ販売」軸で揃える。
 
 const ENV = process.env as Record<string, string | undefined>;
-// Solana 公式 devnet RPC は DAS API (getAssetsByOwner 等) も提供している。
-// Helius は devnet サポートを縮退したので、特に env で上書きしない限り公式 RPC を使う。
 const SOLANA_RPC_URL = ENV.EXPO_PUBLIC_SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
 const DAS_URL = ENV.EXPO_PUBLIC_DAS_URL ?? SOLANA_RPC_URL;
 const COSIGN_AUTHORITY = ENV.EXPO_PUBLIC_COSIGN_AUTHORITY ?? '';
+
+const HERO_DECOR = require('../../assets/decor/handshake.png');
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Stake'>;
 
 type Discovery =
   | { kind: 'pending' }
-  | { kind: 'found'; assetId: string; ownerStr: string }
+  | { kind: 'found'; assetId: string }
   | { kind: 'none' }
   | { kind: 'error'; message: string };
 
@@ -37,8 +46,6 @@ type Tx =
 
 export const StakeScreen: React.FC<Props> = ({ route, navigation }) => {
   const { taskId, contentHash, mintTxSignature } = route.params;
-  // useMemo で固定。さもないと render 毎に new PublicKey / new Keypair が走り、
-  // useEffect deps が変わったと判定されて無限ループする。
   const ownerPubkey = useMemo(() => getDemoWalletPubkey(), []);
   const signer = useMemo(() => getDemoSigner(), []);
   const cosignAuthorityPk = useMemo(() => {
@@ -47,6 +54,7 @@ export const StakeScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const [discovery, setDiscovery] = useState<Discovery>({ kind: 'pending' });
   const [tx, setTx] = useState<Tx>({ kind: 'idle' });
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     if (!ownerPubkey) return;
@@ -62,27 +70,17 @@ export const StakeScreen: React.FC<Props> = ({ route, navigation }) => {
             method: 'getAssetsByOwner',
             params: {
               ownerAddress: ownerPubkey.toBase58(),
-              page: 1,
-              limit: 50,
+              page: 1, limit: 50,
               sortBy: { sortBy: 'created', sortDirection: 'desc' },
             },
           }),
         });
         const json = await res.json();
         const items: any[] = json?.result?.items ?? [];
-        // Filter to compressed NFTs only (Root NFT is cNFT)
         const compressed = items.filter((i) => i?.compression?.compressed === true);
         if (cancelled) return;
-        if (compressed.length === 0) {
-          setDiscovery({ kind: 'none' });
-          return;
-        }
-        const top = compressed[0];
-        setDiscovery({
-          kind: 'found',
-          assetId: String(top.id),
-          ownerStr: ownerPubkey.toBase58(),
-        });
+        if (compressed.length === 0) { setDiscovery({ kind: 'none' }); return; }
+        setDiscovery({ kind: 'found', assetId: String(compressed[0].id) });
       } catch (err: any) {
         if (cancelled) return;
         setDiscovery({ kind: 'error', message: err?.message ?? String(err) });
@@ -92,11 +90,7 @@ export const StakeScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [ownerPubkey]);
 
   const canStake =
-    discovery.kind === 'found' &&
-    !!signer &&
-    !!cosignAuthorityPk &&
-    !!ownerPubkey &&
-    tx.kind !== 'sending';
+    discovery.kind === 'found' && !!signer && !!cosignAuthorityPk && !!ownerPubkey && tx.kind !== 'sending';
 
   const stake = async () => {
     if (discovery.kind !== 'found' || !signer || !cosignAuthorityPk || !ownerPubkey) return;
@@ -114,17 +108,15 @@ export const StakeScreen: React.FC<Props> = ({ route, navigation }) => {
       txObj.recentBlockhash = blockhash;
       txObj.feePayer = signer.publicKey;
       txObj.sign(signer);
-      const sig = await conn.sendRawTransaction(txObj.serialize(), {
-        skipPreflight: false,
-      });
-      await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight: (await conn.getLatestBlockhash()).lastValidBlockHeight }, 'confirmed');
+      const sig = await conn.sendRawTransaction(txObj.serialize(), { skipPreflight: false });
+      await conn.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight: (await conn.getLatestBlockhash()).lastValidBlockHeight },
+        'confirmed',
+      );
       setTx({ kind: 'sent', signature: sig });
       navigation.replace('Done', {
-        taskId,
-        rootNftAssetId: discovery.assetId,
-        contentHash,
-        staked: true,
-        stakeTxSignature: sig,
+        taskId, rootNftAssetId: discovery.assetId, contentHash,
+        staked: true, stakeTxSignature: sig,
       });
     } catch (err: any) {
       setTx({ kind: 'error', message: err?.message ?? String(err) });
@@ -135,87 +127,132 @@ export const StakeScreen: React.FC<Props> = ({ route, navigation }) => {
     navigation.replace('Done', {
       taskId,
       rootNftAssetId: discovery.kind === 'found' ? discovery.assetId : '',
-      contentHash,
-      staked: false,
-      stakeTxSignature: null,
+      contentHash, staked: false, stakeTxSignature: null,
     });
   };
+
+  const blockerNote = !signer
+    ? 'No signer in this build — stake unavailable.'
+    : !cosignAuthorityPk
+    ? 'Server keys not configured yet — stake unavailable.'
+    : discovery.kind === 'pending'
+    ? 'Just looking up your clip on Solana…'
+    : discovery.kind === 'none'
+    ? 'Your clip hasn’t shown up on Solana yet. Give it a few seconds.'
+    : discovery.kind === 'error'
+    ? 'Couldn’t reach Solana to look up your clip.'
+    : null;
 
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.eyebrow}>STAKE</Text>
-        <Text style={styles.heading}>Set RootLens as delegate</Text>
-        <Text style={styles.lede}>
-          Staking lets RootLens co-sign License NFT issuance on your behalf. Revenue (95% to you, 5% to RootLens) is split atomically by the on-chain program when buyers purchase a license. You can unstake any time to disable issuance.
-        </Text>
-
-        <Section title="Mint result">
-          <Field label="Content hash" value={contentHash} mono />
-          <Field label="Mint tx" value={mintTxSignature} mono link={`https://solscan.io/tx/${mintTxSignature}?cluster=devnet`} />
-        </Section>
-
-        <Section title="Root NFT discovery (DAS)">
-          {discovery.kind === 'pending' && (
-            <View style={styles.statusRow}>
-              <ActivityIndicator size="small" color={colors.accent} />
-              <Text style={styles.body}>Searching DAS for newly minted cNFT…</Text>
-            </View>
-          )}
-          {discovery.kind === 'found' && (
-            <Field label="Asset id" value={discovery.assetId} mono />
-          )}
-          {discovery.kind === 'none' && (
-            <Text style={styles.errorText}>
-              No compressed NFT found in this wallet yet. DAS may need a few seconds to index — refresh in a moment.
+        {/* HERO */}
+        <View style={styles.hero}>
+          <View style={styles.heroLeft}>
+            <Text style={styles.eyebrow}>OPTIONAL · ONE TAP</Text>
+            <Text style={styles.heroTitle}>Let RootLens sell licenses for you.</Text>
+            <Text style={styles.heroSub}>
+              We’ll co-sign with you when AI labs request a license. You stay the owner.
+              Every sale settles instantly in USDC, on-chain.
             </Text>
-          )}
-          {discovery.kind === 'error' && (
-            <Text style={styles.errorText}>DAS error: {discovery.message}</Text>
-          )}
-        </Section>
+          </View>
+          <Image source={HERO_DECOR} style={styles.heroDecor} resizeMode="contain" />
+        </View>
 
-        <Section title="Wallet">
-          <Field label="Owner" value={ownerPubkey?.toBase58() ?? '—'} mono />
-          <Field
-            label="Cosign authority"
-            value={COSIGN_AUTHORITY || '(not configured — set EXPO_PUBLIC_COSIGN_AUTHORITY)'}
-            mono
+        {/* THREE GUARANTEES */}
+        <View style={styles.guarantees}>
+          <Guarantee
+            icon="lock"
+            title="You stay the owner."
+            body="The clip never leaves your wallet. Only license issuance can be co-signed."
           />
-          {!signer && (
-            <Text style={styles.errorText}>
-              No signer keypair — set EXPO_PUBLIC_DEMO_KEYPAIR_BASE58 to enable stake.
-            </Text>
-          )}
-        </Section>
+          <Guarantee
+            icon="undo"
+            title="Reversible anytime."
+            body="One tap to take back the delegate and stop new licenses being issued."
+          />
+          <Guarantee
+            icon="usd"
+            title="Paid instantly."
+            body="USDC arrives in your wallet the moment a license is bought — no payouts queue."
+          />
+        </View>
 
-        {tx.kind === 'sending' && (
-          <View style={styles.statusRow}>
-            <ActivityIndicator color={colors.accent} />
-            <Text style={styles.body}>Broadcasting stake tx…</Text>
+        {/* Status */}
+        {blockerNote && (
+          <View style={styles.noteCard}>
+            <View style={styles.noteDot} />
+            <Text style={styles.noteText}>{blockerNote}</Text>
           </View>
         )}
-        {tx.kind === 'error' && <Text style={styles.errorText}>Stake failed: {tx.message}</Text>}
+        {tx.kind === 'sending' && (
+          <View style={styles.txCard}>
+            <ActivityIndicator color={colors.ink} />
+            <Text style={styles.txText}>Setting it up on Solana…</Text>
+          </View>
+        )}
+        {tx.kind === 'error' && (
+          <View style={[styles.txCard, styles.txCardError]}>
+            <Text style={styles.txTextError} numberOfLines={3}>
+              That didn’t go through. {tx.message}
+            </Text>
+          </View>
+        )}
+
+        {/* Tech disclosure */}
+        <View style={styles.detailsBlock}>
+          <Pressable
+            onPress={() => setShowDetails((v) => !v)}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
+            <Text style={styles.detailsToggle}>
+              {showDetails ? 'Hide what this does on-chain' : 'What this does on-chain'}
+            </Text>
+          </Pressable>
+          {showDetails && (
+            <View style={styles.detailsBox}>
+              <Text style={styles.detailsBody}>
+                We submit a Bubblegum <Text style={styles.detailsMono}>delegateV2</Text> instruction
+                signed by your wallet. It sets the cNFT delegate to the RootLens cosign key — required
+                for the License NFT program to mint license cNFTs against your Root NFT and settle USDC
+                on-chain.
+              </Text>
+              <DetailRow
+                label="ASSET"
+                value={discovery.kind === 'found' ? discovery.assetId : 'discovering…'}
+              />
+              <DetailRow
+                label="DELEGATE"
+                value={COSIGN_AUTHORITY || 'not configured'}
+              />
+              <DetailRow
+                label="MINT TX"
+                value={mintTxSignature}
+                link={`https://solscan.io/tx/${mintTxSignature}?cluster=devnet`}
+              />
+            </View>
+          )}
+        </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={styles.bar}>
         <Pressable
-          style={({ pressed }) => [styles.secondary, pressed && styles.secondaryPressed]}
           onPress={skip}
+          style={({ pressed }) => [styles.secondary, pressed && styles.secondaryPressed]}
         >
-          <Text style={styles.secondaryLabel}>Skip stake</Text>
+          <Text style={styles.secondaryLabel}>Not now</Text>
         </Pressable>
         <Pressable
+          onPress={stake}
+          disabled={!canStake}
           style={({ pressed }) => [
             styles.cta,
             !canStake && styles.ctaDisabled,
             pressed && canStake && styles.ctaPressed,
           ]}
-          onPress={stake}
-          disabled={!canStake}
         >
-          <Text style={styles.ctaLabel}>
-            {tx.kind === 'sending' ? 'Sending…' : 'Stake →'}
+          <Text style={[styles.ctaLabel, !canStake && styles.ctaLabelDisabled]}>
+            {tx.kind === 'sending' ? 'Sending…' : 'Yes, let’s earn'}
           </Text>
         </Pressable>
       </View>
@@ -223,75 +260,244 @@ export const StakeScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
-// --- helpers ---
+// ---- helpers ---------------------------------------------------------
 
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>{title}</Text>
-    {children}
+const Guarantee: React.FC<{
+  icon: 'lock' | 'undo' | 'usd';
+  title: string;
+  body: string;
+}> = ({ icon, title, body }) => (
+  <View style={styles.guarRow}>
+    <View style={styles.guarIconWrap}>
+      <GuaranteeIcon kind={icon} />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.guarTitle}>{title}</Text>
+      <Text style={styles.guarBody}>{body}</Text>
+    </View>
   </View>
 );
 
-const Field: React.FC<{ label: string; value: string; mono?: boolean; link?: string }> = ({ label, value, mono, link }) => {
-  const valueEl = (
-    <Text style={[styles.fieldValue, mono && styles.fieldValueMono]} numberOfLines={1}>
-      {value}
-    </Text>
-  );
+const GuaranteeIcon: React.FC<{ kind: 'lock' | 'undo' | 'usd' }> = ({ kind }) => {
+  const stroke = colors.emeraldDeep;
+  const sw = 1.6;
+  if (kind === 'lock') {
+    return (
+      <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+        <Path d="M6 11h12v9H6z" stroke={stroke} strokeWidth={sw} />
+        <Path d="M9 11V8a3 3 0 016 0v3" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+  if (kind === 'undo') {
+    return (
+      <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+        <Path d="M4 8h9a5 5 0 015 5v0a5 5 0 01-5 5H7" stroke={stroke} strokeWidth={sw} strokeLinecap="round" />
+        <Path d="M7 4L4 8l3 4" stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    );
+  }
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {link ? (
-        <Pressable onPress={() => Linking.openURL(link)}>{valueEl}</Pressable>
-      ) : (
-        valueEl
-      )}
-    </View>
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 4v16M16 8c-1-2-3-2.5-4.5-2.5S8 6 8 7.5 9.5 9.5 12 10s4 1 4 3-2 3-4 3-3.5-1-4-3"
+        stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"
+      />
+    </Svg>
   );
 };
 
+const DetailRow: React.FC<{ label: string; value: string; link?: string }> = ({ label, value, link }) => {
+  const inner = (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={[styles.detailValue, link && styles.detailValueLink]} numberOfLines={2}>
+        {value}
+      </Text>
+    </View>
+  );
+  if (link) {
+    return (
+      <Pressable
+        onPress={() => Linking.openURL(link).catch(() => {})}
+        style={({ pressed }) => pressed && { opacity: 0.6 }}
+      >
+        {inner}
+      </Pressable>
+    );
+  }
+  return inner;
+};
+
+// ---- styles ---------------------------------------------------------
+
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
+  root: { flex: 1, backgroundColor: colors.paper },
+  scroll: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxxl },
 
-  eyebrow: { ...typography.label, color: colors.textSecondary, letterSpacing: 1.6 },
-  heading: { ...typography.heading, color: colors.textPrimary },
-  lede: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.md },
-  body: { ...typography.body, color: colors.textPrimary },
-  errorText: { ...typography.caption, color: colors.error, marginTop: spacing.xs },
-
-  section: {
-    paddingTop: spacing.md, paddingBottom: spacing.sm,
-    borderTopWidth: 1, borderTopColor: colors.borderLight,
-    gap: spacing.xs,
+  // hero
+  hero: {
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.md,
+    overflow: 'hidden',
+    ...shadows.card,
   },
-  sectionTitle: { ...typography.captionMedium, color: colors.textPrimary, marginBottom: spacing.xs },
+  heroLeft: { flex: 1, justifyContent: 'center', gap: spacing.xs },
+  eyebrow: { ...typography.label, color: colors.emeraldDeep },
+  heroTitle: {
+    fontFamily: fonts.serifSemibold,
+    fontSize: 24,
+    color: colors.ink,
+    letterSpacing: -0.4,
+    lineHeight: 30,
+    marginTop: 2,
+  },
+  heroSub: {
+    ...typography.body,
+    color: colors.textBody,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  heroDecor: { width: 96, height: 96 },
 
-  field: { paddingVertical: spacing.xs, gap: 2 },
-  fieldLabel: { ...typography.label, color: colors.textHint, letterSpacing: 1.2 },
-  fieldValue: { ...typography.body, color: colors.textPrimary },
-  fieldValueMono: { fontFamily: 'Menlo', fontSize: 11 },
 
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+  // guarantees
+  guarantees: {
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.md,
+    ...shadows.card,
+  },
+  guarRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  guarIconWrap: {
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.emeraldFaint,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  guarTitle: {
+    fontFamily: fonts.serifMedium,
+    fontSize: 15,
+    color: colors.ink,
+    letterSpacing: -0.1,
+  },
+  guarBody: {
+    ...typography.caption,
+    color: colors.textBody,
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 2,
+  },
 
-  footer: {
-    flexDirection: 'row', gap: spacing.md,
+  // status
+  noteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.warnSoft,
+    borderRadius: radii.md,
+    padding: spacing.md,
+  },
+  noteDot: {
+    width: 6, height: 6, borderRadius: 3, backgroundColor: colors.warn,
+  },
+  noteText: {
+    ...typography.caption,
+    color: colors.textBody,
+    flex: 1,
+    fontSize: 13,
+  },
+  txCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  txCardError: {
+    borderColor: colors.danger, backgroundColor: colors.dangerSoft,
+  },
+  txText: { ...typography.body, color: colors.textBody, flex: 1 },
+  txTextError: { ...typography.body, color: colors.danger, flex: 1 },
+
+  // details
+  detailsBlock: { gap: spacing.sm },
+  detailsToggle: {
+    ...typography.labelSmall,
+    color: colors.textMute,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
+  detailsBox: {
+    backgroundColor: colors.paperDeep,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  detailsBody: {
+    ...typography.caption,
+    color: colors.textBody,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  detailsMono: {
+    fontFamily: fonts.mono,
+    fontSize: 11.5,
+    color: colors.ink,
+  },
+  detailRow: { gap: 2, paddingTop: 4 },
+  detailLabel: { ...typography.labelSmall, color: colors.textMute },
+  detailValue: { ...typography.mono, color: colors.ink, fontSize: 11 },
+  detailValueLink: { color: colors.emeraldDeep, textDecorationLine: 'underline' },
+
+  // bottom bar
+  bar: {
+    flexDirection: 'row',
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: Platform.OS === 'ios' ? spacing.xl : spacing.md,
-    borderTopWidth: 1, borderTopColor: colors.borderLight, backgroundColor: colors.background,
+    backgroundColor: colors.card,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   secondary: {
-    paddingVertical: spacing.md, paddingHorizontal: spacing.lg,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center', justifyContent: 'center',
   },
-  secondaryPressed: { backgroundColor: colors.surface },
-  secondaryLabel: { ...typography.bodyMedium, color: colors.textPrimary },
+  secondaryPressed: { backgroundColor: colors.paperDeep },
+  secondaryLabel: { fontFamily: fonts.sansSemibold, fontSize: 14, color: colors.ink },
   cta: {
-    flex: 1, paddingVertical: spacing.md, borderRadius: radii.md,
-    backgroundColor: colors.accent, alignItems: 'center',
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.ink,
+    alignItems: 'center', justifyContent: 'center',
   },
-  ctaPressed: { backgroundColor: colors.accentDark },
-  ctaDisabled: { backgroundColor: colors.textDisabled },
-  ctaLabel: { color: colors.white, fontSize: 15, fontWeight: '600' },
+  ctaPressed: { backgroundColor: colors.inkSoft },
+  ctaDisabled: { backgroundColor: colors.paperDeep },
+  ctaLabel: {
+    color: colors.textOnInk,
+    fontFamily: fonts.sansSemibold,
+    fontSize: 15,
+    letterSpacing: 0.1,
+  },
+  ctaLabelDisabled: { color: colors.textFaint },
 });

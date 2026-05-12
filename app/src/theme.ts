@@ -1,171 +1,229 @@
-// デザイントークン定義
-// 仕様書 §3.1.1 UI表現の基本方針
+// RootLens design system — "Editorial Fintech".
+//
+// Inspired by the Week 5 pitch illustrations: navy outline + emerald accent on
+// warm cream, with hairline borders and confident typography. Pairs Fraunces
+// (serif display) with Inter (sans body) and Menlo (mono readouts).
+//
+// Aesthetic intent:
+//   • Confident, quiet authority — evokes a Japanese design studio (Karte / SmartHR)
+//     more than a SaaS template
+//   • Generous whitespace, hairline rules, occasional sparks of color for value
+//   • Surfaces feel papery; ink is heavy navy; success / value is forest-emerald
 
-// ── ブランドカラー ──
-// インディゴ: 権威・確信・深み。「本物の証明」の重みを表現するアクセントカラー
+import { Platform } from 'react-native';
+
+// ── Palette ──────────────────────────────────────────────────────────────
+// Surfaces and chrome. `paper` is the dominant warm cream, `card` is the
+// clean white that floats above it. `inkSoft` is a navy tone for hover/press.
 export const colors = {
-  // Brand
-  accent: '#1E3A5F',        // ネイビーブルー — 紋章・証明の重厚さ
-  accentLight: '#E8EEF4',   // ネイビーの淡い背景色
-  accentDark: '#172E4A',    // pressed state
-
-  // Neutral
-  black: '#000000',
-  white: '#FFFFFF',
-  background: '#FFFFFF',
-  surface: '#F7F7F7',       // カード・セクション背景
-  surfaceAlt: '#F0F0F0',    // 画像プレースホルダー等
+  // Surfaces
+  paper: '#F8F4ED',          // dominant warm cream
+  paperDeep: '#F0EBE0',      // deeper paper for inset cards
+  card: '#FFFFFF',           // clean surface that floats above paper
+  ink: '#0E1F44',            // primary navy — the line color in illustrations
+  inkSoft: '#1B2D5A',        // pressed / hover navy
+  inkMute: '#4F5F7E',        // navy at lower priority
+  scrim: 'rgba(14, 31, 68, 0.55)',  // overlay scrim for camera / modal
 
   // Text
-  textPrimary: '#1A1A1A',
-  textSecondary: '#666666',
-  textHint: '#999999',
-  textDisabled: '#BBBBBB',
+  textInk: '#0E1F44',
+  textBody: '#1B2D5A',
+  textMute: '#5C6B85',
+  textFaint: '#94A0B5',
+  textOnInk: '#F8F4ED',
 
-  // Border
-  border: '#E5E5E5',
-  borderLight: '#F0F0F0',
+  // Accent — emerald from illustrations
+  emerald: '#1FA679',
+  emeraldDeep: '#157C5A',
+  emeraldSoft: '#E2F4ED',
+  emeraldFaint: '#F0F9F4',
 
-  // Semantic
-  success: '#2E7D32',
-  successLight: '#E8F5E9',
-  error: '#D32F2F',
-  errorLight: '#FFEBEE',
-  recording: '#E53935',
+  // Highlight — gold spark from token graphics
+  gold: '#E8B339',
+  goldSoft: '#FAEFD0',
 
-  // Overlay (dark on light)
-  overlayLight: 'rgba(0,0,0,0.15)',
-  overlayMedium: 'rgba(0,0,0,0.4)',
-  overlayCrop: 'rgba(0,0,0,0.55)',
-  overlayDark: 'rgba(0,0,0,0.6)',
+  // Borders / hairlines
+  border: '#E6DFD0',         // warm hairline that fits paper
+  borderInk: '#0E1F44',
+  borderEmerald: '#A5DBC4',
 
-  // Overlay (light on dark)
+  // Status (kept restrained so they don't fight emerald accent)
+  success: '#1FA679',
+  successSoft: '#E2F4ED',
+  warn: '#B7741A',
+  warnSoft: '#FAE7C4',
+  danger: '#B23A2E',
+  dangerSoft: '#F4DCD7',
+  recording: '#B23A2E',
+
+  // Legacy aliases (existing screens still reference these — kept until refactor)
+  background: '#F8F4ED',     // = paper
+  surface: '#FFFFFF',        // = card
+  surfaceAlt: '#F0EBE0',     // = paperDeep
+  textPrimary: '#0E1F44',
+  textSecondary: '#5C6B85',
+  textHint: '#94A0B5',
+  textDisabled: '#BDC4D2',
+  borderLight: '#F0EBE0',
+  accent: '#0E1F44',         // primary CTA = ink (was navy)
+  accentLight: '#E2F4ED',    // = emeraldSoft
+  accentDark: '#1B2D5A',     // = inkSoft
+  error: '#B23A2E',          // = danger
+  errorLight: '#F4DCD7',     // = dangerSoft
+  black: '#000000',
+  white: '#FFFFFF',
+  overlayLight: 'rgba(14,31,68,0.10)',
+  overlayMedium: 'rgba(14,31,68,0.42)',
+  overlayDark: 'rgba(14,31,68,0.65)',
+  overlayCrop: 'rgba(14,31,68,0.55)',
   overlayWhiteFaint: 'rgba(255,255,255,0.08)',
-  overlayWhiteSubtle: 'rgba(255,255,255,0.1)',
+  overlayWhiteSubtle: 'rgba(255,255,255,0.10)',
   overlayWhite: 'rgba(255,255,255,0.15)',
   overlayWhiteGrid: 'rgba(255,255,255,0.25)',
-  overlayWhiteMask: 'rgba(255,255,255,0.3)',
-  overlayWhiteLine: 'rgba(255,255,255,0.4)',
-  overlayWhiteHalf: 'rgba(255,255,255,0.5)',
-  overlayWhiteFrame: 'rgba(255,255,255,0.7)',
-
-  // Camera/Edit (dark UI)
+  overlayWhiteMask: 'rgba(255,255,255,0.30)',
+  overlayWhiteLine: 'rgba(255,255,255,0.40)',
+  overlayWhiteHalf: 'rgba(255,255,255,0.50)',
+  overlayWhiteFrame: 'rgba(255,255,255,0.70)',
   darkBg: '#000000',
-  darkText: '#FFFFFF',
-  darkTextSecondary: '#AAAAAA',
-  darkTextDisabled: '#555555',
-  darkSeparator: 'rgba(255,255,255,0.2)',
+  darkText: '#F8F4ED',
+  darkTextSecondary: '#AAB6CC',
+  darkTextDisabled: '#5A647A',
+  darkSeparator: 'rgba(255,255,255,0.20)',
+  borderStrong: '#CBC2AE',
+  successLight: '#E2F4ED',
+  statusOk: '#1FA679',
+  statusWarn: '#B7741A',
+  statusError: '#B23A2E',
+  bgInk: '#0E1F44',
+  bgInkSoft: '#1B2D5A',
 } as const;
 
-// ── タイポグラフィ ──
+// ── Typography ─────────────────────────────────────────────────────────
+// Two display families (Fraunces serif + Inter sans), one mono.
+export const fonts = {
+  // Fraunces (variable serif): used for headings, hero numerals, task names.
+  // Loaded in App.tsx via @expo-google-fonts/fraunces.
+  serifLight: 'Fraunces_300Light',
+  serifRegular: 'Fraunces_400Regular',
+  serifMedium: 'Fraunces_500Medium',
+  serifSemibold: 'Fraunces_600SemiBold',
+
+  // Inter: body, UI chrome, secondary labels. Loaded via @expo-google-fonts/inter.
+  sansRegular: 'Inter_400Regular',
+  sansMedium: 'Inter_500Medium',
+  sansSemibold: 'Inter_600SemiBold',
+  sansBold: 'Inter_700Bold',
+
+  // System monospace for tx hashes, price chips, code-like readouts.
+  mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' })!,
+} as const;
+
 export const typography = {
-  heading: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    lineHeight: 28,
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '600' as const,
-    lineHeight: 24,
-  },
-  body: {
-    fontSize: 15,
-    fontWeight: '400' as const,
-    lineHeight: 22,
-  },
-  bodyMedium: {
-    fontSize: 15,
-    fontWeight: '500' as const,
-    lineHeight: 22,
-  },
-  caption: {
-    fontSize: 13,
-    fontWeight: '400' as const,
-    lineHeight: 18,
-  },
-  captionMedium: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    lineHeight: 18,
-  },
+  // Display (Fraunces)
+  display1: { fontFamily: fonts.serifLight, fontSize: 44, lineHeight: 50, letterSpacing: -0.6 },
+  display2: { fontFamily: fonts.serifRegular, fontSize: 32, lineHeight: 38, letterSpacing: -0.4 },
+  display3: { fontFamily: fonts.serifMedium, fontSize: 24, lineHeight: 30, letterSpacing: -0.2 },
+  // Title — used for screen headers and card titles
+  title: { fontFamily: fonts.serifMedium, fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
+  titleSans: { fontFamily: fonts.sansSemibold, fontSize: 17, lineHeight: 24, letterSpacing: -0.1 },
+  // Body
+  body: { fontFamily: fonts.sansRegular, fontSize: 15, lineHeight: 22 },
+  bodyMedium: { fontFamily: fonts.sansMedium, fontSize: 15, lineHeight: 22 },
+  // Caption
+  caption: { fontFamily: fonts.sansRegular, fontSize: 13, lineHeight: 18 },
+  captionMedium: { fontFamily: fonts.sansMedium, fontSize: 13, lineHeight: 18 },
+  // Labels (caps-track for section headers and chips)
   label: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    lineHeight: 14,
+    fontFamily: fonts.sansSemibold, fontSize: 11, lineHeight: 14,
+    letterSpacing: 1.4, textTransform: 'uppercase' as const,
   },
-  small: {
-    fontSize: 10,
-    fontWeight: '600' as const,
-    lineHeight: 14,
+  labelSmall: {
+    fontFamily: fonts.sansSemibold, fontSize: 10, lineHeight: 14,
+    letterSpacing: 1.6, textTransform: 'uppercase' as const,
   },
+  // Mono — readouts, hashes, prices
+  mono: { fontFamily: fonts.mono, fontSize: 12, letterSpacing: 0.2 },
+  monoLg: { fontFamily: fonts.mono, fontSize: 14, letterSpacing: 0.2 },
+  // legacy aliases used by older screens
+  heading: { fontFamily: fonts.serifMedium, fontSize: 24, lineHeight: 30, letterSpacing: -0.3 },
+  small: { fontFamily: fonts.sansSemibold, fontSize: 10, lineHeight: 14, letterSpacing: 1.6 },
 } as const;
 
-// ── スペーシング ──
 export const spacing = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
   xl: 24,
   xxl: 32,
+  xxxl: 48,
+  xxxxl: 64,
 } as const;
 
-// ── 形状 ──
 export const radii = {
-  sm: 6,
-  md: 10,
-  lg: 16,
-  xl: 20,
+  none: 0,
+  xs: 2,
+  sm: 4,
+  md: 8,
+  lg: 12,
+  xl: 18,
+  xxl: 24,
   full: 9999,
 } as const;
 
-// ── ヘッダー共通 ──
+export const shadows = {
+  // Hairline shadow — for cards floating on paper
+  card: {
+    shadowColor: '#0E1F44',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  // More pronounced — for modal / popover
+  pop: {
+    shadowColor: '#0E1F44',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  // legacy aliases
+  sm: {
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08, shadowRadius: 2, elevation: 2,
+  },
+  md: {
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12, shadowRadius: 4, elevation: 4,
+  },
+  lg: {
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18, shadowRadius: 12, elevation: 8,
+  },
+} as const;
+
+// React Navigation header — paper background, navy text, no shadow.
+export const navigationHeaderOptions = {
+  headerStyle: { backgroundColor: colors.paper },
+  headerTintColor: colors.ink,
+  headerTitleStyle: {
+    fontFamily: fonts.serifMedium,
+    fontSize: 18,
+    color: colors.ink,
+  },
+  headerShadowVisible: false,
+  headerBackTitleVisible: false,
+} as const;
+
+// Header style helper for hand-rolled headers (in screens that hide nav header).
 export const headerStyle = {
   height: 52,
   flexDirection: 'row' as const,
   alignItems: 'center' as const,
   justifyContent: 'space-between' as const,
-  paddingHorizontal: 16, // spacing.lg
+  paddingHorizontal: spacing.lg,
   borderBottomWidth: 1,
-  borderBottomColor: '#F0F0F0', // colors.borderLight
+  borderBottomColor: colors.border,
 };
-
-// Navigation header（NativeStack用）
-export const navigationHeaderOptions = {
-  headerStyle: {
-    backgroundColor: '#FFFFFF', // colors.background
-  },
-  headerTintColor: '#1A1A1A', // colors.textPrimary
-  headerTitleStyle: {
-    fontWeight: '600' as const,
-    fontSize: 17,
-  },
-  headerShadowVisible: false,
-  headerBackTitleVisible: false,
-};
-
-// ── シャドウ ──
-export const shadows = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-} as const;

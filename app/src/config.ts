@@ -18,6 +18,8 @@ export const config = {
   publishUrl: `${SERVER_URL}/api/v1/publish`,
   /** Unit H: VLM gate 判定 — 仕様書 §2.3 step 3 / step 6 */
   vlmGateUrl: `${SERVER_URL}/api/v1/vlm-gate`,
+  /** Unit E: co-sign API — buyer simulator が license 発行依頼で叩く */
+  cosignLicenseUrl: `${SERVER_URL}/api/license/co-sign`,
   /** 証明書発行API */
   deviceCertificateUrl: `${SERVER_URL}/api/v1/device-certificate`,
   /** 証明書更新API */

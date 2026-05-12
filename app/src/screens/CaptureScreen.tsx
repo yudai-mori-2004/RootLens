@@ -35,10 +35,23 @@ import { colors, typography, spacing, radii } from '../theme';
 
 // SPECS_JA §2.3 step 2-6: ジェスチャ検出 → start VLM gate → 録画 → end VLM gate → 結果。
 // 旧 sandbox 04 CaptureView から salvage、VLM 呼出を Unit H mobile SDK に差し替え。
+//
+// EXPO_PUBLIC_DEV_QUICK_CAPTURE=1 の時はジェスチャと VLM gate を全部 skip して、
+// 大きな START / STOP ボタンだけの manual 録画 UI を出す (デモ収録の繰り返し用)。
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Capture'>;
 
+const DEV_QUICK_CAPTURE =
+  (process.env as Record<string, string | undefined>).EXPO_PUBLIC_DEV_QUICK_CAPTURE === '1';
+
 export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
+  if (DEV_QUICK_CAPTURE) {
+    return <QuickCaptureScreen route={route} navigation={navigation} />;
+  }
+  return <FullCaptureScreen route={route} navigation={navigation} />;
+};
+
+const FullCaptureScreen: React.FC<Props> = ({ route, navigation }) => {
   const task = findTask(route.params.taskId);
   const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [state, dispatch] = useReducer(captureReducer, initialCaptureSub);
@@ -280,6 +293,195 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
 
       <View style={styles.bottomBar}>
         <Pressable hitSlop={12} onPress={() => navigation.goBack()}>
+          <Text style={styles.cancelText}>← Cancel</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+// ---- Quick capture (dev/demo iteration) -------------------------------
+// EXPO_PUBLIC_DEV_QUICK_CAPTURE=1 で有効化される。ジェスチャ + VLM 両方 skip。
+// 単一 START / STOP ボタンで録画して、vlmEnd=null のまま Review に飛ばす。
+// 撮影自体は同じ recorder を使う (Privacy blur / TP register / Stake は無変更で動く)。
+
+const QuickCaptureScreen: React.FC<Props> = ({ route, navigation }) => {
+  const task = findTask(route.params.taskId);
+  const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
+  const [recording, setRecording] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const recordingStartedRef = useRef(false);
+  const startTsRef = useRef<number | null>(null);
+  const completedRef = useRef(false);
+
+  // permission check (same as full mode)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const existing = await Camera.getCameraPermissionsAsync();
+        if (cancelled) return;
+        if (existing.granted) { setPermission('granted'); return; }
+        const requested = await Camera.requestCameraPermissionsAsync();
+        if (cancelled) return;
+        setPermission(requested.granted ? 'granted' : 'denied');
+      } catch {
+        if (!cancelled) setPermission('denied');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // dummy onHandPose: we still mount HandPosePreviewView for camera frames,
+  // but ignore the hand-pose events. (Recording pipeline still needs the preview alive.)
+  const onHandPose = useCallback(() => {}, []);
+
+  const start = async () => {
+    if (recordingStartedRef.current) return;
+    recordingStartedRef.current = true;
+    startTsRef.current = Date.now();
+    setError(null);
+    try {
+      await startHandPoseRecording();
+      setRecording(true);
+    } catch (e: any) {
+      recordingStartedRef.current = false;
+      setError(e?.message ?? String(e));
+    }
+  };
+
+  const stop = async () => {
+    if (!recordingStartedRef.current || completedRef.current) return;
+    completedRef.current = true;
+    try {
+      const videoUri = await stopHandPoseRecording();
+      const durationMs = startTsRef.current ? Date.now() - startTsRef.current : 0;
+      navigation.replace('Review', {
+        taskId: route.params.taskId,
+        videoUri,
+        vlmEnd: null,
+        vlmEndError: null,
+        durationMs,
+      });
+    } catch (e: any) {
+      completedRef.current = false;
+      setError(e?.message ?? String(e));
+    }
+  };
+
+  // cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingStartedRef.current && !completedRef.current) {
+        stopHandPoseRecording().catch(() => {});
+      }
+    };
+  }, []);
+
+  if (!task) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={styles.statusEyebrow}>NOT FOUND</Text>
+        <Text style={styles.statusBody}>Task "{route.params.taskId}" not found.</Text>
+      </SafeAreaView>
+    );
+  }
+  if (permission === 'pending') {
+    return (
+      <SafeAreaView style={styles.center}>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={styles.statusEyebrow}>CAMERA</Text>
+        <Text style={styles.statusBody}>Checking access…</Text>
+      </SafeAreaView>
+    );
+  }
+  if (permission === 'denied') {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={styles.statusEyebrow}>PERMISSION REQUIRED</Text>
+        <Text style={styles.statusBody}>Allow camera access in iOS Settings.</Text>
+        <Pressable style={styles.btn} onPress={() => navigation.goBack()}>
+          <Text style={styles.btnLabel}>Back</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.root}>
+      <View style={styles.topBar}>
+        <View style={styles.topBarMain}>
+          <View style={styles.topBarHeader}>
+            <Text style={styles.topBarTask}>{task.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{
+                paddingHorizontal: 6, paddingVertical: 2,
+                borderRadius: 4, backgroundColor: '#E8B339',
+              }}>
+                <Text style={{ color: '#0E1F44', fontSize: 9, fontWeight: '700', letterSpacing: 1.2 }}>
+                  DEV
+                </Text>
+              </View>
+              {recording ? (
+                <View style={styles.recPill}>
+                  <View style={styles.recDot} />
+                  <Text style={styles.recLabel}>REC</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
+          <Text style={styles.topBarStatus} numberOfLines={2}>
+            {recording ? 'Recording — tap stop when done.' : 'Tap start to record. AI checks are skipped.'}
+          </Text>
+          {error ? (
+            <View style={styles.feedbackCard}>
+              <Text style={styles.feedbackBody} numberOfLines={3}>{error}</Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      <View style={styles.previewContainer}>
+        <HandPosePreviewView style={StyleSheet.absoluteFill} onHandPose={onHandPose} />
+      </View>
+
+      <View style={[styles.bottomBar, { flexDirection: 'column', gap: 12, paddingTop: 16 }]}>
+        {!recording ? (
+          <Pressable
+            onPress={start}
+            style={({ pressed }) => [
+              {
+                paddingVertical: 18,
+                borderRadius: 12,
+                backgroundColor: '#B23A2E',
+                alignItems: 'center',
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>● Start recording</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={stop}
+            style={({ pressed }) => [
+              {
+                paddingVertical: 18,
+                borderRadius: 12,
+                backgroundColor: '#0E1F44',
+                alignItems: 'center',
+              },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600' }}>■ Stop & continue</Text>
+          </Pressable>
+        )}
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={{ alignItems: 'center', paddingVertical: 8 }}
+          hitSlop={12}
+        >
           <Text style={styles.cancelText}>← Cancel</Text>
         </Pressable>
       </View>

@@ -75,12 +75,28 @@ final class HandPoseCameraController: NSObject {
       throw NSError(domain: "HandPoseCameraController", code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "no back camera"])
     }
+    NSLog("[HandPoseCamera] selected lens: deviceType=%@ localizedName=%@ minZoom=%.2f maxZoom=%.2f",
+          device.deviceType.rawValue, device.localizedName,
+          device.minAvailableVideoZoomFactor, device.maxAvailableVideoZoomFactor)
+
     let input = try AVCaptureDeviceInput(device: device)
     if session.canAddInput(input) {
       session.addInput(input)
     } else {
       throw NSError(domain: "HandPoseCameraController", code: 2,
                     userInfo: [NSLocalizedDescriptionKey: "cannot add camera input"])
+    }
+
+    // Lock zoom to the lens's native widest FOV. On builtInUltraWideCamera the
+    // min zoom factor is 1.0 — that's already the ultra-wide native field of view.
+    // (In iPhone Camera-app terms this is "0.5x".) Doing this defensively in case
+    // some other code path or default has bumped it.
+    do {
+      try device.lockForConfiguration()
+      device.videoZoomFactor = device.minAvailableVideoZoomFactor
+      device.unlockForConfiguration()
+    } catch {
+      NSLog("[HandPoseCamera] could not lock device for zoom config: %@", "\(error)")
     }
 
     videoDataOutput.videoSettings = [
@@ -209,14 +225,35 @@ final class HandPoseCameraController: NSObject {
 
   // MARK: - Helpers
 
-  /// Ultra-wide (0.5x, 13mm equiv) → wide (1x, 26mm) の優先順で取得。
+  /// Ultra-wide (~13mm equiv, "0.5x" in Camera app) → wide (~26mm, "1x") の優先順。
   /// egocentric な家事撮影では両手 + 作業領域を収めるために FOV 広い方が良い。
-  /// iPhone 12 / 13 / 14 / 15 / 16 はいずれも builtInUltraWideCamera を持つ。
-  /// SE 等 ultra-wide 非搭載端末は builtInWideAngleCamera にフォールバック。
+  ///
+  /// iPhone 11 以降の back triple/dual-camera 機 (12 / 13 / 14 / 15 / 16) はいずれも
+  /// builtInUltraWideCamera を持つ。SE 等 ultra-wide 非搭載は builtInWideAngleCamera にフォールバック。
+  ///
+  /// `AVCaptureDevice.default(.builtInUltraWideCamera, ...)` で機種 sniff 不要に取れる。
+  /// 念のため DiscoverySession でも探して、focal length が短い順に preference をつけている。
   private static func defaultBackCamera() -> AVCaptureDevice? {
+    // 1) 最優先: builtInUltraWideCamera を直接取得
     if let ultra = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) {
       return ultra
     }
+    // 2) Discovery: 互換性のためすべての back camera を列挙し、最も focal length が短いものを選ぶ
+    let session = AVCaptureDevice.DiscoverySession(
+      deviceTypes: [
+        .builtInUltraWideCamera,
+        .builtInWideAngleCamera,
+      ],
+      mediaType: .video,
+      position: .back,
+    )
+    let sorted = session.devices.sorted { lhs, rhs in
+      lhs.activeFormat.videoFieldOfView > rhs.activeFormat.videoFieldOfView
+    }
+    if let widest = sorted.first {
+      return widest
+    }
+    // 3) 最終フォールバック: any builtInWideAngleCamera
     return AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
   }
 }

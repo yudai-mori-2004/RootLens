@@ -253,12 +253,18 @@ public final class PrivacyBlurProcessor {
           let pts = CMSampleBufferGetPresentationTimeStamp(sample)
 
           do {
-            let outBuffer = try self.processFrame(
-              inputBuffer: inputBuffer,
-              preferredTransform: preferredTransform,
-              displaySize: displaySize,
-              frameIndex: frameIndex
-            )
+            // autoreleasepool でフレームごとに CIImage / Vision request handler / output
+            // PixelBuffer の retain を即解放させる。これを忘れると 1080p HEVC 1 分動画
+            // (1800 frames × ~8MB BGRA buffer) でメモリが膨れて jetsam OOM kill される。
+            let outBuffer: CVPixelBuffer = try autoreleasepool {
+              try self.processFrame(
+                inputBuffer: inputBuffer,
+                preferredTransform: preferredTransform,
+                displaySize: displaySize,
+                frameIndex: frameIndex,
+                pool: adaptor.pixelBufferPool,
+              )
+            }
             if !adaptor.append(outBuffer, withPresentationTime: pts) {
               writerInput.markAsFinished()
               if resumed.testAndSet() {
@@ -313,7 +319,8 @@ public final class PrivacyBlurProcessor {
     inputBuffer: CVPixelBuffer,
     preferredTransform: CGAffineTransform,
     displaySize: CGSize,
-    frameIndex: Int
+    frameIndex: Int,
+    pool: CVPixelBufferPool?
   ) throws -> CVPixelBuffer {
     // 1) input → CIImage (raw, sensor orientation)
     let raw = CIImage(cvPixelBuffer: inputBuffer)
@@ -378,7 +385,7 @@ public final class PrivacyBlurProcessor {
 
     // 6) blur 領域がなければ upright をそのままレンダ
     if normalizedRegions.isEmpty {
-      let outBuffer = try createPixelBuffer(width: Int(displaySize.width), height: Int(displaySize.height))
+      let outBuffer = try acquirePixelBuffer(pool: pool, width: Int(displaySize.width), height: Int(displaySize.height))
       ciContext.render(upright, to: outBuffer, bounds: uprightExtent, colorSpace: workingColorSpace)
       return outBuffer
     }
@@ -404,7 +411,7 @@ public final class PrivacyBlurProcessor {
     }
 
     // 10) Output buffer に render
-    let outBuffer = try createPixelBuffer(width: Int(displaySize.width), height: Int(displaySize.height))
+    let outBuffer = try acquirePixelBuffer(pool: pool, width: Int(displaySize.width), height: Int(displaySize.height))
     ciContext.render(composite, to: outBuffer, bounds: uprightExtent, colorSpace: workingColorSpace)
     return outBuffer
   }
@@ -452,7 +459,20 @@ public final class PrivacyBlurProcessor {
     )
   }
 
-  private func createPixelBuffer(width: Int, height: Int) throws -> CVPixelBuffer {
+  /// AVAssetWriterInputPixelBufferAdaptor の pool が利用できるならそこから 1 枚取得し、
+  /// 無ければ最後の手段として CVPixelBufferCreate で fresh allocate。
+  /// pool は内部で 3-5 枚に capped されており、フレームごとに recycle されるので
+  /// 1080p HEVC 1 分撮影 (1800 frames × 8MB BGRA buffer) でも常駐は数十 MB に抑えられる。
+  private func acquirePixelBuffer(pool: CVPixelBufferPool?, width: Int, height: Int) throws -> CVPixelBuffer {
+    if let pool = pool {
+      var buf: CVPixelBuffer?
+      let status = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &buf)
+      if status == kCVReturnSuccess, let result = buf {
+        return result
+      }
+      // pool drained 等は fresh allocate にフォールバック
+      NSLog("[PrivacyBlur] pool createPixelBuffer status=%d, falling back to direct allocate", status)
+    }
     let attrs: CFDictionary = [
       kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
       kCVPixelBufferIOSurfacePropertiesKey: [:],

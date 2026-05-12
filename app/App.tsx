@@ -6,28 +6,61 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import {
+  useFonts,
+  Fraunces_300Light,
+  Fraunces_400Regular,
+  Fraunces_500Medium,
+  Fraunces_600SemiBold,
+} from '@expo-google-fonts/fraunces';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 
 import { RootNavigator } from './src/app/RootNavigator';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
-import { colors } from './src/theme';
+import { getDemoWalletPubkey } from './src/domain/wallet';
+import { colors, fonts, typography } from './src/theme';
 
 // 統合フェーズ entry point。
 // CertGate (Unit A の TEE 証明書プロビジョニング) を起動時に解決してから
-// RootNavigator (Login → TaskList → Capture → Review → SignAndMint → Stake → Done) に入る。
+// RootNavigator (Login/Main + 撮影フロー) に入る。
 
 const navTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: colors.background,
-    card: colors.background,
+    background: colors.paper,
+    card: colors.paper,
     border: colors.border,
-    primary: colors.accent,
-    text: colors.textPrimary,
+    primary: colors.ink,
+    text: colors.ink,
   },
 };
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    Fraunces_300Light,
+    Fraunces_400Regular,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.paper }]}>
+        <ActivityIndicator color={colors.ink} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <CertGate>
@@ -50,10 +83,10 @@ const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (cert.status === 'checking' || cert.status === 'provisioning') {
     return (
-      <View style={gateStyles.center}>
-        <ActivityIndicator color={colors.accent} />
-        <Text style={gateStyles.eyebrow}>DEVICE CERTIFICATE</Text>
-        <Text style={gateStyles.body}>
+      <View style={styles.center}>
+        <ActivityIndicator color={colors.ink} />
+        <Text style={[styles.eyebrow, { marginTop: 16 }]}>DEVICE CERTIFICATE</Text>
+        <Text style={styles.body}>
           {cert.status === 'checking' ? 'Checking…' : 'Provisioning…'}
         </Text>
       </View>
@@ -62,39 +95,43 @@ const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   if (cert.status === 'error') {
     return (
-      <View style={gateStyles.center}>
-        <Text style={gateStyles.eyebrow}>SETUP FAILED</Text>
-        <Text style={gateStyles.body} numberOfLines={4}>
+      <View style={styles.center}>
+        <Text style={styles.eyebrow}>SETUP FAILED</Text>
+        <Text style={styles.body} numberOfLines={4}>
           {cert.error ?? 'Unknown error'}
         </Text>
-        <Pressable style={gateStyles.retry} onPress={cert.retry}>
-          <Text style={gateStyles.retryLabel}>Retry</Text>
+        <Pressable style={styles.retry} onPress={cert.retry}>
+          <Text style={styles.retryLabel}>Retry</Text>
         </Pressable>
       </View>
     );
   }
 
-  // ready / renewing は children に passthrough。
+  // ready / renewing は children に passthrough
   return <>{children}</>;
 };
 
-const gateStyles = StyleSheet.create({
+// ---- 起動 route 振り分け用 helper (RootNavigator 側で使う) ------------
+// wallet が env から読めれば Main へ直行、なければ Login で待つ。
+export const initialRouteForApp = (): 'Main' | 'Login' =>
+  getDemoWalletPubkey() ? 'Main' : 'Login';
+
+const styles = StyleSheet.create({
   center: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    padding: 24, gap: 12, backgroundColor: colors.background,
+    padding: 24, gap: 12, backgroundColor: colors.paper,
   },
-  eyebrow: {
-    fontSize: 11, letterSpacing: 1.6, fontWeight: '600',
-    color: colors.textSecondary, marginTop: 16,
-  },
+  eyebrow: { ...typography.label, color: colors.textMute },
   body: {
-    fontSize: 14, lineHeight: 20, color: colors.textPrimary,
+    ...typography.body, color: colors.textInk,
     textAlign: 'center', maxWidth: 320,
   },
   retry: {
-    marginTop: 12,
-    paddingVertical: 10, paddingHorizontal: 24,
-    borderRadius: 6, backgroundColor: colors.accent,
+    marginTop: 12, paddingVertical: 10, paddingHorizontal: 24,
+    borderRadius: 8, backgroundColor: colors.ink,
   },
-  retryLabel: { color: colors.white, fontSize: 14, fontWeight: '600' },
+  retryLabel: {
+    color: colors.textOnInk, fontSize: 14,
+    fontFamily: fonts.sansSemibold,
+  },
 });
