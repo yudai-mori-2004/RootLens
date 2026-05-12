@@ -324,6 +324,69 @@
   max-width: 720px;
 }
 
+/* Section body with side illustration */
+.sectionBodyWithIllustration {
+  display: grid;
+  grid-template-columns: 80px 1fr 240px;
+  gap: 32px;
+  align-items: start;
+}
+
+.sectionBodyContentNarrow {
+  grid-column: 2;
+  max-width: 560px;
+}
+
+.sectionIllustration {
+  grid-column: 3;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.sectionIllustration img {
+  width: 100%;
+  height: auto;
+  max-width: 240px;
+  display: block;
+}
+
+/* Step icon (above step number in card) */
+.stepIcon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.stepIcon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Closing CTA visual (centered above title) */
+.closingCtaVisual {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closingCtaVisual img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 /* ---- Typography helpers ---- */
 .link {
   color: var(--lp-accent);
@@ -624,6 +687,14 @@
     gap: 16px;
   }
 
+  .sectionBodyWithIllustration {
+    grid-template-columns: 56px 1fr 160px;
+    gap: 20px;
+  }
+
+  .sectionIllustration img {
+    max-width: 160px;
+  }
 }
 
 @media (max-width: 600px) {
@@ -672,6 +743,28 @@
 
   .sectionBodyContent {
     grid-column: 1;
+  }
+
+  .sectionBodyWithIllustration {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .sectionBodyContentNarrow {
+    grid-column: 1;
+    max-width: 100%;
+    order: 2;
+  }
+
+  .sectionIllustration {
+    grid-column: 1;
+    justify-content: center;
+    order: 1;
+    padding-top: 0;
+  }
+
+  .sectionIllustration img {
+    max-width: 200px;
   }
 
   .heroTitle {

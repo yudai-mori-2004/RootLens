@@ -77,13 +77,16 @@ export default async function HomePage() {
               <h2 className={s.sectionTitle}>{tProblem("title")}</h2>
             </div>
           </header>
-          <div className={s.sectionBody}>
-            <div className={s.sectionBodyContent}>
+          <div className={s.sectionBodyWithIllustration}>
+            <div className={s.sectionBodyContentNarrow}>
               <p className={s.prose}>{tProblem("p1")}</p>
               <p className={s.prose}>{tProblem("p2")}</p>
               <p className={s.prose} style={{ marginTop: 28 }}>
                 <span className={s.emphasis}>{tProblem("p3")}</span>
               </p>
+            </div>
+            <div className={s.sectionIllustration}>
+              <img src="/lp/problem.webp" alt="" width={800} height={800} loading="lazy" />
             </div>
           </div>
         </div>
@@ -100,13 +103,19 @@ export default async function HomePage() {
             </div>
           </header>
           <div className={s.steps}>
-            {flowSteps.map((key, i) => (
-              <div key={key} className={s.step}>
-                <div className={s.stepNumber}>0{i + 1} / 03</div>
-                <div className={s.stepLabel}>{tFlow(`${key}.label`)}</div>
-                <div className={s.stepText}>{tFlow(`${key}.text`)}</div>
-              </div>
-            ))}
+            {flowSteps.map((key, i) => {
+              const icons = ["/lp/step-record.webp", "/lp/step-validate.webp", "/lp/step-earn.webp"];
+              return (
+                <div key={key} className={s.step}>
+                  <div className={s.stepIcon}>
+                    <img src={icons[i]} alt="" width={400} height={400} loading="lazy" />
+                  </div>
+                  <div className={s.stepNumber}>0{i + 1} / 03</div>
+                  <div className={s.stepLabel}>{tFlow(`${key}.label`)}</div>
+                  <div className={s.stepText}>{tFlow(`${key}.text`)}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -144,6 +153,9 @@ export default async function HomePage() {
       {/* §04 Closing CTA */}
       <section className={s.closingCta}>
         <div className={s.closingCtaInner}>
+          <div className={s.closingCtaVisual}>
+            <img src="/lp/cta.webp" alt="" width={600} height={600} loading="lazy" />
+          </div>
           <div className={s.closingCtaNumber}>§04</div>
           <div className={s.closingCtaMain}>
             <div className={s.closingCtaLabel}>Get started</div>
