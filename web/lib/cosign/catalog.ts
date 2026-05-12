@@ -61,6 +61,35 @@ export function loadCatalogFromFile(path: string): Catalog {
 }
 
 /**
+ * インライン default catalog (YAML を bundle に焼き込みたい時用)。
+ * Vercel 等で env `COSIGN_CATALOG_PATH` を渡せない / file system に YAML を
+ * 同梱できない環境向けのフォールバック。
+ *
+ * `web/config/cosign-catalog.yaml` の内容と同期を取ること。
+ */
+export function defaultCatalog(): Catalog {
+  const byKey = new Map<string, CatalogEntry>();
+  const entries: CatalogEntry[] = [
+    {
+      rootAssetId: WILDCARD_ASSET,
+      licenseUrl:
+        "https://rootlens.io/licenses/commercial-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
+      price: 1_000_000n, // 1 USDC
+    },
+    {
+      rootAssetId: WILDCARD_ASSET,
+      licenseUrl:
+        "https://rootlens.io/licenses/training-only-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
+      price: 500_000n, // 0.5 USDC
+    },
+  ];
+  for (const e of entries) {
+    byKey.set(makeKey(e.rootAssetId, e.licenseUrl), e);
+  }
+  return { byKey };
+}
+
+/**
  * カタログ参照。exact `(rootAssetId, licenseUrl)` を最優先、無ければ
  * fallback `("*", licenseUrl)` (= 当該 license 種別のデフォルト価格) を返す。
  * licenseUrl 側は wildcard 不可 (URL が決まらないと delegate サインの対象が定まらない)。

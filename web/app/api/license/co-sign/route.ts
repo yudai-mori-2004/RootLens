@@ -8,7 +8,7 @@
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { NextRequest, NextResponse } from "next/server";
-import { loadCatalogFromFile, lookup } from "@/lib/cosign/catalog";
+import { defaultCatalog, loadCatalogFromFile, lookup } from "@/lib/cosign/catalog";
 import { buildAndSignIssueLicenseTx } from "@/lib/cosign/build-tx";
 import { fetchAssetWithProof } from "@/lib/cosign/das";
 import { envKeypairSigner } from "@/lib/cosign/signer";
@@ -45,7 +45,15 @@ function getConnection(): Connection {
 }
 
 function getCatalog() {
-  const path = getEnv("COSIGN_CATALOG_PATH");
+  // env が設定されていればそこから YAML を読む (dev / staging で外部編集したい時)。
+  // 未設定なら bundle に焼かれた default catalog を使う (Vercel 等 env を渡せない環境向け)。
+  const path = process.env.COSIGN_CATALOG_PATH;
+  if (!path) {
+    if (cachedCatalog && cachedCatalogPath === "::default::") return cachedCatalog;
+    cachedCatalog = defaultCatalog();
+    cachedCatalogPath = "::default::";
+    return cachedCatalog;
+  }
   if (cachedCatalog && cachedCatalogPath === path) return cachedCatalog;
   cachedCatalog = loadCatalogFromFile(path);
   cachedCatalogPath = path;
