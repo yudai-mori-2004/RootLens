@@ -84,7 +84,7 @@ describe("issue_license — adversarial", () => {
   const licenseTreeConfig = findBubblegumTreeConfig(licenseMerkleTree);
   const licenseTreeAuthority = findLicenseTreeAuthority(programId, licenseMerkleTree);
 
-  before(async () => {
+  beforeAll(async () => {
     await ensureBalance(conn, deployer.publicKey, 0.1);
   });
 

@@ -27,7 +27,7 @@ describe("update_config — adversarial", () => {
   const configPda = new PublicKey(network.config_pda);
   const authority = loadKeypair("authority.json");
 
-  before(async () => {
+  beforeAll(async () => {
     await ensureBalance(conn, authority.publicKey, 0.05);
     // Config が deploy 済か事前確認
     const acc = await conn.getAccountInfo(configPda);

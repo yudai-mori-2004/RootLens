@@ -63,35 +63,37 @@ export function buildUpdateConfigIx(
     newAuthority?: PublicKey | null;
     newStakerBps?: number | null;
     newDelegateBps?: number | null;
+    newRootNftCollection?: PublicKey | null;
+    newUsdcMint?: PublicKey | null;
   }
 ): TransactionInstruction {
   const data: Buffer[] = [anchorDiscriminator("update_config")];
 
-  // Option<Pubkey> new_authority
-  if (args.newAuthority) {
-    data.push(Buffer.from([1]));
-    data.push(args.newAuthority.toBuffer());
-  } else {
-    data.push(Buffer.from([0]));
+  function pushOptionPubkey(v: PublicKey | null | undefined) {
+    if (v) {
+      data.push(Buffer.from([1]));
+      data.push(v.toBuffer());
+    } else {
+      data.push(Buffer.from([0]));
+    }
   }
-  // Option<u16> new_staker_bps
-  if (args.newStakerBps !== undefined && args.newStakerBps !== null) {
-    const buf = Buffer.alloc(3);
-    buf.writeUInt8(1, 0);
-    buf.writeUInt16LE(args.newStakerBps, 1);
-    data.push(buf);
-  } else {
-    data.push(Buffer.from([0]));
+  function pushOptionU16(v: number | null | undefined) {
+    if (v !== undefined && v !== null) {
+      const buf = Buffer.alloc(3);
+      buf.writeUInt8(1, 0);
+      buf.writeUInt16LE(v, 1);
+      data.push(buf);
+    } else {
+      data.push(Buffer.from([0]));
+    }
   }
-  // Option<u16> new_delegate_bps
-  if (args.newDelegateBps !== undefined && args.newDelegateBps !== null) {
-    const buf = Buffer.alloc(3);
-    buf.writeUInt8(1, 0);
-    buf.writeUInt16LE(args.newDelegateBps, 1);
-    data.push(buf);
-  } else {
-    data.push(Buffer.from([0]));
-  }
+
+  // 引数順序は programs/license-nft/src/lib.rs::update_config と一致。
+  pushOptionPubkey(args.newAuthority);
+  pushOptionU16(args.newStakerBps);
+  pushOptionU16(args.newDelegateBps);
+  pushOptionPubkey(args.newRootNftCollection);
+  pushOptionPubkey(args.newUsdcMint);
 
   return new TransactionInstruction({
     programId,

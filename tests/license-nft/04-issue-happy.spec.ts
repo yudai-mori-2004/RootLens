@@ -120,7 +120,7 @@ describe("issue_license — happy path + proof-related adversarial", () => {
 
   let alts: AddressLookupTableAccount[] = [];
 
-  before(async () => {
+  beforeAll(async () => {
     await ensureBalance(conn, deployer.publicKey, 0.1);
     alts = [await loadAlt(conn, new PublicKey(fixtures.alt))];
   });

@@ -34,7 +34,7 @@ describe("claim_revenue — adversarial", () => {
   // 早めに失敗するシナリオが多いので、まず存在を確認する preflight 的な用途
   const poolUsdc = getAssociatedTokenAddressSync(usdcMint, configPda, true);
 
-  before(async () => {
+  beforeAll(async () => {
     await ensureBalance(conn, authority.publicKey, 0.05);
   });
 
