@@ -567,25 +567,21 @@ URL 先 JSON は以下のフィールドを含める。 `full_text` には条文
     "licensor_representations": "The original creator has consented to RootLens ToS as the verified copyright holder under KYC. RootLens has applied its VLM-based pre-screening as a reasonable effort against third-party IP inclusion.",
     "buyer_due_diligence": "For ordinary commercial use including aggregate AI training, the buyer is not required to perform per-asset due diligence on each video.",
     "buyer_notification_duty": "If the buyer has actual knowledge that the Licensed Content contains third-party IP, publicity, or privacy rights, the buyer must promptly notify RootLens in writing.",
-    "indemnification_standard_tier": {
+    "indemnification": {
       "scope": "Suits by third parties against the buyer for IP, privacy, or publicity rights, within RootLens's representations and warranties.",
       "covered_amounts": ["refund of license fee for the affected License NFT", "buyer's reasonable defence costs incurred before RootLens assumes the defence"],
-      "per_claim_cap_usd": 50000,
-      "annual_aggregate_cap_per_buyer_per_root_nft_usd": 250000,
-      "market_positioning": "Mid-tier coverage for the training-data licensing industry — between Shutterstock Standard and Shutterstock Enhanced.",
-      "defence_control": "RootLens retains the option to assume defence (counsel selection, settlement, strategy)."
+      "per_claim_cap_usd": "<set per license at issuance>",
+      "annual_aggregate_cap_per_buyer_per_root_nft_usd": "<set per license at issuance>",
+      "defence_control": "RootLens retains the option to assume defence (counsel selection, settlement, strategy).",
+      "exclusions": [
+        "Use outside the licensed scope",
+        "Cases where the buyer had actual knowledge of the issue but failed to promptly notify RootLens (constructive knowledge is not applied so as not to impose de facto per-asset DD on buyers)",
+        "Suits arising from buyer's modification of the Licensed Content"
+      ],
+      "consequential_damages_exclusion": "Indirect damages (lost future profits, reputational harm, and AI model retraining costs) are excluded by default. Coverage for AI model retraining costs can be agreed separately in an enterprise contract.",
+      "enterprise_contract_note": "Buyers requiring coverage above the default caps negotiate an enterprise contract with RootLens, optionally backed by an IP infringement insurance policy. Specific terms are determined at contract time."
     },
-    "indemnification_enterprise_tier": {
-      "scope": "Cases requiring caps above Standard, or coverage of AI model retraining costs, agreed in a separate enterprise contract.",
-      "preconditions": "Requires RootLens to obtain IP infringement insurance as backstop; rollout is phased by RootLens's business stage. MVP stage offers Standard tier only."
-    },
-    "indemnification_exclusions": [
-      "Use outside the licensed scope",
-      "Cases where the buyer had actual knowledge of the issue but failed to promptly notify RootLens (constructive knowledge is not applied so as not to impose de facto per-asset DD on buyers)",
-      "Suits arising from buyer's modification of the Licensed Content"
-    ],
-    "consequential_damages_exclusion": "Indirect damages (lost future profits, reputational harm, and AI model retraining costs) are excluded from Standard tier. AI model retraining costs are covered only when separately agreed in an Enterprise tier contract.",
-    "two_layer_contract_structure": "Buyer-side obligations (notification, sanctions condition, modification limits, indemnification exclusions) are placed in the Terms of Sale, which the buyer accepts explicitly at License NFT purchase. The copyright grant itself remains a stand-alone unilateral licence so that licence inheritance on NFT transfer is preserved."
+    "two_layer_contract_structure": "Buyer-side obligations (notification, sanctions condition, modification limits, scope-of-use limits) are placed in the Terms of Sale, which the buyer accepts explicitly at License NFT purchase. The copyright grant itself remains a stand-alone unilateral licence so that licence inheritance on NFT transfer is preserved."
   },
   "full_text": "<完全な license terms 本文、 発行時点で固定>"
 }
@@ -603,12 +599,12 @@ URL 先 JSON は以下のフィールドを含める。 `full_text` には条文
 - 準拠法はシンガポール法、 紛争解決はシンガポール国際仲裁センター (SIAC) を指定する。 ニューヨーク条約 (1958) の 172 締約国で仲裁判断が執行可能となる。
 - **制裁対象者条件**: licensee が OFAC SDN List、 EU 制裁リスト、 UK OFSI Consolidated List、 シンガポール MAS Targeted Financial Sanctions List に掲載されている場合、 または包括的制裁対象管轄に居住する場合は、 ライセンスは initially から無効とする。 一方的許諾モデルでは licensee に表明を求められないため、 grant 自体を条件付きとする。
 - **Licensor の表明保証**: 撮影者は KYC 済の本人で当該コンテンツの著作権者として表明していること、 RootLens は機械的内容判定 (Vision Language Model による事前審査) を合理的努力として実施していることを明記する。 買い手は通常商用利用 (集合的 AI 学習を含む) の範囲では、 動画 1 本ごとの事前審査義務を負わない。
-- **補償 — Standard ティア (デフォルト)**: 上記 Licensor 表明保証の範囲内で買い手に第三者からの訴訟が発生した場合、 RootLens は (a) 当該 License NFT のライセンス料返金 + (b) 買い手の合理的防御費用 を補償する。 上限は 1 件あたり 5 万米ドル、 同一買い手 × 同一 Root NFT × 1 年あたり合計 25 万米ドル。 これは学習データのライセンス業界で見たとき、 Shutterstock の Standard と Enhanced の間の中位水準にあたる。 RootLens は訴訟引受の選択権を持つ。
-- **補償 — Enterprise ティア (= 別途個別契約)**: Standard ティアの上限を超える補償、 または AI モデル再訓練費用の補償対象化が必要な大口買い手向け。 個別契約で合意する。 RootLens 側に知的財産権侵害損害保険による裏付けが必要なため、 提供開始は事業段階に応じて段階的に行う (= MVP 段階では Standard ティアのみ提供)。
-- **補償対象外となるケース** (両ティア共通): (a) 買い手のライセンス範囲を超える利用、 (b) 買い手が問題の存在を実際に知っていた (actual knowledge) のに速やかに通知しなかった場合、 (c) 買い手が Licensed Content を改変した結果として発生した訴訟、 のいずれも補償対象外とする。
-- **責任の限定 (AI 再訓練費用の取扱)**: 一般的な間接損害 (= 失った将来利益、 評判の損害、 AI モデル再訓練費用 等) は Standard ティアでは補償対象外。 AI モデル再訓練費用は Enterprise ティアの個別契約で別途合意した場合のみ補償対象となる。
+- **補償条項**: 上記 Licensor 表明保証の範囲内で買い手に第三者からの訴訟が発生した場合、 RootLens は (a) 当該 License NFT のライセンス料返金 + (b) 買い手の合理的防御費用 を補償する設計とする。 具体的な上限額・対象範囲・除外項目は、 ライセンス JSON 内の `indemnification` フィールド (= 上記スキーマ参照) と、 買い手が購入時に同意する販売規約 (Terms of Sale) で定義する。 LP / 公開資料では特定の数値を declare せず、 ライセンス購入時点の販売規約で開示する設計とする (= 創業期段階の財務基盤に応じて、 自己資金で履行可能な水準に設定する)。 RootLens は訴訟引受の選択権を持つ。
+- **大口契約の取扱**: 上記の既定上限を超える補償、 または AI モデル再訓練費用 等の間接損害の補償が必要な買い手は、 RootLens と個別契約 (= enterprise contract) を締結する。 必要に応じて知的財産権侵害損害保険による裏付けを取得した上で、 個別の条件を合意する。
+- **補償対象外となるケース**: (a) 買い手のライセンス範囲を超える利用、 (b) 買い手が問題の存在を実際に知っていた (actual knowledge) のに速やかに通知しなかった場合、 (c) 買い手が Licensed Content を改変した結果として発生した訴訟、 のいずれも補償対象外とする (= 構成的認識は採用しない。 採用すると買い手に個別動画ごとの能動的な事前審査義務を実質的に発生させるため)。
+- **責任の限定 (間接損害の取扱)**: 一般的な間接損害 (= 失った将来利益、 評判の損害、 AI モデル再訓練費用 等) は既定で補償対象外。 個別契約で別途合意した場合のみ対象となる。
 - **買い手の通知義務**: 買い手は、 Licensed Content の中に第三者の知財・肖像権・パブリシティ権が含まれていることを **実際に知った場合** (= actual knowledge)、 RootLens に書面で速やかに通知する義務を負う。
-- **二層契約構造**: 上記の買い手側義務 (通知 / 制裁対象者条件 / 改変制限 / 補償対象外項目) は **License NFT 購入時に買い手が明示的に同意する 販売規約 (Terms of Sale)** に格納する。 著作権許諾の本体は引き続き一方的許諾文書として独立に置く (= 二層構造)。 これにより、 買い手側義務に拘束力を持たせつつ、 著作権許諾本体は学術モデル (Grimmelmann 型) の一方的許諾を維持し、 NFT 譲渡時の自動継承を保つ。
+- **二層契約構造**: 上記の買い手側義務 (通知 / 制裁対象者条件 / 改変制限 / 利用範囲条件 / 補償条項) は **License NFT 購入時に買い手が明示的に同意する 販売規約 (Terms of Sale)** に格納する。 著作権許諾の本体は引き続き一方的許諾文書として独立に置く (= 二層構造)。 これにより、 買い手側義務に拘束力を持たせつつ、 著作権許諾本体は学術モデル (Grimmelmann 型) の一方的許諾を維持し、 NFT 譲渡時の自動継承を保つ。
 
 #### 第三者検証の手順
 
@@ -740,7 +736,7 @@ RootLens 自体が事業継続不能となった場合の取扱を明示する�
 
 #### 既発行 License NFT に対する補償義務
 
-RootLens 解散後は実務的に履行不能となる。 大口買い手向けの個別契約では、 補償義務の継承先確保 (= 後継主体への譲渡、 または保険による補填) を別途約定する。
+RootLens 解散後は実務的に履行不能となる。 個別契約 (= enterprise contract) を締結している買い手向けには、 補償義務の継承先確保 (= 後継主体への譲渡、 または保険による補填) を別途約定する。
 
 #### 代理人 (delegate) の権限の継承
 

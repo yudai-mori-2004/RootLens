@@ -1,8 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
 
-const WAITLIST_URL = "https://forms.gle/vKWyPLY9dQot6xq9A";
-
 export default async function WhyBlockchainPage() {
   const t = await getTranslations("pages.whyBlockchain");
 
@@ -86,21 +84,22 @@ export default async function WhyBlockchainPage() {
         </div>
       </section>
 
-      {/* Closing CTA */}
-      <section className={s.closingCta}>
-        <div className={s.closingCtaInner}>
-          <div className={s.closingCtaButtons}>
-            <a
-              href={WAITLIST_URL}
-              className={s.ctaPrimary}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t("ctaWaitlist")}
-            </a>
-            <a href="/" className={s.ctaSecondary}>
-              RootLens
-            </a>
+      {/* FAQ: natural next questions */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <div className={s.faqList}>
+            <div className={s.faqRow}>
+              <p className={s.faqQuestion}>{t("faqLegalQuestion")}</p>
+              <a href="/legal-basis" className={`${s.ctaSecondary} ${s.faqButton}`}>
+                {t("faqLegalCta")}
+              </a>
+            </div>
+            <div className={s.faqRow}>
+              <p className={s.faqQuestion}>{t("faqTechnicalQuestion")}</p>
+              <a href="/docs/cnft-structure" className={`${s.ctaSecondary} ${s.faqButton}`}>
+                {t("faqTechnicalCta")}
+              </a>
+            </div>
           </div>
         </div>
       </section>

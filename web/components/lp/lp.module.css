@@ -423,6 +423,109 @@
   color: var(--lp-text);
 }
 
+/* ---- Footnote markers + References list (legal-basis page) ---- */
+.footnoteMark {
+  font-size: 0.7em;
+  line-height: 1;
+  vertical-align: super;
+  margin: 0 1px;
+}
+
+.footnoteMark a {
+  color: var(--lp-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.footnoteMark a:hover {
+  color: var(--lp-accent-light);
+  text-decoration: underline;
+}
+
+.referencesTitle {
+  font-family: var(--font-lp-heading, serif);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: var(--lp-text);
+}
+
+.referencesList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.referencesItem {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--lp-text-secondary);
+  padding-left: 0;
+  scroll-margin-top: 80px;
+}
+
+.referencesItem:target {
+  color: var(--lp-text);
+}
+
+.referencesNumber {
+  display: inline-block;
+  min-width: 2.5em;
+  color: var(--lp-accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- FAQ rows (why-blockchain bottom) ---- */
+.faqList {
+  display: flex;
+  flex-direction: column;
+}
+
+.faqRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 36px 0;
+  border-top: 1px solid var(--lp-border, rgba(255, 255, 255, 0.08));
+}
+
+.faqRow:last-child {
+  border-bottom: 1px solid var(--lp-border, rgba(255, 255, 255, 0.08));
+}
+
+.faqQuestion {
+  font-family: var(--font-lp-heading, serif);
+  font-weight: 400;
+  font-size: 1.35rem;
+  line-height: 1.4;
+  color: var(--lp-text);
+  flex: 1;
+  margin: 0;
+}
+
+.faqButton {
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .faqRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 28px 0;
+  }
+  .faqQuestion {
+    font-size: 1.15rem;
+  }
+}
+
 /* ---- Steps (3 columns, with oversized monospace numbers) ---- */
 .steps {
   display: grid;
