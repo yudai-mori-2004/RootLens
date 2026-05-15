@@ -118,3 +118,19 @@ cd ../../web && npm test
 これらは `fixtures.json` の存在を前提とするので、 初回は `setup.ts` を走らせる必要
 がある。 vitest は `pool: 'forks'` の `singleFork: true` で sequential 実行する
 (chain state 共有のため)。
+
+### fixture 破損時の挙動
+
+`fixtures.json` のリーフは devnet 上の永続 chain 状態を指している。 アプリの
+staking 機能や別セッションの操作で同じリーフに対する `delegate` を上書きすると、
+fixture と chain 状態が乖離して当該リーフを使う spec が `Invalid root recomputed
+from proof` で fail する (= leaf hash 計算式の入力 (= delegate) が両者で違うため)。
+
+リカバリは `setup.ts` を再実行 (= `fixtures.json` を削除してから新ツリー / 新リーフ
+を mint する)。 SOL を ~1 SOL 程度消費する。 既知の壊れやすいリーフ:
+
+- `leaves[4]`: アプリの staking フローが消費しうる (= prod cosign delegate `HbVs4...`
+  に書き換わる)。 A11 (insufficient USDC test) が hit する。
+
+長期的には `setup.ts` を冪等化し、 spec 実行前に各リーフのチェーン状態を検証して
+ドリフトしているリーフだけ再 mint する仕組みが望ましい (= 別 task)。

@@ -9,11 +9,18 @@
 // expectedTreeAccountSize は対称関数で round-trip テスト用。
 
 import { describe, expect, it } from "vitest";
-import {
-  expectedTreeAccountSize,
-  inferCanopyDepth,
-  truncateProofForCanopy,
-} from "../canopy";
+import { inferCanopyDepth, truncateProofForCanopy } from "../canopy";
+
+// `inferCanopyDepth` の対称関数 (テスト固有なので production module には置かない)。
+// 与えた depth / buffer / canopy で本物の tree account が取るバイト数を返す。
+function expectedTreeAccountSize(maxDepth: number, maxBufferSize: number, canopyDepth: number): number {
+  const HEADER_SIZE = 56;
+  const changeLogSize = 32 + 32 * maxDepth + 4 + 4;
+  const pathSize = 32 * maxDepth + 32 + 4 + 4;
+  const cmtBody = 24 + changeLogSize * maxBufferSize + pathSize;
+  const canopyBytes = canopyDepth > 0 ? ((1 << (canopyDepth + 1)) - 2) * 32 : 0;
+  return HEADER_SIZE + cmtBody + canopyBytes;
+}
 
 function buildTreeAccount(maxDepth: number, maxBufferSize: number, canopyDepth: number): Buffer {
   const size = expectedTreeAccountSize(maxDepth, maxBufferSize, canopyDepth);

@@ -23,6 +23,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import bs58 from "bs58";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import {
   generateSigner,
@@ -53,9 +54,17 @@ const NETWORK_PATH = resolve(__dirname, "../../network.json");
 const FIXTURES_PATH = resolve(__dirname, "fixtures-canopy.json");
 const KEYS_DIR = resolve(__dirname, "../../keys");
 
-// production cosign delegate の pubkey。 ここに leafDelegate を固定することで
-// `/api/v1/license/issue` (= 同じ delegate keypair で署名) がそのまま通るようにする。
-const PROD_COSIGN_DELEGATE_B58 = "HbVs4vLBkHjdWU3U2tEFUyCyYJ2Prerios3ykXfHQGCF";
+// production cosign delegate の pubkey は keys/cosign-delegate.json (= サーバが
+// COSIGN_DELEGATE_PRIVATE_KEY_BASE58 env で読む secret key と同じもの) から派生する。
+// ハードコードしていた頃は env / .env / ここの 3 箇所が暗黙の同期前提で、 鍵
+// ローテーションのたびに齟齬が出ていた。 唯一の出処は keys/cosign-delegate.json。
+function loadProdCosignDelegateB58(): string {
+  const path = resolve(KEYS_DIR, "cosign-delegate.json");
+  const arr = JSON.parse(readFileSync(path, "utf-8")) as number[];
+  if (arr.length !== 64) throw new Error(`cosign-delegate.json: expected 64-byte JSON array, got ${arr.length}`);
+  const pubkey = Buffer.from(arr).subarray(32); // ed25519 secret key 64B = seed(32B) + pubkey(32B)
+  return bs58.encode(pubkey);
+}
 
 const TREE_DEPTH = 14;
 const TREE_BUFFER = 64;
@@ -92,7 +101,11 @@ function loadKeypair(filename: string): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(bytes));
 }
 
-function loadOrInitFixture(network: { cluster: string; program_id: string; config_pda: string }, deployerPub: string): Fixture {
+function loadOrInitFixture(
+  network: { cluster: string; program_id: string; config_pda: string },
+  deployerPub: string,
+  cosignDelegateB58: string,
+): Fixture {
   if (existsSync(FIXTURES_PATH)) {
     return JSON.parse(readFileSync(FIXTURES_PATH, "utf-8")) as Fixture;
   }
@@ -101,7 +114,7 @@ function loadOrInitFixture(network: { cluster: string; program_id: string; confi
     program_id: network.program_id,
     config_pda: network.config_pda,
     deployer: deployerPub,
-    cosign_delegate_pubkey: PROD_COSIGN_DELEGATE_B58,
+    cosign_delegate_pubkey: cosignDelegateB58,
     tree_params: { max_depth: TREE_DEPTH, max_buffer_size: TREE_BUFFER, canopy_depth: TREE_CANOPY },
     leaves: [],
   };
@@ -119,14 +132,16 @@ async function accountExists(conn: Connection, pubkey: PublicKey): Promise<boole
 async function main() {
   const network = JSON.parse(readFileSync(NETWORK_PATH, "utf-8"));
   const deployer = loadKeypair("deployer.json");
+  const prodCosignDelegateB58 = loadProdCosignDelegateB58();
   const conn = new Connection("https://api.devnet.solana.com", "confirmed");
   const umi = createUmi("https://api.devnet.solana.com");
   umi.use(keypairIdentity(fromWeb3JsKeypair(deployer)));
   umi.use(mplBubblegum());
   umi.use(mplCore());
 
-  const fixture = loadOrInitFixture(network, deployer.publicKey.toBase58());
+  const fixture = loadOrInitFixture(network, deployer.publicKey.toBase58(), prodCosignDelegateB58);
   console.log(`deployer balance: ${(await conn.getBalance(deployer.publicKey)) / 1e9} SOL`);
+  console.log(`cosign delegate: ${prodCosignDelegateB58}`);
   console.log(`fixture path: ${FIXTURES_PATH}`);
 
   // -----------------------------------------------------------------
@@ -202,7 +217,7 @@ async function main() {
       await mintV2(umi, {
         merkleTree: rootTree,
         leafOwner: fromWeb3JsPublicKey(owner.publicKey),
-        leafDelegate: umiPublicKey(PROD_COSIGN_DELEGATE_B58),
+        leafDelegate: umiPublicKey(prodCosignDelegateB58),
         coreCollection: rootNftCollection,
         collectionAuthority: umi.identity,
         metadata,
@@ -213,7 +228,7 @@ async function main() {
         index: i,
         owner: owner.publicKey.toBase58(),
         owner_secret: Array.from(owner.secretKey),
-        leaf_delegate: PROD_COSIGN_DELEGATE_B58,
+        leaf_delegate: prodCosignDelegateB58,
       });
       saveFixture(fixture);
       console.log(`    mint 完了 + fixture 保存`);

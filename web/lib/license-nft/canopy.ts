@@ -71,15 +71,3 @@ export function truncateProofForCanopy<T>(proof: ReadonlyArray<T>, canopyDepth: 
   return proof.slice(0, keep);
 }
 
-/**
- * テスト用ヘルパー: canopy=N の tree account の data length を計算する。
- * `inferCanopyDepth` と対称、 fuzz / 検証用。
- */
-export function expectedTreeAccountSize(maxDepth: number, maxBufferSize: number, canopyDepth: number): number {
-  const HEADER_SIZE = 56;
-  const changeLogSize = 32 + 32 * maxDepth + 4 + 4;
-  const pathSize = 32 * maxDepth + 32 + 4 + 4;
-  const cmtBody = 24 + changeLogSize * maxBufferSize + pathSize;
-  const canopyBytes = canopyDepth > 0 ? ((1 << (canopyDepth + 1)) - 2) * 32 : 0;
-  return HEADER_SIZE + cmtBody + canopyBytes;
-}

@@ -18,6 +18,7 @@ import bs58 from "bs58";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { LICENSE_TYPES, LICENSE_URLS, type LicenseType } from "../../web/lib/license-nft/license-urls";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,44 +27,35 @@ const NETWORK_PATH = resolve(__dirname, "../../network.json");
 const network = JSON.parse(readFileSync(NETWORK_PATH, "utf-8"));
 const LICENSE_COLLECTION: string = network.license_collection;
 
-// catalog.ts (web/lib/license-nft/catalog.ts) と同じ URL を使う。 hash が変わったら
-// ここも更新する (web/scripts/build-license-json.mjs を再実行 → URL を貼り替え)。
-const LICENSE_URLS: Record<string, string> = {
-  "commercial-v1":      "https://rootlens.io/licenses/commercial-v1/a45b97b96684e972516d2188a6fea2e9d37a6f50e6518bb2b23659b3948672dd.json",
-  "non-commercial-v1":  "https://rootlens.io/licenses/non-commercial-v1/e541d00f60f973c34d5bff9d7665fab30ea09e5c6b3d4d7c8f25c147cee6cc4d.json",
-  "training-only-v1":   "https://rootlens.io/licenses/training-only-v1/1aa2b7a6e6991944fe2125e272c2b6abf6f6206ed98b47ed589ff7ff5a1fc450.json",
-  "redistribution-v1":  "https://rootlens.io/licenses/redistribution-v1/bdccbb8167d9a1ac8a994404104dacbaab613ead208e989070ac7137b7008944.json",
-};
-
-const DEFAULT_TYPES = ["commercial-v1", "training-only-v1", "redistribution-v1"];
+const DEFAULT_TYPES: LicenseType[] = ["commercial-v1", "training-only-v1", "redistribution-v1"];
 
 interface Args {
   root: string;
   buyer?: string;
   api: string;
-  types: string[];
+  types: LicenseType[];
 }
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2);
-  const out: Partial<Args> & { types: string[] } = { types: [] };
+  const out: { root?: string; buyer?: string; api?: string; types: LicenseType[] } = { types: [] };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     const val = argv[i + 1];
     if (flag === "--root") { out.root = val; i++; }
     else if (flag === "--buyer") { out.buyer = val; i++; }
     else if (flag === "--api") { out.api = val; i++; }
-    else if (flag === "--type") { out.types.push(val); i++; }
+    else if (flag === "--type") {
+      if (!(LICENSE_TYPES as readonly string[]).includes(val)) {
+        console.error(`unknown license type: ${val} (allowed: ${LICENSE_TYPES.join(", ")})`);
+        process.exit(2);
+      }
+      out.types.push(val as LicenseType); i++;
+    }
     else { console.error(`unknown flag: ${flag}`); process.exit(2); }
   }
   if (!out.root) { console.error("--root <root_asset_id> required"); process.exit(2); }
   if (out.types.length === 0) out.types = DEFAULT_TYPES.slice();
-  for (const t of out.types) {
-    if (!(t in LICENSE_URLS)) {
-      console.error(`unknown license type: ${t} (allowed: ${Object.keys(LICENSE_URLS).join(", ")})`);
-      process.exit(2);
-    }
-  }
   return {
     root: out.root,
     buyer: out.buyer,
