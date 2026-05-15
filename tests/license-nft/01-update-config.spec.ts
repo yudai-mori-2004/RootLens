@@ -35,6 +35,15 @@ describe("update_config — adversarial", () => {
     if (!acc) throw new Error();
     const cfg = decodeConfig(Buffer.from(acc.data));
     expect(cfg.authority.toBase58()).to.equal(authority.publicKey.toBase58());
+    // BPS の baseline を 9500/500 に揃える。 別 spec / cli ツールが先に書き換えている
+    // 可能性があるため、 partial-update テストの前提条件として明示的に設定する。
+    if (cfg.stakerBasisPoints !== 9500 || cfg.delegateBasisPoints !== 500) {
+      const reset = buildUpdateConfigIx(programId, configPda, authority.publicKey, {
+        newStakerBps: 9500,
+        newDelegateBps: 500,
+      });
+      await sendExpectingSuccess(conn, [reset], [authority]);
+    }
   });
 
   // ---------------------------------------------------------------------

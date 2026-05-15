@@ -126,11 +126,21 @@ staking 機能や別セッションの操作で同じリーフに対する `dele
 fixture と chain 状態が乖離して当該リーフを使う spec が `Invalid root recomputed
 from proof` で fail する (= leaf hash 計算式の入力 (= delegate) が両者で違うため)。
 
-リカバリは `setup.ts` を再実行 (= `fixtures.json` を削除してから新ツリー / 新リーフ
-を mint する)。 SOL を ~1 SOL 程度消費する。 既知の壊れやすいリーフ:
+単一リーフだけ再 mint するなら `regen-leaf.ts`:
+
+```bash
+npx tsx regen-leaf.ts --index 4
+```
+
+既存 `root_tree` に新 owner / delegate Keypair の leaf を 1 個 mint し、
+`fixtures.json[leaves][index]` を新エントリで上書きする。 他のリーフ / tree /
+collection には触らない。 SOL は ~0.001 SOL のみ。
+
+全リーフ作り直しが必要なら `fixtures.json` を削除してから `setup.ts` を再実行
+(= 新ツリー含めて全部) — SOL を ~1 SOL 消費する。
+
+既知の壊れやすいリーフ:
 
 - `leaves[4]`: アプリの staking フローが消費しうる (= prod cosign delegate `HbVs4...`
-  に書き換わる)。 A11 (insufficient USDC test) が hit する。
-
-長期的には `setup.ts` を冪等化し、 spec 実行前に各リーフのチェーン状態を検証して
-ドリフトしているリーフだけ再 mint する仕組みが望ましい (= 別 task)。
+  に書き換わる)。 A11 (insufficient USDC test) が hit する。 `regen-leaf.ts --index 4`
+  で復旧。
