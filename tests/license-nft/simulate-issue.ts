@@ -6,7 +6,7 @@
 // されない、 USDC も動かない)。
 //
 // 使い方:
-//   BUYER_KEYPAIR_BASE58=<...> npx tsx simulate-issue-license.ts \
+//   BUYER_KEYPAIR_BASE58=<...> npx tsx simulate-issue.ts \
 //     --root <root_asset_id> --license-url <licenseUrl> [--buyer <pubkey>] \
 //     [--api https://rootlens.io/api/v1/license/issue]
 

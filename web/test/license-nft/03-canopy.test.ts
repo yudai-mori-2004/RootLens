@@ -9,7 +9,7 @@
 // expectedTreeAccountSize は対称関数で round-trip テスト用。
 
 import { describe, expect, it } from "vitest";
-import { inferCanopyDepth, truncateProofForCanopy } from "../canopy";
+import { inferCanopyDepth, truncateProofForCanopy } from "@/lib/license-nft/canopy";
 
 // `inferCanopyDepth` の対称関数 (テスト固有なので production module には置かない)。
 // 与えた depth / buffer / canopy で本物の tree account が取るバイト数を返す。
@@ -37,7 +37,7 @@ describe("inferCanopyDepth", () => {
   // 実 chain で確認した代表的な組み合わせ
   const cases: Array<{ depth: number; buffer: number; canopy: number }> = [
     { depth: 5, buffer: 8, canopy: 0 },     // existing setup.ts (fixture, depth=5)
-    { depth: 14, buffer: 64, canopy: 10 },  // setup-canopy-root-tree.ts
+    { depth: 14, buffer: 64, canopy: 10 },  // setup-canopy-tree.ts
     { depth: 14, buffer: 64, canopy: 11 },  // alt canopy
     { depth: 20, buffer: 64, canopy: 14 },  // bubblegum max
     { depth: 14, buffer: 64, canopy: 0 },   // depth 14 だが canopy なし (= 旧 TP tree 想定)

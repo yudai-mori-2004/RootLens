@@ -240,8 +240,8 @@ async function main() {
   console.log(`  tree:       ${fixture.root_tree}`);
   console.log(`  leaves:     ${fixture.leaves.map((l) => l.owner.slice(0, 8)).join(", ")}`);
   console.log(`\n次の手順:`);
-  console.log(`  1. npx tsx update-config-cli.ts --root-collection ${fixture.root_nft_collection}`);
-  console.log(`  2. npx tsx issue-license-via-api.ts --root <leaf_0 asset id (DAS で導出)>`);
+  console.log(`  1. npx tsx update-config.ts --root-collection ${fixture.root_nft_collection}`);
+  console.log(`  2. npx tsx issue-license.ts --root <leaf_0 asset id (DAS で導出)>`);
   console.log(`  3. npx tsx verify-license-chain.ts <license asset id>`);
 }
 

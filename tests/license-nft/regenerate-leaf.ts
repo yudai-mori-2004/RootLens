@@ -9,7 +9,7 @@
 // リーフ / tree / collection には触らない。
 //
 // 使い方:
-//   npx tsx regen-leaf.ts --index <0..N>
+//   npx tsx regenerate-leaf.ts --index <0..N>
 //
 // SOL は ~0.001 SOL (mint tx fee + leaf rent 数百 lamport) しか掛からない。
 
@@ -70,7 +70,7 @@ function parseArgs(): { index: number } {
     else { console.error(`unknown flag: ${argv[i]}`); process.exit(2); }
   }
   if (index === undefined || Number.isNaN(index)) {
-    console.error("usage: npx tsx regen-leaf.ts --index <0..N>");
+    console.error("usage: npx tsx regenerate-leaf.ts --index <0..N>");
     process.exit(2);
   }
   return { index };

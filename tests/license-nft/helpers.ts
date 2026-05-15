@@ -227,6 +227,44 @@ export async function ensureBalance(
   }
 }
 
+/**
+ * spec 群が共通で前提する Config の chain 状態 (= network.json に記録された値) を
+ * authority keypair で復元する。 spec 実行前に他のセッション (= 別 spec / cli /
+ * デモ) が `update_config` で BPS / root_nft_collection / usdc_mint を書き換え
+ * ていた場合、 検出して元に戻す。 BPS は両方とも引数として渡す前提 (= 個別更新
+ * のため undefined を残してはいけない)。
+ */
+export async function ensureConfigMatchesNetwork(
+  conn: Connection,
+  programId: PublicKey,
+  configPda: PublicKey,
+  authority: Keypair,
+  expected: {
+    rootNftCollection: PublicKey;
+    usdcMint: PublicKey;
+    stakerBps: number;
+    delegateBps: number;
+  },
+): Promise<void> {
+  const acc = await conn.getAccountInfo(configPda);
+  if (!acc) throw new Error(`Config PDA not deployed: ${configPda.toBase58()}`);
+  const cfg = decodeConfig(Buffer.from(acc.data));
+  const updates: Parameters<typeof buildUpdateConfigIx>[3] = {};
+  if (!cfg.rootNftCollection.equals(expected.rootNftCollection)) {
+    updates.newRootNftCollection = expected.rootNftCollection;
+  }
+  if (!cfg.usdcMint.equals(expected.usdcMint)) {
+    updates.newUsdcMint = expected.usdcMint;
+  }
+  if (cfg.stakerBasisPoints !== expected.stakerBps || cfg.delegateBasisPoints !== expected.delegateBps) {
+    updates.newStakerBps = expected.stakerBps;
+    updates.newDelegateBps = expected.delegateBps;
+  }
+  if (Object.keys(updates).length === 0) return;
+  const ix = buildUpdateConfigIx(programId, configPda, authority.publicKey, updates);
+  await sendExpectingSuccess(conn, [ix], [authority]);
+}
+
 /** ALT を解決して使えるようにする */
 export async function loadAlt(
   conn: Connection,

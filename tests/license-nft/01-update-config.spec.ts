@@ -13,6 +13,7 @@ import {
   buildUpdateConfigIx,
   decodeConfig,
   ensureBalance,
+  ensureConfigMatchesNetwork,
   getConnection,
   loadKeypair,
   loadNetwork,
@@ -29,21 +30,19 @@ describe("update_config — adversarial", () => {
 
   beforeAll(async () => {
     await ensureBalance(conn, authority.publicKey, 0.05);
-    // Config が deploy 済か事前確認
+    // Config を network.json の値 (= 監査テストが前提する baseline) に揃える。
+    // 別 spec / cli / デモが先に書き換えていたら更新する。
+    await ensureConfigMatchesNetwork(conn, programId, configPda, authority, {
+      rootNftCollection: new PublicKey(network.root_nft_collection),
+      usdcMint: new PublicKey(network.usdc_mint),
+      stakerBps: network.staker_basis_points,
+      delegateBps: network.delegate_basis_points,
+    });
+    // 念のため authority が一致するか sanity check
     const acc = await conn.getAccountInfo(configPda);
-    expect(acc, "Config PDA must exist").to.not.be.null;
-    if (!acc) throw new Error();
+    if (!acc) throw new Error("Config PDA missing");
     const cfg = decodeConfig(Buffer.from(acc.data));
     expect(cfg.authority.toBase58()).to.equal(authority.publicKey.toBase58());
-    // BPS の baseline を 9500/500 に揃える。 別 spec / cli ツールが先に書き換えている
-    // 可能性があるため、 partial-update テストの前提条件として明示的に設定する。
-    if (cfg.stakerBasisPoints !== 9500 || cfg.delegateBasisPoints !== 500) {
-      const reset = buildUpdateConfigIx(programId, configPda, authority.publicKey, {
-        newStakerBps: 9500,
-        newDelegateBps: 500,
-      });
-      await sendExpectingSuccess(conn, [reset], [authority]);
-    }
   });
 
   // ---------------------------------------------------------------------

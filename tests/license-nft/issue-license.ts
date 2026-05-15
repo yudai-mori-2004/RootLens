@@ -5,7 +5,7 @@
 // 指定したぶんだけ繰り返す。 broadcast 後に buyer 所有 License NFT の差分を出力する。
 //
 // 使い方:
-//   BUYER_KEYPAIR_BASE58=<...> npx tsx issue-license-via-api.ts \
+//   BUYER_KEYPAIR_BASE58=<...> npx tsx issue-license.ts \
 //     --root <root_asset_id> [--buyer <pubkey>] \
 //     [--api https://rootlens.io/api/v1/license/issue] \
 //     [--type commercial-v1 --type training-only-v1 ...]

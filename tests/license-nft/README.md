@@ -9,14 +9,14 @@ License NFT Anchor program (`G1PWd1nMe63isDaYT3iijcyWac9d4RE1CBrvaKZFjpV8`) の
 |---|---|---|
 | **spec** (`*.spec.ts`) | vitest で走る整合 / 攻撃テスト。 一部は devnet 実打 (timeout 60 秒) | `npm test` |
 | **setup スクリプト** (`setup*.ts`) | devnet に Bubblegum tree / MPL Core collection を 1 度だけ作る。 結果は `fixtures*.json` に書き出される (= ローカル artifact、 commit しない) | `npx tsx setup*.ts` |
-| **CLI ツール** (`*-cli.ts`, `verify-*.ts`, `issue-*.ts`, `simulate-*.ts`) | 運用 / デバッグ用、 オフチェーン読み + chain 操作 | `npx tsx ...` |
+| **CLI ツール** (`verify-*.ts`, `issue-*.ts`, `simulate-*.ts`) | 運用 / デバッグ用、 オフチェーン読み + chain 操作 | `npx tsx ...` |
 
 ## fixtures
 
 | ファイル | 何を持つか | 必要な前提 |
 |---|---|---|
 | `fixtures.json` | 監査テスト用の最小 root tree (depth=5, canopy なし) と leaf 5 個 | `setup.ts` を 1 度実行 |
-| `fixtures-canopy.json` | License 発行を実 chain で完走させるための production 想定 root tree (depth=14, canopy=10) と leaf 3 個。 leafDelegate を prod cosign delegate に固定 | `setup-canopy-root-tree.ts` を 1 度実行 |
+| `fixtures-canopy.json` | License 発行を実 chain で完走させるための production 想定 root tree (depth=14, canopy=10) と leaf 3 個。 leafDelegate を prod cosign delegate に固定 | `setup-canopy-tree.ts` を 1 度実行 |
 
 両方とも `.gitignore` 対象 (= leaf owner secret key を含むため絶対に commit しない)。
 
@@ -44,7 +44,7 @@ step 5-6 (Root NFT 側 → TP collection / content_hash) は Extension cNFT
 ### 1. Root NFT tree を 1 度だけ用意
 
 ```bash
-npx tsx setup-canopy-root-tree.ts
+npx tsx setup-canopy-tree.ts
 ```
 
 冪等。 既に `fixtures-canopy.json` 内で記録済みかつ chain 上にも存在するなら skip
@@ -57,7 +57,7 @@ canopy=10 で約 1.5 SOL)。
 ### 2. on-chain Config を新 collection に切り替え
 
 ```bash
-npx tsx update-config-cli.ts \
+npx tsx update-config.ts \
   --root-collection $(jq -r .root_nft_collection fixtures-canopy.json)
 ```
 
@@ -70,7 +70,7 @@ buyer keypair は env 経由:
 
 ```bash
 BUYER_KEYPAIR_BASE58=<base58> \
-  npx tsx issue-license-via-api.ts --root <leaf asset id>
+  npx tsx issue-license.ts --root <leaf asset id>
 ```
 
 デフォルトで commercial-v1 / training-only-v1 / redistribution-v1 の 3 本を発行する。
@@ -91,7 +91,7 @@ mismatch / collection mismatch / preflight 等) のログを直接読める:
 
 ```bash
 BUYER_KEYPAIR_BASE58=<base58> \
-  npx tsx simulate-issue-license.ts \
+  npx tsx simulate-issue.ts \
     --root <root asset id> \
     --license-url <licenseUrl from web/lib/license-nft/catalog.ts>
 ```
@@ -99,7 +99,7 @@ BUYER_KEYPAIR_BASE58=<base58> \
 ## ユニットテスト
 
 `web/lib/license-nft/canopy.ts` の pure 関数 (`inferCanopyDepth`,
-`truncateProofForCanopy`) は `web/lib/license-nft/__tests__/canopy.test.ts` で
+`truncateProofForCanopy`) は `web/test/license-nft/03-canopy.test.ts` で
 独立テストされる。 web/ 側で:
 
 ```bash
@@ -126,10 +126,10 @@ staking 機能や別セッションの操作で同じリーフに対する `dele
 fixture と chain 状態が乖離して当該リーフを使う spec が `Invalid root recomputed
 from proof` で fail する (= leaf hash 計算式の入力 (= delegate) が両者で違うため)。
 
-単一リーフだけ再 mint するなら `regen-leaf.ts`:
+単一リーフだけ再 mint するなら `regenerate-leaf.ts`:
 
 ```bash
-npx tsx regen-leaf.ts --index 4
+npx tsx regenerate-leaf.ts --index 4
 ```
 
 既存 `root_tree` に新 owner / delegate Keypair の leaf を 1 個 mint し、
@@ -142,5 +142,5 @@ collection には触らない。 SOL は ~0.001 SOL のみ。
 既知の壊れやすいリーフ:
 
 - `leaves[4]`: アプリの staking フローが消費しうる (= prod cosign delegate `HbVs4...`
-  に書き換わる)。 A11 (insufficient USDC test) が hit する。 `regen-leaf.ts --index 4`
+  に書き換わる)。 A11 (insufficient USDC test) が hit する。 `regenerate-leaf.ts --index 4`
   で復旧。

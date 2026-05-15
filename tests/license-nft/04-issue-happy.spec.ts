@@ -34,6 +34,7 @@ import {
 } from "./issue-helpers";
 import {
   ensureBalance,
+  ensureConfigMatchesNetwork,
   findUserRevenuePda,
   getConnection,
   loadAlt,
@@ -122,6 +123,15 @@ describe("issue_license — happy path + proof-related adversarial", () => {
 
   beforeAll(async () => {
     await ensureBalance(conn, deployer.publicKey, 0.1);
+    // Config を network.json (= 監査テストが前提する fixture collection / usdc_mint /
+    // BPS) に揃える。 別 spec / cli / デモが先に書き換えていたら更新する。
+    const authority = loadKeypair("authority.json");
+    await ensureConfigMatchesNetwork(conn, programId, configPda, authority, {
+      rootNftCollection,
+      usdcMint,
+      stakerBps: network.staker_basis_points,
+      delegateBps: network.delegate_basis_points,
+    });
     alts = [await loadAlt(conn, new PublicKey(fixtures.alt))];
   });
 

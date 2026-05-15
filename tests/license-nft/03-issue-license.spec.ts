@@ -28,6 +28,7 @@ import {
 } from "./issue-helpers";
 import {
   ensureBalance,
+  ensureConfigMatchesNetwork,
   findUserRevenuePda,
   getConnection,
   loadKeypair,
@@ -86,6 +87,14 @@ describe("issue_license — adversarial", () => {
 
   beforeAll(async () => {
     await ensureBalance(conn, deployer.publicKey, 0.1);
+    // Config を network.json (= 監査テストが前提する fixture collection / usdc_mint /
+    // BPS) に揃える。 別 spec / cli / デモが先に書き換えていたら更新する。
+    await ensureConfigMatchesNetwork(conn, programId, configPda, authority, {
+      rootNftCollection,
+      usdcMint,
+      stakerBps: network.staker_basis_points,
+      delegateBps: network.delegate_basis_points,
+    });
   });
 
   /**

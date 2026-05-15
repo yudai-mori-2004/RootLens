@@ -4,7 +4,7 @@
 // で署名する。 値を Some / None で指定可能、 渡したフィールドのみ更新する。
 //
 // 使い方:
-//   npx tsx update-config-cli.ts \
+//   npx tsx update-config.ts \
 //     [--root-collection <pubkey>] \
 //     [--usdc-mint <pubkey>] \
 //     [--staker-bps <0..10000>] \

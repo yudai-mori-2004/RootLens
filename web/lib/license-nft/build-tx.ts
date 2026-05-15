@@ -26,7 +26,7 @@ const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xW
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
 // canopy 推定 + proof 切り詰めの実装は web/lib/license-nft/canopy.ts に分離 (Solana
-// SDK 非依存の pure module、 vitest で unit test される)。
+// SDK 非依存の pure module、 vitest で unit test される (web/test/license-nft/03-canopy.test.ts))。
 import { inferCanopyDepth, truncateProofForCanopy } from "./canopy";
 
 export function findAssociatedTokenAddress(
