@@ -8,7 +8,7 @@
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { NextRequest, NextResponse } from "next/server";
-import { loadCatalogFromFile, lookup } from "@/lib/license-nft/catalog";
+import { getCatalog, lookup } from "@/lib/license-nft/catalog";
 import { prepareIssueLicense } from "@/lib/license-nft/build-tx";
 import { fetchRootNftProof } from "@/lib/license-nft/das";
 import { envKeypairSigner } from "@/lib/license-nft/signer";
@@ -26,7 +26,6 @@ function bad(error: string, code: string, status = 400, detail?: string) {
 }
 
 let cachedConn: Connection | null = null;
-let cachedCatalog: ReturnType<typeof loadCatalogFromFile> | null = null;
 
 function getEnv(name: string): string {
   const v = process.env[name];
@@ -39,12 +38,6 @@ function getConnection(): Connection {
     cachedConn = new Connection(getEnv("SOLANA_RPC_URL"), "confirmed");
   }
   return cachedConn;
-}
-
-function getCatalog() {
-  if (cachedCatalog) return cachedCatalog;
-  cachedCatalog = loadCatalogFromFile(getEnv("COSIGN_CATALOG_PATH"));
-  return cachedCatalog;
 }
 
 // ----- handler ----------------------------------------------------------

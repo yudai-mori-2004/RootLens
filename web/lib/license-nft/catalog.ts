@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// (rootAssetId, licenseUrl) → price のカタログ。YAML から読み込み。
-// このファイルだけが catalog の真実の出処。サーバの他の検証は contract に任せる。
-
-import { readFileSync } from "node:fs";
-import { parse as parseYaml } from "yaml";
+// (rootAssetId, licenseUrl) → price のカタログ。
+//
+// コード内で直接定義する (= ランタイムでファイル読み込みしない)。 Vercel の
+// function bundle に YAML を持ち込むと outputFileTracingIncludes の設定が
+// 必要になり fragile。 catalog は 3 行程度の規模なので コード化が正解。
+//
+// 編集は本ファイルを直接書き換える + redeploy。 動的更新 UI は別 unit。
+// 統合フェーズで dataset / 複雑な条件付き販売に置き換える前提の最小モック。
 
 export interface CatalogEntry {
   rootAssetId: string;     // base58
@@ -17,47 +20,41 @@ export interface Catalog {
   byKey: Map<string, CatalogEntry>;
 }
 
-/** YAML の expected shape */
-interface RawCatalog {
-  entries: Array<{
-    rootAssetId: string;
-    licenseUrl: string;
-    /** "1000000" のような u64 文字列。number は精度落ちるので NG */
-    price: string | number;
-  }>;
-}
-
 export const WILDCARD_ASSET = "*";
 
 export function makeKey(rootAssetId: string, licenseUrl: string): string {
   return `${rootAssetId}:${licenseUrl}`;
 }
 
-export function parseCatalog(yaml: string): Catalog {
-  const raw = parseYaml(yaml) as RawCatalog | null;
-  if (!raw || !Array.isArray(raw.entries)) {
-    throw new Error("invalid catalog YAML: missing entries[]");
-  }
+const ENTRIES: ReadonlyArray<CatalogEntry> = [
+  // commercial-v1 デフォルト (任意の clip)
+  {
+    rootAssetId: WILDCARD_ASSET,
+    licenseUrl: "https://rootlens.io/licenses/commercial-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
+    price: 1_000_000n, // 1 USDC
+  },
+  // training-only-v1 デフォルト
+  {
+    rootAssetId: WILDCARD_ASSET,
+    licenseUrl: "https://rootlens.io/licenses/training-only-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
+    price: 500_000n, // 0.5 USDC
+  },
+  // override 例: 特定 clip の高品質枠 (テストフィクスチャ leaf_0 を mock として流用)
+  {
+    rootAssetId: "FHnFnX2fhtEDY2pCow16mWQRnUyhpBuRCNowm3ZNNHQt",
+    licenseUrl: "https://rootlens.io/licenses/commercial-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
+    price: 5_000_000n, // 5 USDC
+  },
+];
+
+export function getCatalog(): Catalog {
   const byKey = new Map<string, CatalogEntry>();
-  for (const e of raw.entries) {
-    if (!e.rootAssetId || !e.licenseUrl || e.price === undefined) {
-      throw new Error(`invalid catalog entry: ${JSON.stringify(e)}`);
-    }
-    const price = typeof e.price === "string" ? BigInt(e.price) : BigInt(Math.trunc(e.price));
-    if (price <= 0n) {
-      throw new Error(`invalid price in catalog: ${e.price}`);
-    }
+  for (const e of ENTRIES) {
     const key = makeKey(e.rootAssetId, e.licenseUrl);
-    if (byKey.has(key)) {
-      throw new Error(`duplicate catalog entry for key: ${key}`);
-    }
-    byKey.set(key, { rootAssetId: e.rootAssetId, licenseUrl: e.licenseUrl, price });
+    if (byKey.has(key)) throw new Error(`duplicate catalog entry: ${key}`);
+    byKey.set(key, e);
   }
   return { byKey };
-}
-
-export function loadCatalogFromFile(path: string): Catalog {
-  return parseCatalog(readFileSync(path, "utf-8"));
 }
 
 /**
