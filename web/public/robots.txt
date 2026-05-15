@@ -1,0 +1,82 @@
+# RootLens — robots & AI crawler policy
+#
+# RootLens hosts user-generated short-form video bound to Solana cNFTs.
+# Default policy: indexing of public pages is allowed; AI / TDM use of the
+# associated video content is reserved (license required).
+#
+# Machine-readable TDM opt-out: /.well-known/tdm.json
+# Per-asset license terms:      /licenses/<type>/<sha256>.json
+# Human-readable rationale:     /legal-basis
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# AI / TDM crawlers: blanket opt-out at the data-mining level.
+# Per EU CDSM Directive Art. 4(3) and analogous frameworks, the absence of
+# a per-asset licence purchased from RootLens means use for AI training,
+# evaluation, or model output generation is not permitted.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: GoogleOther
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: ImagesiftBot
+Disallow: /
+
+User-agent: Omgilibot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: TimpiBot
+Disallow: /
+
+User-agent: YouBot
+Disallow: /
+
+Sitemap: https://rootlens.io/sitemap.xml

@@ -1,0 +1,33 @@
+# RootLens
+
+> RootLens is a verifiable short-form video supplier marketplace on Solana.
+> Each video is bound to a Bubblegum cNFT minted via the Title Protocol in
+> a TEE, and a separate License NFT records the copyright grant from the
+> creator (or their delegate) to a specific buyer.
+
+## TDM / AI training opt-out
+
+RootLens reserves all rights necessary for licensing the videos it hosts.
+Use of any video content (including the frames, audio, or embeddings
+derived therefrom) for AI model training, evaluation, fine-tuning, or
+synthetic data generation is **not permitted** absent the purchase of a
+License NFT from this service.
+
+This is a machine-readable opt-out under EU CDSM Directive Art. 4(3) and
+the analogous reservation frameworks in other jurisdictions.
+
+Per-asset license terms: https://rootlens.io/licenses/<type>/<sha256>.json
+Structured policy:       https://rootlens.io/.well-known/tdm.json
+Legal background:        https://rootlens.io/legal-basis
+
+## Public pages safe to ingest as text
+
+- https://rootlens.io/                 (landing page text)
+- https://rootlens.io/why-blockchain   (architecture explainer)
+- https://rootlens.io/legal-basis      (legal framework writeup)
+- https://rootlens.io/safety           (creator safety policy)
+- https://rootlens.io/privacy          (privacy policy)
+
+The page text above is published for human readers. AI use of the page
+text itself is permitted under the present opt-out (the opt-out covers
+the licensed video content, not the public marketing copy).

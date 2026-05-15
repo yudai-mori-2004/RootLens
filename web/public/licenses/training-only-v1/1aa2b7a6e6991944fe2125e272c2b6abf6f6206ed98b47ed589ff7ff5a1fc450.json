@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "license_type": "training-only-v1",
+  "issuer": {
+    "rootlens_program_id": "G1PWd1nMe63isDaYT3iijcyWac9d4RE1CBrvaKZFjpV8",
+    "license_collection": "BvhuJiTWDW6n5cSzE4XmzYcwLry7vcstS1U7fD7n9N1b"
+  },
+  "binding": {
+    "root_mint_format": "solana_pubkey_b58",
+    "verification_note": "Verify sha256(b58_decode(this License NFT's bound root_mint)) == leaf.asset_data_hash"
+  },
+  "terms": {
+    "is_unilateral_grant": true,
+    "is_contract": false,
+    "is_exclusive": false,
+    "ledger_authoritative": false,
+    "legal_authoritative": true,
+    "licensee_identification": "Lawful holder of the License NFT on Solana. The licensee identity is determined by NFT ownership; the mint address need not be enumerated in the terms.",
+    "data_identification_method": "The Content licensed under this NFT is the video bound to the Root NFT whose b58-encoded asset id is appended to this License NFT URI as ?root_mint=<...> (see SPECS_JA §5.5.3 Layer 1).",
+    "permitted_uses": [
+      "ai_training"
+    ],
+    "duration": "perpetual",
+    "transfer_rule": "Transfer of the NFT transfers the license, except where theft or fraud is established; in such cases legal remedies prevail (Legal-Authoritative, SPECS_JA §5.5.2).",
+    "governing_law": "Singapore",
+    "dispute_resolution": "Singapore International Arbitration Centre (SIAC), Singapore seat",
+    "ny_convention_enforceability": "Awards are enforceable in the 172 NY Convention member states.",
+    "sanctions_condition": "License is void ab initio if licensee is on OFAC SDN List, EU Consolidated Financial Sanctions List, UK OFSI Consolidated List, or Singapore MAS Targeted Financial Sanctions List, or is located in a comprehensively sanctioned jurisdiction.",
+    "licensor_representations": "The original creator has consented to RootLens ToS as the verified copyright holder under KYC. RootLens has applied its VLM-based pre-screening as a reasonable effort against third-party IP inclusion.",
+    "buyer_due_diligence": "For ordinary commercial use including aggregate AI training, the buyer is not required to perform per-asset due diligence on each video.",
+    "buyer_notification_duty": "If the buyer has actual knowledge that the Licensed Content contains third-party IP, publicity, or privacy rights, the buyer must promptly notify RootLens in writing.",
+    "indemnification": {
+      "scope": "Suits by third parties against the buyer for IP, privacy, or publicity rights, within RootLens's representations and warranties.",
+      "covered_amounts": [
+        "refund of license fee for the affected License NFT",
+        "buyer's reasonable defence costs incurred before RootLens assumes the defence"
+      ],
+      "per_claim_cap_usd": "set in Terms of Sale at License NFT purchase",
+      "annual_aggregate_cap_per_buyer_per_root_nft_usd": "set in Terms of Sale at License NFT purchase",
+      "defence_control": "RootLens retains the option to assume defence (counsel selection, settlement, strategy).",
+      "exclusions": [
+        "Use outside the licensed scope",
+        "Cases where the buyer had actual knowledge of the issue but failed to promptly notify RootLens (constructive knowledge is not applied so as not to impose de facto per-asset due diligence on buyers)",
+        "Suits arising from buyer's modification of the Licensed Content"
+      ],
+      "consequential_damages_exclusion": "Indirect damages (lost future profits, reputational harm, AI model retraining costs) are excluded by default. Coverage for AI model retraining costs can be agreed separately in an enterprise contract.",
+      "enterprise_contract_note": "Buyers requiring coverage above the default caps negotiate an enterprise contract with RootLens, optionally backed by an IP infringement insurance policy. Specific terms are determined at contract time."
+    },
+    "two_layer_contract_structure": "Buyer-side obligations (notification, sanctions condition, modification limits, scope-of-use limits) are placed in the Terms of Sale, which the buyer accepts explicitly at License NFT purchase. The copyright grant itself remains a stand-alone unilateral licence so that licence inheritance on NFT transfer is preserved."
+  },
+  "full_text": "RootLens License — AI Training Only (v1.0)\nlicense_type_id: training-only-v1\n=========================================================================\n\nThis license grants the holder of a specific License NFT a unilateral,\nnon-exclusive, royalty-free copyright license to use the Subject Content\n**solely for the purpose of AI / machine-learning model training**.\nThis is a unilateral grant, not a contract (§10).\n\n\n§1 Definitions\n\n(1)–(7) The terms \"Program\", \"License Collection\", \"License NFT\", \"Subject\n    Root NFT\", \"Subject Content\", \"Licensor\", and \"Licensee\" have the same\n    meanings as in the commercial-v1 license and are not repeated here.\n\n(8) \"AI training use\" means the use of Subject Content as part of a training\n    or evaluation dataset for the purpose of optimizing the parameters of\n    a machine-learning model. This includes:\n\n    a. Use as training data in supervised, self-supervised, or reinforcement\n       learning;\n    b. Use as source data for fine-tuning, transfer learning, or knowledge\n       distillation;\n    c. Use as benchmark data for model evaluation, validation, or testing;\n    d. Use as a source for data augmentation.\n\n\n§2 Grant of license\n\nLicensor grants Licensee, with respect to the Subject Content, the following\nrights on a non-exclusive, worldwide, royalty-free basis (consideration\nfully discharged by the License NFT's purchase price):\n\n(1) The right to copy, store on local infrastructure, transfer between\n    internal systems, and otherwise technologically use the Subject Content\n    for the purpose of Licensee's own AI training use.\n\n(2) The right of Licensee or its affiliated parties to use, on a commercial\n    or non-commercial basis, AI models (parameters, weight files, inference\n    servers, hosted services, etc.) resulting from such training. The\n    trained model is not subject to this license; Licensee retains\n    independent ownership of it.\n\n\n§3 Restrictions\n\nLicensee shall not:\n\n(1) Use the Subject Content, or any substantial portion thereof, for any\n    purpose other than AI training use. In particular, this license does\n    not permit use of the Subject Content for product or service\n    promotion, end-user playback, social-media posting, or sale or\n    distribution of the data as a product.\n\n(2) Distribute, publish, transmit, or make accessible the Subject Content\n    or any copy thereof to any third party outside Licensee's organization,\n    except:\n\n    a. To Licensee's contractors who are under Licensee's legal control\n       and bound by confidentiality obligations at least as protective as\n       those in this license, and only insofar as necessary to perform\n       training tasks for Licensee; or\n\n    b. As required by applicable law or court order.\n\n(3) Train AI models in a manner intended to cause the model to memorize and\n    output the Subject Content, in substantially reproducible form, in\n    response to inferences (i.e., training methods aimed at deliberate\n    overfitting / regurgitation are prohibited).\n\n(4) Create derivative works of the Subject Content. This license does not\n    permit derivative works. Learned representations that arise as\n    incidental byproducts of AI training are not deemed derivative works\n    for purposes of this clause.\n\n(5) Sublicense, assign, or rent out the right to use the Subject Content\n    to a third party in a manner that severs use rights from the License\n    NFT itself. (Transfer of the License NFT itself is governed by §5.)\n\n\n§4 Term\n\nThis license is perpetual, subject to the following termination events:\n\n(1) Licensor may terminate this license upon Licensee's material breach of §3.\n\n(2) The license terminates upon burn of the License NFT.\n\nUpon termination, Licensee shall destroy all copies of the Subject Content.\nHowever, AI models (parameters, weight files, derivative models, etc.) for\nwhich training was completed prior to termination may continue to be held\nand used by Licensee after termination. This reflects that this license\ngrants only the right to access and train upon the data, and does not\nextend its termination effect to the resulting model.\n\n\n§5 Transfer of license with NFT\n\nIf the License NFT is transferred to another party, this license terminates\nas to the original Licensee and arises anew, on identical terms, in favor\nof the new owner. AI models for which training was completed by the\noriginal Licensee survive transfer pursuant to §4.\n\n\n§6 Legal-Authoritative\n\n(Same as commercial-v1 §6: courts may correct ownership in cases of theft,\nfraud, key compromise, or duress.)\n\n\n§7–§9\n\n(Same as commercial-v1 §7–§9: warranty disclaimer, limitation of liability,\ngoverning law = Singapore, dispute resolution = SIAC arbitration.)\n\n\n§10 Nature of this license (unilateral grant)\n\n(Same as commercial-v1 §10. In particular, the restrictions in §3 are\nnot contractual obligations of Licensee but conditions on the scope of\nthe grant in §2. Acts outside those conditions constitute copyright\ninfringement, not contract breach.)\n\n\n§11 Severability\n\n(Same as commercial-v1 §11.)\n\n\n------------------------------------------------------------\nEND OF LICENSE TEXT (training-only-v1)\n"
+}

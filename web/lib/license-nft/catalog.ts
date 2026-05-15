@@ -26,25 +26,27 @@ export function makeKey(rootAssetId: string, licenseUrl: string): string {
   return `${rootAssetId}:${licenseUrl}`;
 }
 
+// URL の <sha256>.json 部分は条文 JSON 自身の sha256。 条文を更新したら
+// `node web/scripts/build-license-json.mjs` を再実行 → ここの URL を貼り替え。
+const URL_COMMERCIAL_V1 =
+  "https://rootlens.io/licenses/commercial-v1/a45b97b96684e972516d2188a6fea2e9d37a6f50e6518bb2b23659b3948672dd.json";
+const URL_NON_COMMERCIAL_V1 =
+  "https://rootlens.io/licenses/non-commercial-v1/e541d00f60f973c34d5bff9d7665fab30ea09e5c6b3d4d7c8f25c147cee6cc4d.json";
+const URL_TRAINING_ONLY_V1 =
+  "https://rootlens.io/licenses/training-only-v1/1aa2b7a6e6991944fe2125e272c2b6abf6f6206ed98b47ed589ff7ff5a1fc450.json";
+const URL_REDISTRIBUTION_V1 =
+  "https://rootlens.io/licenses/redistribution-v1/bdccbb8167d9a1ac8a994404104dacbaab613ead208e989070ac7137b7008944.json";
+
 const ENTRIES: ReadonlyArray<CatalogEntry> = [
-  // commercial-v1 デフォルト (任意の clip)
-  {
-    rootAssetId: WILDCARD_ASSET,
-    licenseUrl: "https://rootlens.io/licenses/commercial-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
-    price: 1_000_000n, // 1 USDC
-  },
-  // training-only-v1 デフォルト
-  {
-    rootAssetId: WILDCARD_ASSET,
-    licenseUrl: "https://rootlens.io/licenses/training-only-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
-    price: 500_000n, // 0.5 USDC
-  },
+  // 4 種別すべてに wildcard 価格を設定。 価格は撮影者側の rate card を尊重する
+  // 単純化として、 公開デフォルトはここに置く (= 著作権等管理事業法 一任型を回避
+  // する rate card 方式の最小実装、 legal-rationale.md §2.6)。
+  { rootAssetId: WILDCARD_ASSET, licenseUrl: URL_COMMERCIAL_V1, price: 1_000_000n }, // 1 USDC
+  { rootAssetId: WILDCARD_ASSET, licenseUrl: URL_NON_COMMERCIAL_V1, price: 200_000n }, // 0.2 USDC
+  { rootAssetId: WILDCARD_ASSET, licenseUrl: URL_TRAINING_ONLY_V1, price: 500_000n }, // 0.5 USDC
+  { rootAssetId: WILDCARD_ASSET, licenseUrl: URL_REDISTRIBUTION_V1, price: 5_000_000n }, // 5 USDC
   // override 例: 特定 clip の高品質枠 (テストフィクスチャ leaf_0 を mock として流用)
-  {
-    rootAssetId: "FHnFnX2fhtEDY2pCow16mWQRnUyhpBuRCNowm3ZNNHQt",
-    licenseUrl: "https://rootlens.io/licenses/commercial-v1/0000000000000000000000000000000000000000000000000000000000000000.json",
-    price: 5_000_000n, // 5 USDC
-  },
+  { rootAssetId: "FHnFnX2fhtEDY2pCow16mWQRnUyhpBuRCNowm3ZNNHQt", licenseUrl: URL_COMMERCIAL_V1, price: 5_000_000n },
 ];
 
 export function getCatalog(): Catalog {

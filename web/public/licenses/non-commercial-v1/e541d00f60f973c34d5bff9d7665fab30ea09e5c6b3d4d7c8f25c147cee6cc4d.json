@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "license_type": "non-commercial-v1",
+  "issuer": {
+    "rootlens_program_id": "G1PWd1nMe63isDaYT3iijcyWac9d4RE1CBrvaKZFjpV8",
+    "license_collection": "BvhuJiTWDW6n5cSzE4XmzYcwLry7vcstS1U7fD7n9N1b"
+  },
+  "binding": {
+    "root_mint_format": "solana_pubkey_b58",
+    "verification_note": "Verify sha256(b58_decode(this License NFT's bound root_mint)) == leaf.asset_data_hash"
+  },
+  "terms": {
+    "is_unilateral_grant": true,
+    "is_contract": false,
+    "is_exclusive": false,
+    "ledger_authoritative": false,
+    "legal_authoritative": true,
+    "licensee_identification": "Lawful holder of the License NFT on Solana. The licensee identity is determined by NFT ownership; the mint address need not be enumerated in the terms.",
+    "data_identification_method": "The Content licensed under this NFT is the video bound to the Root NFT whose b58-encoded asset id is appended to this License NFT URI as ?root_mint=<...> (see SPECS_JA §5.5.3 Layer 1).",
+    "permitted_uses": [
+      "research",
+      "evaluation",
+      "personal_non_commercial_use"
+    ],
+    "duration": "perpetual",
+    "transfer_rule": "Transfer of the NFT transfers the license, except where theft or fraud is established; in such cases legal remedies prevail (Legal-Authoritative, SPECS_JA §5.5.2).",
+    "governing_law": "Singapore",
+    "dispute_resolution": "Singapore International Arbitration Centre (SIAC), Singapore seat",
+    "ny_convention_enforceability": "Awards are enforceable in the 172 NY Convention member states.",
+    "sanctions_condition": "License is void ab initio if licensee is on OFAC SDN List, EU Consolidated Financial Sanctions List, UK OFSI Consolidated List, or Singapore MAS Targeted Financial Sanctions List, or is located in a comprehensively sanctioned jurisdiction.",
+    "licensor_representations": "The original creator has consented to RootLens ToS as the verified copyright holder under KYC. RootLens has applied its VLM-based pre-screening as a reasonable effort against third-party IP inclusion.",
+    "buyer_due_diligence": "For ordinary commercial use including aggregate AI training, the buyer is not required to perform per-asset due diligence on each video.",
+    "buyer_notification_duty": "If the buyer has actual knowledge that the Licensed Content contains third-party IP, publicity, or privacy rights, the buyer must promptly notify RootLens in writing.",
+    "indemnification": {
+      "scope": "Suits by third parties against the buyer for IP, privacy, or publicity rights, within RootLens's representations and warranties.",
+      "covered_amounts": [
+        "refund of license fee for the affected License NFT",
+        "buyer's reasonable defence costs incurred before RootLens assumes the defence"
+      ],
+      "per_claim_cap_usd": "set in Terms of Sale at License NFT purchase",
+      "annual_aggregate_cap_per_buyer_per_root_nft_usd": "set in Terms of Sale at License NFT purchase",
+      "defence_control": "RootLens retains the option to assume defence (counsel selection, settlement, strategy).",
+      "exclusions": [
+        "Use outside the licensed scope",
+        "Cases where the buyer had actual knowledge of the issue but failed to promptly notify RootLens (constructive knowledge is not applied so as not to impose de facto per-asset due diligence on buyers)",
+        "Suits arising from buyer's modification of the Licensed Content"
+      ],
+      "consequential_damages_exclusion": "Indirect damages (lost future profits, reputational harm, AI model retraining costs) are excluded by default. Coverage for AI model retraining costs can be agreed separately in an enterprise contract.",
+      "enterprise_contract_note": "Buyers requiring coverage above the default caps negotiate an enterprise contract with RootLens, optionally backed by an IP infringement insurance policy. Specific terms are determined at contract time."
+    },
+    "two_layer_contract_structure": "Buyer-side obligations (notification, sanctions condition, modification limits, scope-of-use limits) are placed in the Terms of Sale, which the buyer accepts explicitly at License NFT purchase. The copyright grant itself remains a stand-alone unilateral licence so that licence inheritance on NFT transfer is preserved."
+  },
+  "full_text": "RootLens License — Non-Commercial Use (v1.0)\nlicense_type_id: non-commercial-v1\n=========================================================================\n\nThis license grants the holder of a specific License NFT a unilateral,\nnon-exclusive, royalty-free copyright license to use the Subject Content\n**solely for non-commercial purposes**. This is a unilateral grant, not\na contract (§10).\n\n\n§1 Definitions\n\n(1)–(7) Same as commercial-v1.\n\n(8) \"Non-commercial use\" means use that is not directed to commercial\n    advantage or monetary compensation, including:\n\n    a. Academic research (basic research, paper publication, conference\n       presentation at universities and public research institutions);\n    b. Personal viewing or learning;\n    c. Educational use by non-profit organizations;\n    d. Use in open-source or public-benefit projects, provided that the\n       project does not engage in direct monetization.\n\n(9) Where the boundary between commercial and non-commercial is unclear\n    (e.g., research at an institution that contemplates future\n    commercialization, free services supported by advertising revenue),\n    Licensee is encouraged either to confirm in writing with Licensor in\n    advance, or to obtain a separate commercial license (commercial-v1).\n\n\n§2 Grant of license\n\nLicensor grants Licensee, with respect to the Subject Content, the\nfollowing rights on a non-exclusive, worldwide, royalty-free basis,\nstrictly within the scope of non-commercial use under §3:\n\n(1) The right to reproduce, display, perform, transmit to the public, or\n    otherwise technologically use the Subject Content for non-commercial\n    purposes.\n\n(2) The right to use the Subject Content for non-commercial AI or\n    machine-learning training, evaluation, and benchmarking.\n\n(3) The right to create, use, and distribute derivative works of the\n    Subject Content, strictly within non-commercial scope.\n\n\n§3 Restrictions\n\n(1) Licensee shall not use the Subject Content for any purpose directed\n    to commercial advantage or monetary compensation. Commercial use\n    requires a separate commercial license (e.g., commercial-v1).\n\n(2) Where Licensee creates derivative works of the Subject Content and\n    distributes them, Licensee shall impose at least as restrictive\n    non-commercial terms on such derivative works (a Share-Alike-style\n    obligation).\n\n(3) Licensee shall not sublicense, assign, or rent out the right to use\n    the Subject Content to a third party in a manner that severs use\n    rights from the License NFT itself. (Transfer of the License NFT\n    itself is governed by §5.)\n\n\n§4 Term\n\nPerpetual, subject to commercial-v1 §4-style termination events\n(material breach, burn).\n\n\n§5 Transfer of license with NFT\n\n(Same as commercial-v1 §5.)\n\n\n§6 Legal-Authoritative\n\n(Same as commercial-v1 §6.)\n\n\n§7–§9\n\n(Same as commercial-v1 §7–§9: warranty disclaimer, limitation of liability,\ngoverning law = Singapore, dispute resolution = SIAC arbitration.)\n\n\n§10 Nature of this license (unilateral grant)\n\n(Same as commercial-v1 §10. In particular, the restrictions in §3 are\nnot contractual obligations of Licensee but conditions on the scope of\nthe grant in §2. Acts outside those conditions—including any commercial\nuse—constitute copyright infringement, not contract breach.)\n\n\n§11 Severability\n\n(Same as commercial-v1 §11.)\n\n\n------------------------------------------------------------\nEND OF LICENSE TEXT (non-commercial-v1)\n"
+}
