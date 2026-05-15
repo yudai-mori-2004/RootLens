@@ -48,12 +48,16 @@ pub mod license_nft {
         new_authority: Option<Pubkey>,
         new_staker_basis_points: Option<u16>,
         new_delegate_basis_points: Option<u16>,
+        new_root_nft_collection: Option<Pubkey>,
+        new_usdc_mint: Option<Pubkey>,
     ) -> Result<()> {
         instructions::update_config::handler(
             ctx,
             new_authority,
             new_staker_basis_points,
             new_delegate_basis_points,
+            new_root_nft_collection,
+            new_usdc_mint,
         )
     }
 
