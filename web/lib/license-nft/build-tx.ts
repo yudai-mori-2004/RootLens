@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// issue_license tx を組み立てて delegate 署名を付与する orchestration 層。
-//
-// 依存はすべて引数で受ける (Connection, fetchAssetWithProof, Signer)。
-// → unit test で mock 注入できる。
+// issue_license tx を組み立てて delegate 署名を付与する。
+// 依存は引数注入 (Connection / fetchProof / Signer) — unit test で mock 可能。
 
 import {
+  AddressLookupTableAccount,
   Connection,
   PublicKey,
   TransactionMessage,
@@ -19,15 +18,14 @@ import {
   findMplCoreCpiSigner,
   findUserRevenuePda,
 } from "./program";
-import type { AssetWithProof } from "./das";
+import type { RootNftProof } from "./das";
 import type { DelegateSigner } from "./signer";
 
-// ===== ATA derivation (avoid @solana/spl-token dep) ======================
-
+// @solana/spl-token を依存に入れずに ATA を導出 (server bundle を小さく保つ)
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 const TOKEN_PROGRAM_ID = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 
-export function getAssociatedTokenAddress(
+export function findAssociatedTokenAddress(
   mint: PublicKey,
   owner: PublicKey,
   allowOwnerOffCurve = false,
@@ -42,45 +40,30 @@ export function getAssociatedTokenAddress(
   return ata;
 }
 
-// ===== build + sign =====================================================
-
-export interface BuildTxParams {
-  /** Solana RPC connection (config 取得用) */
+export interface PrepareIssueLicenseInput {
   connection: Connection;
-  /** DAS で proof を引く関数 (test では mock 可能) */
-  fetchProof: (rootAssetId: string) => Promise<AssetWithProof>;
-  /** delegate 署名者 */
+  fetchProof: (rootAssetId: string) => Promise<RootNftProof>;
   signer: DelegateSigner;
-
-  /** License NFT program ID */
   programId: PublicKey;
-  /** Config PDA (network.json から) */
   configPda: PublicKey;
-  /** RootLens 専用の License Merkle Tree pubkey */
   licenseMerkleTree: PublicKey;
-
-  /** リクエストパラメータ */
-  rootAssetId: string;       // base58
-  licenseUrl: string;        // catalog から取得した正規 URL
-  buyerAddress: string;      // base58
-  price: bigint;             // catalog price (u64)
-  licenseName: string;       // メタデータ name (例: "RootLens License — commercial-v1")
+  /** v0 tx を 1232B 内に収めるための ALT (固定アカウント群を index 化)。 未指定なら raw v0 で組む */
+  addressLookupTable?: PublicKey;
+  rootAssetId: string;
+  licenseUrl: string;
+  buyerAddress: string;
+  price: bigint;
+  licenseName: string;
 }
 
-export interface BuildTxResult {
-  /** delegate のみ署名済の v0 tx (base64) */
+export interface PrepareIssueLicenseOutput {
   partialSignedTxBase64: string;
-  /** デバッグ用: 構築に使った blockhash */
   recentBlockhash: string;
 }
 
-/**
- * issue_license の `asset_data_hash` フィールドが leaf に焼かれているなら proof.assetDataHash を使う。
- * §5.5.3 の URI append 方式のときは zero (32B) でよい — contract がそれを許容する前提。
- */
 function buildIxFromProof(
   programId: PublicKey,
-  proof: AssetWithProof,
+  proof: RootNftProof,
   buyer: PublicKey,
   delegate: PublicKey,
   rootCollection: PublicKey,
@@ -102,9 +85,9 @@ function buildIxFromProof(
       configPda,
       userRevenuePda: findUserRevenuePda(programId, staker),
       usdcMint,
-      buyerUsdc: getAssociatedTokenAddress(usdcMint, buyer),
-      delegateUsdc: getAssociatedTokenAddress(usdcMint, delegate),
-      poolUsdc: getAssociatedTokenAddress(usdcMint, configPda, /*allowOwnerOffCurve*/ true),
+      buyerUsdc: findAssociatedTokenAddress(usdcMint, buyer),
+      delegateUsdc: findAssociatedTokenAddress(usdcMint, delegate),
+      poolUsdc: findAssociatedTokenAddress(usdcMint, configPda, /*allowOwnerOffCurve*/ true),
       rootMerkleTree: proof.treeId,
       licenseMerkleTree,
       licenseTreeConfig: findBubblegumTreeConfig(licenseMerkleTree),
@@ -129,29 +112,22 @@ function buildIxFromProof(
   );
 }
 
-/**
- * issue_license tx を組み立て、delegate 鍵で sign して base64 で返す。
- * 買い手は受け取った tx に自分の署名を足して broadcast する想定。
- */
-export async function buildAndSignIssueLicenseTx(p: BuildTxParams): Promise<BuildTxResult> {
+export async function prepareIssueLicense(p: PrepareIssueLicenseInput): Promise<PrepareIssueLicenseOutput> {
   const buyer = new PublicKey(p.buyerAddress);
   const delegate = p.signer.publicKey;
 
-  // 1) Config を取得して license_collection / usdc_mint / title_core_collection を解決
   const cfgInfo = await p.connection.getAccountInfo(p.configPda, "confirmed");
   if (!cfgInfo) throw new Error(`config PDA not found: ${p.configPda.toBase58()}`);
   const cfg = decodeConfig(cfgInfo.data);
 
-  // 2) DAS で leaf + proof
   const proof = await p.fetchProof(p.rootAssetId);
 
-  // 3) IX 構築
   const ix = buildIxFromProof(
     p.programId,
     proof,
     buyer,
     delegate,
-    cfg.titleCoreCollection,
+    cfg.rootNftCollection,
     cfg.licenseCollection,
     p.licenseMerkleTree,
     cfg.usdcMint,
@@ -161,16 +137,21 @@ export async function buildAndSignIssueLicenseTx(p: BuildTxParams): Promise<Buil
     p.price,
   );
 
-  // 4) v0 tx 組み立て、fee_payer = buyer
+  let altAccounts: AddressLookupTableAccount[] = [];
+  if (p.addressLookupTable) {
+    const r = await p.connection.getAddressLookupTable(p.addressLookupTable, { commitment: "confirmed" });
+    if (!r.value) throw new Error(`ALT not found: ${p.addressLookupTable.toBase58()}`);
+    altAccounts = [r.value];
+  }
+
+  // buyer が fee_payer。 buyer 署名は client 側で追加される前提で delegate のみ partial sign
   const blockhash = await p.connection.getLatestBlockhash("confirmed");
   const message = new TransactionMessage({
     payerKey: buyer,
     recentBlockhash: blockhash.blockhash,
     instructions: [ix],
-  }).compileToV0Message();
+  }).compileToV0Message(altAccounts);
   const tx = new VersionedTransaction(message);
-
-  // 5) delegate 署名のみ付与 (buyer の署名は client 側で足してもらう)
   await p.signer.signTransaction(tx);
 
   return {

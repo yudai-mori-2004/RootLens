@@ -27,7 +27,7 @@ pub mod license_nft {
 
     pub fn initialize_config(
         ctx: Context<InitializeConfig>,
-        title_core_collection: Pubkey,
+        root_nft_collection: Pubkey,
         license_collection: Pubkey,
         usdc_mint: Pubkey,
         staker_basis_points: u16,
@@ -35,7 +35,7 @@ pub mod license_nft {
     ) -> Result<()> {
         instructions::initialize_config::handler(
             ctx,
-            title_core_collection,
+            root_nft_collection,
             license_collection,
             usdc_mint,
             staker_basis_points,

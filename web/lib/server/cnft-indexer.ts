@@ -6,7 +6,7 @@
  */
 
 import { supabase } from "./page-store";
-import { DAS_RPC_URL } from "../verify/config";
+import { SOLANA_RPC_URL } from "../verify/config";
 import { getCollectionMints } from "../verify/config";
 
 export const NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet";
@@ -33,7 +33,7 @@ async function dasSearchAssets(
   page: number,
   limit: number = 1000,
 ): Promise<{ items: DasAsset[]; total: number }> {
-  const res = await fetch(DAS_RPC_URL, {
+  const res = await fetch(SOLANA_RPC_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -54,7 +54,7 @@ async function dasSearchAssets(
 }
 
 export async function dasGetAsset(assetId: string): Promise<DasAsset | null> {
-  const res = await fetch(DAS_RPC_URL, {
+  const res = await fetch(SOLANA_RPC_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -71,7 +71,7 @@ export async function dasGetAsset(assetId: string): Promise<DasAsset | null> {
 
 /** asset_id → ミントTXの blockTime を取得 */
 async function getBlockTime(assetId: string): Promise<number | null> {
-  const sigRes = await fetch(DAS_RPC_URL, {
+  const sigRes = await fetch(SOLANA_RPC_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -86,7 +86,7 @@ async function getBlockTime(assetId: string): Promise<number | null> {
   if (!items || items.length === 0) return null;
   const txSig = items[0][0];
 
-  const txRes = await fetch(DAS_RPC_URL, {
+  const txRes = await fetch(SOLANA_RPC_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -169,7 +169,7 @@ export async function indexFromTransaction(txSignature: string): Promise<number>
     if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_INTERVAL));
 
     try {
-      const txRes = await fetch(DAS_RPC_URL, {
+      const txRes = await fetch(SOLANA_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

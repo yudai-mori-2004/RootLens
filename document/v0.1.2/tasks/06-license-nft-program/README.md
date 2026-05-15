@@ -239,7 +239,7 @@ URI は `MetadataArgsV2.uri` に格納 → Bubblegum の `data_hash` 計算に�
 
 検証側の手順 (SPECS §5.5.3 参照): License NFT を DAS から fetch → URI を読む → `?root_mint=` を parse → 主張される Root NFT を DAS から fetch して TitleCore 所属 + TP 発行を確認 → URI 本体 (query を除いた part) の hash と URL path 内 `<terms_hash>` を比較して条文改ざん検知。
 
-> Bubblegum が将来 asset_data を有効化したら、`asset_data = root_asset_id_bytes` で渡し、Bubblegum 側で `keccak256(asset_data)` を `leaf.asset_data_hash` に焼き込ませる方式に切替予定。レイアウト的にこの方が clean。
+> Bubblegum が将来 asset_data を有効化したら、`asset_data = root_asset_id_bytes` で渡し、Bubblegum 側で `sha256(asset_data)` を `leaf.asset_data_hash` に焼き込ませる方式に切替予定。レイアウト的にこの方が clean。
 
 ## 監査 grade テスト計画 (実装済 17 ケース、全 pass)
 

@@ -27,7 +27,7 @@ export interface NetworkConfig {
   program_id: string;
   config_pda: string;
   authority: string;
-  title_core_collection: string;
+  root_nft_collection: string;
   license_collection: string;
   usdc_mint: string;
   staker_basis_points: number;
@@ -152,7 +152,7 @@ export function findUserRevenuePda(programId: PublicKey, user: PublicKey): Publi
 
 export interface ConfigAccount {
   authority: PublicKey;
-  titleCoreCollection: PublicKey;
+  rootNftCollection: PublicKey;
   licenseCollection: PublicKey;
   usdcMint: PublicKey;
   stakerBasisPoints: number;
@@ -166,7 +166,7 @@ export interface ConfigAccount {
  * layout (programs/license-nft/src/state.rs Config):
  *   8B discriminator
  *   32B authority
- *   32B title_core_collection
+ *   32B root_nft_collection
  *   32B license_collection
  *   32B usdc_mint
  *   2B staker_basis_points (LE u16)
@@ -181,7 +181,7 @@ export function decodeConfig(data: Buffer): ConfigAccount {
   let off = 8; // skip discriminator
   const authority = new PublicKey(data.subarray(off, off + 32));
   off += 32;
-  const titleCoreCollection = new PublicKey(data.subarray(off, off + 32));
+  const rootNftCollection = new PublicKey(data.subarray(off, off + 32));
   off += 32;
   const licenseCollection = new PublicKey(data.subarray(off, off + 32));
   off += 32;
@@ -194,7 +194,7 @@ export function decodeConfig(data: Buffer): ConfigAccount {
   const bump = data.readUInt8(off);
   return {
     authority,
-    titleCoreCollection,
+    rootNftCollection,
     licenseCollection,
     usdcMint,
     stakerBasisPoints,

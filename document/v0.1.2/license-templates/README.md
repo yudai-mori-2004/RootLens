@@ -52,17 +52,17 @@ program is jurisdiction-agnostic; switching license URL is the only change.
 | `non-commercial-v1` | Non-commercial only (research, education, personal) | [non-commercial-v1.txt](non-commercial-v1.txt) |
 | `redistribution-v1` | Commercial + redistribution (Creative-Commons-Share-Alike-style viral propagation) | [redistribution-v1.txt](redistribution-v1.txt) |
 
-To add a new type: create the new `.txt`, compute its `keccak256` hash,
+To add a new type: create the new `.txt`, compute its `sha256` hash,
 upload to immutable R2 storage, register in the RootLens API allowlist.
 No on-chain program change is required.
 
 ## Hash and URL structure
 
-Each `.txt` file's `keccak256` hash (32 bytes, hex) is its unique identity.
+Each `.txt` file's `sha256` hash (32 bytes, hex) is its unique identity.
 
 ```bash
 # Compute hash
-keccak256sum commercial-v1.txt
+sha256sum commercial-v1.txt
 # → e.g. 0xa7c3...0x5b91
 
 # Self-certifying URL after R2 deployment
@@ -78,7 +78,7 @@ https://rootlens.io/licenses/commercial-v1/0xa7c3...0x5b91.json
 
 The JSON wrapper contains both `license_text_url` and `license_text_hash`,
 so any third party can verify
-`keccak256(fetch(license_text_url)) == license_text_hash`.
+`sha256(fetch(license_text_url)) == license_text_hash`.
 
 The `issue_license` program appends `?root_mint=<root_asset_id_b58>` to the
 URI, so the final URI sealed into the License NFT leaf is:
@@ -117,9 +117,9 @@ identifier:
 ```
 
 Three-way hash verification:
-1. `keccak256(license_text)` must equal `license_text_hash`
+1. `sha256(license_text)` must equal `license_text_hash`
 2. `license_text_hash` must equal the hash component of the JSON wrapper URL
-3. `keccak256(fetch(license_text_url))` must equal the same hash
+3. `sha256(fetch(license_text_url))` must equal the same hash
 
 ## Common structure of all templates
 

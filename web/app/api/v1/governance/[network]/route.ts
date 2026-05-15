@@ -96,7 +96,7 @@ const TSA_PROVIDERS: TsaProvider[] = [
 const NETWORK_CONFIG: Record<string, { cluster: string; rpc_url: string }> = {
   devnet: {
     cluster: "devnet",
-    rpc_url: process.env.NEXT_PUBLIC_DAS_RPC_URL || "https://api.devnet.solana.com",
+    rpc_url: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com",
   },
   mainnet: {
     cluster: "mainnet-beta",

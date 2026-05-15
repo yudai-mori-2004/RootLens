@@ -71,7 +71,7 @@ export function deriveAssetId(merkleTree: PublicKey, nonce: bigint): PublicKey {
 
 export interface ConfigAccount {
   authority: PublicKey;
-  titleCoreCollection: PublicKey;
+  rootNftCollection: PublicKey;
   licenseCollection: PublicKey;
   usdcMint: PublicKey;
   stakerBasisPoints: number;
@@ -83,7 +83,7 @@ export interface ConfigAccount {
  * Config layout (programs/license-nft/src/state.rs):
  *   8B discriminator
  *   32B authority
- *   32B title_core_collection
+ *   32B root_nft_collection
  *   32B license_collection
  *   32B usdc_mint
  *   2B staker_basis_points (LE u16)
@@ -96,13 +96,13 @@ export function decodeConfig(data: Buffer | Uint8Array): ConfigAccount {
   if (buf.length < 141) throw new Error(`Config account too small: ${buf.length}`);
   let off = 8;
   const authority = new PublicKey(buf.subarray(off, off + 32));            off += 32;
-  const titleCoreCollection = new PublicKey(buf.subarray(off, off + 32));  off += 32;
+  const rootNftCollection = new PublicKey(buf.subarray(off, off + 32));  off += 32;
   const licenseCollection = new PublicKey(buf.subarray(off, off + 32));    off += 32;
   const usdcMint = new PublicKey(buf.subarray(off, off + 32));             off += 32;
   const stakerBasisPoints = buf.readUInt16LE(off);                         off += 2;
   const delegateBasisPoints = buf.readUInt16LE(off);                       off += 2;
   const bump = buf.readUInt8(off);
-  return { authority, titleCoreCollection, licenseCollection, usdcMint, stakerBasisPoints, delegateBasisPoints, bump };
+  return { authority, rootNftCollection, licenseCollection, usdcMint, stakerBasisPoints, delegateBasisPoints, bump };
 }
 
 // ===== issue_license IX builder =========================================

@@ -42,7 +42,7 @@ const __dirname = dirname(__filename);
 interface Fixtures {
   program_id: string;
   config_pda: string;
-  title_core_collection: string;
+  root_nft_collection: string;
   license_collection: string;
   usdc_mint: string;
   deployer: string;
@@ -70,7 +70,7 @@ describe("issue_license — adversarial", () => {
 
   const programId = new PublicKey(network.program_id);
   const configPda = new PublicKey(network.config_pda);
-  const titleCore = new PublicKey(network.title_core_collection);
+  const rootNftCollection = new PublicKey(network.root_nft_collection);
   const licenseCollection = new PublicKey(network.license_collection);
   const usdcMint = new PublicKey(network.usdc_mint);
   const licenseMerkleTree = new PublicKey(fixtures.license_tree);
@@ -126,10 +126,10 @@ describe("issue_license — adversarial", () => {
   }
 
   // ---------------------------------------------------------------------
-  // [A2] root_collection arg が config.title_core_collection と一致しない
+  // [A2] root_collection arg が config.root_nft_collection と一致しない
   //   → handler 早期 require! で InvalidCollection で reject
   // ---------------------------------------------------------------------
-  it("rejects when root_collection != config.title_core_collection (A2)", async () => {
+  it("rejects when root_collection != config.root_nft_collection (A2)", async () => {
     const leaf = fixtures.leaves[0];
     const stakerKey = new PublicKey(leaf.owner);
     const delegateKp = Keypair.fromSecretKey(Uint8Array.from(leaf.delegate_secret));
@@ -142,7 +142,7 @@ describe("issue_license — adversarial", () => {
     const poolUsdc = getAssociatedTokenAddressSync(usdcMint, configPda, true);
     const userRevenuePda = findUserRevenuePda(programId, stakerKey);
 
-    // BOGUS root_collection (TitleCore とは別の pubkey)
+    // BOGUS root_collection (Root NFT Collection とは別の pubkey)
     const bogusRootCollection = Keypair.generate().publicKey;
 
     const ix = buildIssueLicenseIx(
@@ -232,7 +232,7 @@ describe("issue_license — adversarial", () => {
         creatorHash: new Uint8Array(32),
         assetDataHash: new Uint8Array(32),
         flags: 0,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license.json",
         licenseName: "Test License",
         price: 1_000_000n,
@@ -300,7 +300,7 @@ describe("issue_license — adversarial", () => {
         creatorHash: new Uint8Array(32),
         assetDataHash: new Uint8Array(32),
         flags: 0,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license.json",
         licenseName: "Test License",
         price: 1_000_000n,
@@ -356,7 +356,7 @@ describe("issue_license — adversarial", () => {
         creatorHash: new Uint8Array(32),
         assetDataHash: new Uint8Array(32),
         flags: 0,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license.json",
         licenseName: "Test License",
         price: 1_000_000n,
@@ -407,7 +407,7 @@ describe("issue_license — adversarial", () => {
         creatorHash: new Uint8Array(32),
         assetDataHash: new Uint8Array(32),
         flags: 0,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license.json",
         licenseName: "Test License",
         price: 0n, // ← reject 対象

@@ -4,8 +4,8 @@
 
 import { describe, it, expect } from "vitest";
 import { PublicKey, VersionedTransaction } from "@solana/web3.js";
-import { buildAndSignIssueLicenseTx, getAssociatedTokenAddress } from "@/lib/cosign/build-tx";
-import { decodeIssueLicenseIxData, anchorDiscriminator, findUserRevenuePda } from "@/lib/cosign/program";
+import { prepareIssueLicense, findAssociatedTokenAddress } from "@/lib/license-nft/build-tx";
+import { decodeIssueLicenseIxData, anchorDiscriminator, findUserRevenuePda } from "@/lib/license-nft/program";
 import { makeMockEnv } from "./helpers";
 
 const LICENSE_URL = "https://rootlens.io/licenses/commercial-v1/abc.json";
@@ -14,7 +14,7 @@ const LICENSE_NAME = "RootLens License — commercial-v1";
 describe("build-tx", () => {
   it("builds issue_license tx with delegate signature attached, buyer slot empty", async () => {
     const env = makeMockEnv();
-    const result = await buildAndSignIssueLicenseTx({
+    const result = await prepareIssueLicense({
       connection: env.connection,
       fetchProof: env.fetchProof,
       signer: env.signer,
@@ -52,7 +52,7 @@ describe("build-tx", () => {
   it("encoded IX args match input price + URI + name", async () => {
     const env = makeMockEnv();
     const PRICE = 4_242_000n;
-    const result = await buildAndSignIssueLicenseTx({
+    const result = await prepareIssueLicense({
       connection: env.connection,
       fetchProof: env.fetchProof,
       signer: env.signer,
@@ -84,13 +84,13 @@ describe("build-tx", () => {
     expect(decoded.dataHash.equals(Buffer.alloc(32, 2))).toBe(true);
     expect(decoded.creatorHash.equals(Buffer.alloc(32, 3))).toBe(true);
     expect(decoded.root.equals(Buffer.alloc(32, 1))).toBe(true);
-    // root_collection は config の title_core_collection
+    // root_collection は config の root_nft_collection
     expect(decoded.rootCollection.toBase58()).toBe(env.rootCollection.toBase58());
   });
 
   it("IX accounts: staker = leaf.owner, user_revenue PDA, ATAs derived correctly", async () => {
     const env = makeMockEnv();
-    const result = await buildAndSignIssueLicenseTx({
+    const result = await prepareIssueLicense({
       connection: env.connection,
       fetchProof: env.fetchProof,
       signer: env.signer,
@@ -119,9 +119,9 @@ describe("build-tx", () => {
     expect(ixKeys[3].toBase58()).toBe(env.configPda.toBase58());
     expect(ixKeys[4].toBase58()).toBe(findUserRevenuePda(env.programId, env.stakerKp.publicKey).toBase58());
     expect(ixKeys[5].toBase58()).toBe(env.usdcMint.toBase58());
-    expect(ixKeys[6].toBase58()).toBe(getAssociatedTokenAddress(env.usdcMint, env.buyerKp.publicKey).toBase58());
-    expect(ixKeys[7].toBase58()).toBe(getAssociatedTokenAddress(env.usdcMint, env.delegateKp.publicKey).toBase58());
-    expect(ixKeys[8].toBase58()).toBe(getAssociatedTokenAddress(env.usdcMint, env.configPda, true).toBase58());
+    expect(ixKeys[6].toBase58()).toBe(findAssociatedTokenAddress(env.usdcMint, env.buyerKp.publicKey).toBase58());
+    expect(ixKeys[7].toBase58()).toBe(findAssociatedTokenAddress(env.usdcMint, env.delegateKp.publicKey).toBase58());
+    expect(ixKeys[8].toBase58()).toBe(findAssociatedTokenAddress(env.usdcMint, env.configPda, true).toBase58());
     expect(ixKeys[9].toBase58()).toBe(env.rootMerkleTree.toBase58());
     expect(ixKeys[10].toBase58()).toBe(env.licenseMerkleTree.toBase58());
 
@@ -136,7 +136,7 @@ describe("build-tx", () => {
     (env.connection.getAccountInfo as ReturnType<typeof import("vitest").vi.fn>)
       .mockResolvedValueOnce(null);
     await expect(
-      buildAndSignIssueLicenseTx({
+      prepareIssueLicense({
         connection: env.connection,
         fetchProof: env.fetchProof,
         signer: env.signer,
@@ -152,12 +152,12 @@ describe("build-tx", () => {
     ).rejects.toThrow(/config PDA not found/);
   });
 
-  it("getAssociatedTokenAddress refuses off-curve owner unless explicitly allowed", () => {
+  it("findAssociatedTokenAddress refuses off-curve owner unless explicitly allowed", () => {
     // configPda は確実に off-curve (PDA)
     const env = makeMockEnv();
-    expect(() => getAssociatedTokenAddress(env.usdcMint, env.configPda)).toThrow(/off-curve/);
+    expect(() => findAssociatedTokenAddress(env.usdcMint, env.configPda)).toThrow(/off-curve/);
     // allowOwnerOffCurve=true で OK
-    const ata = getAssociatedTokenAddress(env.usdcMint, env.configPda, true);
+    const ata = findAssociatedTokenAddress(env.usdcMint, env.configPda, true);
     expect(ata).toBeInstanceOf(PublicKey);
   });
 });

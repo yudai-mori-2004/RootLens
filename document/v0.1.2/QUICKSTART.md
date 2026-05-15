@@ -14,7 +14,7 @@ License NFT Anchor プログラムを devnet にデプロイし、Config + Licen
 | [Rust](https://rustup.rs/) | |
 | [Solana CLI / Agave](https://github.com/anza-xyz/agave) **3.1.14+** | `agave-install init 3.1.14` |
 | ~5 SOL on devnet | プログラムデプロイ ~2 SOL + 残り collection 作成等。[faucet.solana.com](https://faucet.solana.com) |
-| Title Protocol が devnet に既にデプロイ済 | TitleCore Collection の pubkey を取得するため |
+| Title Protocol が devnet に既にデプロイ済 | Root NFT Collection の pubkey (= TP の Extension cNFT 専用 collection) を取得するため |
 
 ---
 
@@ -46,7 +46,7 @@ cargo build --release -p license-cli
 # 5. Config PDA + License Collection を初期化
 ./target/release/license-cli init-config \
   --cluster devnet \
-  --title-core-collection $(jq -r .core_collection_mint ../title-protocol/network.json) \
+  --root-nft-collection $(jq -r .ext_collection_mint ../title-protocol/network.json) \
   --usdc-mint <YOUR_USDC_MINT_PUBKEY>
 ```
 

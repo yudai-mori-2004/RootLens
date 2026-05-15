@@ -5,9 +5,9 @@
 
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
-import { decodeConfig } from "@/lib/cosign/program";
-import type { AssetWithProof } from "@/lib/cosign/das";
-import type { DelegateSigner } from "@/lib/cosign/signer";
+import { decodeConfig } from "@/lib/license-nft/program";
+import type { RootNftProof } from "@/lib/license-nft/das";
+import type { DelegateSigner } from "@/lib/license-nft/signer";
 import { vi } from "vitest";
 
 export interface MockEnv {
@@ -23,16 +23,16 @@ export interface MockEnv {
   stakerKp: Keypair;
   signer: DelegateSigner;
   connection: Connection;
-  fetchProof: (rootAssetId: string) => Promise<AssetWithProof>;
+  fetchProof: (rootAssetId: string) => Promise<RootNftProof>;
 }
 
 /**
  * Config account の raw bytes を組み立てる (programs/license-nft/src/state.rs と一致)。
- * 8B disc + 32B authority + 32B title_core + 32B license_core + 32B usdc + 2B + 2B + 1B
+ * 8B disc + 32B authority + 32B root_nft_collection + 32B license_collection + 32B usdc + 2B + 2B + 1B
  */
 function buildConfigBytes(opts: {
   authority: PublicKey;
-  titleCoreCollection: PublicKey;
+  rootNftCollection: PublicKey;
   licenseCollection: PublicKey;
   usdcMint: PublicKey;
 }): Buffer {
@@ -40,7 +40,7 @@ function buildConfigBytes(opts: {
   // discriminator 8B (中身は不要、decode は skip するだけ)
   let off = 8;
   opts.authority.toBuffer().copy(buf, off); off += 32;
-  opts.titleCoreCollection.toBuffer().copy(buf, off); off += 32;
+  opts.rootNftCollection.toBuffer().copy(buf, off); off += 32;
   opts.licenseCollection.toBuffer().copy(buf, off); off += 32;
   opts.usdcMint.toBuffer().copy(buf, off); off += 32;
   buf.writeUInt16LE(9500, off); off += 2;
@@ -71,7 +71,7 @@ export function makeMockEnv(): MockEnv {
   const authority = Keypair.generate().publicKey;
   const configBytes = buildConfigBytes({
     authority,
-    titleCoreCollection: rootCollection,
+    rootNftCollection: rootCollection,
     licenseCollection,
     usdcMint,
   });
@@ -93,7 +93,7 @@ export function makeMockEnv(): MockEnv {
     })),
   } as unknown as Connection;
 
-  const fetchProof = vi.fn(async (_id: string): Promise<AssetWithProof> => ({
+  const fetchProof = vi.fn(async (_id: string): Promise<RootNftProof> => ({
     root: new Uint8Array(32).fill(1),
     dataHash: new Uint8Array(32).fill(2),
     creatorHash: new Uint8Array(32).fill(3),

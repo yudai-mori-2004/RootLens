@@ -2,19 +2,12 @@
  * Root CA + Intermediate CA 鍵管理 + Device Certificate 発行
  * 仕様書 §4.3, §4.4
  *
- * 3層PKI構造:
- *   Root CA → iOS/Android Intermediate CA → Device Certificate
+ * 3層PKI構造: Root CA → iOS/Android Intermediate CA → Device Certificate
  *
- * 暗号アルゴリズムは CryptoSigner インターフェースで抽象化（crypto.ts参照）。
- * dev環境: LocalEcSigner（ファイルベース鍵）
- * 本番: KmsSigner（AWS KMS）に差し替え
- *
- * 環境変数:
- *   ROOT_CA_CERT_PEM — Root CA 証明書
- *   IOS_INTERMEDIATE_CA_CERT_PEM / IOS_INTERMEDIATE_CA_KEY_PEM — iOS ICA
- *   ANDROID_INTERMEDIATE_CA_CERT_PEM / ANDROID_INTERMEDIATE_CA_KEY_PEM — Android ICA
- *
- * ローカル開発時はファイルからフォールバック。
+ * 鍵 / 証明書はすべて環境変数から読み込む (`process.env.*_PEM`)。
+ * ローカルの真実の出処は `keys/` フォルダ。 ローテーション時は
+ * `keys/sync-to-env.mjs` でファイルから env 文字列に変換し、
+ * `web/.env` および Vercel ダッシュボードに反映する。
  */
 
 import * as x509 from "@peculiar/x509";
@@ -29,35 +22,15 @@ import {
 } from "./crypto";
 import { isKmsConfigured, getKmsSigner } from "./crypto-kms";
 
-// @peculiar/x509 が使う Crypto プロバイダを設定（Node.js環境）
 x509.cryptoProvider.set(crypto.webcrypto as Crypto);
 
-// ---------------------------------------------------------------------------
-// 定数
-// ---------------------------------------------------------------------------
-
-/** Device Certificate の有効期間（日） */
 export const DEVICE_CERT_VALIDITY_DAYS = 90;
-
-/** 現在のPKI署名アルゴリズム */
 export const PKI_ALGORITHM: SigningAlgorithm = "ES256";
 
-// ---------------------------------------------------------------------------
-// PEM 読み込みユーティリティ
-// ---------------------------------------------------------------------------
-
-export function loadPem(envVar: string, fallbackPath?: string): string {
-  const envValue = process.env[envVar];
-  if (envValue) return envValue;
-  if (fallbackPath) {
-    const fs = require("fs");
-    const path = require("path");
-    const resolved = path.resolve(process.cwd(), fallbackPath);
-    if (fs.existsSync(resolved)) {
-      return fs.readFileSync(resolved, "utf-8");
-    }
-  }
-  throw new Error(`${envVar} is not set and fallback not found`);
+export function loadPemFromEnv(envVar: string): string {
+  const v = process.env[envVar];
+  if (!v) throw new Error(`${envVar} is not set`);
+  return v;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,8 +41,7 @@ let rootCaCert: x509.X509Certificate | null = null;
 
 async function loadRootCaCert(): Promise<x509.X509Certificate> {
   if (rootCaCert) return rootCaCert;
-  const certPem = loadPem("ROOT_CA_CERT_PEM", "../certs/dev/root-ca.pem");
-  rootCaCert = new x509.X509Certificate(certPem);
+  rootCaCert = new x509.X509Certificate(loadPemFromEnv("ROOT_CA_CERT_PEM"));
   return rootCaCert;
 }
 
@@ -88,22 +60,16 @@ async function loadIntermediateCA(platform: "ios" | "android"): Promise<Intermed
   if (intermediateCache[platform]) return intermediateCache[platform];
 
   const prefix = platform === "ios" ? "IOS" : "ANDROID";
-  const certPem = loadPem(
-    `${prefix}_INTERMEDIATE_CA_CERT_PEM`,
-    `../certs/dev/${platform}-intermediate-ca.pem`,
+  const cert = new x509.X509Certificate(
+    loadPemFromEnv(`${prefix}_INTERMEDIATE_CA_CERT_PEM`),
   );
-  const cert = new x509.X509Certificate(certPem);
 
-  // KMS Key ID が設定されていれば KmsSigner を使用（本番）
-  // 設定されていなければ PEM ファイルから LocalEcSigner（dev）
+  // KMS Key ID が設定されていれば KmsSigner、 そうでなければ env から PEM を読み LocalEcSigner
   let signer: CryptoSigner;
   if (isKmsConfigured(platform)) {
     signer = getKmsSigner(platform);
   } else {
-    const keyPem = loadPem(
-      `${prefix}_INTERMEDIATE_CA_KEY_PEM`,
-      `../certs/dev/${platform}-intermediate-ca-key.pem`,
-    );
+    const keyPem = loadPemFromEnv(`${prefix}_INTERMEDIATE_CA_KEY_PEM`);
     signer = await LocalEcSigner.fromPkcs8Pem(keyPem, PKI_ALGORITHM);
   }
 
@@ -117,6 +83,22 @@ export function _resetCache(): void {
   for (const key of Object.keys(intermediateCache)) {
     delete intermediateCache[key];
   }
+}
+
+/**
+ * テスト専用: Intermediate CA キャッシュに直接 fixture を流し込む。
+ * 本番コードからは絶対に呼ばないこと (= ファイル / env を bypass する)。
+ * テストでは ephemeral な test PKI を生成してこの関数で注入する。
+ */
+export async function _setTestIntermediateCA(
+  platform: "ios" | "android",
+  certPem: string,
+  keyPem: string,
+): Promise<void> {
+  intermediateCache[platform] = {
+    cert: new x509.X509Certificate(certPem),
+    signer: await LocalEcSigner.fromPkcs8Pem(keyPem, PKI_ALGORITHM),
+  };
 }
 
 // ---------------------------------------------------------------------------

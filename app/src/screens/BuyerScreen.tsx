@@ -25,7 +25,7 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 //
 // フロー:
 //   1) supplier wallet の staked cNFT を DAS で列挙
-//   2) ユーザがどれか選ぶ → POST /api/license/co-sign
+//   2) ユーザがどれか選ぶ → POST /api/v1/license/issue
 //   3) gateway が delegate 署名済の VersionedTransaction (base64) を返す
 //   4) 端末で buyer keypair で additional sign → sendRawTransaction
 //   5) 確認 → 買えたカードを「License acquired」に切替
@@ -129,8 +129,8 @@ export const BuyerScreen: React.FC = () => {
     }
     setBuy({ kind: 'sending', assetId: clip.assetId });
     try {
-      // 1) co-sign API を叩いて partial-signed tx を貰う
-      const res = await fetch(config.cosignLicenseUrl, {
+      // 1) License Issue API を叩いて partial-signed tx を貰う
+      const res = await fetch(config.licenseIssueUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

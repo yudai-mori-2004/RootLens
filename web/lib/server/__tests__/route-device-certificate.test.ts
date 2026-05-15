@@ -20,7 +20,7 @@ import * as x509 from "@peculiar/x509";
 import crypto from "crypto";
 import { NextRequest } from "next/server";
 
-import { _resetCache } from "../ca";
+import { _resetCache, _setTestIntermediateCA } from "../ca";
 import { _resetStore as _resetRateLimit } from "../rate-limit";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +33,7 @@ let rootCaKeyPair: CryptoKeyPair;
 let rootCaCert: x509.X509Certificate;
 let icaKeyPair: CryptoKeyPair;
 let icaCert: x509.X509Certificate;
+let icaKeyPem: string;
 
 beforeAll(async () => {
   rootCaKeyPair = await crypto.webcrypto.subtle.generateKey(
@@ -79,21 +80,21 @@ beforeAll(async () => {
     ],
   });
 
+  // Root CA cert は env (公開物なので)、ICA fixture は beforeEach で in-memory 注入
   const icaKeyPkcs8 = await crypto.webcrypto.subtle.exportKey("pkcs8", icaKeyPair.privateKey);
-  const icaKeyPem =
+  icaKeyPem =
     `-----BEGIN PRIVATE KEY-----\n${Buffer.from(icaKeyPkcs8).toString("base64").match(/.{1,64}/g)!.join("\n")}\n-----END PRIVATE KEY-----`;
 
   process.env.ROOT_CA_CERT_PEM = rootCaCert.toString("pem");
-  process.env.IOS_INTERMEDIATE_CA_CERT_PEM = icaCert.toString("pem");
-  process.env.IOS_INTERMEDIATE_CA_KEY_PEM = icaKeyPem;
-  process.env.ANDROID_INTERMEDIATE_CA_CERT_PEM = icaCert.toString("pem");
-  process.env.ANDROID_INTERMEDIATE_CA_KEY_PEM = icaKeyPem;
 });
 
 beforeEach(() => {
   vi.resetModules();
   _resetCache();
   _resetRateLimit();
+  // 注: ICA fixture の注入は `loadDeviceCertRoute` / `loadRenewRoute` 内で
+  // 動的 import の直後に行う (vi.resetModules で ca モジュールが新規
+  // instance になるため、ここで注入してもルート handler からは見えない)
 });
 
 afterEach(() => {
@@ -145,6 +146,13 @@ async function loadDeviceCertRoute(opts: LoadRouteOpts = {}) {
   }));
 
   const mod = await import("../../../app/api/v1/device-certificate/route");
+
+  // 動的 import 後に走る ca モジュールは新規 instance なので、
+  // ここで test fixture ICA を再注入 (= ファイル / env を読みに行かせない)
+  const caMod = await import("../ca");
+  await caMod._setTestIntermediateCA("android", icaCert.toString("pem"), icaKeyPem);
+  await caMod._setTestIntermediateCA("ios", icaCert.toString("pem"), icaKeyPem);
+
   return mod.POST;
 }
 
@@ -417,6 +425,12 @@ async function loadRenewRoute(opts: LoadRenewOpts = {}) {
   }));
 
   const mod = await import("../../../app/api/v1/device-certificate/renew/route");
+
+  // 動的 import 後の新規 ca instance に test fixture ICA を再注入
+  const caMod = await import("../ca");
+  await caMod._setTestIntermediateCA("android", icaCert.toString("pem"), icaKeyPem);
+  await caMod._setTestIntermediateCA("ios", icaCert.toString("pem"), icaKeyPem);
+
   return mod.POST;
 }
 

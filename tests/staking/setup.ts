@@ -37,7 +37,7 @@ interface LicenseLeaf {
 interface LicenseFixtures {
   program_id: string;
   config_pda: string;
-  title_core_collection: string;
+  root_nft_collection: string;
   license_collection: string;
   usdc_mint: string;
   license_tree: string;
@@ -91,7 +91,7 @@ function main() {
   const out = {
     program_id: lf.program_id,
     config_pda: lf.config_pda,
-    title_core_collection: lf.title_core_collection,
+    root_nft_collection: lf.root_nft_collection,
     license_collection: lf.license_collection,
     usdc_mint: lf.usdc_mint,
     license_tree: lf.license_tree,

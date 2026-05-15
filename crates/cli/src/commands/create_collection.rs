@@ -2,7 +2,7 @@
 //
 //! `license-cli create-collection`: 任意の MPL Core Collection を新規作成。
 //!
-//! 主な用途は audit/test 環境での Root Collection (TP TitleCore のテスト代替) 作成。
+//! 主な用途は audit/test 環境での Root NFT Collection (TP Extension cNFT collection の代替) 作成。
 //! BubblegumV2 plugin を作成時に永続付与するため、Bubblegum cNFT の mint 先に使える。
 
 use std::path::Path;

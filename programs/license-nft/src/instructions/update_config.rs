@@ -20,7 +20,7 @@ pub struct UpdateConfig<'info> {
 
 /// すべて Option<...> で渡し、Some の項目だけ更新する。
 ///
-/// title_core_collection と usdc_mint は init 後変更不可 (誤って差し替えると
+/// root_nft_collection と usdc_mint は init 後変更不可 (誤って差し替えると
 /// 既発行の License NFT の意味が変わるため)。本命令ではそもそも引数に持たない。
 pub fn handler(
     ctx: Context<UpdateConfig>,

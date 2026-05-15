@@ -11,7 +11,7 @@
 //   - `delegateV2` の wire format は kinobi 自動生成版 (mpl-bubblegum SDK) を参照して手書き
 //
 // 関連:
-//   - `web/lib/cosign/das.ts` — Unit E (server) 側に同じ DAS read が既存
+//   - `web/lib/license-nft/das.ts` — Unit E (server) 側に同じ DAS read が既存
 //   - `tests/staking/` — devnet 上で G→D の e2e (issue_license が通る/落ちる) を検証
 
 import {
@@ -70,7 +70,7 @@ interface DasGetAssetProofResult {
 }
 
 /** asset + proof を 1 トリップで取得した正規化形 */
-export interface AssetWithProof {
+export interface RootNftProof {
   treeId: PublicKey;
   root: Uint8Array;
   dataHash: Uint8Array;
@@ -106,10 +106,10 @@ function base58Bytes32(b58: string): Uint8Array {
   return new PublicKey(b58).toBytes();
 }
 
-export async function fetchAssetWithProof(
+export async function fetchRootNftProof(
   rootAssetId: PublicKey,
   dasUrl: string,
-): Promise<AssetWithProof> {
+): Promise<RootNftProof> {
   const id = rootAssetId.toBase58();
   const [asset, proof] = await Promise.all([
     dasRpc<DasGetAssetResult>(dasUrl, 'getAsset', { id }),
@@ -168,7 +168,7 @@ export async function getDelegateStatus(
   rootAssetId: PublicKey,
   dasUrl: string,
 ): Promise<DelegateStatus> {
-  const ap = await fetchAssetWithProof(rootAssetId, dasUrl);
+  const ap = await fetchRootNftProof(rootAssetId, dasUrl);
   const ownerEqualsDelegate = ap.leafOwner.equals(ap.leafDelegate);
   return {
     delegate: ap.leafDelegate,
@@ -192,7 +192,7 @@ export async function buildStakeIx(args: {
   cosignAuthority: PublicKey;
   dasUrl: string;
 }): Promise<TransactionInstruction> {
-  const ap = await fetchAssetWithProof(args.rootAssetId, args.dasUrl);
+  const ap = await fetchRootNftProof(args.rootAssetId, args.dasUrl);
   if (!ap.leafOwner.equals(args.currentOwner)) {
     throw new Error(
       `currentOwner ${args.currentOwner.toBase58()} != leaf.owner ${ap.leafOwner.toBase58()}`,
@@ -219,7 +219,7 @@ export async function buildUnstakeIx(args: {
   currentOwner: PublicKey;
   dasUrl: string;
 }): Promise<TransactionInstruction> {
-  const ap = await fetchAssetWithProof(args.rootAssetId, args.dasUrl);
+  const ap = await fetchRootNftProof(args.rootAssetId, args.dasUrl);
   if (!ap.leafOwner.equals(args.currentOwner)) {
     throw new Error(
       `currentOwner ${args.currentOwner.toBase58()} != leaf.owner ${ap.leafOwner.toBase58()}`,
@@ -243,7 +243,7 @@ function buildDelegateV2Ix(args: {
   leafOwner: PublicKey;
   previousLeafDelegate: PublicKey;
   newLeafDelegate: PublicKey;
-  asset: AssetWithProof;
+  asset: RootNftProof;
 }): TransactionInstruction {
   const { payer, leafOwner, previousLeafDelegate, newLeafDelegate, asset } = args;
 
@@ -295,7 +295,7 @@ function buildDelegateV2Ix(args: {
  *   [Option<u8>  flags]            = 1B tag + 1B?
  *   [u64 LE nonce][u32 LE index]
  */
-function serializeDelegateV2Args(asset: AssetWithProof): Buffer {
+function serializeDelegateV2Args(asset: RootNftProof): Buffer {
   const parts: Buffer[] = [];
   parts.push(Buffer.from(DELEGATE_V2_DISCRIMINATOR));
   parts.push(Buffer.from(asset.root));

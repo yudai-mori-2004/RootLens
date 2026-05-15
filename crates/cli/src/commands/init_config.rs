@@ -37,7 +37,7 @@ pub async fn run(
     cluster: &str,
     rpc_override: Option<&str>,
     program_id_override: Option<&str>,
-    title_core_collection: &str,
+    root_nft_collection: &str,
     usdc_mint: &str,
     staker_bps: u16,
     delegate_bps: u16,
@@ -56,9 +56,9 @@ pub async fn run(
         .unwrap_or(DEFAULT_PROGRAM_ID)
         .parse()
         .map_err(|e| CliError::Config(format!("program_id: {e}")))?;
-    let title_core: Pubkey = title_core_collection
+    let root_nft: Pubkey = root_nft_collection
         .parse()
-        .map_err(|e| CliError::Config(format!("title_core_collection: {e}")))?;
+        .map_err(|e| CliError::Config(format!("root_nft_collection: {e}")))?;
     let usdc: Pubkey = usdc_mint
         .parse()
         .map_err(|e| CliError::Config(format!("usdc_mint: {e}")))?;
@@ -67,7 +67,7 @@ pub async fn run(
     println!("  Cluster:               {cluster}");
     println!("  RPC:                   {rpc_url}");
     println!("  Program:               {program_id}");
-    println!("  TitleCore Collection:  {title_core}");
+    println!("  Root NFT Collection:   {root_nft}");
     println!("  USDC mint:             {usdc}");
     println!("  Staker / Delegate BPS: {staker_bps} / {delegate_bps}\n");
 
@@ -168,7 +168,7 @@ pub async fn run(
                 &program_id,
                 &config_pda,
                 &authority_pubkey,
-                &title_core,
+                &root_nft,
                 &license_pubkey,
                 &usdc,
                 staker_bps,
@@ -195,7 +195,7 @@ pub async fn run(
         program_id: program_id.to_string(),
         config_pda: config_pda.to_string(),
         authority: authority_pubkey.to_string(),
-        title_core_collection: title_core.to_string(),
+        root_nft_collection: root_nft.to_string(),
         license_collection: license_collection_pubkey.to_string(),
         usdc_mint: usdc.to_string(),
         staker_basis_points: staker_bps,
@@ -212,7 +212,7 @@ pub async fn run(
     println!("  Authority:            {authority_pubkey}");
     println!("  Authority keypair:    {}", authority_path.display());
     println!("  Config PDA:           {config_pda}");
-    println!("  TitleCore:            {title_core}");
+    println!("  Root NFT Collection:  {root_nft}");
     println!("  License Collection:   {license_collection_pubkey}");
     println!("  USDC mint:            {usdc}");
     println!("  Staker / Delegate:    {staker_bps} / {delegate_bps} bps");

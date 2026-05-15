@@ -26,7 +26,7 @@ pub struct InitializeConfig<'info> {
 
 pub fn handler(
     ctx: Context<InitializeConfig>,
-    title_core_collection: Pubkey,
+    root_nft_collection: Pubkey,
     license_collection: Pubkey,
     usdc_mint: Pubkey,
     staker_basis_points: u16,
@@ -36,7 +36,7 @@ pub fn handler(
 
     // disallow null pubkey for safety (admin が間違えて Pubkey::default() を渡すケース)
     require!(
-        title_core_collection != Pubkey::default(),
+        root_nft_collection != Pubkey::default(),
         LicenseNftError::InvalidCollection
     );
     require!(
@@ -50,7 +50,7 @@ pub fn handler(
 
     let config = &mut ctx.accounts.config;
     config.authority = ctx.accounts.authority.key();
-    config.title_core_collection = title_core_collection;
+    config.root_nft_collection = root_nft_collection;
     config.license_collection = license_collection;
     config.usdc_mint = usdc_mint;
     config.staker_basis_points = staker_basis_points;
@@ -58,10 +58,10 @@ pub fn handler(
     config.bump = ctx.bumps.config;
 
     msg!(
-        "license-nft: config initialized — staker={}bps delegate={}bps title_core={} license={}",
+        "license-nft: config initialized — staker={}bps delegate={}bps root_nft={} license={}",
         staker_basis_points,
         delegate_basis_points,
-        title_core_collection,
+        root_nft_collection,
         license_collection,
     );
     Ok(())

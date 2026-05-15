@@ -79,7 +79,7 @@ cargo build --release -p license-cli
 ```bash
 ./target/release/license-cli init-config \
   --cluster devnet \
-  --title-core-collection <TitleCore_Collection_Pubkey> \
+  --root-nft-collection <RootNFT_Collection_Pubkey> \
   --usdc-mint <USDC_Mint_Pubkey>
 ```
 
@@ -95,7 +95,7 @@ cargo build --release -p license-cli
 
 ### 引数の調達方法
 
-- **TitleCore Collection**: `cat ../title-protocol/network.json | jq -r .core_collection_mint`
+- **Root NFT Collection**: `cat ../title-protocol/network.json | jq -r .ext_collection_mint` (TP の Extension cNFT collection、 サブライセンス権の主体)
 - **USDC mint** (devnet 用 mock): 別途 SPL Token CLI で作成、または既存の devnet mint を使う
 
 ```bash
@@ -114,7 +114,7 @@ spl-token create-token --decimals 6 --url devnet
   "program_id": "G1PWd1nMe63...",
   "config_pda": "...",
   "authority": "...",
-  "title_core_collection": "...",
+  "root_nft_collection": "...",
   "license_collection": "...",
   "usdc_mint": "...",
   "staker_basis_points": 9500,
@@ -136,7 +136,7 @@ spl-token create-token --decimals 6 --url devnet
 
 License Collection の `update_authority = Config PDA` のため、
 **admin keypair が漏洩しても License Collection に偽 cNFT を mint できない**
-(= TP の TitleCore Collection より trust model が強い)。
+(= TP の Root NFT Collection より trust model が強い)。
 
 License NFT の発行は完全に program code path 経由でしか起きないことが
 オンチェーン強制される。

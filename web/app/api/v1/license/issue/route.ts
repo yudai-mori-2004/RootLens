@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// POST /api/license/co-sign
+// POST /api/v1/license/issue — SPECS_JA §5.3
 //
-// SPECS_JA §5.3 の co-sign フロー。クライアント (AI 企業) から
-// (rootAssetId, licenseUrl, buyerAddress) を受け取り、catalog にあれば
-// issue_license tx を組み立てて delegate 署名を付与して返す。
+// (rootAssetId, licenseUrl, buyerAddress) → catalog で price 解決 → DAS で Root NFT
+// proof 取得 → issue_license tx 組み立て → delegate で partial sign → base64 で返す。
+// buyer 側で署名追加 + broadcast (settle はクライアント責務)。
 
 import { Connection, PublicKey } from "@solana/web3.js";
 import { NextRequest, NextResponse } from "next/server";
-import { defaultCatalog, loadCatalogFromFile, lookup } from "@/lib/cosign/catalog";
-import { buildAndSignIssueLicenseTx } from "@/lib/cosign/build-tx";
-import { fetchAssetWithProof } from "@/lib/cosign/das";
-import { envKeypairSigner } from "@/lib/cosign/signer";
+import { loadCatalogFromFile, lookup } from "@/lib/license-nft/catalog";
+import { prepareIssueLicense } from "@/lib/license-nft/build-tx";
+import { fetchRootNftProof } from "@/lib/license-nft/das";
+import { envKeypairSigner } from "@/lib/license-nft/signer";
 
 export const runtime = "nodejs";
 
@@ -25,10 +25,7 @@ function bad(error: string, code: string, status = 400, detail?: string) {
   return NextResponse.json({ error, code, ...(detail ? { detail } : {}) }, { status });
 }
 
-// ----- module-level singletons (cold start で 1 回だけ初期化) -------------
-
 let cachedConn: Connection | null = null;
-let cachedCatalogPath: string | null = null;
 let cachedCatalog: ReturnType<typeof loadCatalogFromFile> | null = null;
 
 function getEnv(name: string): string {
@@ -45,25 +42,8 @@ function getConnection(): Connection {
 }
 
 function getCatalog() {
-  // env が設定されていればそこから YAML を読む (dev / staging で外部編集したい時)。
-  // 未設定 / ファイル読み失敗 (Vercel 等 YAML を bundle に同梱できない環境) なら
-  // bundle に焼かれた default catalog を使う。
-  const path = process.env.COSIGN_CATALOG_PATH;
-  if (!path) {
-    if (cachedCatalog && cachedCatalogPath === "::default::") return cachedCatalog;
-    cachedCatalog = defaultCatalog();
-    cachedCatalogPath = "::default::";
-    return cachedCatalog;
-  }
-  if (cachedCatalog && cachedCatalogPath === path) return cachedCatalog;
-  try {
-    cachedCatalog = loadCatalogFromFile(path);
-    cachedCatalogPath = path;
-  } catch (e) {
-    console.warn(`[cosign] catalog file at ${path} unreadable (${(e as Error).message}), using inline default`);
-    cachedCatalog = defaultCatalog();
-    cachedCatalogPath = "::default::";
-  }
+  if (cachedCatalog) return cachedCatalog;
+  cachedCatalog = loadCatalogFromFile(getEnv("COSIGN_CATALOG_PATH"));
   return cachedCatalog;
 }
 
@@ -76,7 +56,7 @@ export async function POST(req: NextRequest) {
   try {
     body = (await req.json()) as RequestBody;
   } catch {
-    console.warn(`[cosign ${reqId}] INVALID_INPUT (bad JSON)`);
+    console.warn(`[license-issue ${reqId}] INVALID_INPUT (bad JSON)`);
     return bad("invalid JSON body", "INVALID_INPUT");
   }
 
@@ -85,21 +65,21 @@ export async function POST(req: NextRequest) {
   const buyerAddress = typeof body.buyerAddress === "string" ? body.buyerAddress : null;
 
   if (!rootAssetId || !licenseUrl || !buyerAddress) {
-    console.warn(`[cosign ${reqId}] INVALID_INPUT (missing fields)`);
+    console.warn(`[license-issue ${reqId}] INVALID_INPUT (missing fields)`);
     return bad(
       "rootAssetId, licenseUrl, buyerAddress are required",
       "INVALID_INPUT",
     );
   }
 
-  console.info(`[cosign ${reqId}] received rootAssetId=${rootAssetId} licenseUrl=${licenseUrl} buyer=${buyerAddress}`);
+  console.info(`[license-issue ${reqId}] received rootAssetId=${rootAssetId} licenseUrl=${licenseUrl} buyer=${buyerAddress}`);
 
   // base58 形式の sanity check (PublicKey ctor が throw すれば無効)
   try {
     new PublicKey(rootAssetId);
     new PublicKey(buyerAddress);
   } catch {
-    console.warn(`[cosign ${reqId}] INVALID_INPUT (bad pubkey)`);
+    console.warn(`[license-issue ${reqId}] INVALID_INPUT (bad pubkey)`);
     return bad("rootAssetId / buyerAddress must be base58 pubkeys", "INVALID_INPUT");
   }
 
@@ -109,37 +89,37 @@ export async function POST(req: NextRequest) {
     const catalog = getCatalog();
     entry = lookup(catalog, rootAssetId, licenseUrl);
   } catch (e) {
-    console.error(`[cosign ${reqId}] INTERNAL_ERROR catalog load`, e);
+    console.error(`[license-issue ${reqId}] INTERNAL_ERROR catalog load`, e);
     return bad("catalog load failed", "INTERNAL_ERROR", 500, (e as Error).message);
   }
   if (!entry) {
-    console.warn(`[cosign ${reqId}] NOT_LISTED rootAssetId=${rootAssetId} licenseUrl=${licenseUrl}`);
+    console.warn(`[license-issue ${reqId}] NOT_LISTED rootAssetId=${rootAssetId} licenseUrl=${licenseUrl}`);
     return bad("(rootAssetId, licenseUrl) not in catalog", "NOT_LISTED", 404);
   }
 
-  // 構築 + sign
   try {
-    // DAS API は Solana 公式 devnet RPC でも提供されているので、専用 env が無ければ
-    // SOLANA_RPC_URL を流用する。dev/staging で別 DAS provider に切替えたい時のみ env 設定。
-    const dasUrl = process.env.DAS_RPC_URL || getEnv("SOLANA_RPC_URL");
-    const result = await buildAndSignIssueLicenseTx({
+    const rpcUrl = getEnv("SOLANA_RPC_URL");
+    const result = await prepareIssueLicense({
       connection: getConnection(),
-      fetchProof: (id) => fetchAssetWithProof(dasUrl, id),
-      signer: envKeypairSigner(getEnv("COSIGN_DELEGATE_PRIVATE_KEY_BASE58")),
+      fetchProof: (id) => fetchRootNftProof(rpcUrl, id),
+      signer: envKeypairSigner("COSIGN_DELEGATE_PRIVATE_KEY_BASE58"),
       programId: new PublicKey(getEnv("LICENSE_NFT_PROGRAM_ID")),
       configPda: new PublicKey(getEnv("LICENSE_NFT_CONFIG_PDA")),
       licenseMerkleTree: new PublicKey(getEnv("LICENSE_MERKLE_TREE")),
+      addressLookupTable: process.env.LICENSE_NFT_ALT
+        ? new PublicKey(process.env.LICENSE_NFT_ALT)
+        : undefined,
       rootAssetId,
       licenseUrl: entry.licenseUrl,
       buyerAddress,
       price: entry.price,
       licenseName: process.env.LICENSE_NAME ?? "RootLens License",
     });
-    console.info(`[cosign ${reqId}] OK price=${entry.price} elapsed=${Date.now() - t0}ms`);
+    console.info(`[license-issue ${reqId}] OK price=${entry.price} elapsed=${Date.now() - t0}ms`);
     return NextResponse.json({ partialSignedTx: result.partialSignedTxBase64 });
   } catch (e) {
     const msg = (e as Error).message ?? "unknown";
-    console.error(`[cosign ${reqId}] build/sign error: ${msg}`);
+    console.error(`[license-issue ${reqId}] build/sign error: ${msg}`);
     if (msg.includes("DAS")) {
       return bad("DAS lookup failed", "DAS_LOOKUP_FAILED", 502, msg);
     }

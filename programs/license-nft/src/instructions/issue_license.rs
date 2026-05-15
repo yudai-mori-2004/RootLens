@@ -7,7 +7,7 @@
 //
 // 検証順序 (fail-fast, fail-any-revert-all):
 //   1. price > 0
-//   2. Collection check: 引数 collection_pubkey == config.title_core_collection
+//   2. Collection check: 引数 collection_pubkey == config.root_nft_collection
 //   3. LeafSchema::V2 を構築 (collection_hash は in-program で計算)
 //   4. mpl_account_compression::verify_leaf で root_merkle_tree 上の在籍を検証
 //      → owner / delegate / collection / data_hash / creator_hash がすべて一致
@@ -153,8 +153,9 @@ pub fn handler<'info>(
     creator_hash: [u8; 32],
     asset_data_hash: [u8; 32],
     flags: u8,
-    // root_collection: Root NFT が紐づく MPL Core Collection (TitleCore)。
-    // Option<Pubkey> ではなく必須 — Root NFT は常に TitleCore に属する前提
+    // root_collection: Root NFT が紐づく MPL Core Collection (TP の Extension cNFT
+    // 専用 collection、 サブライセンス権の主体)。Option<Pubkey> ではなく必須 —
+    // Root NFT は常にこの collection に属する前提
     root_collection: Pubkey,
 
     // ===== License NFT mint args =====
@@ -168,7 +169,7 @@ pub fn handler<'info>(
 
     // ----- 2. Collection check -----
     require!(
-        root_collection == ctx.accounts.config.title_core_collection,
+        root_collection == ctx.accounts.config.root_nft_collection,
         LicenseNftError::InvalidCollection
     );
     let collection_hash = hash_collection_option(Some(root_collection))

@@ -46,7 +46,7 @@ export interface StakingFixtures {
   /** license-nft のデプロイ済 program id (e2e で issue_license を呼ぶ用) */
   program_id: string;
   config_pda: string;
-  title_core_collection: string;
+  root_nft_collection: string;
   license_collection: string;
   usdc_mint: string;
   license_tree: string;
@@ -140,7 +140,7 @@ interface DasGetAssetProofResult {
   tree_id: string;
 }
 
-export interface AssetWithProof {
+export interface RootNftProof {
   treeId: PublicKey;
   root: Uint8Array;
   dataHash: Uint8Array;
@@ -175,10 +175,10 @@ function base58Bytes32(b58: string): Uint8Array {
   return new PublicKey(b58).toBytes();
 }
 
-export async function fetchAssetWithProof(
+export async function fetchRootNftProof(
   assetId: PublicKey,
   dasUrl: string,
-): Promise<AssetWithProof> {
+): Promise<RootNftProof> {
   const id = assetId.toBase58();
   const [asset, proof] = await Promise.all([
     dasRpc<DasGetAssetResult>(dasUrl, "getAsset", { id }),
@@ -220,13 +220,13 @@ export async function waitUntilDelegate(
   expected: PublicKey,
   dasUrl: string,
   opts: { intervalMs?: number; timeoutMs?: number } = {},
-): Promise<AssetWithProof> {
+): Promise<RootNftProof> {
   const interval = opts.intervalMs ?? 2000;
   const timeout = opts.timeoutMs ?? 60000;
   const deadline = Date.now() + timeout;
-  let last: AssetWithProof | null = null;
+  let last: RootNftProof | null = null;
   while (Date.now() < deadline) {
-    last = await fetchAssetWithProof(assetId, dasUrl);
+    last = await fetchRootNftProof(assetId, dasUrl);
     if (last.leafDelegate.equals(expected)) return last;
     await new Promise((r) => setTimeout(r, interval));
   }
@@ -244,7 +244,7 @@ export interface DelegateV2BuildArgs {
   payer: PublicKey;
   leafOwner: PublicKey;
   newLeafDelegate: PublicKey;
-  asset: AssetWithProof;
+  asset: RootNftProof;
 }
 
 export function buildDelegateV2Ix(args: DelegateV2BuildArgs): TransactionInstruction {
@@ -322,16 +322,8 @@ export async function sendIx(
   });
 }
 
-// ============================================================================
-// RPC URL (env)
-// ============================================================================
-
 export function getDasUrl(): string {
-  return (
-    process.env.SOLANA_RPC_URL ??
-    process.env.HELIUS_RPC_URL ??
-    "https://api.devnet.solana.com" // 注: solana 公式 RPC は DAS 非対応。Helius 等を env で渡すこと
-  );
+  return process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
 }
 
 export function getConnection(): Connection {

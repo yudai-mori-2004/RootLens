@@ -2,12 +2,12 @@
 //
 // Config PDA を close し、rent を authority に戻す。
 //
-// 用途: 監査/テスト環境で title_core_collection / usdc_mint を変更したいとき、
+// 用途: 監査/テスト環境で root_nft_collection / usdc_mint を変更したいとき、
 //       一旦 close → re-init で再 pin する経路。
 //
 // セキュリティ注意:
 //   production では admin がこの命令で Config を閉じて再 init すれば実質
-//   title_core_collection をローテートできてしまう (immutability の bypass)。
+//   root_nft_collection をローテートできてしまう (immutability の bypass)。
 //   よって本命令は audit/dev 用と位置付け、production ビルドでは
 //   feature gate で外すことを推奨 (TODO: features = ["admin-mutable-config"])。
 

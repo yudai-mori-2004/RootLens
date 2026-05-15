@@ -101,12 +101,12 @@ pub fn build_update_config_ix(
 /// initialize_config ix を構築する。
 ///
 /// args 順序は src/instructions/initialize_config.rs の handler シグネチャに一致：
-///   title_core_collection, license_collection, usdc_mint, staker_bps, delegate_bps
+///   root_nft_collection, license_collection, usdc_mint, staker_bps, delegate_bps
 pub fn build_initialize_config_ix(
     program_id: &Pubkey,
     config_pda: &Pubkey,
     authority: &Pubkey,
-    title_core_collection: &Pubkey,
+    root_nft_collection: &Pubkey,
     license_collection: &Pubkey,
     usdc_mint: &Pubkey,
     staker_basis_points: u16,
@@ -114,7 +114,7 @@ pub fn build_initialize_config_ix(
 ) -> Instruction {
     let mut data = Vec::with_capacity(8 + 32 + 32 + 32 + 2 + 2);
     data.extend_from_slice(&anchor_discriminator("initialize_config"));
-    data.extend_from_slice(&title_core_collection.to_bytes());
+    data.extend_from_slice(&root_nft_collection.to_bytes());
     data.extend_from_slice(&license_collection.to_bytes());
     data.extend_from_slice(&usdc_mint.to_bytes());
     data.extend_from_slice(&staker_basis_points.to_le_bytes());

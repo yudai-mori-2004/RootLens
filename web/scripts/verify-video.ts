@@ -16,7 +16,7 @@ import {
 import type { VerifyResponse } from "@title-protocol/sdk";
 import { Connection } from "@solana/web3.js";
 
-const SOLANA_RPC_URL = "https://devnet.helius-rpc.com/?api-key=7bdef7b8-8661-4449-840c-aa835168f2b1";
+const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
 const OWNER_WALLET = "EvmnNCtsjGJTuMCe78GbGHSq2mcQpWQgDG8eDB9BBJEY";
 
 async function main() {

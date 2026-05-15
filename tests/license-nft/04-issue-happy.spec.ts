@@ -50,7 +50,7 @@ const __dirname = dirname(__filename);
 interface Fixtures {
   program_id: string;
   config_pda: string;
-  title_core_collection: string;
+  root_nft_collection: string;
   license_collection: string;
   usdc_mint: string;
   deployer: string;
@@ -79,7 +79,7 @@ describe("issue_license — happy path + proof-related adversarial", () => {
 
   const programId = new PublicKey(network.program_id);
   const configPda = new PublicKey(network.config_pda);
-  const titleCore = new PublicKey(network.title_core_collection);
+  const rootNftCollection = new PublicKey(network.root_nft_collection);
   const licenseCollection = new PublicKey(network.license_collection);
   const usdcMint = new PublicKey(network.usdc_mint);
   const licenseMerkleTree = new PublicKey(fixtures.license_tree);
@@ -213,7 +213,7 @@ describe("issue_license — happy path + proof-related adversarial", () => {
         creatorHash: proof.creatorHash,
         assetDataHash: proof.assetDataHash,
         flags: proof.flags,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license/0.json",
         licenseName: "Test License #0",
         price: PRICE,
@@ -292,7 +292,7 @@ describe("issue_license — happy path + proof-related adversarial", () => {
         creatorHash: proof.creatorHash,
         assetDataHash: proof.assetDataHash,
         flags: proof.flags,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license/1.json",
         licenseName: "Test License #1",
         price: 1_000_000n,
@@ -351,7 +351,7 @@ describe("issue_license — happy path + proof-related adversarial", () => {
         creatorHash: proof.creatorHash,
         assetDataHash: proof.assetDataHash,
         flags: proof.flags,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license/2.json",
         licenseName: "Test License #2",
         price: 1_000_000n,
@@ -408,7 +408,7 @@ describe("issue_license — happy path + proof-related adversarial", () => {
         creatorHash: proof.creatorHash,
         assetDataHash: proof.assetDataHash,
         flags: proof.flags,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license/3.json",
         licenseName: "Test License #3",
         price: 1_000_000n,
@@ -462,7 +462,7 @@ describe("issue_license — happy path + proof-related adversarial", () => {
         creatorHash: proof.creatorHash,
         assetDataHash: proof.assetDataHash,
         flags: proof.flags,
-        rootCollection: titleCore,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license/4.json",
         licenseName: "Test License #4",
         price: 1_000_000n,

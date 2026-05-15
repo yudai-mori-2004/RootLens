@@ -7,7 +7,8 @@ use anchor_lang::prelude::*;
 /// SPECS §5.4.1 / §5.4.2 に対応。分配比率はオンチェーンで第三者検証可能。
 ///
 /// trust model:
-///   - title_core_collection: TP TEE が発行した Root NFT の正当性を MPL Core Collection で保証
+///   - root_nft_collection:   TP TEE が発行した Root NFT の正当性を MPL Core Collection で保証
+///                            (= TP 内 "Extension cNFT" 専用 collection、 サブライセンス権の主体)
 ///   - license_collection:    本プログラム発行の License NFT の正当性を保証。
 ///                            update_authority は **本 Config PDA**。
 ///                            admin keypair が漏洩しても License Collection に偽 mint 不可
@@ -17,8 +18,8 @@ use anchor_lang::prelude::*;
 pub struct Config {
     /// admin (update_config / authority 移譲のみ可能。Collection 操作はできない)
     pub authority: Pubkey,
-    /// TitleCore MPL Core Collection (Root NFT の collection)。issue_license の collection check で参照
-    pub title_core_collection: Pubkey,
+    /// Root NFT の所属 MPL Core Collection (TP "Extension cNFT" 専用 collection)。issue_license の collection check で参照
+    pub root_nft_collection: Pubkey,
     /// License MPL Core Collection (本プログラム発行 License NFT の collection)。
     /// update_authority = この Config PDA。MintV2 の collection_authority に PDA seeds で sign
     pub license_collection: Pubkey,

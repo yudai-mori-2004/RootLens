@@ -9,8 +9,8 @@
 import { fetchGlobalConfig, findGlobalConfigPDA, TITLE_CONFIG_PROGRAM_ID, type TrustedTeeNode, type WasmModuleInfo, type WasmVersionInfo } from '@title-protocol/sdk';
 import { Connection } from '@solana/web3.js';
 
-/** DAS (Digital Asset Standard) API エンドポイント */
-export const DAS_RPC_URL = process.env.NEXT_PUBLIC_DAS_RPC_URL!;
+/** Solana JSON-RPC エンドポイント (= DAS API も同 URL で提供される) */
+export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!;
 
 /** PDQ照合の閾値 (ハミング距離, 256bit空間)
  * DCT計算はTEEと同一のWASMバイナリで実行。
@@ -42,7 +42,7 @@ export interface GlobalConfigData {
 export type { TrustedTeeNode, WasmModuleInfo, WasmVersionInfo };
 
 export async function getGlobalConfigData(): Promise<GlobalConfigData> {
-  const connection = new Connection(DAS_RPC_URL);
+  const connection = new Connection(SOLANA_RPC_URL);
   const config = await fetchGlobalConfig(connection, 'devnet');
 
   return {

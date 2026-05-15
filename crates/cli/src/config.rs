@@ -21,7 +21,7 @@ pub struct NetworkConfig {
     pub program_id: String,
     pub config_pda: String,
     pub authority: String,
-    pub title_core_collection: String,
+    pub root_nft_collection: String,
     pub license_collection: String,
     pub usdc_mint: String,
     pub staker_basis_points: u16,
@@ -74,13 +74,14 @@ pub fn resolve_rpc_url(cluster: &str, rpc_override: Option<&str>) -> String {
     }
 }
 
-/// TP の network.json から `core_collection_mint` を読み取って TitleCore として返す。
-pub fn read_tp_core_collection(path: &Path) -> Result<String, CliError> {
+/// TP の network.json から `ext_collection_mint` を読み取って Root NFT collection として返す。
+/// (Root NFT = TP の Extension cNFT で RootLens 用サブライセンス権を保有する NFT)
+pub fn read_tp_root_nft_collection(path: &Path) -> Result<String, CliError> {
     let raw = std::fs::read_to_string(path)
         .map_err(|e| CliError::Config(format!("TP network.json を読めない ({}): {e}", path.display())))?;
     let v: serde_json::Value = serde_json::from_str(&raw)?;
-    v.get("core_collection_mint")
+    v.get("ext_collection_mint")
         .and_then(|x| x.as_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| CliError::Config("TP network.json に core_collection_mint が無い".into()))
+        .ok_or_else(|| CliError::Config("TP network.json に ext_collection_mint が無い".into()))
 }

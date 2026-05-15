@@ -8,13 +8,13 @@ pub enum LicenseNftError {
     InvalidBasisPoints,
     #[msg("price は 0 より大きくなければならない")]
     InvalidPrice,
-    #[msg("title_core_collection / usdc_mint は init 後に変更できない")]
+    #[msg("root_nft_collection / usdc_mint は init 後に変更できない")]
     ImmutableConfigField,
     #[msg("UserRevenue PDA の user フィールドが signer と一致しない")]
     UserMismatch,
     #[msg("Bubblegum leaf の data_hash が再構築された値と一致しない")]
     DataHashMismatch,
-    #[msg("Root NFT が指定された TitleCore コレクションに verified=true で属していない")]
+    #[msg("Root NFT が指定された Root NFT コレクションに verified=true で属していない")]
     InvalidCollection,
     #[msg("license_collection アカウントが Config の license_collection と一致しない")]
     InvalidLicenseCollection,

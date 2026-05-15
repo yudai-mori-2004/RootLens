@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, it, expect } from "vitest";
-import { parseCatalog, lookup, makeKey, WILDCARD_ASSET } from "@/lib/cosign/catalog";
+import { parseCatalog, lookup, makeKey, WILDCARD_ASSET } from "@/lib/license-nft/catalog";
 
 const SAMPLE = `
 entries:

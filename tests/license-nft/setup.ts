@@ -2,7 +2,7 @@
 //
 // 監査テスト前のセットアップ。
 //   1. License Bubblegum tree 作成 (tree_creator = license_tree_authority PDA)
-//   2. Root Bubblegum tree 作成 (tree_creator = deployer。TP TitleCore のテスト代替)
+//   2. Root Bubblegum tree 作成 (tree_creator = deployer。TP Root NFT Collection のテスト代替)
 //   3. テスト用 Root NFT leaf を 5 個 mint (異なる owner / delegate 組み合わせ)
 //   4. 結果を tests/license-nft/fixtures.json に保存
 //
@@ -38,7 +38,7 @@ interface NetworkConfig {
   program_id: string;
   config_pda: string;
   authority: string;
-  title_core_collection: string;
+  root_nft_collection: string;
   license_collection: string;
   usdc_mint: string;
   staker_basis_points: number;
@@ -59,7 +59,7 @@ async function main() {
 
   const network: NetworkConfig = JSON.parse(readFileSync(NETWORK_PATH, "utf-8"));
   const programId = new PublicKey(network.program_id);
-  const titleCore = new PublicKey(network.title_core_collection); // = test root collection (deployer 所有)
+  const rootNftCollection = new PublicKey(network.root_nft_collection); // = test root collection (deployer 所有)
   const deployer = loadKeypair("deployer.json");
 
   const conn = new Connection("https://api.devnet.solana.com", "confirmed");
@@ -70,7 +70,7 @@ async function main() {
   const fixtures: any = {
     program_id: network.program_id,
     config_pda: network.config_pda,
-    title_core_collection: network.title_core_collection,
+    root_nft_collection: network.root_nft_collection,
     license_collection: network.license_collection,
     usdc_mint: network.usdc_mint,
     deployer: deployer.publicKey.toBase58(),
@@ -157,14 +157,14 @@ async function main() {
           share: 100,
         },
       ],
-      collection: some(fromWeb3JsPublicKey(titleCore)),
+      collection: some(fromWeb3JsPublicKey(rootNftCollection)),
     };
 
     await mintV2(umi, {
       merkleTree: rootMerkleTree.publicKey,
       leafOwner: fromWeb3JsPublicKey(staker.publicKey),
       leafDelegate: fromWeb3JsPublicKey(delegate.publicKey),
-      coreCollection: fromWeb3JsPublicKey(titleCore),
+      coreCollection: fromWeb3JsPublicKey(rootNftCollection),
       collectionAuthority: umi.identity, // deployer = test collection の update_authority
       metadata,
     }).sendAndConfirm(umi);

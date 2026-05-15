@@ -26,7 +26,7 @@ import {
 
 import {
   buildDelegateV2Ix,
-  fetchAssetWithProof,
+  fetchRootNftProof,
   findBubblegumTreeConfig,
   getConnection,
   getDasUrl,
@@ -52,7 +52,7 @@ describe("Unit G+D — staking gates issue_license", function () {
 
   const programId = new PublicKey(fixtures.program_id);
   const configPda = new PublicKey(fixtures.config_pda);
-  const titleCoreCollection = new PublicKey(fixtures.title_core_collection);
+  const rootNftCollection = new PublicKey(fixtures.root_nft_collection);
   const licenseCollection = new PublicKey(fixtures.license_collection);
   const usdcMint = new PublicKey(fixtures.usdc_mint);
   const rootTree = new PublicKey(fixtures.root_tree);
@@ -118,7 +118,7 @@ describe("Unit G+D — staking gates issue_license", function () {
   });
 
   async function ensureStaked(target: PublicKey): Promise<void> {
-    const cur = await fetchAssetWithProof(assetId, dasUrl);
+    const cur = await fetchRootNftProof(assetId, dasUrl);
     if (cur.leafDelegate.equals(target)) return;
     const ix = buildDelegateV2Ix({
       payer: owner.publicKey,
@@ -131,7 +131,7 @@ describe("Unit G+D — staking gates issue_license", function () {
   }
 
   async function buildIssueIxFor(coSigner: PublicKey): Promise<TransactionInstruction> {
-    const ap = await fetchAssetWithProof(assetId, dasUrl);
+    const ap = await fetchRootNftProof(assetId, dasUrl);
     const licenseTreeAuthority = findLicenseTreeAuthority(programId, licenseMerkleTree);
     const licenseTreeConfig = findBubblegumTreeConfig(licenseMerkleTree);
     const userRevenuePda = findUserRevenuePda(programId, ap.leafOwner);
@@ -165,7 +165,7 @@ describe("Unit G+D — staking gates issue_license", function () {
         creatorHash: ap.creatorHash,
         assetDataHash: ap.assetDataHash ?? new Uint8Array(32),
         flags: ap.flags ?? 0,
-        rootCollection: titleCoreCollection,
+        rootCollection: rootNftCollection,
         licenseMetadataUri: "https://example.com/license.json",
         licenseName: "Test License",
         price: PRICE,
@@ -192,7 +192,7 @@ describe("Unit G+D — staking gates issue_license", function () {
 
   it("unstaked → issue_license が DelegateMismatch で失敗する", async () => {
     // unstake (delegate を owner に戻す)
-    const cur = await fetchAssetWithProof(assetId, dasUrl);
+    const cur = await fetchRootNftProof(assetId, dasUrl);
     if (!cur.leafDelegate.equals(owner.publicKey)) {
       const ix = buildDelegateV2Ix({
         payer: owner.publicKey,

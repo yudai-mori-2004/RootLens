@@ -31,7 +31,7 @@ export {
   getGlobalConfigData,
   getProtocolAddresses,
   findWasmVersionByHash,
-  DAS_RPC_URL,
+  SOLANA_RPC_URL,
   PDQ_THRESHOLD,
 } from "./config";
 export type { GlobalConfigData } from "./config";

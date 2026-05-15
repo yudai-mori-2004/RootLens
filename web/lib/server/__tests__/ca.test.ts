@@ -5,14 +5,15 @@
  * verifyCSR / issueDeviceCertificate / アルゴリズム検証を網羅する。
  */
 
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as x509 from "@peculiar/x509";
 import crypto from "crypto";
 import {
   verifyCSR,
   issueDeviceCertificate,
-  loadPem,
+  loadPemFromEnv,
   _resetCache,
+  _setTestIntermediateCA,
   DEVICE_CERT_VALIDITY_DAYS,
   PKI_ALGORITHM,
 } from "../ca";
@@ -28,6 +29,7 @@ let rootCaKeyPair: CryptoKeyPair;
 let rootCaCert: x509.X509Certificate;
 let icaKeyPair: CryptoKeyPair;
 let icaCert: x509.X509Certificate;
+let icaKeyPem: string;
 
 beforeAll(async () => {
   // Root CA
@@ -76,15 +78,20 @@ beforeAll(async () => {
     ],
   });
 
-  // テスト用PKIを環境変数にセット
-  const icaKeyPkcs8 = await crypto.webcrypto.subtle.exportKey("pkcs8", icaKeyPair.privateKey);
-  const icaKeyPem = `-----BEGIN PRIVATE KEY-----\n${Buffer.from(icaKeyPkcs8).toString("base64").match(/.{1,64}/g)!.join("\n")}\n-----END PRIVATE KEY-----`;
-
+  // Root CA cert は env (公開物なので)
   process.env.ROOT_CA_CERT_PEM = rootCaCert.toString("pem");
-  process.env.ANDROID_INTERMEDIATE_CA_CERT_PEM = icaCert.toString("pem");
-  process.env.ANDROID_INTERMEDIATE_CA_KEY_PEM = icaKeyPem;
-  process.env.IOS_INTERMEDIATE_CA_CERT_PEM = icaCert.toString("pem");
-  process.env.IOS_INTERMEDIATE_CA_KEY_PEM = icaKeyPem;
+
+  // ICA 秘密鍵 PEM — fixture を作って毎 test で _setTestIntermediateCA に渡す
+  const icaKeyPkcs8 = await crypto.webcrypto.subtle.exportKey("pkcs8", icaKeyPair.privateKey);
+  icaKeyPem = `-----BEGIN PRIVATE KEY-----\n${Buffer.from(icaKeyPkcs8).toString("base64").match(/.{1,64}/g)!.join("\n")}\n-----END PRIVATE KEY-----`;
+});
+
+// 各 test 前にキャッシュをリセットしつつ ICA fixture を再注入
+// (= テストでは `keys/` ファイルや env を読まずに in-memory fixture で完結させる)
+beforeEach(async () => {
+  _resetCache();
+  await _setTestIntermediateCA("android", icaCert.toString("pem"), icaKeyPem);
+  await _setTestIntermediateCA("ios", icaCert.toString("pem"), icaKeyPem);
 });
 
 afterEach(() => {
@@ -324,22 +331,16 @@ describe("issueDeviceCertificate", () => {
 // loadPem
 // ---------------------------------------------------------------------------
 
-describe("loadPem", () => {
+describe("loadPemFromEnv", () => {
   it("環境変数から読み込む", () => {
     process.env._TEST_PEM = "test-value";
-    const result = loadPem("_TEST_PEM");
+    const result = loadPemFromEnv("_TEST_PEM");
     expect(result).toBe("test-value");
     delete process.env._TEST_PEM;
   });
 
-  it("環境変数もファイルもない場合にエラー", () => {
-    expect(() => loadPem("_NONEXISTENT_VAR")).toThrow("is not set and fallback not found");
-  });
-
-  it("環境変数がなくファイルもない場合にエラー", () => {
-    expect(() => loadPem("_NONEXISTENT_VAR", "/nonexistent/path.pem")).toThrow(
-      "is not set and fallback not found",
-    );
+  it("環境変数が未設定ならエラー", () => {
+    expect(() => loadPemFromEnv("_NONEXISTENT_VAR")).toThrow("is not set");
   });
 });
 

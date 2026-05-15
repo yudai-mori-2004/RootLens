@@ -12,7 +12,7 @@ import { PublicKey } from "@solana/web3.js";
 
 import {
   buildDelegateV2Ix,
-  fetchAssetWithProof,
+  fetchRootNftProof,
   getConnection,
   getDasUrl,
   loadFixtures,
@@ -46,7 +46,7 @@ describe("Unit G — stake / unstake roundtrip", function () {
   });
 
   it("stake: delegateV2 で leaf.delegate を cosign_authority に切替える", async () => {
-    const before = await fetchAssetWithProof(assetId, dasUrl);
+    const before = await fetchRootNftProof(assetId, dasUrl);
     expect(before.leafOwner.toBase58()).to.equal(leaf.owner);
     // 既に staking 済みなら skip しない (idempotent に再 stake してもよい)
 
@@ -65,7 +65,7 @@ describe("Unit G — stake / unstake roundtrip", function () {
   });
 
   it("unstake: delegateV2 で leaf.delegate を owner 自身に戻す", async () => {
-    const before = await fetchAssetWithProof(assetId, dasUrl);
+    const before = await fetchRootNftProof(assetId, dasUrl);
     expect(before.leafDelegate.toBase58()).to.equal(cosignAuthority.publicKey.toBase58());
 
     const ix = buildDelegateV2Ix({

@@ -41,7 +41,7 @@ following rights on a non-exclusive, worldwide, royalty-free basis:
 
     a. **License reference.** Include in the redistribution payload (e.g.,
        README, LICENSE file, metadata, accompanying manifest) the URL
-       (`license_text_url`) and `keccak256` hash (`license_text_hash`)
+       (`license_text_url`) and `sha256` hash (`license_text_hash`)
        of this license, in human-readable form. The following content
        is illustrative and acceptable:
 
@@ -49,7 +49,7 @@ following rights on a non-exclusive, worldwide, royalty-free basis:
        This data is licensed under RootLens redistribution-v1 license.
        Original License NFT URI: <URI of the originating License NFT>
        License text URL: <license_text_url>
-       License text hash (keccak256): <license_text_hash>
+       License text hash (sha256): <license_text_hash>
        ```
 
     b. **Subject Root NFT reference.** Include in the redistribution

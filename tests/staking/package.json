@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "setup": "node --import tsx/esm setup.ts",
-    "test": "node --import tsx/esm --experimental-vm-modules ./node_modules/mocha/bin/mocha.js --timeout 90000 './*.spec.ts'"
+    "test": "node --import tsx/esm --experimental-vm-modules ./node_modules/mocha/bin/mocha.js --timeout 90000 './*.spec.ts'",
+    "test:e2e": "node --import tsx/esm --experimental-vm-modules ./node_modules/mocha/bin/mocha.js --timeout 120000 03-api-license-issue.spec.ts"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.0",

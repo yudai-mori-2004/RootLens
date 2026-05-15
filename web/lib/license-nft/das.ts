@@ -8,7 +8,7 @@
 
 import { PublicKey } from "@solana/web3.js";
 
-export interface AssetWithProof {
+export interface RootNftProof {
   /** leaf root (32B Merkle root) */
   root: Uint8Array;
   /** leaf data_hash (32B) */
@@ -77,11 +77,11 @@ interface GetAssetProofResult {
   tree_id: string;       // base58
 }
 
-/** 1 リクエストで getAssetWithProof 相当を取得 (ホスト側に getAssetWithProof が無い場合の汎用フォールバック) */
-export async function fetchAssetWithProof(
+/** 1 リクエストで getRootNftProof 相当を取得 (ホスト側に getRootNftProof が無い場合の汎用フォールバック) */
+export async function fetchRootNftProof(
   rpcUrl: string,
   assetIdBase58: string,
-): Promise<AssetWithProof> {
+): Promise<RootNftProof> {
   // 並列で叩く
   const [asset, proof] = await Promise.all([
     rpc<GetAssetResult>(rpcUrl, "getAsset", { id: assetIdBase58 }),

@@ -13,7 +13,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { SignedJson } from "@title-protocol/sdk";
 import type { ContentResolver, ResolvedContent, ExtensionNft } from "../content-resolver";
-import { DAS_RPC_URL, getCollectionMints } from "../config";
+import { SOLANA_RPC_URL, getCollectionMints } from "../config";
 
 const NETWORK = process.env.NEXT_PUBLIC_SOLANA_NETWORK || "devnet";
 
@@ -42,7 +42,7 @@ interface DasAsset {
 }
 
 async function dasGetAsset(assetId: string): Promise<DasAsset | null> {
-  const res = await fetch(DAS_RPC_URL, {
+  const res = await fetch(SOLANA_RPC_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
