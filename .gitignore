@@ -68,8 +68,10 @@ test-ledger/
 keys/
 # Anchor / license-cli が生成する bootstrap config (環境ローカル)
 network.json
-# License tree 等の後続作成 fixtures (テスト用)
+# setup スクリプトが devnet で生成する fixtures (= 各開発者ローカル artifact)。
+# leaf owner の secret key を含むので絶対に commit しない。
 tests/license-nft/fixtures.json
+tests/license-nft/fixtures-canopy.json
 tests/license-nft/node_modules/
 
 # Hand-pose module build artifacts
