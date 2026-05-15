@@ -318,7 +318,7 @@ export async function sendExpectingSuccess(
   return await sendAndConfirmTransaction(conn, tx, signers, { commitment: "confirmed" });
 }
 
-export interface SendError {
+interface SendError {
   /** Anchor #[error_code] の variant 名 (e.g. "InvalidBasisPoints") */
   errorName?: string;
   /** Solana Program Error code (numeric) */
