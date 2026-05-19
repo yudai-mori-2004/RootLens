@@ -1,11 +1,12 @@
 import 'react-native-get-random-values';
 import 'fast-text-encoding';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import {
   useFonts,
   Fraunces_300Light,
@@ -42,6 +43,12 @@ const navTheme = {
 };
 
 export default function App() {
+  // 起動時 baseline: portrait に lock しておく (= 全 screen の既定方向)。
+  // 撮影画面だけ task に応じて override し、 unmount で portrait に戻す。
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+  }, []);
+
   const [fontsLoaded] = useFonts({
     Fraunces_300Light,
     Fraunces_400Regular,

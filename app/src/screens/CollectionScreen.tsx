@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Linking,
-  Pressable,
   RefreshControl,
   SafeAreaView,
   StyleSheet,
@@ -13,31 +11,27 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 import { getDemoWalletPubkey } from '../domain/wallet';
-import { TASKS, type TaskDef } from '../domain/taskCatalog';
+import { ClipCard } from '../components/ClipCard';
+import { StakeSheet } from '../components/StakeSheet';
+import { clipStore, useClips, type Clip } from '../services/clipPipeline';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
-// COLLECTION タブ — 完全 on-chain real data。
+// COLLECTION タブ — 撮影者が自分のクリップを管理する場所。
 //
-//   • supplier wallet の Root NFT (cNFT) を DAS getAssetsByOwner で列挙
-//   • License Collection 配下の全 License NFT を DAS getAssetsByGroup で取得
-//   • License NFT の content.json_uri から `?root_mint=<asset_id>` を parse
-//   • root_asset_id ごとに license 数 + 単価で売上集計
+// SPECS_JA §2.7 のクリップ状態機械を可視化する:
+//   • アップロード中 / 処理中 / 準備完了 / 不合格 / 処理エラー はローカル pipeline (= clipPipeline)
+//     の発火源 (= 撮影完了時の「送る」 押下)
+//   • ステーキング済み はオンチェーン (DAS) からも hydrate される (= 過去にステーキング済みの cNFT)
 //
-// 単価は license URL 内の terms slug から判定:
-//   commercial-v1 → $1.00 USDC (price は License NFT 発行時 program に渡された値)
-//   training-only-v1 → $0.50 USDC
-//
-// price の真値を取りたい場合は将来 License NFT のオンチェーン event / Memo を
-// 引くべきだが、現状 catalog 固定値 = on-chain で支払われた値なのでこれで一致する。
+// 両方を 1 つの Clip[] にマージして ClipCard に渡す。 タップして開く Stake シートは「準備完了」
+// 状態にのみ作用する (= SPECS §4.2 で UI 上の入口がここに統合された)。
 
 const ENV = process.env as Record<string, string | undefined>;
 const DAS_URL =
   ENV.EXPO_PUBLIC_DAS_URL ?? ENV.EXPO_PUBLIC_SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
 
-// 固定の on-chain config (config PDA から読める値を hardcode)。devnet 固定。
 const LICENSE_COLLECTION_MINT = 'BvhuJiTWDW6n5cSzE4XmzYcwLry7vcstS1U7fD7n9N1b';
 
-// License URL → price (USDC)。default catalog と同期させる。
 const LICENSE_PRICE_BY_SLUG: Record<string, number> = {
   'commercial-v1': 1.0,
   'training-only-v1': 0.5,
@@ -56,36 +50,32 @@ function rootMintFromUri(uri: string | null | undefined): string | null {
   return m ? m[1] : null;
 }
 
-interface OwnedAsset {
-  id: string;
+interface OnChainStakedClip {
+  rootAssetId: string;
   delegate: string | null;
   ownerEqualsDelegate: boolean;
   createdAtUnix: number | null;
-}
-
-interface PerClipRevenue {
   licenseCount: number;
   revenueUsdc: number;
 }
 
-// ---- screen -----------------------------------------------------------
-
 export const CollectionScreen: React.FC = () => {
   const ownerPubkey = useMemo(() => getDemoWalletPubkey(), []);
-  const [items, setItems] = useState<OwnedAsset[] | null>(null);
-  // root_asset_id → { count, revenue }
-  const [revenue, setRevenue] = useState<Map<string, PerClipRevenue>>(() => new Map());
-  const [error, setError] = useState<string | null>(null);
+  const pipelineClips = useClips();
+
+  const [onChain, setOnChain] = useState<OnChainStakedClip[] | null>(null);
+  const [onChainError, setOnChainError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchAll = useCallback(async () => {
+  const [stakeTarget, setStakeTarget] = useState<Clip | null>(null);
+
+  const fetchOnChain = useCallback(async () => {
     if (!ownerPubkey) {
-      setItems([]);
+      setOnChain([]);
       return;
     }
-    setError(null);
+    setOnChainError(null);
     try {
-      // 1) Supplier の Root NFT (cNFT) 列挙
       const ownedRes = await fetch(DAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -100,25 +90,7 @@ export const CollectionScreen: React.FC = () => {
       });
       const ownedJson = await ownedRes.json();
       const ownedItems: any[] = ownedJson?.result?.items ?? [];
-      const mapped: OwnedAsset[] = ownedItems
-        .filter((a) => a?.compression?.compressed === true)
-        .map((a) => {
-          const owner = a?.ownership?.owner ?? '';
-          const delegate = a?.ownership?.delegate ?? null;
-          return {
-            id: String(a.id),
-            delegate,
-            ownerEqualsDelegate: !delegate || delegate === owner,
-            createdAtUnix:
-              typeof a?.compression?.created_at === 'number'
-                ? a.compression.created_at
-                : null,
-          };
-        });
-      setItems(mapped);
 
-      // 2) License Collection 配下の全 License NFT を集計 → root_mint で grouping
-      // getAssetsByGroup は page 制で limit max 1000。Devnet で license 数は当面少数なので 1 page 固定。
       const licRes = await fetch(DAS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,68 +106,108 @@ export const CollectionScreen: React.FC = () => {
       const licJson = await licRes.json();
       const licItems: any[] = licJson?.result?.items ?? [];
 
-      const agg = new Map<string, PerClipRevenue>();
+      const rev = new Map<string, { count: number; usdc: number }>();
       for (const lic of licItems) {
         const uri: string | undefined =
           lic?.content?.json_uri ?? lic?.content?.metadata?.uri ?? lic?.content?.links?.uri;
         const rootMint = rootMintFromUri(uri);
         if (!rootMint) continue;
         const price = priceFromUri(uri);
-        const cur = agg.get(rootMint) ?? { licenseCount: 0, revenueUsdc: 0 };
-        cur.licenseCount += 1;
-        cur.revenueUsdc = +(cur.revenueUsdc + price).toFixed(2);
-        agg.set(rootMint, cur);
+        const cur = rev.get(rootMint) ?? { count: 0, usdc: 0 };
+        cur.count += 1;
+        cur.usdc = +(cur.usdc + price).toFixed(2);
+        rev.set(rootMint, cur);
       }
-      setRevenue(agg);
+
+      const mapped: OnChainStakedClip[] = ownedItems
+        .filter((a) => a?.compression?.compressed === true)
+        .map((a) => {
+          const owner: string = a?.ownership?.owner ?? '';
+          const delegate: string | null = a?.ownership?.delegate ?? null;
+          const r = rev.get(String(a.id)) ?? { count: 0, usdc: 0 };
+          return {
+            rootAssetId: String(a.id),
+            delegate,
+            ownerEqualsDelegate: !delegate || delegate === owner,
+            createdAtUnix: typeof a?.compression?.created_at === 'number' ? a.compression.created_at : null,
+            licenseCount: r.count,
+            revenueUsdc: r.usdc,
+          };
+        });
+
+      setOnChain(mapped);
     } catch (e: any) {
-      setError(e?.message ?? String(e));
-      setItems([]);
+      setOnChainError(e?.message ?? String(e));
+      setOnChain([]);
     }
   }, [ownerPubkey]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => { fetchOnChain(); }, [fetchOnChain]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchAll();
+    await fetchOnChain();
     setRefreshing(false);
-  }, [fetchAll]);
+  }, [fetchOnChain]);
 
-  // 集計 (real)
+  // pipeline clips + on-chain clips を 1 つの Clip[] にマージ
+  // ローカル pipeline 内にすでに同じ rootAssetId がある場合は pipeline 側を優先する。
+  const mergedClips: Clip[] = useMemo(() => {
+    const pipelineAssetIds = new Set(
+      pipelineClips.filter((c) => c.rootAssetId).map((c) => c.rootAssetId!),
+    );
+    const onChainOnly: Clip[] = (onChain ?? [])
+      .filter((oc) => !pipelineAssetIds.has(oc.rootAssetId))
+      .map((oc) => ({
+        id: oc.rootAssetId,
+        taskId: '',  // legacy on-chain clip: task association unknown
+        state: 'staked' as const,
+        createdAt: (oc.createdAtUnix ?? 0) * 1000,
+        rootAssetId: oc.rootAssetId,
+        delegate: oc.delegate,
+        licenseCount: oc.licenseCount,
+        revenueUsdc: oc.revenueUsdc,
+      }));
+    return [...pipelineClips, ...onChainOnly].sort((a, b) => b.createdAt - a.createdAt);
+  }, [pipelineClips, onChain]);
+
+  // ヒーロー totals (= 全 staked clip の合算)
   const totals = useMemo(() => {
-    if (!items || items.length === 0) {
-      return { earned: 0, licenses: 0, clips: 0 };
-    }
     let earned = 0;
     let licenses = 0;
-    for (const a of items) {
-      const r = revenue.get(a.id);
-      if (r) {
-        earned += r.revenueUsdc;
-        licenses += r.licenseCount;
+    for (const c of mergedClips) {
+      if (c.state === 'staked') {
+        earned += c.revenueUsdc ?? 0;
+        licenses += c.licenseCount ?? 0;
       }
     }
-    return { earned: +earned.toFixed(2), licenses, clips: items.length };
-  }, [items, revenue]);
+    return { earned: +earned.toFixed(2), licenses, clips: mergedClips.length };
+  }, [mergedClips]);
 
-  // sparkline (cumulative real earnings over clip chronology)
   const spark = useMemo(() => {
-    if (!items || items.length === 0) return null;
+    const staked = mergedClips.filter((c) => c.state === 'staked');
+    if (staked.length === 0) return null;
     let acc = 0;
     const pts: number[] = [];
-    for (const a of [...items].reverse()) {
-      const r = revenue.get(a.id);
-      acc += r?.revenueUsdc ?? 0;
+    for (const c of [...staked].reverse()) {
+      acc += c.revenueUsdc ?? 0;
       pts.push(acc);
     }
     return pts;
-  }, [items, revenue]);
+  }, [mergedClips]);
+
+  const onOpenStake = useCallback((clip: Clip) => setStakeTarget(clip), []);
+  const onRemove = useCallback((clip: Clip) => clipStore.remove(clip.id), []);
+  const onRetry = useCallback((clip: Clip) => clipStore.retry(clip.id), []);
+  const onCloseStake = useCallback(() => setStakeTarget(null), []);
+
+  const loading = onChain === null;
 
   return (
     <SafeAreaView style={styles.root}>
       <FlatList
-        data={items ?? []}
-        keyExtractor={(a) => a.id}
+        data={mergedClips}
+        keyExtractor={(c) => c.id}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />
@@ -205,25 +217,33 @@ export const CollectionScreen: React.FC = () => {
             ownerPubkey={ownerPubkey?.toBase58() ?? null}
             totals={totals}
             spark={spark}
-            loading={items === null}
+            loading={loading}
           />
         }
         ListEmptyComponent={
-          <EmptyState loading={items === null} error={error} hasWallet={!!ownerPubkey} />
+          <EmptyState loading={loading} error={onChainError} hasWallet={!!ownerPubkey} />
         }
         renderItem={({ item }) => (
           <ClipCard
-            asset={item}
-            rev={revenue.get(item.id) ?? null}
+            clip={item}
+            onOpenStake={onOpenStake}
+            onRemove={onRemove}
+            onRetry={onRetry}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+      />
+
+      <StakeSheet
+        visible={stakeTarget !== null}
+        clip={stakeTarget}
+        onClose={onCloseStake}
       />
     </SafeAreaView>
   );
 };
 
-// ---- Hero --------------------------------------------------------------
+// ─── Hero ────────────────────────────────────────────────────────────
 
 const HERO_DECOR = require('../../assets/decor/earnings-stack.png');
 
@@ -250,9 +270,7 @@ const Hero: React.FC<{
           <Text style={styles.heroEyebrow}>LIFETIME EARNINGS</Text>
           <View style={styles.heroNumberRow}>
             <Text style={styles.heroCurrency}>$</Text>
-            <Text style={styles.heroNumber}>
-              {loading ? '—' : totals.earned.toFixed(2)}
-            </Text>
+            <Text style={styles.heroNumber}>{loading ? '—' : totals.earned.toFixed(2)}</Text>
             <Text style={styles.heroUnit}>USDC</Text>
           </View>
           {hasAnyEarnings ? (
@@ -269,13 +287,13 @@ const Hero: React.FC<{
       <View style={styles.statsRow}>
         <StatTile label="LICENSES SOLD" value={loading ? '—' : String(totals.licenses)} accent />
         <View style={styles.statSep} />
-        <StatTile label="CLIPS OWNED" value={loading ? '—' : String(totals.clips)} />
+        <StatTile label="CLIPS" value={loading ? '—' : String(totals.clips)} />
       </View>
 
       <View style={styles.listIntro}>
         <Text style={styles.listIntroLabel}>YOUR CLIPS</Text>
         <Text style={styles.listIntroHint}>
-          On-chain license sales attribute to each clip in real time. Pull to refresh.
+          撮影したクリップはここで状態が見えます。 「準備完了」 のカードをタップするとステーキング画面が開きます。
         </Text>
       </View>
     </View>
@@ -324,75 +342,7 @@ const Sparkline: React.FC<{ points: number[]; width: number; height: number }> =
   );
 };
 
-// ---- Clip Card --------------------------------------------------------
-
-const ClipCard: React.FC<{ asset: OwnedAsset; rev: PerClipRevenue | null }> = ({ asset, rev }) => {
-  const licenseCount = rev?.licenseCount ?? 0;
-  const revenue = rev?.revenueUsdc ?? 0;
-  const open = () =>
-    Linking.openURL(`https://solscan.io/token/${asset.id}?cluster=devnet`).catch(() => {});
-  const recorded = useMemo(() => {
-    if (!asset.createdAtUnix) return null;
-    const d = new Date(asset.createdAtUnix * 1000);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }, [asset.createdAtUnix]);
-
-  return (
-    <Pressable
-      onPress={open}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-    >
-      <View style={styles.thumb}>
-        <Text style={styles.thumbFallback}>cNFT</Text>
-      </View>
-
-      <View style={styles.cardMid}>
-        <Text style={styles.cardName} numberOfLines={1}>
-          {`Clip ${asset.id.slice(0, 4)}…${asset.id.slice(-4)}`}
-        </Text>
-        <View style={styles.cardMeta}>
-          <View
-            style={[
-              styles.statusChip,
-              asset.ownerEqualsDelegate ? styles.statusChipUnstaked : styles.statusChipStaked,
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusChipText,
-                {
-                  color: asset.ownerEqualsDelegate ? colors.textMute : colors.emeraldDeep,
-                },
-              ]}
-            >
-              {asset.ownerEqualsDelegate ? 'NOT STAKED' : 'STAKED'}
-            </Text>
-          </View>
-          {recorded ? <Text style={styles.cardSub}>· {recorded}</Text> : null}
-        </View>
-      </View>
-
-      <View style={styles.cardRight}>
-        <View style={styles.statCol}>
-          <Text style={styles.statColValue}>{licenseCount}</Text>
-          <Text style={styles.statColLabel}>LIC</Text>
-        </View>
-        <View style={styles.statColSep} />
-        <View style={styles.statCol}>
-          <Text style={[
-            styles.statColValue,
-            revenue > 0 ? { color: colors.emeraldDeep } : { color: colors.textFaint },
-          ]}>
-            ${revenue.toFixed(2)}
-          </Text>
-          <Text style={styles.statColLabel}>EARNED</Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-};
-
-// ---- Empty / Error / Loading ------------------------------------------
+// ─── Empty / Error / Loading ─────────────────────────────────────────
 
 const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: boolean }> = ({
   loading, error, hasWallet,
@@ -401,7 +351,7 @@ const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: 
     return (
       <View style={styles.empty}>
         <ActivityIndicator color={colors.ink} />
-        <Text style={styles.emptyText}>Loading from DAS…</Text>
+        <Text style={styles.emptyText}>Loading…</Text>
       </View>
     );
   }
@@ -436,13 +386,13 @@ const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: 
       </Svg>
       <Text style={styles.emptyEyebrow}>NO CLIPS YET</Text>
       <Text style={styles.emptyText}>
-        Pick a job to record your first clip. It will start earning here.
+        Job タブから撮影を始めると、 撮影完了後ここに表示されます。
       </Text>
     </View>
   );
 };
 
-// ---- Styles ------------------------------------------------------------
+// ─── styles ──────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
@@ -475,9 +425,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.card,
   },
-  walletDot: {
-    width: 6, height: 6, borderRadius: 3, backgroundColor: colors.emerald,
-  },
+  walletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.emerald },
   walletPillText: {
     ...typography.mono,
     fontSize: 11,
@@ -497,51 +445,29 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   heroCardLeft: { flex: 1, gap: 4, justifyContent: 'center' },
-  heroEyebrow: {
-    ...typography.label,
-    color: colors.textMute,
-  },
-  heroNumberRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-    marginTop: 4,
-  },
+  heroEyebrow: { ...typography.label, color: colors.textMute },
+  heroNumberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 4 },
   heroCurrency: {
     fontFamily: fonts.serifLight,
-    fontSize: 32,
-    color: colors.ink,
-    lineHeight: 36,
+    fontSize: 32, color: colors.ink, lineHeight: 36,
   },
   heroNumber: {
     fontFamily: fonts.serifLight,
-    fontSize: 56,
-    color: colors.ink,
-    letterSpacing: -1.5,
-    lineHeight: 60,
+    fontSize: 56, color: colors.ink, letterSpacing: -1.5, lineHeight: 60,
   },
   heroUnit: {
     fontFamily: fonts.sansSemibold,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    color: colors.textMute,
-    marginLeft: 6,
-    marginBottom: 6,
+    fontSize: 11, letterSpacing: 1.4, color: colors.textMute,
+    marginLeft: 6, marginBottom: 6,
   },
-  heroDecorWrap: {
-    width: 110,
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  heroDecorWrap: { width: 110, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   heroDecor: { width: '100%', height: '100%' },
 
   statsRow: {
     flexDirection: 'row',
     backgroundColor: colors.card,
     borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1, borderColor: colors.border,
     paddingVertical: spacing.lg,
     ...shadows.card,
   },
@@ -549,109 +475,13 @@ const styles = StyleSheet.create({
   statSep: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
   statValue: {
     fontFamily: fonts.serifMedium,
-    fontSize: 28,
-    color: colors.ink,
-    letterSpacing: -0.5,
+    fontSize: 28, color: colors.ink, letterSpacing: -0.5,
   },
-  statLabel: {
-    ...typography.labelSmall,
-    color: colors.textMute,
-  },
+  statLabel: { ...typography.labelSmall, color: colors.textMute },
 
-  listIntro: {
-    paddingTop: spacing.md,
-    paddingHorizontal: 2,
-    gap: 4,
-  },
-  listIntroLabel: {
-    ...typography.label,
-    color: colors.textMute,
-  },
-  listIntroHint: {
-    ...typography.caption,
-    color: colors.textBody,
-  },
-
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    ...shadows.card,
-  },
-  cardPressed: { backgroundColor: colors.paperDeep },
-
-  thumb: {
-    width: 76,
-    aspectRatio: 1,
-    backgroundColor: colors.paperDeep,
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: spacing.sm,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  thumbFallback: {
-    ...typography.label,
-    color: colors.textMute,
-  },
-
-  cardMid: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    paddingRight: spacing.sm,
-    gap: 4,
-  },
-  cardName: {
-    fontFamily: fonts.mono,
-    fontSize: 13,
-    color: colors.ink,
-    letterSpacing: 0,
-  },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  statusChip: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-  },
-  statusChipStaked: {
-    backgroundColor: colors.emeraldSoft,
-    borderColor: colors.borderEmerald,
-  },
-  statusChipUnstaked: {
-    backgroundColor: 'transparent',
-    borderColor: colors.border,
-  },
-  statusChipText: { ...typography.labelSmall },
-  cardSub: { ...typography.caption, color: colors.textFaint },
-
-  cardRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingRight: spacing.lg,
-    paddingLeft: spacing.sm,
-    borderLeftWidth: 1,
-    borderLeftColor: colors.border,
-    gap: spacing.md,
-  },
-  statCol: { alignItems: 'center', minWidth: 56, gap: 2 },
-  statColSep: { width: 1, height: 30, backgroundColor: colors.border },
-  statColValue: {
-    fontFamily: fonts.serifMedium,
-    fontSize: 18,
-    color: colors.ink,
-    letterSpacing: -0.2,
-  },
-  statColLabel: {
-    ...typography.labelSmall,
-    color: colors.textMute,
-  },
+  listIntro: { paddingTop: spacing.md, paddingHorizontal: 2, gap: 4 },
+  listIntroLabel: { ...typography.label, color: colors.textMute },
+  listIntroHint: { ...typography.caption, color: colors.textBody, lineHeight: 19 },
 
   empty: {
     paddingTop: spacing.xxl,

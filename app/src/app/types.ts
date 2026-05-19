@@ -1,44 +1,18 @@
 // Navigation 型定義。
 //
 // アプリは大きく 2 階層:
-//   • RootStack — Login (1 回だけ) → MainTabs (ベース) → 撮影フロー (Capture..Done)
+//   • RootStack — Login (初回) → MainTabs (= ベース) → TaskBriefing → Capture (撮影終了で Main に戻る)
 //   • MainTabs  — Job / Collection / Settings の 3 タブ
 //
-// 撮影フローの screens は Tab の上に被せる stack screen にしてある。
-// これでフロー中はタブバーが消え、Done で `popToTop` すると Job タブに戻る。
-
-import type { VlmGateResult } from '../services/vlmGate';
+// 撮影フロー (= TaskBriefing と Capture) は Tab の上に被せる stack screen。
+// 撮影完了時は popToTop で Main の Collection タブに自動的に戻る。
+// Review / SignAndMint / Stake / Done は廃止 (= SPECS_JA §2.7 のクリップ状態機械で Collection に統合)。
 
 export type RootStackParamList = {
   Login: undefined;
   Main: undefined; // MainTabs を埋め込むコンテナ画面
+  TaskBriefing: { taskId: string };
   Capture: { taskId: string };
-  Review: {
-    taskId: string;
-    videoUri: string;
-    vlmEnd: VlmGateResult | null;
-    vlmEndError: string | null;
-    durationMs: number;
-  };
-  SignAndMint: {
-    taskId: string;
-    processedVideoUri: string;
-    originalVideoUri: string;
-  };
-  Stake: {
-    taskId: string;
-    rootNftAssetId: string;
-    mintTxSignature: string;
-    contentHash: string;
-    publicUrl: string | null;
-  };
-  Done: {
-    taskId: string;
-    rootNftAssetId: string;
-    contentHash: string;
-    staked: boolean;
-    stakeTxSignature: string | null;
-  };
 };
 
 export type MainTabParamList = {

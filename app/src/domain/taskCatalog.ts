@@ -17,6 +17,13 @@ import type { ImageSourcePropType } from 'react-native';
 
 export type TaskIntensity = 'LIGHT' | 'MEDIUM' | 'HEAVY';
 
+// 撮影時の端末向き。 task ごとに固定。
+// portrait  = 縦長 mount。 体の真下 / 足元 / 手元の縦長物 (vacuum / 読書 / 階段) 向き。
+// landscape = 横長 mount。 目の前で水平に広がる作業 (調理 / 片付け / 組み立て) 向き。
+// 物理 LEFT / RIGHT (= mount を左右どちらに付けるか) は user 任意、 OS の orientation
+// listener で実値を取得して native に渡す。 LEFT / RIGHT 区別は TaskDef に持たない。
+export type TaskOrientation = 'portrait' | 'landscape';
+
 export interface TaskDef {
   id: string;
   name: string;
@@ -28,6 +35,7 @@ export interface TaskDef {
   durationMin: [number, number]; // [min, max]
   reward: number; // USDC
   intensity: TaskIntensity;
+  orientation: TaskOrientation;
 }
 
 export const TASKS: TaskDef[] = [
@@ -46,6 +54,7 @@ export const TASKS: TaskDef[] = [
     durationMin: [5, 10],
     reward: 1.2, // ~7.5 min × $10/hr
     intensity: 'LIGHT',
+    orientation: 'landscape',
   },
   {
     id: 'wash-dishes',
@@ -58,6 +67,7 @@ export const TASKS: TaskDef[] = [
     durationMin: [5, 12],
     reward: 1.4, // ~8.5 min × $10/hr
     intensity: 'MEDIUM',
+    orientation: 'landscape',
   },
   {
     id: 'cook-pasta',
@@ -70,6 +80,7 @@ export const TASKS: TaskDef[] = [
     durationMin: [10, 20],
     reward: 2.5, // ~15 min × $10/hr
     intensity: 'MEDIUM',
+    orientation: 'landscape',
   },
   {
     id: 'vacuum-floor',
@@ -82,6 +93,7 @@ export const TASKS: TaskDef[] = [
     durationMin: [5, 12],
     reward: 1.4, // ~8.5 min × $10/hr
     intensity: 'LIGHT',
+    orientation: 'portrait',
   },
   {
     id: 'make-bed',
@@ -94,6 +106,7 @@ export const TASKS: TaskDef[] = [
     durationMin: [3, 6],
     reward: 0.8, // ~4.5 min × $10/hr
     intensity: 'LIGHT',
+    orientation: 'landscape',
   },
 ];
 

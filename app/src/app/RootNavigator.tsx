@@ -5,19 +5,17 @@ import { navigationHeaderOptions } from '../theme';
 
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
+import { TaskBriefingScreen } from '../screens/TaskBriefingScreen';
 import { CaptureScreen } from '../screens/CaptureScreen';
-import { ReviewScreen } from '../screens/ReviewScreen';
-import { SignAndMintScreen } from '../screens/SignAndMintScreen';
-import { StakeScreen } from '../screens/StakeScreen';
-import { DoneScreen } from '../screens/DoneScreen';
 import { getDemoWalletPubkey } from '../domain/wallet';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// 撮影フロー (Capture..Done) は Tab の上に被せて push する root-stack screen。
-// Done で `popToTop` すると MainTabs の現在タブ (Job) に戻る。
+// 撮影フロー (TaskBriefing → Capture) は MainTabs の上に push する root-stack screen。
+// Capture 完了時 (= 「送る」 押下) は popToTop で MainTabs の Collection タブに戻る。
+// Review / SignAndMint / Stake / Done は廃止 (= SPECS_JA §2.7、 状態は Collection に統合)。
 //
-// initialRoute: env に wallet があれば Main 直行、無ければ Login で wallet 設定を促す。
+// initialRoute: env に wallet があれば Main 直行、 無ければ Login で wallet 設定を促す。
 const initialRoute: 'Main' | 'Login' = getDemoWalletPubkey() ? 'Main' : 'Login';
 
 export const RootNavigator: React.FC = () => (
@@ -25,17 +23,14 @@ export const RootNavigator: React.FC = () => (
     <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
     <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
     <Stack.Screen
+      name="TaskBriefing"
+      component={TaskBriefingScreen}
+      options={{ title: '', presentation: 'card' }}
+    />
+    <Stack.Screen
       name="Capture"
       component={CaptureScreen}
       options={{ title: 'Record', headerShown: false, presentation: 'fullScreenModal' }}
-    />
-    <Stack.Screen name="Review" component={ReviewScreen} options={{ title: 'Review' }} />
-    <Stack.Screen name="SignAndMint" component={SignAndMintScreen} options={{ title: 'Mint' }} />
-    <Stack.Screen name="Stake" component={StakeScreen} options={{ title: 'Stake' }} />
-    <Stack.Screen
-      name="Done"
-      component={DoneScreen}
-      options={{ headerShown: false }}
     />
   </Stack.Navigator>
 );

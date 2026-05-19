@@ -33,7 +33,7 @@ export const JobScreen: React.FC = () => {
         contentContainerStyle={styles.list}
         ListHeaderComponent={<Header />}
         renderItem={({ item }) => (
-          <JobCard task={item} onPress={() => nav.navigate('Capture', { taskId: item.id })} />
+          <JobCard task={item} onPress={() => nav.navigate('TaskBriefing', { taskId: item.id })} />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.lg }} />}
       />
