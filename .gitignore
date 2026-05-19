@@ -72,6 +72,10 @@ network.json
 # leaf owner の secret key を含むので絶対に commit しない。
 tests/license-nft/fixtures.json
 tests/license-nft/fixtures-canopy.json
+
+# Vendored external reference repos (= 開発者ローカル参照、 sub-repo として持つ)。
+# stera-sdk / ml-egodex / VisionProTeleop / Arvos など 600 MB 級なので commit しない。
+references/
 tests/license-nft/node_modules/
 
 # Hand-pose module build artifacts
