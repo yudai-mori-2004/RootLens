@@ -34,16 +34,15 @@ processPrivacyBlur({
 
 ## なぜ顔のみ
 
-SPECS §2.3 step 7 は本来「**顔と OCR テキスト両方**」をブラーすることを要求している。OCR を本ユニットで実装しない理由:
+SPECS §2.5 を 2026-05 に更新し、 「テキストぼかしは行わない」 ことを設計判断として明示した。 業界標準 (= Meta EgoBlur 公式 / Brighter AI / Celantur) も face + license plate のみ。 egocentric 視点の任意シーンテキストを 100% blur する技術は現時点で存在せず (= EasyOCR / DBNet / PP-OCRv5 のいずれも recall 50-70% / false positive 多発)、 「ぼかした」 と claim できない blur は逆に誤解を招く。 個人情報を含む書類・画面の写り込みは scenario design (= 撮影 task の指示) + 撮影者の consent flow で担保する。
+
+参考: iOS 側で試した技術的制約:
 
 1. `VNRecognizeTextRequest` は recognizer であって detector ではない。読めなかった text は output に含まれず、PC 画面のような密集シーンで recall hole が出る
 2. .fast / .accurate どちらも non-frontal な視点 (机上の書類を斜め下から見る、傾いた画面など) で recall が崩れる
 3. 4-pass orientation OCR (0/90/180/270°) を試しても、回転 input でテクスチャ (床の継ぎ目、布の織目) を文字と誤認する false positive が大量に出る
 4. confidence threshold + min text length + minimumTextHeight でフィルタしても recall ↔ false positive のトレードオフは解消しない
-5. 2026 年時点で App Store の任意シーン text 自動 blur アプリは存在しない (Brighter AI / Celantur / CapCut / BlurScreen 全部「手動領域指定」または「顔のみ」)
-6. iOS 26 / WWDC25-26 でも純粋な text-region detector は未提供。`RecognizeDocumentsRequest` は recognizer ベース
-
-production 解は **DBNet または PP-OCRv5_det を CoreML 化する別ユニット** (~1.5-2 週間)。本ユニットはそれを future task と切り分け、顔のみで scope を絞って完成度を上げる。
+5. iOS 26 / WWDC25-26 でも純粋な text-region detector は未提供。`RecognizeDocumentsRequest` は recognizer ベース
 
 ## API (TypeScript)
 
@@ -189,7 +188,7 @@ sandbox 04 のクリップを拾う path は持たない (sandbox 独立性原�
 
 ## スコープ外
 
-- **テキスト blur** — Vision OCR では recall / false positive の両立不可。DBNet/PP-OCRv5_det CoreML 化を別ユニットで作る (future task)
+- **テキスト blur** — §2.5 の設計判断により scope 外 (= future task としても予定しない)。 業界標準と同じく顔のみ
 - **顔以外の身体部位 blur** (体型/手の傷など) — 仕様書で要求されてない
 - **オブジェクト blur** (車のナンバープレート、住所表記の看板) — 仕様書で要求されてない
 - **Android** — 本ユニットは iOS のみ。MediaCodec + GLES + ML Kit で同等パイプラインを組む後続タスク
