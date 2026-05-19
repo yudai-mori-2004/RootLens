@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.env
+.env.local
+.env*.local
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# drizzle migrations は commit する (= git で再現可能)
+# 生成物は無視
+.drizzle-cache/
+
+# Python bytecode (= modal/ 配下に出る)
+__pycache__/
+*.pyc
