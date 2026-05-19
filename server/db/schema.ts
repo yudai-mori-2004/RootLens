@@ -36,13 +36,13 @@ export const clips = pgTable(
     /// 端末から upload された 生 MP4 の sha256 (hex)。 重複検知 + 冪等な workflow キー。
     contentHash: text("content_hash"),
 
-    /// R2 オブジェクトキー。
+    /// R2 オブジェクトキー / プレフィックス。
     rawMp4Key: text("raw_mp4_key"),               // バケット = R2_BUCKET_RAW、 端末 upload された MP4
-    blurredMp4Key: text("blurred_mp4_key"),       // バケット = R2_BUCKET_BLURRED、 サーバ blur 後 (= preview 兼)
-    deliveryMcapKey: text("delivery_mcap_key"),   // バケット = R2_BUCKET_BLURRED、 buyer 配信用 Stera-canonical MCAP
+    blurredMp4Key: text("blurred_mp4_key"),       // バケット = R2_BUCKET_BLURRED、 Pipeline 2 出力 (= preview 兼 dataset RGB ソース)
+    datasetPrefix: text("dataset_prefix"),        // Pipeline 3 出力 (= LeRobot v3 dataset の R2 prefix、 buyer 配信用)。 Pipeline 3 未実行なら NULL
 
-    /// processing 中の現在ステップ (= SPECS_JA §6.2 step 名と一致)。
-    /// 'c2pa-verify' | 'anonymize' | 'derive-manifest' | 'quality-eval' | 'tp-submit' | 'mcap-synthesize' | 'r2-place'
+    /// processing 中の現在ステップ (= Pipeline 2 の進行表示)。
+    /// 'c2pa-verify' | 'anonymize' | 'quality-eval' | 'tp-submit'
     processingStep: text("processing_step"),
 
     /// 品質評価結果 (= SPECS_JA §6.3)。

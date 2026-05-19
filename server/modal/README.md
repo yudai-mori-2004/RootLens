@@ -1,10 +1,15 @@
 # server/modal — Modal 関数
 
-rootlens-server のサーバパイプライン §6.2 ステップ 2 (= 匿名化処理) を Modal の CPU 関数として動かす。
+SPECS §6.2 で定義した 2 つのサーバ側パイプラインを Modal で動かす。
 
-YuNet (= OpenCV 公式同梱の軽量 face detector、 ONNX 232KB) のみ。 テキストぼかしは入れていない (= 業界標準と同じ判断、 詳細は SPECS §2.5 / §2.10)。
+| 関数 | パイプライン | resource | 役割 |
+|---|---|---|---|
+| `blur.py` (= `rootlens-blur`) | Pipeline 2 | CPU 4 / 2 GB | YuNet 顔ぼかし + C2PA 「署名 S」 |
+| `bundle.py` (= `rootlens-bundle`) | Pipeline 3 | CPU 4 / 4 GB (= WiLoR 統合後に GPU 化) | LeRobot v3 dataset 構築 |
 
-GPU は使わない (= YuNet は CPU で 100+ FPS 出る)。 EgoBlur Gen2 を 以前使っていたが Aria 用 Faster-RCNN で 2 FPS / T4 と遅すぎたため、 2026-05 に YuNet へ置換した。
+Pipeline 1 (= 撮影) は端末側、 Modal は触らない。
+
+顔ぼかしは YuNet (= OpenCV 公式同梱、 ONNX 232 KB) のみ。 テキストぼかしは入れていない (= SPECS §2.5、 業界標準と同じ判断)。 GPU 不要 (= YuNet は CPU で 100+ FPS)。 過去に EgoBlur Gen2 を使っていたが Aria 用 Faster-RCNN で 2 FPS / T4 と遅すぎたため YuNet へ置換した。
 
 ## セットアップ (初回のみ)
 

@@ -23,7 +23,7 @@ RootLens の出力を、 そのまま HuggingFace Hub にアップロード可�
 │  処理:                                                                 │
 │    a. 顔ぼかし (= YuNet)                                             │
 │    b. C2PA サーバ署名 「署名 S」 (= SPECS §2.10 段階 1)              │
-│    c. quality score 算出 (= STERA §6.1 と同等の閾値)                 │
+│    c. quality score 算出 (= SPECS §6.3 の閾値)                        │
 │    d. Title Protocol register → Root NFT 発行                        │
 │  Output: blurred-rgb.mp4 へのリンク + quality_score + root_asset_id  │
 └─────────────────────────────────────────────────────────────────────┘
@@ -174,28 +174,19 @@ iOS アプリが 1 セッションごとに以下を出力:
 
 `server/modal/synthesize.py` は廃止 (= 旧 MCAP 合成路は LeRobot v3 に置換)。 `server/lib/r2-keys.ts` の `deliveryMcapKey` は `datasetPrefix` に置換。
 
-## 既存 doc / コードの cleanup
+## 旧 MCAP 合成路の撤去
 
-Stera 互換性は捨てるので、 spec / コード / task doc から下記の表現を全削除:
+旧 spec で 「Stera 互換 MCAP 合成」 と呼んでいたサーバ側ステップは Pipeline 3 (= LeRobot v3 bundle) に置換される。 関連 identifier (= `delivery-mcap`、 `synthesize-clip`、 `mcap-synthesize`) は サーバコードからも撤去。 paper / repo の参考引用としての言及は保持して良い。
 
-- 「Stera 互換 MCAP」
-- 「stera-sdk」 を 我々のサーバ依存として呼ぶ箇所 (= 設計判断の参照として paper / repo を引用するのは可)
-- 「MCAP 合成」 (= LeRobot v3 bundle に置換)
-- 旧 `delivery-mcap` / `synthesize-clip` 等の identifier
+サーバコード側の影響範囲 (= rename / 削除):
 
-対象ファイル (= 11 ファイル):
-
-- `document/v0.1.2/STERA.md` (= 削除候補、 内容を本タスクの reference として吸収後)
-- `document/v0.1.2/SPECS_JA.md`
-- `document/v0.1.2/README.md`
-- `document/v0.1.2/tasks/13-unit-c-privacy-blur/README.md`
-- `document/v0.1.2/tasks/15-stera-baseline-capture/README.md` (= task 名 + 内容を本タスクと整合)
-- `document/v0.1.2/tasks/16-realtime-guide-and-gestures/README.md`
-- `server/modal/synthesize.py`
-- `server/lib/modal.ts`
-- `server/lib/r2-keys.ts`
-- `server/workflow/process-clip.ts`
-- `server/db/schema.ts`
+- `server/modal/synthesize.py` 削除
+- `server/modal/bundle.py` 新設 (= Pipeline 3 関数)
+- `server/lib/modal.ts` の `callSynthesize` → `callBundle`
+- `server/lib/r2-keys.ts` の `deliveryMcapKey` → `datasetPrefix`
+- `server/workflow/process-clip.ts` の step 名 `mcap-synthesize` → `bundle`
+- `server/db/schema.ts` の `delivery_mcap_key` カラム → `dataset_prefix` (= drizzle migration 必要)
+- `server/shared/api-types.ts` / `server/lib/mapper.ts` 上記に追随
 
 ## 成功条件
 

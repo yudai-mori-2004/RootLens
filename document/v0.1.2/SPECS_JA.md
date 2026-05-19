@@ -94,7 +94,7 @@ RootLens が収集するのは、一人称視点で両手が映った家事動�
 
 エゴセントリック視点かつ両手が映る家事動画に撮影対象を限定することで、 プライバシーリスクは構造的に低減される。 カメラは撮影者の手元を向いており、 他者の顔が正面から映ることは少ない。
 
-匿名化処理 (= 顔ぼかし) はすべてサーバ側で実行する。 端末側ではぼかし処理を行わない。 これは「アプリ画面で見たぼかし」 と「公開される配信のぼかし」 がズレるリスクを構造的に排除するため、 また Stera 互換のデータ供給を目指す上で、 ぼかし基準を Stera 圏のサーバ側パイプラインに揃えるためである。
+匿名化処理 (= 顔ぼかし) はすべてサーバ側で実行する。 端末側ではぼかし処理を行わない。 これは「アプリ画面で見たぼかし」 と「公開される配信のぼかし」 がズレるリスクを構造的に排除するため、 また配布データセットで ぼかし基準を統一するためである。
 
 テキスト (= 看板 / 書類 / 画面の文字) のぼかしは行わない。 業界標準 (= Meta EgoBlur 公式 / Brighter AI / Celantur) は face + license plate のみで、 「全シーンテキストの blur」 は egocentric setting で技術的に未解決 (= EasyOCR / DBNet / PP-OCRv5 のいずれも recall 50-70% / false positive 多発で実用にならない)。 個人情報を含む書類・画面の写り込みは scenario design (= 撮影 task の指示と例示) + 撮影者の consent flow で担保する。
 
@@ -736,97 +736,89 @@ RootLens は、delegate されている Root NFT に対応する処理済みの�
 
 販売は、§5.3 の co-sign フローに従い、単一の issue_license トランザクションとして実行される。License NFT の発行、USDC の支払い、収益の分配がアトミックに完了する。
 
-### 6.2 サーバー側処理パイプライン
+### 6.2 処理パイプラインの構成
 
-端末は H.264 MP4 を 1 個アップロードするだけ。 サーバが残りすべて (= 匿名化 / C2PA 署名 / 機械学習による属性抽出 / Stera 互換 MCAP 合成 / TP 提出 / R2 配置) をやる。 「内容は仕様書の範囲外」 として未定義のまま残さない。
+処理は 3 つの独立したパイプラインに分かれる。 各パイプラインは入力に **データへのリンク** を取り、 出力に別のリンクを返す純粋関数として記述される。 互いに疎結合で、 ストレージ実装 (= R2、 S3、 他) には依存しない。
 
-入力: 任意の MP4 (端末撮影、 もしくは外部ソース)。 §2.10 段階 1 では C2PA 署名は無くて良い (= サーバが受領後に署名する)。 段階 2 が稼働すれば端末署名済 MP4 が来るので ingredient として参照する。
-
-#### ステップ 1: C2PA 事前検証
-
-入力 MP4 に C2PA manifest が付いているなら c2pa-rs で検証 (= 署名 D の cert chain を RootLens 認証局までたどる)。 manifest 無し / 不正 → 「サーバ署名 (= 署名 S) のみ」 として処理を続行 (= 段階 1)。 不正な場合のみ処理エラー扱い。
-
-#### ステップ 2: 匿名化処理
-
-ffmpeg pipe で MP4 を raw BGR frame として stream → 各 frame に 顔ぼかし (= YuNet、 OpenCV 公式同梱 ONNX 232 KB) → ffmpeg で H.264 再 encode → **ぼかし済 MP4** を生成。 Modal の CPU 関数として実行 (= GPU 不要、 YuNet は 100+ FPS @ 1080p CPU)。 テキストぼかしは行わない (= §2.5 参照、 業界標準と同じ判断)。
-
-#### ステップ 3: サーバ派生 C2PA 署名
-
-ぼかし済 MP4 に C2PA manifest (= 「署名 S」) を作る:
-
-- ぼかしルールを actions として記録 (= `c2pa.placed.face_blur`)
-- 入力 MP4 に C2PA manifest があったなら ingredient として埋め込み参照 (= ingredient chain で端末由来まで遡れる)
-- RootLens サーバ証明書による署名
-
-#### ステップ 4: 機械学習による属性抽出
-
-ぼかし済 MP4 (= サーバ署名済) を入力に、 機械学習で属性を抽出:
-
-- **手姿勢**: stera-sdk の `HandTracker(model="mediapipe")` で 21 関節を全フレームで検出。 stera-sdk が公開する Stera 互換 schema で構造化
-- **品質スコア**: stera-sdk の `Evaluate` で算出 (= 手の出現率、 同期率、 フレーム欠落数等。 §6.3 参照)
-- 将来追加: 行動ラベル / シーン記述 / 物体検出
-
-これらは VLM の達成確度 (§2.3) とは独立した、 dataset 品質指標。
-
-#### ステップ 5: TP 提出と Root NFT 発行
-
-ぼかし済 MP4 (= 署名 S 付き) を `@title-protocol/sdk` の `TitleClient.register` に渡す:
-
-```typescript
-const result = await client.register({
-  content: signedBlurredMp4Buffer,
-  ownerWallet: clipOwnerPubkey,
-  processorIds: ["core-c2pa"],
-  delegateMint: true,
-});
+```
+Pipeline 1 (撮影)          rgb.mp4 + sensors.jsonl を生成、 アップロード
+                                       ↓
+Pipeline 2 (品質評価)      顔ぼかし + 「署名 S」 + 品質 score + Root NFT 発行
+                                       ↓
+Pipeline 3 (販売データ整形) WiLoR hand pose + LeRobot v3 dataset 構築
 ```
 
-TP の TEE 内で:
-1. 署名 S を c2pa-rs で検証 + ingredient chain walk back
-2. (将来) Extension WASM `rootlens-license-v1` で TEE 署名付き binding metadata 生成
-3. MP4 content hash を `content_hash` とする Root NFT (cNFT) を Solana に発行
+Pipeline 2 と 3 はサーバ側で動く独立した関数。 詳細実装は [tasks/17-dataset-format/README.md](tasks/17-dataset-format/README.md) と [tasks/17-dataset-format/LeRobotDataset v3.md](tasks/17-dataset-format/LeRobotDataset%20v3.md) を参照。 ここでは各パイプラインの責務だけを定義する。
 
-TP の TEE は最後まで RootLens にも TP node 運用者にもコンテンツを開示しない。 結果として配信される Root NFT は、 TP の TEE attestation により content↔cNFT の binding が独立検証可能。
+#### Pipeline 1: 撮影
 
-#### ステップ 6: Stera 互換 MCAP 合成
+端末側で完結。 ARKit で同期した RGB + sensor stream を 1 セッションの単位で記録する。 出力ファイル:
 
-ぼかし済 MP4 + ステップ 4 の手姿勢 / 品質メトリクス + TP の content_hash を入力に、 stera-sdk で **Stera-canonical MCAP** を構築:
+| ファイル | 内容 | 形式 |
+|---|---|---|
+| `rgb.mp4` | エゴセントリック RGB 映像 | H.264, AVAssetWriter, 30 fps |
+| `sensors.jsonl` | per-frame の camera pose / IMU 軽量サンプル / tracking_state | JSON Lines, 30 fps |
+| `imu_high_rate.jsonl` | 100 Hz の IMU 生サンプル | JSON Lines, 100 Hz |
+| `camera_intrinsics.json` | fx / fy / cx / cy + RGB / depth 解像度 | JSON, セッション 1 回 |
+| `depth/{frame_id}.png` | LiDAR depth (= Pro 機のみ、 144×256 16-bit) | PNG, 30 fps |
 
-```python
-session = StreamCreate.from_mp4("blurred.mp4", hand_pose_data, quality_metrics)
-session.add_metadata("root_nft_asset_id", tp_result.root_asset_id)
-session.export("delivery.mcap")
-```
+時刻基準は `ARFrame.timestamp` (= デバイス boot からの経過秒)。 全 stream で共通の値を使い、 後段で frame index 同期できる。
 
-これが買い手配信用の canonical 形式。 stera-sdk を使うことで Stera 圏の dataset と直接互換 (= buyer は stera-sdk でそのまま読める)。
+#### Pipeline 2: 品質評価
 
-#### ステップ 7: R2 配置 + 「準備完了」 遷移
+入力: 生データへのリンク (= Pipeline 1 出力)。
 
-- ぼかし済 MP4 (= preview 兼検証用) → `blurred-mp4/<content_hash>.mp4`
-- 合成 MCAP (= buyer 配信用) → `delivery-mcap/<content_hash>.mcap`
-- 原本 MP4 (= 再処理 buffer 用) → server 内に短期保管 (= MVP では 7 日)
+処理:
 
-R2 配置完了で クリップ状態を「準備完了」 に遷移させ、 §2.9 の通知を撮影者に送る。
+a. **顔ぼかし** ([§2.5](#25-プライバシー保護の所在) 参照)
+   ffmpeg pipe で MP4 を raw BGR frame として stream → 各 frame に YuNet (= OpenCV 同梱、 ONNX 232 KB) → ffmpeg で H.264 再 encode。 CPU で 100+ FPS。
 
-#### 失敗時の再試行と冪等性
+b. **C2PA サーバ署名 「署名 S」** ([§2.10](#210-c2pa-署名の段階) 参照)
+   ぼかし済 MP4 に C2PA manifest を埋め込む。 `c2pa.placed.face_blur` actions、 RootLens サーバ証明書による ES256 署名。 入力 MP4 に端末署名 (= 「署名 D」) があれば ingredient として参照。
 
-全ステップは冪等に設計する: 同じ入力 MP4 に対して同じステップを複数回実行しても結果は同じ。 これにより、 サーバが途中で再起動した場合や、 ネットワーク障害で部分的にステップが失敗した場合に、 安全に再試行できる。
+c. **品質スコア算出** ([§6.3](#63-品質スコアの算出と意味) 参照)
+   ぼかし済 MP4 から手の出現率 / RGB-IMU 同期率 / フレーム欠落数 等を計算、 0〜100 の総合スコアを出す。
 
-具体的には:
+d. **TP 提出と Root NFT 発行**
+   ぼかし済 MP4 (= 署名 S 付き) を `@title-protocol/sdk` の `TitleClient.register` に渡す:
 
-- ステップ 2 のぼかし結果は入力 hash をキーにキャッシュし、 再実行時は前回の結果を返す
-- ステップ 3 の派生 manifest 生成は決定論的
-- ステップ 4 の手姿勢 / 品質スコアは決定論的 (= model 固定 + seed 固定)
-- ステップ 5 の Root NFT 発行は、 既発行 (= 同一 content_hash) があればそれを返すだけで終わる
-- ステップ 6 の MCAP 合成は決定論的
+   ```typescript
+   const result = await client.register({
+     content: signedBlurredMp4Buffer,
+     ownerWallet: clipOwnerPubkey,
+     processorIds: ["core-c2pa"],
+     delegateMint: true,
+   });
+   ```
 
-各ステップの再試行回数は内部設定の上限を持ち、 これを超えた場合はクリップを「処理エラー」 状態に置く。
+   TP の TEE 内で 署名 S を `c2pa-rs` で検証 + ingredient chain walk back し、 MP4 content hash を `content_hash` とする Root NFT (cNFT) を Solana に発行する。 TEE は最後まで RootLens にも TP node 運用者にもコンテンツを開示しないため、 結果として配信される Root NFT は content↔cNFT の binding が独立検証可能。
 
-オーケストレーション層は Vercel Workflow DevKit を用いて、 ステップ間の状態を永続化し、 サーバ再起動を跨いで resume できるようにする。
+出力: ぼかし済 MP4 へのリンク + 品質スコア + root_asset_id。
+
+#### Pipeline 3: 販売データ整形
+
+入力: 生データへのリンク + Pipeline 2 で得た root_asset_id。
+
+処理:
+
+a. **手姿勢推定**
+   ぼかし済 MP4 の各 frame を WiLoR (= 内蔵 YOLO + transformer reconstruction) に入れて、 MANO pose 48-dim + shape 10-dim + 21 keypoint 3D を両手分取得。
+
+b. **per-frame parquet 構築**
+   Pipeline 1 の sensors.jsonl + imu_high_rate.jsonl + depth/* と、 a で得た手姿勢を frame index で結合、 LeRobot v3 の `observation.*` / `action` 列に展開した parquet を生成。 action は両手手首 6-DoF (= 14-dim)、 MANO 全体 / 21 keypoint は `observation.*` に保持。
+
+c. **LeRobot v3 dataset 組み立て**
+   ぼかし済 MP4 を `videos/observation.images.ego_cam/chunk-000/file-000.mp4` に配置、 meta/info.json に Pipeline 2 で得た root_asset_id / content_hash / signed_json_uri 等を `rootlens.*` 拡張として焼く。
+
+出力: LeRobot v3 dataset へのリンク (= `meta/` `data/` `videos/` 一式)。
+
+#### 冪等性
+
+3 パイプラインともに同じ入力に対して同じ出力を返す。 ぼかし結果は入力 hash をキーにキャッシュ、 Root NFT 発行は同一 content_hash の既発行があれば短絡、 LeRobot dataset 構築も決定論的。 ネットワーク障害や中断からの再実行が安全。
 
 ### 6.3 品質スコアの算出と意味
 
-ステップ 4 の品質評価が用いるメトリックは、 STERA.md §6.1 に整理した Stera 圏の運用基準を出発点とする (= 業界互換のため)。 本仕様の具体値は次の通り。
+Pipeline 2 の品質評価が用いるメトリックは、 ego-centric 計測の業界共通ベンチに揃える。 具体値は次の通り。
 
 | メトリック | 高品質 (= 満点側に寄与) |
 |---|---|

@@ -5,14 +5,12 @@
 // クリップ状態 (= SPECS_JA §2.7)
 export type ClipState = "uploading" | "processing" | "ready" | "staked" | "error";
 
-// 処理ステップ (= SPECS_JA §6.2)。 新方針 = MP4 in → server で全部 → Stera MCAP out。
+// 処理ステップ (= SPECS_JA §6.2 Pipeline 2 の進行表示)。
 export type ProcessingStep =
   | "c2pa-verify"         // 端末 C2PA 署名 (= 段階 2 のみ) を事前検証
   | "anonymize"           // ぼかし MP4 生成 + サーバ C2PA 署名 (= 「署名 S」、 段階 1)
   | "quality-eval"        // 品質スコア算出
-  | "tp-submit"           // TitleClient.register で Root NFT 発行
-  | "mcap-synthesize"     // ぼかし MP4 + hand pose → Stera 互換 MCAP 合成
-  | "r2-place";           // 配信 MCAP を R2 に配置
+  | "tp-submit";          // TitleClient.register で Root NFT 発行
 
 export interface ClipDto {
   id: string;

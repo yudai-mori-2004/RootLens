@@ -7,8 +7,8 @@ import { presignBlurredGet } from "@/lib/r2";
 //
 // preview MP4 の事前署名 GET URL を含めるため async。 R2 への signing 計算は CPU only、 1 ms 未満。
 export async function clipToDto(row: Clip): Promise<ClipDto> {
-  // ぼかし済 MP4 (= サーバ blur 出力) を Stake シートで preview する。
-  // 配信用の Stera MCAP とは別、 こちらは撮影者が見るためのもの。
+  // ぼかし済 MP4 (= Pipeline 2 出力) を Stake シートで preview する。
+  // Pipeline 3 の LeRobot dataset とは別、 こちらは撮影者が見るためのもの。
   let previewVideoUrl: string | null = null;
   if (row.blurredMp4Key) {
     try {

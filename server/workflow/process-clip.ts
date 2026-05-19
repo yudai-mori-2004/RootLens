@@ -2,23 +2,24 @@ import { eq } from "drizzle-orm";
 import { FatalError } from "workflow";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
-import { callBlur, callSynthesize } from "@/lib/modal";
+import { callBlur } from "@/lib/modal";
 import { computeQuality, type QualityBreakdown } from "@/lib/quality";
 import { submitToTp } from "@/lib/tp";
-import { rawMp4Key, blurredMp4Key, deliveryMcapKey } from "@/lib/r2-keys";
+import { rawMp4Key, blurredMp4Key } from "@/lib/r2-keys";
 import type { ProcessingStep } from "@/shared/api-types";
 
-// SPECS_JA §6.2 サーバ側処理パイプラインを Vercel Workflow DevKit で実装する。
+// SPECS_JA §6.2 Pipeline 2 (品質評価) を Vercel Workflow DevKit で実装する。
 //
-// 入力: 端末から R2 にアップロードされた 生 MP4 1 個。
+// 入力: 端末から R2 にアップロードされた 生 MP4 1 個 + 並走 sensor stream。
 // 流れ:
-//   1. c2pa-verify     端末署名の事前検証 (= 段階 2 のみ、 MVP は no-op)
-//   2. anonymize       Modal で ぼかし MP4 生成 + サーバ C2PA 署名 (= 「署名 S」)
-//   3. quality-eval    ぼかし MP4 から品質スコア算出
-//   4. tp-submit       TitleClient.register で Root NFT 発行
-//   5. mcap-synthesize Modal で ぼかし MP4 + hand pose → Stera 互換 MCAP 合成
-//   6. r2-place        配信 MCAP 配置完了 (= 既に Modal が R2 に上げているので mark のみ)
-//   7. ready           DB 更新 + 撮影者通知
+//   1. c2pa-verify   端末署名の事前検証 (= 段階 2 のみ、 MVP は no-op)
+//   2. anonymize     Modal で ぼかし MP4 生成 + サーバ C2PA 署名 (= 「署名 S」)
+//   3. quality-eval  ぼかし MP4 から品質スコア算出
+//   4. tp-submit     TitleClient.register で Root NFT 発行
+//   5. ready         DB 更新 + 撮影者通知
+//
+// Pipeline 3 (= LeRobot dataset 整形) は本 workflow に含まない。 ライセンス販売
+// イベントなど Pipeline 2 と独立した契機で `callBundle` を呼ぶ。
 //
 // WDK の規約:
 //   - `"use workflow"` ディレクティブを付けた関数が orchestration
@@ -69,30 +70,14 @@ export async function processClip(input: ProcessClipInput) {
     idempotencyKey: blur.blurredContentHash,
   });
 
-  // ステップ 5: Stera 互換 MCAP 合成 (= Modal で hand pose 抽出 + MCAP 構築)
-  await setStep(input.clipId, "mcap-synthesize");
-  const mcap = await synthesize({
-    clipId: input.clipId,
-    blurredKey: blurredMp4Key(clip.contentHash),
-    outputKey: deliveryMcapKey(clip.contentHash),
-    rootAssetId: tp.rootAssetId,
-    idempotencyKey: blur.blurredContentHash,
-  });
-
-  // ステップ 6: R2 配置 (= Modal が既に upload 済、 mark のみ)
-  await setStep(input.clipId, "r2-place");
-
-  // ステップ 7: 「準備完了」 へ遷移
+  // ステップ 5: 「準備完了」 へ遷移
   await markReady({
     clipId: input.clipId,
     rootAssetId: tp.rootAssetId,
     qualityScore: quality.total,
     qualityBreakdown: quality.breakdown,
     blurredMp4Key: blurredMp4Key(clip.contentHash),
-    deliveryMcapKey: deliveryMcapKey(clip.contentHash),
   });
-
-  void mcap;  // 統計は DB 側では現状未保存、 後で「dataset metric」 として焼く余地あり
 }
 
 // ─── steps (= 永続化される処理単位、 自動 retry) ────────────────────
@@ -157,29 +142,12 @@ async function callTp(args: {
   });
 }
 
-async function synthesize(args: {
-  clipId: string;
-  blurredKey: string;
-  outputKey: string;
-  rootAssetId: string;
-  idempotencyKey: string;
-}) {
-  "use step";
-  return await callSynthesize({
-    blurredKey: args.blurredKey,
-    outputKey: args.outputKey,
-    rootAssetId: args.rootAssetId,
-    idempotencyKey: args.idempotencyKey,
-  });
-}
-
 async function markReady(args: {
   clipId: string;
   rootAssetId: string;
   qualityScore: number;
   qualityBreakdown: QualityBreakdown;
   blurredMp4Key: string;
-  deliveryMcapKey: string;
 }) {
   "use step";
   await db.update(clips)
@@ -196,7 +164,6 @@ async function markReady(args: {
         frameGapCount: args.qualityBreakdown.frameGapCount,
       },
       blurredMp4Key: args.blurredMp4Key,
-      deliveryMcapKey: args.deliveryMcapKey,
       updatedAt: new Date(),
     })
     .where(eq(clips.id, args.clipId));
