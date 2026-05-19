@@ -34,8 +34,9 @@ image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("ffmpeg", "libgl1", "libglib2.0-0")
     .pip_install(
-        "lerobot>=0.4.0",        # LeRobotDataset v3 writer
-        "pyarrow",               # parquet
+        # LeRobot v3 schema 互換の parquet 書き出しは pyarrow + 手書きで完結する。
+        # lerobot pip 本体は WiLoR 統合時に GPU image で追加する (= torch deps が重い)。
+        "pyarrow",
         "numpy<2",
         "opencv-python-headless==4.10.0.84",
         "boto3==1.35.50",
