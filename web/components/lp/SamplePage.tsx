@@ -3,12 +3,9 @@ import s from "./lp.module.css";
 
 const R2_PUBLIC = "https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev/lp-sample/v0.1";
 
-const PREVIEW_EPISODES = [
-  { ep: 0, captionKey: "previewEp0Caption" },
-  { ep: 7, captionKey: "previewEp7Caption" },
-  { ep: 21, captionKey: "previewEp21Caption" },
-  { ep: 44, captionKey: "previewEp44Caption" },
-] as const;
+// キャプションには contributor が付けた task_name を表示しない (= 実映像との乖離が
+// 既に何件か見つかっているため)。 episode index だけ表示し、 実内容は動画再生で確認させる。
+const PREVIEW_EPISODES = [0, 7, 21, 44] as const;
 
 function videoUrl(ep: number): string {
   return `${R2_PUBLIC}/videos/observation.images.ego_cam/chunk-000/episode_${String(ep).padStart(3, "0")}.mp4`;
@@ -85,7 +82,7 @@ export default async function SamplePage() {
               marginTop: 32,
             }}
           >
-            {PREVIEW_EPISODES.map(({ ep, captionKey }) => (
+            {PREVIEW_EPISODES.map((ep) => (
               <figure key={ep} style={{ margin: 0 }}>
                 <video
                   controls
@@ -106,7 +103,7 @@ export default async function SamplePage() {
                     color: "var(--lp-text-secondary)",
                   }}
                 >
-                  episode_{String(ep).padStart(3, "0")} · {t(captionKey)}
+                  episode_{String(ep).padStart(3, "0")}
                 </figcaption>
               </figure>
             ))}
