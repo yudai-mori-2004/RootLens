@@ -164,6 +164,44 @@
       "closingTitle": "See what we have built",
       "closingDesc": "Try a verified photo, explore the code, or read the spec.",
       "closingCtaGithub": "View on GitHub"
+    },
+    "sample": {
+      "meta": {
+        "title": "Sample dataset (v0.1)",
+        "description": "First-person household task footage with face blur, C2PA provenance, and per-frame hand pose. 48 episodes in LeRobotDataset v3.0."
+      },
+      "heroEyebrow": "Public preview",
+      "heroEyebrowDesc": "First-person household task data",
+      "heroTitle": "Sample dataset",
+      "heroSubtitle": "48 episodes of first-person household-task video, with face blur, embedded C2PA provenance, per-frame hand pose, and natural-language phase labels. Open for inspection.",
+      "release": "lp-sample-v0.1",
+      "s1Title": "What's in the box",
+      "s1p1": "For every frame: blurred RGB video, both hands' MANO pose and 3D keypoints, two-hand wrist 6-DoF as the action signal, and the current phase of the action as a natural-language sentence. The dataset follows the LeRobotDataset v3.0 layout, so any LeRobot-compatible loader reads it without custom code.",
+      "s1p2": "Faces are blurred server-side with OpenCV YuNet before encoding. Every MP4 carries an embedded C2PA manifest signed by the RootLens authority, declaring the blur action.",
+      "s2Title": "Phase labels",
+      "s2p1": "Each episode is segmented into 1–9 phases. The frame-level task_index points to a free-form English sentence in meta/tasks.jsonl, in the style of Ego4D narrations.",
+      "s2p2": "Phase strings look like \"Right hand reaches for the kettle handle.\", \"Both hands pour tea into the cup.\", \"Right hand sets the kettle back on the counter.\" Generated with Claude Haiku 4.5 at temperature 0. Vocabulary is open (no fixed closed taxonomy).",
+      "s3Title": "What is NOT in this preview",
+      "s3p1": "These clips were recorded with the stock iPhone Camera app, not the RootLens capture app. So the dataset does not contain IMU, camera 6-DoF in a world frame, ARKit tracking state, LiDAR depth, or any of the ARKit sidecars. These ship with the full app-captured dataset (= a separate, later release).",
+      "s3p2": "Columns that depend on these modalities are simply omitted from the parquet schema rather than zero-filled, so downstream tooling sees a clean schema instead of phantom \"stationary camera\" data.",
+      "s4Title": "Episodes and tasks",
+      "s4p1": "48 episodes recorded in Japan with a single iPhone, all chest-mounted first-person. Tasks include pouring tea, washing a cup, opening and closing doors, hanging clothes, microwave operations, and similar household actions. See the dataset card or meta/tasks.jsonl for the full list.",
+      "s5Title": "Files",
+      "s5p1": "Every file is served directly from a Cloudflare R2 public bucket. The total dataset is about 580 MB.",
+      "ctaReadCard": "Read the dataset card",
+      "ctaDownloadParquet": "Download data parquet",
+      "ctaBrowseTasks": "Browse tasks.jsonl",
+      "ctaInfoJson": "View info.json",
+      "previewHeading": "Inline preview",
+      "previewSubheading": "A few of the 48 episodes, streamed directly from the public bucket.",
+      "previewEp0Caption": "Pour tea into a cup",
+      "previewEp7Caption": "Open the door",
+      "previewEp21Caption": "Hang a sweatshirt on a hanger",
+      "previewEp44Caption": "Take out from microwave",
+      "licenseHeading": "License",
+      "licenseP1": "This preview dataset is provided for evaluation. Reach out to RootLens for licensing terms before any redistribution or model training use.",
+      "faqTechQuestion": "How is the dataset card structured?",
+      "faqTechCta": "Open the README"
     }
   },
   "lp": {
@@ -172,7 +210,8 @@
       "tagline": "Film your day. Train robots. Get paid.",
       "description": "A camera app where anyone can film household tasks and get paid when robot companies license the footage.",
       "ctaDemo": "See how it works",
-      "ctaHow": "Learn more"
+      "ctaHow": "Learn more",
+      "ctaSample": "Browse the sample data"
     },
     "problem": {
       "title": "Robots learn by watching people. But the footage barely exists.",

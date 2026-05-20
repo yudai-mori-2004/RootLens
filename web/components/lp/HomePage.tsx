@@ -36,6 +36,10 @@ export default async function HomePage() {
                 Join the early waitlist
                 <span aria-hidden="true">→</span>
               </a>
+              <a href="/sample" className={s.ctaSecondary}>
+                {tHero("ctaSample")}
+                <span aria-hidden="true">→</span>
+              </a>
             </div>
             <div className={s.storeBadges} style={{ marginTop: 24 }}>
               <div className={s.storeBadge}>
