@@ -173,7 +173,7 @@
       "heroEyebrow": "Public preview",
       "heroEyebrowDesc": "First-person hand-action data",
       "heroTitle": "See what we ship",
-      "heroSubtitle": "Look at the actual dataset before you talk to us. 48 first-person clips of human hands doing real household tasks, with per-frame 3D hand pose and a natural-language description of what's happening on every frame. Watch the videos, download the data, take it apart.",
+      "heroSubtitle": "Look at the actual dataset before you talk to us. 48 first-person clips of human hands doing real household tasks, with per-frame 3D hand pose and a natural-language description of what's happening on every frame. Watch the videos, download the parquet, and dig in.",
       "s1Title": "Built for hand-conditioned models",
       "s1p1": "If you train imitation learning policies, vision-language-action models, or any system that needs to map first-person video to fine-grained hand motion, this is the shape of data you want. Every clip is a short, contiguous task. Every frame ships with both hands' 3D pose, the wrist trajectory, and a sentence describing what the hands are doing right now.",
       "s2Title": "What each frame contains",
@@ -193,7 +193,7 @@
       "ctaBrowseTasks": "Browse the labels",
       "ctaInfoJson": "View info.json",
       "licenseHeading": "License",
-      "licenseP1": "Free to download and inspect for evaluation. If you want to redistribute the data or train a model on it, get in touch and we'll set up a license that fits.",
+      "licenseP1": "Free to download and inspect for evaluation. For redistribution or model training, contact us and we'll set up licensing that fits your use case.",
       "faqTechQuestion": "Want the full schema and design notes?",
       "faqTechCta": "Open the data card"
     }
