@@ -56,7 +56,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const run = await start(processClip, [{ clipId: clip.id }]);
 
   const [updated] = await db.update(clips)
-    .set({ state: "processing", processingStep: "c2pa-verify", workflowRunId: run.runId, updatedAt: new Date() })
+    .set({ state: "processing", processingStep: "anonymize", workflowRunId: run.runId, updatedAt: new Date() })
     .where(eq(clips.id, clip.id))
     .returning();
 

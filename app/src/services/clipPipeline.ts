@@ -7,12 +7,8 @@ import { getDemoWalletPubkey } from '../domain/wallet';
 // クリップの状態機械とパイプラインの抽象。
 //
 // SPECS_JA §2.7 のクリップ状態機械を そのまま型として表現する。
-//
-// バックエンドは 2 つの実装を持つ:
-//   - MockBackend (= 時間経過で状態遷移するモック、 開発初期 / E2E テスト用)
-//   - HttpBackend (= 本物の rootlens-server を叩く、 production)
-// 環境変数 EXPO_PUBLIC_USE_REAL_SERVER === 'true' かつ EXPO_PUBLIC_SERVER_URL があれば
-// HttpBackend を使う。 そうでなければ MockBackend。
+// rootlens-server (= EXPO_PUBLIC_SERVER_URL 必須) に対して 4 ファイル並列 PUT →
+// finalize → polling の流れで状態を hydrate する。
 //
 // 永続化: 進行中 / 準備完了 のクリップは AsyncStorage に保存する
 // (= アプリ再起動後も Collection に表示される)。 ステーキング済みのクリップは
@@ -25,19 +21,18 @@ export type ClipState =
   | 'staked'
   | 'error';
 
+/// サーバ shared/api-types.ts の ProcessingStep と完全一致させる。
 export type ProcessingStep =
-  | 'c2pa-verify'
   | 'anonymize'
-  | 'derive-manifest'
   | 'quality-eval'
-  | 'tp-submit'
-  | 'r2-place';
+  | 'tp-submit';
 
 export interface QualityBreakdown {
-  /// いずれかの手が出ているフレーム比率 (0..1)
-  anyHandRatio: number;
-  /// 両手が出ているフレーム比率 (0..1)
-  twoHandRatio: number;
+  /// いずれかの手が出ているフレーム比率 (0..1)。 Pipeline 2 では未計算で null、
+  /// Pipeline 3 (= WiLoR) 通過後に backfill。
+  anyHandRatio: number | null;
+  /// 両手が出ているフレーム比率 (0..1)。 同上、 Pipeline 3 で backfill。
+  twoHandRatio: number | null;
   /// 深度データが有効なフレーム比率 (0..1)。 LiDAR 非搭載機は null。
   depthValidRatio: number | null;
   /// RGB / 深度 / IMU の同期率 (0..1)
@@ -90,6 +85,9 @@ export interface Clip {
   /// ライセンス販売の集計 (= state === 'staked' の場合)。
   licenseCount?: number;
   revenueUsdc?: number;
+
+  /// state === 'error' のとき、 サーバから返ったエラー内容 (= UX に表示)。
+  errorMessage?: string;
 }
 
 interface EnqueueInput {
@@ -102,27 +100,10 @@ interface EnqueueInput {
   snapshotUri?: string;
 }
 
-// ─── backend selection (= mock / http の切り替え口) ────────────────────
-
-/// 環境変数で active backend を選ぶ。
-/// production では EXPO_PUBLIC_USE_REAL_SERVER=true + EXPO_PUBLIC_SERVER_URL を set。
-/// それ以外 (= 開発初期) は mock。
-function selectBackend(): 'mock' | 'http' {
-  const ENV = process.env as Record<string, string | undefined>;
-  if (ENV.EXPO_PUBLIC_USE_REAL_SERVER === 'true' && ENV.EXPO_PUBLIC_SERVER_URL) {
-    return 'http';
-  }
-  return 'mock';
-}
-
-/// rootlens-server の base URL (= http backend 使用時のみ意味を持つ)。
+/// rootlens-server の base URL。 環境変数 EXPO_PUBLIC_SERVER_URL から取得。
+/// 未設定なら全 API 呼び出しが throw する。
 export function getServerBaseUrl(): string | null {
   return process.env.EXPO_PUBLIC_SERVER_URL ?? null;
-}
-
-/// 現在の active backend モードを返す (= UI で「dev mock 動作中」 を表示したい時等に使う)。
-export function getActiveBackendMode(): 'mock' | 'http' {
-  return selectBackend();
 }
 
 // ─── store 実装 ─────────────────────────────────────────────────────────
@@ -135,7 +116,6 @@ class ClipStore {
   private clips: Map<string, Clip> = new Map();
   private listeners: Set<Listener> = new Set();
   private hydrated = false;
-  private pipelineTimers: Map<string, ReturnType<typeof setTimeout>[]> = new Map();
 
   /// useSyncExternalStore は getSnapshot が安定参照を返すことを要求する。
   /// データ変更があるまで同じ配列インスタンスを返すよう cache する。
@@ -181,8 +161,8 @@ class ClipStore {
     return this.clips.get(id);
   }
 
-  /// 「送る」 で呼ばれる。 アップロード → 処理 → 準備完了 を駆動する。
-  /// active backend = 'http' なら本物の rootlens-server、 'mock' なら時間経過 simulation。
+  /// 「送る」 で呼ばれる。 サーバへ 4 ファイル PUT → finalize → polling で
+  /// uploading → processing → ready を駆動する。 失敗時は state='error' + errorMessage。
   enqueue(input: EnqueueInput): string {
     const id = makeClipId();
     const clip: Clip = {
@@ -198,52 +178,38 @@ class ClipStore {
     this.notify();
     this.persist();
 
-    if (selectBackend() === 'http') {
-      this.httpEnqueue(id, input).catch((e) => {
-        console.warn('[clipPipeline] httpEnqueue failed', e);
-        this.update(id, { state: 'error' });
-      });
-    } else {
-      this.simulatePipeline(id, input.sessionDirUri);
-    }
+    this.httpEnqueue(id, input).catch((e) => {
+      console.warn('[clipPipeline] httpEnqueue failed', e);
+      this.update(id, { state: 'error', errorMessage: errorMessageOf(e) });
+    });
     return id;
   }
 
-  /// ステーキング。 http backend では POST /api/clips/:id/stake、 mock では即時遷移。
+  /// ステーキング。 POST /api/clips/:id/stake を呼んで state を 'staked' に遷移させる。
   async stake(id: string): Promise<void> {
     const clip = this.clips.get(id);
-    if (!clip || clip.state !== 'ready') return;
-
-    if (selectBackend() === 'http') {
-      await this.httpStake(id);
-      return;
+    if (!clip || clip.state !== 'ready') {
+      throw new Error(`Cannot stake from state '${clip?.state ?? 'missing'}'`);
     }
-    // mock: 800ms wait してから state 遷移
-    await new Promise((r) => setTimeout(r, 800));
-    this.update(id, { state: 'staked', delegate: 'rootlens-cosign-authority' });
+    await this.httpStake(id);
   }
 
   /// クリップ削除 (= 不合格 / 処理エラー / 準備完了 状態のクリップを撮影者の意思で消す)
   remove(id: string): void {
-    this.cancelTimers(id);
+    this.stopHttpPolling(id);
     this.clips.delete(id);
     this.notify();
     this.persist();
   }
 
-  /// 処理エラーから撮影者が「もう一度試す」 場合の再投入 (= 本実装ではサーバへ
-  /// 再処理リクエストを送る、 fake では新しいクリップとして simulate しなおす)
-  retry(id: string): void {
+  /// 処理エラーから撮影者が「もう一度試す」 場合の再投入。 サーバ側で
+  /// state を 'processing' に戻し workflow を再起動する。 R2 raw データはそのまま使う。
+  async retry(id: string): Promise<void> {
     const clip = this.clips.get(id);
-    if (!clip) return;
-    if (clip.state !== 'error') return;
-    this.update(id, {
-      state: 'uploading',
-      uploadProgress: 0,
-      qualityScore: undefined,
-      qualityBreakdown: undefined,
-    });
-    this.simulatePipeline(id, '');
+    if (!clip || clip.state !== 'error') {
+      throw new Error(`Cannot retry from state '${clip?.state ?? 'missing'}'`);
+    }
+    await this.httpRetry(id);
   }
 
   // ─── HTTP backend (= 本物の rootlens-server を叩く) ──────────────────
@@ -350,9 +316,36 @@ class ClipStore {
       },
       body: JSON.stringify({}),
     });
-    if (!res.ok) throw new Error(`POST stake failed: ${res.status}`);
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`POST /api/clips/${clipId}/stake failed: ${res.status} ${body.slice(0, 200)}`);
+    }
     const { clip: staked } = await res.json();
     this.applyServerClip(staked);
+  }
+
+  /// 'error' クリップを再投入。 サーバ側で state を 'processing' に戻し workflow を再起動する。
+  private async httpRetry(clipId: string): Promise<void> {
+    const serverUrl = getServerBaseUrl();
+    if (!serverUrl) throw new Error('EXPO_PUBLIC_SERVER_URL not set');
+    const walletPubkey = getDemoWalletPubkey()?.toBase58();
+    if (!walletPubkey) throw new Error('No wallet pubkey available');
+
+    const res = await fetch(`${serverUrl}/api/clips/${clipId}/retry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Wallet-Pubkey': walletPubkey,
+      },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`POST /api/clips/${clipId}/retry failed: ${res.status} ${body.slice(0, 200)}`);
+    }
+    const { clip: retried } = await res.json();
+    this.applyServerClip(retried);
+    this.startHttpPolling(clipId);
   }
 
   private startHttpPolling(clipId: string): void {
@@ -408,6 +401,7 @@ class ClipStore {
       licenseCount: serverClip.licenseCount ?? 0,
       revenueUsdc: serverClip.revenueUsdc ?? 0,
       previewVideoUrl: serverClip.previewVideoUrl ?? undefined,
+      errorMessage: serverClip.errorMessage ?? undefined,
       // uploadProgress は client 側でしか分からないので current 値を保持
       uploadProgress: cur?.uploadProgress,
     };
@@ -452,67 +446,6 @@ class ClipStore {
     }
   }
 
-  private cancelTimers(id: string): void {
-    const ts = this.pipelineTimers.get(id);
-    if (ts) {
-      for (const t of ts) clearTimeout(t);
-      this.pipelineTimers.delete(id);
-    }
-  }
-
-  /// ── fake パイプライン駆動 ──
-  /// アップロード 8 秒 → サーバ処理 6 ステップ × 約 2 秒 = 12 秒 → 必ず ready
-  /// 品質スコアは閾値による棄却を行わないので (= SPECS §6.3)、 状態としては必ず ready に遷移する。
-  /// 本実装では simulatePipeline 全体を WebSocket / SSE / polling で server からの状態を反映するロジックに置き換える。
-  private simulatePipeline(id: string, _mcapUri: string): void {
-    this.cancelTimers(id);
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    this.pipelineTimers.set(id, timers);
-
-    // アップロード進捗 (= 8 秒で 0→1)
-    const uploadMs = 8_000;
-    const uploadStep = 200;
-    let elapsed = 0;
-    const tickUpload = () => {
-      const cur = this.clips.get(id);
-      if (!cur || cur.state !== 'uploading') return;
-      elapsed += uploadStep;
-      const p = Math.min(1, elapsed / uploadMs);
-      this.update(id, { uploadProgress: p });
-      if (p < 1) {
-        timers.push(setTimeout(tickUpload, uploadStep));
-      } else {
-        // → processing
-        const steps: ProcessingStep[] = [
-          'c2pa-verify', 'anonymize', 'derive-manifest', 'quality-eval', 'tp-submit', 'r2-place',
-        ];
-        this.update(id, { state: 'processing', processingStep: steps[0] });
-        let stepIdx = 0;
-        const advance = () => {
-          stepIdx += 1;
-          const cur2 = this.clips.get(id);
-          if (!cur2 || cur2.state !== 'processing') return;
-          if (stepIdx < steps.length) {
-            this.update(id, { processingStep: steps[stepIdx] });
-            timers.push(setTimeout(advance, 2_000));
-          } else {
-            // 全ステップ完了。 必ず ready に遷移 (= 棄却閾値なし)。
-            this.update(id, {
-              state: 'ready',
-              processingStep: undefined,
-              rootAssetId: makeFakeAssetId(),
-              qualityScore: mockQualityScore(),
-              qualityBreakdown: mockQualityBreakdown(),
-              reward: mockReward(),
-              delegate: null,
-            });
-          }
-        };
-        timers.push(setTimeout(advance, 2_000));
-      }
-    };
-    timers.push(setTimeout(tickUpload, uploadStep));
-  }
 }
 
 // ─── ヘルパー ─────────────────────────────────────────────────────────
@@ -521,32 +454,11 @@ function makeClipId(): string {
   return `clip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function makeFakeAssetId(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz123456789';
-  let out = '';
-  for (let i = 0; i < 44; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
-
-function mockQualityScore(): number {
-  // 60〜95 で正規分布気味に
-  return Math.round(60 + Math.random() * 35);
-}
-
-function mockQualityBreakdown(opts: { poor?: boolean } = {}): QualityBreakdown {
-  const poor = opts.poor === true;
-  return {
-    anyHandRatio: poor ? 0.18 : 0.5 + Math.random() * 0.45,
-    twoHandRatio: poor ? 0.08 : 0.25 + Math.random() * 0.5,
-    depthValidRatio: null,  // LiDAR 非搭載 (iPhone 12) を想定
-    syncRatio: 0.8 + Math.random() * 0.2,
-    frameGapCount: poor ? 12 : Math.floor(Math.random() * 3),
-  };
-}
-
-function mockReward(): ClipReward {
-  const low = 0.6 + Math.random() * 0.6;
-  return { rangeUsdcLow: +low.toFixed(2), rangeUsdcHigh: +(low + 0.8 + Math.random() * 1.2).toFixed(2) };
+/// 例外 / 文字列 / 任意値 を UI 向けの 1 行 message に正規化。
+function errorMessageOf(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'string') return e;
+  try { return JSON.stringify(e); } catch { return String(e); }
 }
 
 // ─── singleton + React hooks ───────────────────────────────────────────
@@ -585,29 +497,23 @@ export function describeState(s: ClipState): string {
 
 export function describeProcessingStep(step: ProcessingStep | undefined): string {
   switch (step) {
-    case 'c2pa-verify':     return '署名を事前検証中';
-    case 'anonymize':       return '顔と文字をぼかし中';
-    case 'derive-manifest': return '派生 C2PA 署名を生成中';
+    case 'anonymize':       return '顔をぼかし中';
     case 'quality-eval':    return '品質を評価中';
     case 'tp-submit':       return 'TP に提出して Root NFT 発行中';
-    case 'r2-place':        return '配信ストレージに配置中';
     default:                return '';
   }
 }
 
 export function processingStepIndex(step: ProcessingStep | undefined): number {
   switch (step) {
-    case 'c2pa-verify':     return 1;
-    case 'anonymize':       return 2;
-    case 'derive-manifest': return 3;
-    case 'quality-eval':    return 4;
-    case 'tp-submit':       return 5;
-    case 'r2-place':        return 6;
+    case 'anonymize':       return 1;
+    case 'quality-eval':    return 2;
+    case 'tp-submit':       return 3;
     default:                return 0;
   }
 }
 
-export const PROCESSING_TOTAL_STEPS = 6;
+export const PROCESSING_TOTAL_STEPS = 3;
 
 // File 一時的に保持する不要 export 防止のため、 ensure unused warning ガード
 void FileSystem;

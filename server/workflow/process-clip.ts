@@ -12,11 +12,12 @@ import type { ProcessingStep } from "@/shared/api-types";
 //
 // 入力: 端末から R2 にアップロードされた 生 MP4 1 個 + 並走 sensor stream。
 // 流れ:
-//   1. c2pa-verify   端末署名の事前検証 (= 段階 2 のみ、 MVP は no-op)
-//   2. anonymize     Modal で ぼかし MP4 生成 + サーバ C2PA 署名 (= 「署名 S」)
-//   3. quality-eval  ぼかし MP4 から品質スコア算出
-//   4. tp-submit     TitleClient.register で Root NFT 発行
-//   5. ready         DB 更新 + 撮影者通知
+//   1. anonymize     Modal で ぼかし MP4 生成 + サーバ C2PA 署名 (= 「署名 S」)
+//   2. quality-eval  sensors.jsonl から品質スコア算出
+//   3. tp-submit     TitleClient.register で Root NFT 発行
+//   4. ready         DB 更新
+//
+// 端末 C2PA 署名 (= 段階 2) は今後の追加。 該当 step は導入時に再度追加する。
 //
 // Pipeline 3 (= LeRobot dataset 整形) は本 workflow に含まない。 ライセンス販売
 // イベントなど Pipeline 2 と独立した契機で `callBundle` を呼ぶ。
@@ -40,11 +41,7 @@ export async function processClip(input: ProcessClipInput) {
     throw new FatalError(`Clip ${input.clipId} missing contentHash / rawMp4Key`);
   }
 
-  // ステップ 1: 端末 C2PA 事前検証 (= MVP は no-op、 段階 2 で実装)
-  await setStep(input.clipId, "c2pa-verify");
-  await verifyDeviceC2pa({ clipId: input.clipId, rawMp4Key: clip.rawMp4Key });
-
-  // ステップ 2: 匿名化 + サーバ派生 C2PA 署名 (= Modal が一括で実施)
+  // ステップ 1: 匿名化 + サーバ派生 C2PA 署名 (= Modal が一括で実施)
   await setStep(input.clipId, "anonymize");
   const blur = await runBlur({
     clipId: input.clipId,
@@ -53,14 +50,14 @@ export async function processClip(input: ProcessClipInput) {
     outputKey: blurredMp4Key(clip.contentHash),
   });
 
-  // ステップ 3: 品質評価
+  // ステップ 2: 品質評価
   await setStep(input.clipId, "quality-eval");
   const quality = await evalQuality({
     clipId: input.clipId,
-    blurredKey: blurredMp4Key(clip.contentHash),
+    contentHash: clip.contentHash,
   });
 
-  // ステップ 4: TP submission + Root NFT 発行
+  // ステップ 3: TP submission + Root NFT 発行
   await setStep(input.clipId, "tp-submit");
   const tp = await callTp({
     clipId: input.clipId,
@@ -70,7 +67,7 @@ export async function processClip(input: ProcessClipInput) {
     idempotencyKey: blur.blurredContentHash,
   });
 
-  // ステップ 5: 「準備完了」 へ遷移
+  // ステップ 4: 「準備完了」 へ遷移
   await markReady({
     clipId: input.clipId,
     rootAssetId: tp.rootAssetId,
@@ -96,13 +93,6 @@ async function setStep(clipId: string, step: ProcessingStep) {
     .where(eq(clips.id, clipId));
 }
 
-async function verifyDeviceC2pa(_args: { clipId: string; rawMp4Key: string }) {
-  "use step";
-  // MVP: 端末 C2PA 署名 (= 段階 2) は未実装、 ここは no-op。
-  // 段階 2 が動き始めたら c2pa-rs (= node binding) で MP4 manifest を verify し、
-  // 不正なら FatalError を throw して workflow 中断。
-}
-
 async function runBlur(args: {
   clipId: string;
   contentHash: string;
@@ -117,9 +107,9 @@ async function runBlur(args: {
   });
 }
 
-async function evalQuality(args: { clipId: string; blurredKey: string }) {
+async function evalQuality(args: { clipId: string; contentHash: string }) {
   "use step";
-  return await computeQuality({ blurredR2Key: args.blurredKey });
+  return await computeQuality({ contentHash: args.contentHash });
 }
 
 async function callTp(args: {
@@ -168,5 +158,5 @@ async function markReady(args: {
     })
     .where(eq(clips.id, args.clipId));
 
-  // TODO: Expo Push 通知発火
+  // Push 通知は持っていない。 端末は 2 秒 polling で ready を拾う (= clipPipeline.startHttpPolling)。
 }

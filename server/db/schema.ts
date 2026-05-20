@@ -42,14 +42,16 @@ export const clips = pgTable(
     datasetPrefix: text("dataset_prefix"),        // Pipeline 3 出力 (= LeRobot v3 dataset の R2 prefix、 buyer 配信用)。 Pipeline 3 未実行なら NULL
 
     /// processing 中の現在ステップ (= Pipeline 2 の進行表示)。
-    /// 'c2pa-verify' | 'anonymize' | 'quality-eval' | 'tp-submit'
+    /// 'anonymize' | 'quality-eval' | 'tp-submit'
     processingStep: text("processing_step"),
 
     /// 品質評価結果 (= SPECS_JA §6.3)。
     qualityScore: integer("quality_score"),
+    /// anyHandRatio / twoHandRatio は Pipeline 2 では計算しない (= 手検出は Pipeline 3 の
+     /// WiLoR でしか行わない)。 Pipeline 2 では null、 Pipeline 3 実行後に backfill する。
     qualityBreakdown: jsonb("quality_breakdown").$type<{
-      anyHandRatio: number;
-      twoHandRatio: number;
+      anyHandRatio: number | null;
+      twoHandRatio: number | null;
       depthValidRatio: number | null;
       syncRatio: number;
       frameGapCount: number;

@@ -7,8 +7,7 @@ export type ClipState = "uploading" | "processing" | "ready" | "staked" | "error
 
 // 処理ステップ (= SPECS_JA §6.2 Pipeline 2 の進行表示)。
 export type ProcessingStep =
-  | "c2pa-verify"         // 端末 C2PA 署名 (= 段階 2 のみ) を事前検証
-  | "anonymize"           // ぼかし MP4 生成 + サーバ C2PA 署名 (= 「署名 S」、 段階 1)
+  | "anonymize"           // ぼかし MP4 生成 + サーバ C2PA 署名 (= 「署名 S」)
   | "quality-eval"        // 品質スコア算出
   | "tp-submit";          // TitleClient.register で Root NFT 発行
 
@@ -20,9 +19,10 @@ export interface ClipDto {
   achievementConfidence: number | null;
   processingStep: ProcessingStep | null;
   qualityScore: number | null;
+  /// anyHandRatio / twoHandRatio は Pipeline 2 では未計算 (= null)、 Pipeline 3 で WiLoR 通過後に backfill。
   qualityBreakdown: {
-    anyHandRatio: number;
-    twoHandRatio: number;
+    anyHandRatio: number | null;
+    twoHandRatio: number | null;
     depthValidRatio: number | null;
     syncRatio: number;
     frameGapCount: number;
@@ -100,4 +100,10 @@ export interface StakeResponse {
 /// 撮影者がクリップを破棄する。 ready 以下は server 側でも削除、 staked は不可。
 export interface DeleteClipResponse {
   ok: true;
+}
+
+/// POST /api/clips/:id/retry
+/// state='error' のクリップを再処理する。 R2 の raw 5 ファイルはそのまま残ってる前提。
+export interface RetryResponse {
+  clip: ClipDto;
 }

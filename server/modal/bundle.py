@@ -102,11 +102,10 @@ def _extract_hand_observations(rgb_bgr) -> dict:
     import numpy as np
 
     pipe = get_wilor_pipeline()
-    try:
-        outputs = pipe.predict(rgb_bgr)
-    except Exception as e:
-        print(f"[bundle] wilor predict failed: {e}")
-        outputs = []
+    # 失敗は propagate する。 silent zeros で 504/504 frames が "未検出" として通る
+    # silent-failure を避けたい (= GPU OOM や input shape ミスをここで検知)。
+    # 「detection が無かった」 は outputs == [] で表現され throw されない。
+    outputs = pipe.predict(rgb_bgr)
 
     # 既定値 (= 未検出 frame は zeros)
     zeros_kp = [[0.0, 0.0, 0.0] for _ in range(21)]

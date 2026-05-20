@@ -188,7 +188,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
 
     let mp4URL = sessionDir.appendingPathComponent("rgb.mp4")
-    try? FileManager.default.removeItem(at: mp4URL)
+    try removeIfExists(at: mp4URL)
 
     let writer = try AVAssetWriter(outputURL: mp4URL, fileType: .mp4)
     // 6 Mbps target (= 60fps 1080p で十分な品質、 5 分動画で ~225 MB)。
@@ -226,8 +226,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // sensor stream の出力 file を準備
     let sensorsURL = sessionDir.appendingPathComponent("sensors.jsonl")
     let imuURL = sessionDir.appendingPathComponent("imu_high_rate.jsonl")
-    try? FileManager.default.removeItem(at: sensorsURL)
-    try? FileManager.default.removeItem(at: imuURL)
+    try removeIfExists(at: sensorsURL)
+    try removeIfExists(at: imuURL)
     FileManager.default.createFile(atPath: sensorsURL.path, contents: nil)
     FileManager.default.createFile(atPath: imuURL.path, contents: nil)
     let sensorsHandle = try FileHandle(forWritingTo: sensorsURL)
@@ -235,7 +235,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
     // depth ディレクトリ (= Pro 機の sceneDepth は LiDAR、 非 Pro 機では空のまま)
     let depthDir = sessionDir.appendingPathComponent("depth")
-    try? FileManager.default.removeItem(at: depthDir)
+    try removeIfExists(at: depthDir)
     try FileManager.default.createDirectory(at: depthDir, withIntermediateDirectories: true)
 
     // camera_intrinsics.json は intrinsics 確定するまで待ちたいので、 初回 frame で書く
@@ -275,12 +275,18 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     group.wait()
 
-    // sensor file は sensorFileQueue 上で書いてるので、 そこでの flush を待ってから close する
+    // sensor file は sensorFileQueue 上で書いてるので、 そこでの flush を待ってから close する。
+    // sync を欠かすと データが途中で切れる (= 不正データ) ので、 失敗時は必ず throw して呼び出し元に伝える。
+    var sensorCloseError: Error?
     sensorFileQueue.sync {
-      try? self.sensorsFileHandle?.synchronize()
-      try? self.sensorsFileHandle?.close()
-      try? self.imuFileHandle?.synchronize()
-      try? self.imuFileHandle?.close()
+      do {
+        try self.sensorsFileHandle?.synchronize()
+        try self.sensorsFileHandle?.close()
+        try self.imuFileHandle?.synchronize()
+        try self.imuFileHandle?.close()
+      } catch {
+        sensorCloseError = error
+      }
     }
 
     self.assetWriter = nil
@@ -297,7 +303,21 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       throw writer.error ?? NSError(domain: "ArkitCaptureController", code: 5,
                                     userInfo: [NSLocalizedDescriptionKey: "writer failed"])
     }
+    if let sensorCloseError {
+      throw NSError(domain: "ArkitCaptureController", code: 6,
+                    userInfo: [
+                      NSLocalizedDescriptionKey: "sensor file close failed: \(sensorCloseError.localizedDescription)",
+                      NSUnderlyingErrorKey: sensorCloseError,
+                    ])
+    }
     return dir
+  }
+
+  /// 存在しなければ no-op、 存在すれば throw 込みで削除する。 try? の代わりに使う。
+  private func removeIfExists(at url: URL) throws {
+    if FileManager.default.fileExists(atPath: url.path) {
+      try FileManager.default.removeItem(at: url)
+    }
   }
 
   // MARK: - sensor JSONL writers

@@ -273,8 +273,16 @@ const BlurPreviewPlayer: React.FC<{
 
 const QualityBreakdownDisplay: React.FC<{ breakdown: QualityBreakdown }> = ({ breakdown }) => {
   const rows: Array<{ label: string; ratio: number | null; raw?: string }> = [
-    { label: 'いずれかの手の出現率', ratio: breakdown.anyHandRatio },
-    { label: '両手の出現率', ratio: breakdown.twoHandRatio },
+    {
+      label: 'いずれかの手の出現率',
+      ratio: breakdown.anyHandRatio,
+      raw: breakdown.anyHandRatio === null ? '販売準備時に算出' : undefined,
+    },
+    {
+      label: '両手の出現率',
+      ratio: breakdown.twoHandRatio,
+      raw: breakdown.twoHandRatio === null ? '販売準備時に算出' : undefined,
+    },
     { label: '深度データ有効率', ratio: breakdown.depthValidRatio, raw: breakdown.depthValidRatio === null ? '対応端末なし' : undefined },
     { label: 'RGB / 深度 / IMU の同期率', ratio: breakdown.syncRatio },
     { label: 'フレーム欠落数', ratio: null, raw: `${breakdown.frameGapCount} 個` },

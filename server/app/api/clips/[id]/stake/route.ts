@@ -10,10 +10,11 @@ interface Ctx { params: Promise<{ id: string }> }
 
 // POST /api/clips/:id/stake
 //
-// MVP 実装: state を 'staked' に遷移、 mock の delegate アドレスを焼く。
-// 本実装: Bubblegum の delegate 命令の tx を build + 部分署名して返し、 端末が wallet
-// 署名してネットワーク送信する。 サーバ側は co-sign の policy 検証 (= ToS 同意済か、
-// クリップ owner と signer が一致するか) を行う。
+// Bubblegum delegate を サーバ side で焼き込む簡易版。 ROOTLENS_COSIGN_DELEGATE
+// (= base58 pubkey) が必須。 未設定なら 501 で fail-loud (= silent mock を作らない)。
+// 本実装では Bubblegum の delegate instruction の tx を build + 部分署名して
+// 端末へ返し、 端末 wallet 署名 + network 送信に切り替える。 その時 server は
+// co-sign の policy 検証 (= ToS 同意済か、 owner と signer が一致するか) を行う。
 export async function POST(req: Request, ctx: Ctx) {
   let walletPubkey: string;
   try {
@@ -22,6 +23,17 @@ export async function POST(req: Request, ctx: Ctx) {
     return r as Response;
   }
   const { id } = await ctx.params;
+
+  const cosignDelegate = process.env.ROOTLENS_COSIGN_DELEGATE;
+  if (!cosignDelegate) {
+    return NextResponse.json(
+      {
+        error:
+          "ROOTLENS_COSIGN_DELEGATE is not set. Configure the Bubblegum cosign delegate pubkey to enable staking.",
+      },
+      { status: 501 },
+    );
+  }
 
   const rows = await db.select().from(clips)
     .where(and(eq(clips.id, id), eq(clips.walletPubkey, walletPubkey)))
@@ -38,11 +50,10 @@ export async function POST(req: Request, ctx: Ctx) {
     );
   }
 
-  // MVP mock: delegate を固定文字列に設定。 本実装では tx 構築 + co-sign。
   const [updated] = await db.update(clips)
     .set({
       state: "staked",
-      delegate: process.env.ROOTLENS_COSIGN_DELEGATE ?? "rootlens-cosign-authority",
+      delegate: cosignDelegate,
       updatedAt: new Date(),
     })
     .where(eq(clips.id, clip.id))

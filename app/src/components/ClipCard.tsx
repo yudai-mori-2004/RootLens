@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import type { Clip } from '../services/clipPipeline';
-import { describeProcessingStep, processingStepIndex } from '../services/clipPipeline';
+import { describeProcessingStep, processingStepIndex, PROCESSING_TOTAL_STEPS } from '../services/clipPipeline';
 import { findTask, type TaskDef } from '../domain/taskCatalog';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
@@ -135,7 +135,7 @@ const UploadingCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onRemove?
 // ─── 処理中 ────────────────────────────────────────────────────────────
 
 const ProcessingCard: React.FC<{ clip: Clip; task: TaskDef | undefined }> = ({ clip, task }) => {
-  const stepIdx = processingStepIndex(clip.processingStep);  // 1..4
+  const stepIdx = processingStepIndex(clip.processingStep);  // 1..3
   const stepLabel = describeProcessingStep(clip.processingStep);
   // 現在ステップの dot を pulse
   const pulse = useRef(new Animated.Value(0)).current;
@@ -155,9 +155,9 @@ const ProcessingCard: React.FC<{ clip: Clip; task: TaskDef | undefined }> = ({ c
       <TaskThumb task={task} />
       <View style={styles.cardMid}>
         <TaskName clip={clip} task={task} />
-        <Text style={styles.eyebrowMuted}>処理中 ({stepIdx}/4) · {stepLabel}</Text>
+        <Text style={styles.eyebrowMuted}>処理中 ({stepIdx}/{PROCESSING_TOTAL_STEPS}) · {stepLabel}</Text>
         <View style={styles.dotRow}>
-          {[1, 2, 3, 4].map((i) => {
+          {Array.from({ length: PROCESSING_TOTAL_STEPS }, (_, i) => i + 1).map((i) => {
             const isDone = i < stepIdx;
             const isCurrent = i === stepIdx;
             return (

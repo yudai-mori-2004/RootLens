@@ -1,8 +1,8 @@
 # rootlens-server
 
-RootLens のクライアント (= モバイルアプリ) からのクリップアップロード、 サーバ側パイプライン (= ぼかし、 派生 C2PA 署名、 品質評価、 TP 提出、 R2 配置)、 ステーキング API を提供する Next.js (App Router) サーバ。
+RootLens のクライアント (= モバイルアプリ) からのクリップアップロード、 サーバ側パイプライン (= ぼかし + C2PA 署名 S、 品質評価、 TP 提出)、 ステーキング API を提供する Next.js (App Router) サーバ。
 
-SPECS_JA §2.7 (= クリップ状態機械) と §6.2 (= 6 ステップサーバパイプライン) を実装する。
+SPECS_JA §2.7 (= クリップ状態機械) と §6.2 (= サーバパイプライン) を実装する。
 
 ## アーキテクチャ
 
@@ -17,18 +17,15 @@ SPECS_JA §2.7 (= クリップ状態機械) と §6.2 (= 6 ステップサーバ
 mobile client                  vercel server                    external
 ─────────────                  ─────────────                    ────────
 POST /api/clips             ───►  insert clip (uploading)
-                              ◄── presigned PUT URL
-PUT R2 (raw MCAP)           ─────────────────────────────────►  Cloudflare R2
+                              ◄── presigned PUT URL (4 files)
+PUT R2 (rgb.mp4 + sensors)   ────────────────────────────────►  Cloudflare R2
 POST /api/clips/:id/finalize ──►  workflow start (processing)
                                     │
-                                    │ step 1: c2pa-verify
-                                    │ step 2: anonymize          ───► Modal (GPU)
-                                    │ step 3: derive-manifest    ───► c2pa-rs
-                                    │ step 4: quality-eval       ───► Modal
-                                    │ step 5: tp-submit          ───► Title Protocol
-                                    │ step 6: r2-place
+                                    │ step 1: anonymize          ───► Modal (CPU, YuNet + C2PA 署名 S)
+                                    │ step 2: quality-eval       ───► R2 から sensors.jsonl を読んで集計
+                                    │ step 3: tp-submit          ───► Title Protocol
                                     ▼ ready
-                                    push 通知 → 端末
+GET /api/clips/:id (poll)   ◄───  ready 状態を 2 秒間隔 polling
 POST /api/clips/:id/stake   ───►  Bubblegum delegate            ───► Solana
 ```
 
@@ -125,25 +122,30 @@ server/
 
 ## 開発の進め方
 
-MVP 実装は以下の順で進める想定:
+下記が本物化済 / 未完の差分。 silent stub は除去済 (= 未配線なら fail-loud で落ちる)。
 
-1. **stub で動かす** (現状) — `lib/c2pa.ts` `lib/quality.ts` `lib/tp.ts` `lib/modal.ts` はすべて stub。 workflow を起動するとモック値で `ready` に遷移する
-2. **R2 を本物化** — Cloudflare アカウント + access key を `.env` に入れて、 PUT / GET の事前署名 URL を実際に発行
-3. **Modal で blur 関数を deploy** — Python で YuNet 顔ぼかし関数を書いて modal deploy
-4. **Modal で quality eval 関数を deploy** — MCAP 解析 + メトリクス算出
-5. **c2pa-rs Node binding を整える** — `lib/c2pa.ts` で実際に派生 manifest 生成 + R2 に再 PUT
-6. **TP を本物化** — `../title-protocol/` を deploy 済の endpoint に向ける
-7. **stake を本物化** — Bubblegum delegate tx の build + co-sign
-8. **観測整備** — Vercel Logs + Sentry 等で各 step のメトリクスを取る
+実装済:
+- R2 presigned URL 発行 / GET / PUT
+- Modal blur (= YuNet + C2PA 「署名 S」) を呼ぶ wiring
+- 品質評価 (= R2 raw bucket から sensors.jsonl を読んで syncRatio / frameGapCount / depthValidRatio を算出。 手検出率は Pipeline 3 で backfill)
+- TP register (= `../title-protocol/` の SDK 経由)
+- ステーキング (= ROOTLENS_COSIGN_DELEGATE を delegate に焼く。 未設定なら 501)
+- 'error' クリップの再投入 (= POST /api/clips/:id/retry)
+
+未完 / 次の作業:
+- 端末 C2PA 「署名 A」 の verify (= 段階 2 で追加。 現状 workflow に該当 step は無い)
+- Bubblegum delegate instruction の tx 構築 + 端末側 wallet 署名 + 送信 (= 現状はサーバが delegate アドレスを直接焼く簡易版)
+- Expo Push 通知 (= 現状クライアントは 2 秒 polling)
+- Pipeline 3 (= LeRobot dataset 整形) の Modal `bundle.py` を販売時に走らせる orchestration
 
 ## クライアント側との結合
 
-クライアント (= `../app/src/services/clipPipeline.ts`) はモックパイプラインを内蔵している。 本サーバが稼働したら、 同 file の `enqueue` / `simulatePipeline` を HTTP 呼び出しに切り替える。 API 型は `shared/api-types.ts` で揃えてある。
+クライアント (= `../app/src/services/clipPipeline.ts`) は本サーバを HTTP で叩く。 `EXPO_PUBLIC_SERVER_URL` 未設定なら即 throw する (= mock fallback は持たない)。 API 型は `shared/api-types.ts` で揃えてある。
 
-クライアント変更箇所:
-- `POST /api/clips` で clip 作成 + presigned URL 取得
-- `PUT` で R2 直接アップロード (= 進捗は XHR / fetch の progress event で観測)
+エンドポイント:
+- `POST /api/clips` で clip 作成 + 4 ファイル分の presigned PUT URL 取得
+- `PUT` で R2 直接アップロード (= rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json を並列)
 - `POST /api/clips/:id/finalize` で workflow 起動
-- `GET /api/clips/:id` で polling、 もしくは Expo Push で通知受信
-
-切り替えは feature flag (= 環境変数 `EXPO_PUBLIC_USE_REAL_SERVER`) で gradual に進められるよう、 clipPipeline.ts に注入口を残す。
+- `GET /api/clips/:id` で 2 秒間隔 polling (= ready / error / staked で停止)
+- `POST /api/clips/:id/retry` で 'error' クリップを再投入
+- `POST /api/clips/:id/stake` でステーキング
