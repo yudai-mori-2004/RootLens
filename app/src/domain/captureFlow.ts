@@ -24,13 +24,13 @@ export type CaptureState =
   | { kind: 'recording'; sinceTs: number }
   | { kind: 'thumbs_up_holding'; sinceTs: number }
   | { kind: 'finalizing' }
-  | { kind: 'reviewing'; mp4Uri: string; achievementConfidence: number; snapshotUri: string | null };
+  | { kind: 'reviewing'; sessionDirUri: string; achievementConfidence: number; snapshotUri: string | null };
 
 export type CaptureEvent =
   | { kind: 'frame'; ts: number; gesture: 'open_palm' | 'thumbs_up' | null; wearerHandCount: number }
   | { kind: 'vlmStartResult'; match: boolean; reason: string }
   | { kind: 'vlmStartError'; message: string }
-  | { kind: 'reviewReady'; mp4Uri: string; achievementConfidence: number; snapshotUri: string | null }
+  | { kind: 'reviewReady'; sessionDirUri: string; achievementConfidence: number; snapshotUri: string | null }
   | { kind: 'retake' };
 
 export const initialCaptureState: CaptureState = { kind: 'await_palm', feedback: null };
@@ -96,7 +96,7 @@ export function captureReducer(state: CaptureState, ev: CaptureEvent): CaptureSt
       if (ev.kind === 'reviewReady') {
         return {
           kind: 'reviewing',
-          mp4Uri: ev.mp4Uri,
+          sessionDirUri: ev.sessionDirUri,
           achievementConfidence: ev.achievementConfidence,
           snapshotUri: ev.snapshotUri,
         };

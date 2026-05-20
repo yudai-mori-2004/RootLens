@@ -40,22 +40,32 @@ export interface ClipDto {
 // ─── API リクエスト / レスポンス ─────────────────────────────────────
 
 /// POST /api/clips
-/// 撮影者「送る」 押下時に呼ぶ。 サーバはクリップ行を作って upload-url を返す。
+/// 撮影者「送る」 押下時に呼ぶ。 サーバはクリップ行を作って Pipeline 1 出力 4 ファイル分の
+/// presigned PUT URL を返す。
 export interface CreateClipRequest {
   taskId: string;
   achievementConfidence: number;
-  /// 端末で計算済の生 MCAP の sha256 (hex)。 重複アップロード検知に使う。
+  /// 端末で計算済の rgb.mp4 の sha256 (hex)。 重複アップロード検知に使う。
   contentHash: string;
-  /// MCAP のサイズ (bytes、 multipart upload の判定に使う)
+  /// rgb.mp4 のサイズ (bytes)
   contentSize: number;
 }
+
+/// Pipeline 1 が並走出力する 4 ファイル分の presigned PUT URL。
+/// 端末はこれを使って 4 並列 PUT を行う。
+export type RawSessionFilename =
+  | "rgb.mp4"
+  | "sensors.jsonl"
+  | "imu_high_rate.jsonl"
+  | "camera_intrinsics.json";
+export interface RawSessionUploadResponse {
+  files: Record<RawSessionFilename, { url: string; key: string; contentType: string }>;
+  expiresAt: string; // ISO8601
+}
+
 export interface CreateClipResponse {
   clip: ClipDto;
-  upload: {
-    url: string;       // 事前署名 PUT URL
-    method: "PUT";
-    expiresAt: string; // ISO8601
-  };
+  upload: RawSessionUploadResponse;
 }
 
 /// POST /api/clips/:id/finalize

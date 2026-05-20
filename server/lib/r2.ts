@@ -1,6 +1,12 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { rawMp4Key, blurredMp4Key, datasetPrefix } from "./r2-keys";
+import {
+  rawMp4Key,
+  rawSessionFileKey,
+  blurredMp4Key,
+  datasetPrefix,
+  type RawSessionFilename,
+} from "./r2-keys";
 
 // 注意: AWS SDK 依存。 workflow worker bundle に取り込まれないよう、
 // 純粋な key 命名関数は lib/r2-keys.ts に分離。
@@ -44,7 +50,50 @@ export { rawMp4Key, blurredMp4Key, datasetPrefix };
 
 // ─── presigned URLs ────────────────────────────────────────────────────
 
-/// 端末からの 生 MP4 PUT 用 事前署名 URL。
+/// セッション 1 件の 4 ファイル分の PUT presigned URL を一括発行。
+/// 端末はこれを受けて 4 並列 PUT する (= raw/<contentHash>/rgb.mp4 + sensors.jsonl
+/// + imu_high_rate.jsonl + camera_intrinsics.json)。 depth/ (= Pro 機の per-frame PNG)
+/// は別途 token ベースで扱う想定で、 本関数は深さ 0 のファイルのみ扱う。
+export async function presignRawSessionUploads(opts: {
+  contentHash: string;
+  expiresInSec?: number;
+}): Promise<RawSessionUploadResponse> {
+  const expiresIn = opts.expiresInSec ?? 3600;
+  const filenames: RawSessionFilename[] = [
+    "rgb.mp4",
+    "sensors.jsonl",
+    "imu_high_rate.jsonl",
+    "camera_intrinsics.json",
+  ];
+  const contentTypes: Record<RawSessionFilename, string> = {
+    "rgb.mp4": "video/mp4",
+    "sensors.jsonl": "application/x-ndjson",
+    "imu_high_rate.jsonl": "application/x-ndjson",
+    "camera_intrinsics.json": "application/json",
+  };
+  const files: RawSessionUploadResponse["files"] = {} as RawSessionUploadResponse["files"];
+  for (const filename of filenames) {
+    const key = rawSessionFileKey(opts.contentHash, filename);
+    const cmd = new PutObjectCommand({
+      Bucket: BUCKET_RAW,
+      Key: key,
+      ContentType: contentTypes[filename],
+    });
+    const url = await getSignedUrl(r2, cmd, { expiresIn });
+    files[filename] = { url, key, contentType: contentTypes[filename] };
+  }
+  return { files, expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() };
+}
+
+export interface RawSessionUploadResponse {
+  files: Record<
+    RawSessionFilename,
+    { url: string; key: string; contentType: string }
+  >;
+  expiresAt: string;
+}
+
+/// 互換用: 既存呼出 (= rgb.mp4 1 ファイルだけの presigned URL) を維持する。
 export async function presignRawMp4Upload(opts: {
   contentHash: string;
   expiresInSec?: number;

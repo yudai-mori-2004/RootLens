@@ -360,7 +360,7 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
       recordingFinalizedRef.current = true;
       (async () => {
         try {
-          const mp4Uri = await stopArkitRecording();
+          const sessionDirUri = await stopArkitRecording();
           await RealtimeFeedback.onRecordingStop();
           // VLM 事後チェック (= 達成確度の取得)。 失敗しても reviewing には進む
           let achievementConfidence = 0;
@@ -379,7 +379,7 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
             console.warn('[Capture] VLM end check failed', e);
           }
           // reviewing 状態に遷移 (= 撮影者が「送る / 撮り直す」 を選ぶ)
-          dispatch({ kind: 'reviewReady', mp4Uri, achievementConfidence, snapshotUri });
+          dispatch({ kind: 'reviewReady', sessionDirUri, achievementConfidence, snapshotUri });
           // 終了 finalize はこのターンで完了、 次の録画開始に備えてフラグを reset
           recordingStartedRef.current = false;
         } catch (e: any) {
@@ -410,7 +410,7 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
     if (state.kind !== 'reviewing') return;
     clipStore.enqueue({
       taskId: route.params.taskId,
-      mp4Uri: state.mp4Uri,
+      sessionDirUri: state.sessionDirUri,
       achievementConfidence: state.achievementConfidence,
       snapshotUri: state.snapshotUri ?? undefined,
     });
@@ -422,16 +422,16 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
     });
   }, [state, navigation, route.params.taskId]);
 
-  // reviewing → 「撮り直す」: MCAP を破棄して await_palm に戻る (= 同じ mount のまま即時再撮影)
+  // reviewing → 「撮り直す」: セッションディレクトリ丸ごと破棄して await_palm に戻る
   const onReviewRetake = useCallback(() => {
     if (state.kind !== 'reviewing') return;
-    const { mp4Uri } = state;
+    const { sessionDirUri } = state;
     (async () => {
       try {
-        const path = mp4Uri.startsWith('file://') ? mp4Uri.replace('file://', '') : mp4Uri;
+        const path = sessionDirUri.startsWith('file://') ? sessionDirUri.replace('file://', '') : sessionDirUri;
         await FileSystem.deleteAsync(path, { idempotent: true });
       } catch (e) {
-        console.warn('[Capture] failed to delete discarded MCAP', e);
+        console.warn('[Capture] failed to delete discarded session dir', e);
       }
     })();
     recordingFinalizedRef.current = false;
@@ -446,11 +446,11 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
       recordingFinalizedRef.current = true;
       (async () => {
         try {
-          const mp4Uri = await stopArkitRecording();
+          const sessionDirUri = await stopArkitRecording();
           await RealtimeFeedback.onRecordingStop();
           let snapshotUri: string | null = null;
           try { snapshotUri = await captureArkitSnapshot(); } catch {}
-          dispatch({ kind: 'reviewReady', mp4Uri, achievementConfidence: 0, snapshotUri });
+          dispatch({ kind: 'reviewReady', sessionDirUri, achievementConfidence: 0, snapshotUri });
           recordingStartedRef.current = false;
         } catch (e: any) {
           setError(`録画停止に失敗: ${e?.message ?? e}`);

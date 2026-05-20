@@ -94,8 +94,9 @@ export interface Clip {
 
 interface EnqueueInput {
   taskId: string;
-  /// 端末 AVAssetWriter で出力された MP4 の file:// URI
-  mp4Uri: string;
+  /// 端末 startArkitRecording が返したセッションディレクトリの file:// URI。
+  /// 配下に rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json が並ぶ。
+  sessionDirUri: string;
   achievementConfidence: number;
   /// 端末で撮ったプレビュー用 snapshot URI (= サーバ完了時に server 側 ぼかし済 MP4 url で置き換わる)
   snapshotUri?: string;
@@ -203,7 +204,7 @@ class ClipStore {
         this.update(id, { state: 'error' });
       });
     } else {
-      this.simulatePipeline(id, input.mp4Uri);
+      this.simulatePipeline(id, input.sessionDirUri);
     }
     return id;
   }
@@ -255,18 +256,23 @@ class ClipStore {
     const walletPubkey = getDemoWalletPubkey()?.toBase58();
     if (!walletPubkey) throw new Error('No wallet pubkey available');
 
-    // 1. ファイルサイズ + 安定 hash (= MVP は uri + size + ts ベース、 後で実 SHA256 に差し替え)
-    const info = await FileSystem.getInfoAsync(input.mp4Uri, { size: true });
-    if (!info.exists) throw new Error(`MP4 file not found: ${input.mp4Uri}`);
+    // 1. sessionDir 配下の 4 ファイルの存在確認 + rgb.mp4 のサイズ + hash
+    const sessionDir = input.sessionDirUri.endsWith('/') ? input.sessionDirUri : `${input.sessionDirUri}/`;
+    const mp4Uri = `${sessionDir}rgb.mp4`;
+    const sensorsUri = `${sessionDir}sensors.jsonl`;
+    const imuUri = `${sessionDir}imu_high_rate.jsonl`;
+    const intrinsicsUri = `${sessionDir}camera_intrinsics.json`;
+    const info = await FileSystem.getInfoAsync(mp4Uri, { size: true });
+    if (!info.exists) throw new Error(`rgb.mp4 not found in session dir: ${sessionDir}`);
     const contentSize = (info as any).size ?? 0;
-    const seed = `${input.mp4Uri}|${contentSize}|${Date.now()}`;
+    const seed = `${mp4Uri}|${contentSize}|${Date.now()}`;
     const contentHash = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
       seed,
       { encoding: Crypto.CryptoEncoding.HEX },
     );
 
-    // 2. POST /api/clips → presigned PUT URL を取得
+    // 2. POST /api/clips → 4 ファイル分の presigned PUT URL を取得
     const createRes = await fetch(`${serverUrl}/api/clips`, {
       method: 'POST',
       headers: {
@@ -287,17 +293,30 @@ class ClipStore {
     this.renameLocalId(localId, serverClip.id);
     this.update(serverClip.id, { id: serverClip.id });
 
-    // 3. R2 へ multipart 不要の単発 PUT (= FileSystem.uploadAsync が裏で stream)
-    const uploadRes = await FileSystem.uploadAsync(upload.url, input.mp4Uri, {
-      httpMethod: 'PUT',
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-      headers: {
-        'Content-Type': 'video/mp4',
-      },
-    });
-    if (uploadRes.status < 200 || uploadRes.status >= 300) {
-      throw new Error(`R2 PUT failed: ${uploadRes.status} ${uploadRes.body?.slice(0, 200) ?? ''}`);
-    }
+    // 3. R2 へ 4 ファイルを並列 PUT (= rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json)。
+    // いずれか 1 つでも失敗したら全体を error 扱い (= 部分成功は禁止、 bundle 整合性が崩れる)。
+    const uploadTasks: Array<{ name: string; uri: string; url: string; contentType: string; required: boolean }> = [
+      { name: 'rgb.mp4', uri: mp4Uri, url: upload.files['rgb.mp4'].url, contentType: upload.files['rgb.mp4'].contentType, required: true },
+      { name: 'sensors.jsonl', uri: sensorsUri, url: upload.files['sensors.jsonl'].url, contentType: upload.files['sensors.jsonl'].contentType, required: true },
+      { name: 'imu_high_rate.jsonl', uri: imuUri, url: upload.files['imu_high_rate.jsonl'].url, contentType: upload.files['imu_high_rate.jsonl'].contentType, required: true },
+      { name: 'camera_intrinsics.json', uri: intrinsicsUri, url: upload.files['camera_intrinsics.json'].url, contentType: upload.files['camera_intrinsics.json'].contentType, required: true },
+    ];
+
+    await Promise.all(uploadTasks.map(async (task) => {
+      const fileInfo = await FileSystem.getInfoAsync(task.uri);
+      if (!fileInfo.exists) {
+        if (task.required) throw new Error(`${task.name} not found in session dir`);
+        return;
+      }
+      const res = await FileSystem.uploadAsync(task.url, task.uri, {
+        httpMethod: 'PUT',
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { 'Content-Type': task.contentType },
+      });
+      if (res.status < 200 || res.status >= 300) {
+        throw new Error(`R2 PUT failed for ${task.name}: ${res.status} ${res.body?.slice(0, 200) ?? ''}`);
+      }
+    }));
     this.update(serverClip.id, { uploadProgress: 1 });
 
     // 4. POST /api/clips/:id/finalize → サーバ workflow 起動

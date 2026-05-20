@@ -4,7 +4,10 @@ import type { ViewProps } from 'react-native';
 
 // ARKit ベース撮影モジュールの薄ラッパー。
 //
-// 出力は Stera 互換 MCAP (= STERA.md §4 参照)。
+// startRecording は session ディレクトリ URL を引数に取り、 その配下に Pipeline 1 の
+// 5 ファイル (= rgb.mp4 / sensors.jsonl / imu_high_rate.jsonl / camera_intrinsics.json /
+// depth/ (Pro 機のみ)) を並走出力する。 詳細は document/v0.1.2/tasks/15-capture-baseline/README.md。
+//
 // 加えて 15 Hz でリアルタイムの手の検出結果を onHandTrack イベントで通知する。
 
 export interface ArkitCapturePreviewProps extends ViewProps {}
@@ -49,7 +52,11 @@ interface ArkitCaptureNativeModule {
   isAvailable(): Promise<boolean>;
   startSession(): Promise<void>;
   stopSession(): Promise<void>;
-  startRecording(outputPath: string): Promise<string>;
+  /** sessionDir 配下に rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json
+   *  を並走出力する。 空文字なら temp 配下に session ディレクトリを生成する。
+   *  返値は session ディレクトリの file:// URI。 */
+  startRecording(sessionDir: string): Promise<string>;
+  /** 返値は startRecording の sessionDir をそのまま返す。 */
   stopRecording(): Promise<string>;
   captureSnapshot(): Promise<string>;
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
@@ -74,9 +81,12 @@ export async function stopArkitSession(): Promise<void> {
   return nativeModule.stopSession();
 }
 
-export async function startArkitRecording(outputPath = ''): Promise<string> {
+/** sessionDir 配下に rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json
+ *  (+ Pro 機の depth/) を並走出力する。 空文字なら native 側で temp 配下に新規ディレクトリを生成。
+ *  返値は session ディレクトリの file:// URI。 */
+export async function startArkitRecording(sessionDir = ''): Promise<string> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
-  return nativeModule.startRecording(outputPath);
+  return nativeModule.startRecording(sessionDir);
 }
 
 export async function stopArkitRecording(): Promise<string> {

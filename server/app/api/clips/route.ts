@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
 import { requireWalletPubkey } from "@/lib/auth";
-import { presignRawMp4Upload } from "@/lib/r2";
+import { presignRawSessionUploads, rawMp4Key } from "@/lib/r2";
 import { clipToDto, clipsToDtos } from "@/lib/mapper";
 import type { CreateClipRequest, CreateClipResponse, ListClipsResponse } from "@/shared/api-types";
 
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 }
 
 // POST /api/clips
-// 撮影者「送る」 押下。 クリップ行作成 + 生 MCAP の事前署名 PUT URL を返す。
+// 撮影者「送る」 押下。 クリップ行作成 + Pipeline 1 出力 4 ファイル分の事前署名 PUT URL を返す。
 const createSchema = z.object({
   taskId: z.string().min(1),
   achievementConfidence: z.number().int().min(0).max(100),
@@ -55,21 +55,17 @@ export async function POST(req: Request) {
     .where(and(eq(clips.walletPubkey, walletPubkey), eq(clips.contentHash, parsed.data.contentHash)))
     .limit(1);
   if (existing.length > 0) {
-    const presigned = await presignRawMp4Upload({ contentHash: parsed.data.contentHash });
+    const presigned = await presignRawSessionUploads({ contentHash: parsed.data.contentHash });
     const body: CreateClipResponse = {
       clip: await clipToDto(existing[0]),
-      upload: {
-        url: presigned.url,
-        method: "PUT",
-        expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-      },
+      upload: presigned,
     };
     return NextResponse.json(body);
   }
 
   // 新規作成
   const id = `clip_${parsed.data.contentHash.slice(0, 12)}_${Date.now().toString(36)}`;
-  const presigned = await presignRawMp4Upload({ contentHash: parsed.data.contentHash });
+  const presigned = await presignRawSessionUploads({ contentHash: parsed.data.contentHash });
 
   const [inserted] = await db.insert(clips).values({
     id,
@@ -78,16 +74,12 @@ export async function POST(req: Request) {
     state: "uploading",
     achievementConfidence: parsed.data.achievementConfidence,
     contentHash: parsed.data.contentHash,
-    rawMp4Key: presigned.key,
+    rawMp4Key: rawMp4Key(parsed.data.contentHash),
   }).returning();
 
   const body: CreateClipResponse = {
     clip: await clipToDto(inserted),
-    upload: {
-      url: presigned.url,
-      method: "PUT",
-      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-    },
+    upload: presigned,
   };
   return NextResponse.json(body, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import ARKit
 import AVFoundation
 import CoreImage
+import CoreMotion
 import CoreVideo
 import Foundation
 import UIKit
@@ -92,7 +93,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var videoInput: AVAssetWriterInput?
   private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
   private var recordingStartTime: CMTime = .invalid
-  private var recordingOutputURL: URL?
+  private var sessionDirURL: URL?
+  private var rgbMp4URL: URL?
+
+  // sensor stream state (= recording 中のみ非 nil、 Pipeline 1 出力ファイル群を逐次 append)
+  private var sensorsFileHandle: FileHandle?
+  private var imuFileHandle: FileHandle?
+  private var frameIndexCounter: Int = 0
+  private let sensorFileQueue = DispatchQueue(label: "io.rootlens.arkit-capture.sensors", qos: .utility)
+  private let motionManager = CMMotionManager()
+  private let motionQueue = OperationQueue()
 
   // セッション稼働状態
   private var sessionRunning = false
@@ -151,15 +161,21 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     sessionRunning = false
   }
 
-  // MARK: - Recording lifecycle (AVAssetWriter MP4)
+  // MARK: - Recording lifecycle (Pipeline 1 全 sensor 出力)
 
-  func startRecording(to url: URL) throws -> URL {
+  /// 1 セッション分のキャプチャを開始する。 引数 sessionDir 配下に以下を並走出力する:
+  ///   rgb.mp4               H.264 AVAssetWriter 出力 (= ARFrame.capturedImage)
+  ///   sensors.jsonl         per-frame の camera transform / intrinsics / tracking / IMU 軽量 sample
+  ///   imu_high_rate.jsonl   CMMotionManager 100 Hz サンプル
+  ///   camera_intrinsics.json デバイス + 解像度 + intrinsics の 1 回書き出し
+  /// stopRecording で全 handle を flush + close + return。
+  func startRecording(sessionDir: URL) throws -> URL {
     if assetWriter != nil {
       throw NSError(domain: "ArkitCaptureController", code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "already recording"])
     }
-    // 既存ファイルがあれば消す (= 同じ URL に上書き)
-    try? FileManager.default.removeItem(at: url)
+
+    try FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
 
     // sensor 解像度を取得して AVAssetWriter を構成
     let sensorRes = currentSensorResolution()
@@ -170,7 +186,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
                     userInfo: [NSLocalizedDescriptionKey: "sensor resolution unknown"])
     }
 
-    let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+    let mp4URL = sessionDir.appendingPathComponent("rgb.mp4")
+    try? FileManager.default.removeItem(at: mp4URL)
+
+    let writer = try AVAssetWriter(outputURL: mp4URL, fileType: .mp4)
     // 6 Mbps target (= 60fps 1080p で十分な品質、 5 分動画で ~225 MB)。
     // サーバ側で再 encode するので深く詰めない。
     let videoSettings: [String: Any] = [
@@ -185,16 +204,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     ]
     let input = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
     input.expectsMediaDataInRealTime = true
-    // 表示 orientation を transform で焼く (= 再生時に自動回転)
     input.transform = currentDisplayOrientation().videoTransform
 
-    // ARFrame.capturedImage は kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
     let sourcePixelAttrs: [String: Any] = [
       kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange,
       kCVPixelBufferWidthKey as String: sensorW,
       kCVPixelBufferHeightKey as String: sensorH,
     ]
-    let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: sourcePixelAttrs)
+    let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+      assetWriterInput: input, sourcePixelBufferAttributes: sourcePixelAttrs)
 
     guard writer.canAdd(input) else {
       throw NSError(domain: "ArkitCaptureController", code: 4,
@@ -204,24 +222,44 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     writer.startWriting()
     writer.startSession(atSourceTime: .zero)
 
+    // sensor stream の出力 file を準備
+    let sensorsURL = sessionDir.appendingPathComponent("sensors.jsonl")
+    let imuURL = sessionDir.appendingPathComponent("imu_high_rate.jsonl")
+    try? FileManager.default.removeItem(at: sensorsURL)
+    try? FileManager.default.removeItem(at: imuURL)
+    FileManager.default.createFile(atPath: sensorsURL.path, contents: nil)
+    FileManager.default.createFile(atPath: imuURL.path, contents: nil)
+    let sensorsHandle = try FileHandle(forWritingTo: sensorsURL)
+    let imuHandle = try FileHandle(forWritingTo: imuURL)
+
+    // camera_intrinsics.json は intrinsics 確定するまで待ちたいので、 初回 frame で書く
+    // (= ARFrame の camera.intrinsics は最初の didUpdate まで埋まらない可能性)
+
     self.assetWriter = writer
     self.videoInput = input
     self.pixelBufferAdaptor = adaptor
     self.recordingStartTime = .invalid
-    self.recordingOutputURL = url
+    self.sessionDirURL = sessionDir
+    self.rgbMp4URL = mp4URL
+    self.sensorsFileHandle = sensorsHandle
+    self.imuFileHandle = imuHandle
+    self.frameIndexCounter = 0
 
     if !sessionRunning { startSession() }
     handTracker.setRecordingMode(true)
+    startMotionUpdates()
 
-    return url
+    return sessionDir
   }
 
+  /// 1 セッションを終了。 全ファイルを flush + close する。 返値は sessionDir URL。
   func stopRecording() throws -> URL {
-    guard let writer = assetWriter, let input = videoInput, let url = recordingOutputURL else {
+    guard let writer = assetWriter, let input = videoInput, let dir = sessionDirURL else {
       throw NSError(domain: "ArkitCaptureController", code: 2,
                     userInfo: [NSLocalizedDescriptionKey: "not recording"])
     }
     handTracker.setRecordingMode(false)
+    stopMotionUpdates()
 
     input.markAsFinished()
     let group = DispatchGroup()
@@ -231,17 +269,221 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     group.wait()
 
+    // sensor file は sensorFileQueue 上で書いてるので、 そこでの flush を待ってから close する
+    sensorFileQueue.sync {
+      try? self.sensorsFileHandle?.synchronize()
+      try? self.sensorsFileHandle?.close()
+      try? self.imuFileHandle?.synchronize()
+      try? self.imuFileHandle?.close()
+    }
+
     self.assetWriter = nil
     self.videoInput = nil
     self.pixelBufferAdaptor = nil
     self.recordingStartTime = .invalid
-    self.recordingOutputURL = nil
+    self.sessionDirURL = nil
+    self.rgbMp4URL = nil
+    self.sensorsFileHandle = nil
+    self.imuFileHandle = nil
+    self.frameIndexCounter = 0
 
     if writer.status == .failed {
       throw writer.error ?? NSError(domain: "ArkitCaptureController", code: 5,
                                     userInfo: [NSLocalizedDescriptionKey: "writer failed"])
     }
-    return url
+    return dir
+  }
+
+  // MARK: - sensor JSONL writers
+
+  /// CMMotionManager を 100 Hz で起動、 imu_high_rate.jsonl に append。
+  private func startMotionUpdates() {
+    guard motionManager.isDeviceMotionAvailable else {
+      NSLog("[ArkitCaptureController] CMDeviceMotion unavailable, skipping imu_high_rate")
+      return
+    }
+    motionManager.deviceMotionUpdateInterval = 1.0 / 100.0
+    motionQueue.maxConcurrentOperationCount = 1
+    motionManager.startDeviceMotionUpdates(to: motionQueue) { [weak self] motion, _ in
+      guard let self = self, let m = motion else { return }
+      self.appendImuLine(motion: m)
+    }
+  }
+
+  private func stopMotionUpdates() {
+    if motionManager.isDeviceMotionActive {
+      motionManager.stopDeviceMotionUpdates()
+    }
+  }
+
+  /// 1 frame ぶんの sensors.jsonl 行を書き出す (= sensorFileQueue 上)。
+  /// camera_intrinsics.json が未書きならここで 1 回だけ書く (= 初回 frame で intrinsics が確定する)。
+  private func writeSensorsLine(frame: ARFrame) {
+    guard let handle = sensorsFileHandle else { return }
+    let frameIndex = frameIndexCounter
+    frameIndexCounter += 1
+
+    let ts = frame.timestamp
+    let t = frame.camera.transform        // simd_float4x4 (= column-major)
+    let k = frame.camera.intrinsics       // simd_float3x3
+    let trackingPair = describeTrackingState(frame.camera.trackingState)
+
+    // row-major 4×4 → [[Float; 4]; 4]
+    let row0 = [t.columns.0[0], t.columns.1[0], t.columns.2[0], t.columns.3[0]]
+    let row1 = [t.columns.0[1], t.columns.1[1], t.columns.2[1], t.columns.3[1]]
+    let row2 = [t.columns.0[2], t.columns.1[2], t.columns.2[2], t.columns.3[2]]
+    let row3 = [t.columns.0[3], t.columns.1[3], t.columns.2[3], t.columns.3[3]]
+    let transformRows: [[Float]] = [row0, row1, row2, row3]
+
+    // row-major 3×3 を 9 要素 flat に
+    let intr: [Float] = [
+      k.columns.0[0], k.columns.1[0], k.columns.2[0],
+      k.columns.0[1], k.columns.1[1], k.columns.2[1],
+      k.columns.0[2], k.columns.1[2], k.columns.2[2],
+    ]
+
+    // IMU snapshot (= 直近 CMDeviceMotion)
+    let mot = motionManager.deviceMotion
+    let imuDict: [String: Any]
+    if let m = mot {
+      imuDict = [
+        "orientation": [m.attitude.quaternion.x, m.attitude.quaternion.y, m.attitude.quaternion.z, m.attitude.quaternion.w],
+        "angular_velocity": [m.rotationRate.x, m.rotationRate.y, m.rotationRate.z],
+        "linear_acceleration": [
+          m.userAcceleration.x + m.gravity.x,
+          m.userAcceleration.y + m.gravity.y,
+          m.userAcceleration.z + m.gravity.z,
+        ],
+      ]
+    } else {
+      imuDict = [:]
+    }
+
+    let line: [String: Any] = [
+      "ts": ts,
+      "frame_index": frameIndex,
+      "tracking_state": trackingPair.state,
+      "tracking_reason": trackingPair.reason,
+      "camera_transform": transformRows,
+      "camera_intrinsics": intr,
+      "imu": imuDict,
+    ]
+
+    sensorFileQueue.async {
+      do {
+        let data = try JSONSerialization.data(withJSONObject: line, options: [])
+        handle.write(data)
+        handle.write(Data("\n".utf8))
+      } catch {
+        NSLog("[ArkitCaptureController] sensors.jsonl write failed: %@", "\(error)")
+      }
+    }
+
+    // 初回 frame で camera_intrinsics.json を 1 回書く
+    if frameIndex == 0, let dir = sessionDirURL {
+      writeCameraIntrinsicsJson(into: dir, frame: frame)
+    }
+  }
+
+  private func appendImuLine(motion: CMDeviceMotion) {
+    guard let handle = imuFileHandle else { return }
+    let line: [String: Any] = [
+      "ts": motion.timestamp,
+      "orientation": [motion.attitude.quaternion.x, motion.attitude.quaternion.y, motion.attitude.quaternion.z, motion.attitude.quaternion.w],
+      "angular_velocity": [motion.rotationRate.x, motion.rotationRate.y, motion.rotationRate.z],
+      "linear_acceleration": [
+        motion.userAcceleration.x + motion.gravity.x,
+        motion.userAcceleration.y + motion.gravity.y,
+        motion.userAcceleration.z + motion.gravity.z,
+      ],
+    ]
+    sensorFileQueue.async {
+      do {
+        let data = try JSONSerialization.data(withJSONObject: line, options: [])
+        handle.write(data)
+        handle.write(Data("\n".utf8))
+      } catch {
+        NSLog("[ArkitCaptureController] imu_high_rate.jsonl write failed: %@", "\(error)")
+      }
+    }
+  }
+
+  private func writeCameraIntrinsicsJson(into dir: URL, frame: ARFrame) {
+    let url = dir.appendingPathComponent("camera_intrinsics.json")
+    let k = frame.camera.intrinsics
+    let res = frame.camera.imageResolution
+    let fps: Double = {
+      if let cfg = session.configuration as? ARWorldTrackingConfiguration {
+        return Double(cfg.videoFormat.framesPerSecond)
+      }
+      return 30.0
+    }()
+
+    var dict: [String: Any] = [
+      "device_model": currentDeviceModel(),
+      "platform": "iOS",
+      "os_version": UIDevice.current.systemVersion,
+      "rgb": [
+        "width": Int(res.width),
+        "height": Int(res.height),
+        "fps": fps,
+        "fx": k.columns.0[0],
+        "fy": k.columns.1[1],
+        "cx": k.columns.2[0],
+        "cy": k.columns.2[1],
+      ],
+    ]
+    // LiDAR 機なら depth 解像度 + intrinsics も書く (= ARFrame.sceneDepth が存在する場合)
+    if let depth = frame.sceneDepth {
+      let dW = CVPixelBufferGetWidth(depth.depthMap)
+      let dH = CVPixelBufferGetHeight(depth.depthMap)
+      // depth intrinsics は ARKit が直接 expose しない: RGB intrinsics に解像度比で
+      // スケーリングするのが Project Aria / Stera の慣行。
+      let sx = Float(dW) / Float(res.width)
+      let sy = Float(dH) / Float(res.height)
+      dict["depth"] = [
+        "width": dW,
+        "height": dH,
+        "fx": k.columns.0[0] * sx,
+        "fy": k.columns.1[1] * sy,
+        "cx": k.columns.2[0] * sx,
+        "cy": k.columns.2[1] * sy,
+      ]
+    }
+
+    do {
+      let data = try JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted])
+      try data.write(to: url, options: .atomic)
+    } catch {
+      NSLog("[ArkitCaptureController] camera_intrinsics.json write failed: %@", "\(error)")
+    }
+  }
+
+  private func describeTrackingState(_ s: ARCamera.TrackingState) -> (state: String, reason: String) {
+    switch s {
+    case .notAvailable: return ("notAvailable", "")
+    case .normal:       return ("normal", "")
+    case .limited(let r):
+      switch r {
+      case .initializing:          return ("limited", "initializing")
+      case .relocalizing:          return ("limited", "relocalizing")
+      case .excessiveMotion:       return ("limited", "excessiveMotion")
+      case .insufficientFeatures:  return ("limited", "insufficientFeatures")
+      @unknown default:            return ("limited", "unknown")
+      }
+    @unknown default: return ("unknown", "")
+    }
+  }
+
+  private func currentDeviceModel() -> String {
+    var systemInfo = utsname()
+    uname(&systemInfo)
+    let machineMirror = Mirror(reflecting: systemInfo.machine)
+    let identifier = machineMirror.children.reduce("") { id, element in
+      guard let value = element.value as? Int8, value != 0 else { return id }
+      return id + String(UnicodeScalar(UInt8(value)))
+    }
+    return identifier
   }
 
   // MARK: - Snapshot (VLM 用)
@@ -314,8 +556,12 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // 録画 (= AVAssetWriter に pixelBuffer を append)。 録画中のみ。
+    // 録画 (= AVAssetWriter に pixelBuffer を append + sensors.jsonl 行 append)。 録画中のみ。
     if let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter {
+      // sensors.jsonl は全 ARFrame に 1 行ずつ。 RGB frame と frame_index を揃える
+      // (= 録画中に append される rgb frame と 1:1 で対応)
+      self.writeSensorsLine(frame: frame)
+
       frameQueue.async { [weak self] in
         guard let self = self else { return }
         guard writer.status == .writing else { return }

@@ -41,19 +41,21 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
     }
 
-    AsyncFunction("startRecording") { (outputPath: String, promise: Promise) in
+    // sessionDir を引数に取り、 そこに rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl
+    // + camera_intrinsics.json を並走出力する。 空文字なら temp 配下に session ディレクトリを生成する。
+    AsyncFunction("startRecording") { (sessionDirPath: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         do {
-          let url: URL
-          if outputPath.isEmpty {
-            let dir = NSTemporaryDirectory()
+          let dir: URL
+          if sessionDirPath.isEmpty {
+            let tmp = NSTemporaryDirectory()
             let ts = Int(Date().timeIntervalSince1970)
-            url = URL(fileURLWithPath: "\(dir)rootlens_arkit_\(ts).mp4")
+            dir = URL(fileURLWithPath: "\(tmp)rootlens_session_\(ts)/")
           } else {
-            url = URL(fileURLWithPath: outputPath)
+            dir = URL(fileURLWithPath: sessionDirPath)
           }
-          let outURL = try ArkitCaptureController.shared.startRecording(to: url)
-          promise.resolve(outURL.absoluteString)
+          let outDir = try ArkitCaptureController.shared.startRecording(sessionDir: dir)
+          promise.resolve(outDir.absoluteString)
         } catch {
           promise.reject("ARKIT_CAPTURE_START_ERROR", error.localizedDescription)
         }
