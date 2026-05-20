@@ -72,18 +72,22 @@ _face_detector = None
 def get_face_detector():
     """OpenCV 同梱 YuNet (= cv2.FaceDetectorYN) を遅延 init。
 
-    score_threshold:
-      - OpenCV demo の default は 0.6 (= 正面の典型的な顔向け)。
-      - egocentric / chest-mounted では 拳 / 食器 / 物体が「顔っぽい形」 として
-        confidence 0.60-0.86 のレンジで誤検出される。 3 本のサンプル動画で
-        全 frame 計測したところ 0.6 では 12-51 % frame で誤検出、 0.85 まで
-        上げると 0.1 % まで落ちた。 contributor の顔は一人称視点で映らない
-        前提なので 0.85 に上げる。 他人の顔の遠距離・横向きの検出率は
-        多少下がるが、 chest-mounted の egocentric では他人の顔がアップで
-        映る場面が少なく、 拳の連続誤検出を抑えるメリットが上回る。
+    DEPRECATION NOTE (2026-05-20):
+      この経路 (= サーバ Modal で YuNet 顔ぼかし) は dead-end。 egocentric の拳 / 食器を
+      顔として confidence 0.6-0.86 で誤検出する一方、 本物の正面顔も max conf 0.77-0.79
+      しか出ないため、 threshold を上げると本物の顔も見逃す。 つまり threshold だけでは
+      egocentric 用途で誤検出と検出漏れの両立は無理。
 
-    NMS IoU 0.3 は OpenCV demo 標準のまま。
-    input size は frame ごとに setInputSize で書き換える (= dummy 320×320 で create)。
+      代替: アプリ撮影フローでは端末 Apple Vision (= VNDetectFaceRectanglesRequest
+      revision 3) を使う。 誤検出ほぼゼロ、 本物の顔も拾える。 LP 第一弾サンプル も Mac
+      ローカル CLI (server/scripts/macos_blur/) で Apple Vision に切り替え済み。
+
+      本 blur.py は legacy 互換のため残しているが、 アプリ撮影パイプライン再設計
+      (= server Modal blur 撤去) と同時に削除予定。 当面はサンプル取得用途のみ。
+
+    score_threshold 0.6 / NMS IoU 0.3 は OpenCV demo 標準値に戻す
+    (= 0.85 だと本物の顔も検出できないと判明、 0.6 だと拳誤検出多発、 どちらの妥協も
+    不適切なので「default 値で legacy 動作」 に戻して責任を回避する)。
     """
     global _face_detector
     if _face_detector is None:
@@ -97,7 +101,7 @@ def get_face_detector():
             YUNET_MODEL_PATH,
             "",                      # config (= unused for YuNet)
             (320, 320),              # dummy 初期 input size
-            score_threshold=0.85,
+            score_threshold=0.6,
             nms_threshold=0.3,
             top_k=5000,
         )
