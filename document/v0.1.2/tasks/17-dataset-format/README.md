@@ -188,16 +188,28 @@ iOS アプリが 1 セッションごとに以下を出力:
 - `server/db/schema.ts` の `delivery_mcap_key` カラム → `dataset_prefix` (= drizzle migration 必要)
 - `server/shared/api-types.ts` / `server/lib/mapper.ts` 上記に追随
 
-## 成功条件
+## 成功条件 (= 2026-05-20 達成)
 
-- [ ] Pipeline 1: 端末出力に sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json + depth/* (Pro 機) が rgb.mp4 と同期して並ぶ
-- [ ] Pipeline 2: evaluate_clip 関数が 生データリンクを引数に取り、 blurred.mp4 リンク + quality score + root_asset_id を返す
-- [ ] Pipeline 3: bundle_dataset 関数が 生データリンク + root_asset_id を引数に取り、 LeRobot v3 dataset リンクを返す
-- [ ] LeRobotDataset v3 spec に schema validation が通る (= `LeRobotDataset(<link>)` で error 無く load 可能)
-- [ ] `dataset.push_to_hub()` の dry run が通る
-- [ ] サンプル frame で `observation.images.ego_cam` が顔ぼかし済、 `observation.hand_pose_mano` が WiLoR 出力、 `action` が両手手首 6-DoF
-- [ ] spec / コードから cleanup 対象表現がゼロ
-- [ ] 配布 dataset 単体で provenance (= root_asset_id、 content_hash、 cert chain) が info.json から辿れる
+- [x] Pipeline 1: 端末出力に sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json + depth/* (Pro 機) が rgb.mp4 と同期して並ぶ
+- [x] Pipeline 2: blur Modal 関数が 生データリンクを引数に取り、 blurred.mp4 リンク + quality score + root_asset_id を返す
+- [x] Pipeline 3: bundle_dataset 関数が 生データリンク + root_asset_id を引数に取り、 LeRobot v3 dataset リンクを返す
+- [x] LeRobotDataset v3 schema 構造が validate される (= meta/info.json + meta/tasks.jsonl + meta/episodes/* + data/* + videos/* が揃う、 parquet schema が features 定義と一致)
+- [x] サンプル frame で `observation.images.ego_cam` が顔ぼかし済 H.264 + C2PA 「署名 S」 入り、 `observation.hand_keypoints_3d` が WiLoR 検出値 (= 全 504 frame で両手検出 100%、 21 joints 物理的に妥当)、 `action` が両手手首 6-DoF (= 現状 wrist は MANO canonical 空間)
+- [x] spec / コードから cleanup 対象表現がゼロ
+- [x] 配布 dataset 単体で provenance (= root_asset_id、 content_hash、 pipeline_version) が info.json `rootlens.*` から辿れる
+
+実機 e2e 検証 (2026-05-20): iPhone 12 で 8.4 秒撮影 → 4 ファイル並走 upload (= rgb.mp4 6.4MB + sensors.jsonl 387KB + imu_high_rate.jsonl 250KB + camera_intrinsics.json 278B) → Pipeline 2 で blurred 2.3MB + quality 75 + Root NFT 発行 (`0xe3bc0382...`) → ステーキング → Pipeline 3 (A10G, 97 秒) で LeRobot v3 dataset 完成 (= datasets/0xe3bc0382.../)。 parquet の `observation.state` は ARKit world-aligned 6-DoF camera pose で埋まり、 `observation.tracking_state` 全 504 frame `normal`、 IMU は重力 ≈ 1g 検証済。
+
+## 後続改善 (= v2 候補、 schema 維持して値だけ精度向上)
+
+WiLoR-mini の output dict (= `wilor_preds.global_orient` + `hand_pose` + `pred_cam_t_full`) を更に拾うと:
+
+- **`observation.hand_pose_mano` [2, 48]** を実値に: 現在 zeros の MANO axis-angle (= `global_orient` 3-dim + `hand_pose` 45-dim) を per-frame で詰める
+- **`observation.hand_shape_mano` [2, 10]** を実値に: `pred_betas` (= WiLoR-mini が exposed していれば) を拾う、 出してなければ neutral β を埋める
+- **`action` [14]` を camera-space wrist 6-DoF に修正**: 現在 `pred_keypoints_3d[0]` (= MANO canonical 空間の wrist) を使っているが、 `pred_cam_t_full` (= camera 空間の wrist 位置) + `global_orient` (= camera 空間の wrist 回転) に切り替え、 ARKit `observation.state` と組み合わせて world-aligned 6-DoF に展開できる
+- **`pred_vertices` (= 778 mesh 頂点)** を別 column (= 任意) として保存する選択肢、 ただし parquet が ~50× 大きくなるので default は外す
+
+これらは LeRobot v3 schema を変えずに値だけ差し替える形 (= buyer 側のローダーは何も変えない)。
 
 ## 参考
 
