@@ -4,9 +4,9 @@ Per-clip multimodal recording captured on an iPhone with Apple ARKit, distribute
 
 ## Format
 
-LeRobotDataset v3.0. One dataset corresponds to one captured clip (one episode).
+LeRobotDataset v3.0. A dataset is one or more captured clips packaged together; each clip is one episode.
 
-Directory layout:
+Directory layout (per-clip distribution shape):
 
 ```
 <root>/
@@ -19,7 +19,14 @@ Directory layout:
 └── videos/observation.images.ego_cam/chunk-000/file-000.mp4
 ```
 
-The `data_path` and `video_path` templates in `meta/info.json` follow the LeRobotDataset v3.0 convention (`data/chunk-{episode_chunk:03d}/file-{file_index:03d}.parquet`, `videos/{video_key}/chunk-{episode_chunk:03d}/file-{file_index:03d}.mp4`).
+The `data_path` template in `meta/info.json` follows the LeRobotDataset v3.0 convention (`data/chunk-{episode_chunk:03d}/file-{file_index:03d}.parquet`).
+
+The `video_path` template has two supported forms, recorded in `meta/info.json`:
+
+- Concatenated form: `videos/{video_key}/chunk-{episode_chunk:03d}/file-{file_index:03d}.mp4` (= multiple episodes encoded into one MP4 file per chunk, with byte/frame offsets stored in `meta/episodes/.../*.parquet`).
+- Per-episode form: `videos/{video_key}/chunk-{episode_chunk:03d}/episode_{episode_index:03d}.mp4` (= one MP4 file per episode, independently addressable).
+
+Multi-episode preview releases (e.g. the public sample) use the per-episode form so individual clips can be linked and streamed without pulling the whole dataset.
 
 ## Bundler version
 
@@ -32,8 +39,8 @@ The `data_path` and `video_path` templates in `meta/info.json` follow the LeRobo
 - Codec: H.264 (`AVVideoCodecType.h264`), pixel format `yuv420p`, profile `H264HighAutoLevel`.
 - Source: `ARFrame.capturedImage` from an `ARWorldTrackingConfiguration` session, written through `AVAssetWriter` with an `AVAssetWriterInputPixelBufferAdaptor`.
 - Recording bitrate target: 6 Mbps (`AVVideoAverageBitRateKey = 6_000_000`).
-- Face blur applied per frame on the server with [OpenCV YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) before encoding.
-- C2PA "signature S" embedded in the file. The C2PA manifest's actions include `c2pa.placed.face_blur` with software agent `YuNet`. Signing uses ES256 with a leaf certificate issued by the RootLens authority.
+- Face blur applied per frame on the capture device with Apple's [Vision framework](https://developer.apple.com/documentation/vision/vndetectfacerectanglesrequest) (`VNDetectFaceRectanglesRequest` revision 3) before encoding. Detected faces are tracked across frames (IoU matching + EMA smoothing) to suppress per-frame jitter, then masked with a Gaussian blur. The raw, unblurred frames never leave the device.
+- C2PA "signature S" embedded in the file. The C2PA manifest's actions include `c2pa.placed.face_blur` with software agent `Apple Vision`. Signing uses ES256 with a leaf certificate issued by the RootLens authority.
 - Resolution and frame rate are device-format dependent and recorded in `meta/info.json` (`fps`) and in the sidecar `camera_intrinsics.json` (`rgb.width`, `rgb.height`, `rgb.fps`). The iOS capture module (`ArSessionController.pickPreferredFormat`) prefers the built-in ultra-wide camera at a video format near 720 px height; the reference clip captured on iPhone 12 was 1280 x 720 at 60 fps.
 
 ## Per-frame columns (`data/chunk-000/file-000.parquet`)
@@ -69,7 +76,7 @@ tx = 2 * (cx - w/2) / (box_size * cam_bbox[0]) + cam_bbox[1]
 ty = 2 * (cy - h/2) / (box_size * cam_bbox[0]) + cam_bbox[2]
 ```
 
-The inputs (`box_size`, `cx`, `cy`, `w`, `h`, `focal_length`) are all in pixels, and `cam_bbox[0:3]` is the unitless weak-perspective camera prediction from the network. The result is a dimensionless triplet tied to the MANO canonical mesh scale; it is not in metric meters. Converting to metric coordinates requires either a known scale for the MANO hand used at training time or a depth measurement at the wrist (for example, sampling `depth/{frame_index}.png` at the wrist pixel on LiDAR-equipped devices).
+The inputs (`box_size`, `cx`, `cy`, `w`, `h`, `focal_length`) are all in pixels, and `cam_bbox[0:3]` is the unitless weak-perspective camera prediction from the network. The result is a dimensionless triplet tied to the MANO canonical mesh scale; it is not in metric meters. Converting to metric coordinates requires either a known scale for the MANO hand used at training time or a depth measurement at the wrist (for example, sampling `depth/{frame_index:06d}.png` at the wrist pixel on LiDAR-equipped devices).
 
 ## Phase labels (semantic sub-tasks)
 
@@ -118,7 +125,7 @@ These sidecars are not consumed by the LeRobotDataset loader. They are provided 
 
 ## Provenance
 
-- **C2PA manifest** in every RGB MP4: ES256 signed by a leaf certificate issued by the RootLens authority. The active manifest includes a `c2pa.actions` block with `c2pa.placed.face_blur` performed by `YuNet`.
+- **C2PA manifest** in every RGB MP4: ES256 signed by a leaf certificate issued by the RootLens authority. The active manifest includes a `c2pa.actions` block with `c2pa.placed.face_blur` performed by `Apple Vision`.
 - **Solana Root NFT (Title Protocol cNFT)**: minted by Title Protocol's TEE after C2PA verification. The asset id is recorded in `meta/info.json` as `rootlens.root_nft_asset_id`.
 
 ## Loading

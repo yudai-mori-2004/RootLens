@@ -1,0 +1,1514 @@
+{
+  "fps": 30.0,
+  "total_episodes": 48,
+  "episodes": [
+    {
+      "index": 0,
+      "video_id": "sample_0001",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 15.6,
+      "length_frames": 467,
+      "task": "pour tea into a cup",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand holds a glass pitcher while left hand holds a white cup on the counter."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 9.0,
+          "text": "Right hand tilts and pours liquid from the glass pitcher into the white cup held in the left hand."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 15.57,
+          "text": "Right hand sets the glass pitcher down on the counter while left hand holds the cup with tea."
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "video_id": "sample_0002",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 35.5,
+      "length_frames": 1064,
+      "task": "pour tea into a cup",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands grasp the dark beverage container with the white lid."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand removes the lid from the beverage container."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 18.0,
+          "text": "Both hands hold the beverage container and pour the dark liquid into the white cup."
+        },
+        {
+          "start_sec": 18.0,
+          "end_sec": 27.0,
+          "text": "Right hand continues pouring the beverage into the cup while left hand steadies the cup."
+        },
+        {
+          "start_sec": 27.0,
+          "end_sec": 35.47,
+          "text": "Both hands set down the beverage container, revealing the filled cup of dark liquid."
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "video_id": "sample_0003",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 30.6,
+      "length_frames": 917,
+      "task": "boil water in a kettle",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches for and grasps the white electric kettle on the counter."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands hold the kettle and position it under the sink faucet to fill it with water."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 12.0,
+          "text": "Right hand turns on the faucet and water flows into the kettle."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 15.0,
+          "text": "Right hand turns off the faucet and lifts the filled kettle from the sink."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 18.0,
+          "text": "Both hands carry the kettle away from the sink toward the counter."
+        },
+        {
+          "start_sec": 18.0,
+          "end_sec": 30.57,
+          "text": "Right hand sets the kettle down on the counter and releases it."
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "video_id": "sample_0004",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 16.7,
+      "length_frames": 502,
+      "task": "pour coffee into a cup",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold and examine a carton of iced coffee on the counter."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands position the coffee carton above a white cup, preparing to pour."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 12.0,
+          "text": "Both hands pour coffee from the carton into the white cup."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 16.73,
+          "text": "Both hands lower the coffee carton and set it down on the counter next to the filled cup."
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "video_id": "sample_0005",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 16.7,
+      "length_frames": 502,
+      "task": "pour coffee into a cup",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold and examine a carton of iced coffee on the counter."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands position the coffee carton above a white cup, preparing to pour."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 12.0,
+          "text": "Both hands pour coffee from the carton into the white cup."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 16.73,
+          "text": "Both hands lower the coffee carton and set it down on the counter next to the filled cup."
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "video_id": "sample_0006",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 29.7,
+      "length_frames": 890,
+      "task": "wash the cup",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand holds a small cup under running water from the faucet."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 9.0,
+          "text": "Both hands rub the cup under the running water to rinse it."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 15.0,
+          "text": "Right hand holds the cup while left hand scrubs the inside with a sponge under running water."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 21.0,
+          "text": "Both hands continue scrubbing and rinsing the cup under the running water."
+        },
+        {
+          "start_sec": 21.0,
+          "end_sec": 29.67,
+          "text": "Right hand holds the clean cup while water runs over it to complete the final rinse."
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "video_id": "sample_0007",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 7.6,
+      "length_frames": 229,
+      "task": "open the door",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches for and grasps the door handle."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 7.63,
+          "text": "Right hand pulls the door open, revealing the interior space."
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "video_id": "sample_0008",
+      "category": "living_room",
+      "region": "Japan",
+      "duration_sec": 9.3,
+      "length_frames": 279,
+      "task": "open the door",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand grasps the door handle and pulls the door open."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 9.3,
+          "text": "Right hand continues to hold the door open while viewing the interior space."
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "video_id": "sample_0009",
+      "category": "living_room",
+      "region": "Japan",
+      "duration_sec": 7.7,
+      "length_frames": 231,
+      "task": "close the door",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches for and grasps the door handle."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 7.7,
+          "text": "Right hand pulls the door closed by turning the handle."
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "video_id": "sample_0010",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 7.4,
+      "length_frames": 222,
+      "task": "close the door",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.5,
+          "text": "Right hand reaches for the door handle."
+        },
+        {
+          "start_sec": 1.5,
+          "end_sec": 7.4,
+          "text": "Right hand pulls the door closed."
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "video_id": "sample_0011",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 24.2,
+      "length_frames": 725,
+      "task": "hang a shirt on a hanger",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold and manipulate a gray shirt, beginning to unfold and spread it out."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands continue to unfold and arrange the shirt, positioning it for hanging."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Both hands hold the shirt open and guide it toward the hanger with the blue handle."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 12.0,
+          "text": "Both hands position the shirt onto the hanger, threading one shoulder onto the hanger hook."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 15.0,
+          "text": "Both hands adjust and slide the shirt further onto the hanger, securing the first shoulder."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 18.0,
+          "text": "Both hands guide the second shoulder of the shirt onto the hanger."
+        },
+        {
+          "start_sec": 18.0,
+          "end_sec": 24.17,
+          "text": "Both hands smooth and adjust the shirt on the hanger, ensuring it hangs properly."
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "video_id": "sample_0012",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 24.9,
+      "length_frames": 748,
+      "task": "hang a long sleeve tee on a hanger",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands grasp and manipulate the black long sleeve shirt from the pile of clothes."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands hold up the black shirt to examine it and spread it open."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Both hands continue to hold and adjust the black shirt while positioning it."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 12.0,
+          "text": "Both hands fold and manipulate the black shirt, preparing it for hanging."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 15.0,
+          "text": "Right hand reaches for the white hanger while left hand holds the shirt."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 18.0,
+          "text": "Both hands position the black shirt onto the white hanger."
+        },
+        {
+          "start_sec": 18.0,
+          "end_sec": 24.93,
+          "text": "Both hands adjust and secure the black shirt on the hanger."
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "video_id": "sample_0013",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 16.4,
+      "length_frames": 492,
+      "task": "hang a sweatshirt on a hanger",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold the black sweatshirt and position it toward the hanger hook."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands guide the sweatshirt onto the hanger, threading the fabric over the hook."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Both hands adjust and straighten the sweatshirt on the hanger."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 16.4,
+          "text": "Both hands release the sweatshirt, leaving it hanging on the hanger."
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "video_id": "sample_0014",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 17.3,
+      "length_frames": 520,
+      "task": "take out from microwave",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches for and grasps the microwave door handle."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand pulls the microwave door open, revealing a plate of food inside."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Both hands grasp the plate of food and lift it out of the microwave."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 12.0,
+          "text": "Both hands carry the plate away from the microwave toward the kitchen counter."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 17.33,
+          "text": "Both hands set the plate down on the kitchen counter next to other items."
+        }
+      ]
+    },
+    {
+      "index": 14,
+      "video_id": "sample_0015",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 19.7,
+      "length_frames": 591,
+      "task": "put into microwave",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold a plate with food wrapped in plastic film above the microwave tray."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands lower the plate with food onto the microwave tray inside the oven."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Right hand releases the plate and moves away from the microwave interior."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 12.0,
+          "text": "Both hands move toward the microwave door to close it."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 15.0,
+          "text": "Right hand reaches toward the microwave control panel."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 19.7,
+          "text": "The microwave is operating with food heating inside."
+        }
+      ]
+    },
+    {
+      "index": 15,
+      "video_id": "sample_0016",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 49.5,
+      "length_frames": 1485,
+      "task": "make tea",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.1,
+          "text": "Both hands grasp and manipulate the black coffee maker, examining its components."
+        },
+        {
+          "start_sec": 3.1,
+          "end_sec": 6.2,
+          "text": "Both hands continue to handle and rotate the coffee maker, inspecting different parts."
+        },
+        {
+          "start_sec": 6.2,
+          "end_sec": 9.3,
+          "text": "Both hands work with the coffee maker, separating or adjusting its internal components."
+        },
+        {
+          "start_sec": 9.3,
+          "end_sec": 12.4,
+          "text": "Both hands hold and manipulate the coffee maker carafe and base assembly."
+        },
+        {
+          "start_sec": 12.4,
+          "end_sec": 18.57,
+          "text": "Both hands hold the coffee maker carafe and continue to examine or adjust its parts."
+        },
+        {
+          "start_sec": 18.57,
+          "end_sec": 34.03,
+          "text": "Right hand pours liquid from the black coffee maker into a white cup held in the left hand."
+        },
+        {
+          "start_sec": 34.03,
+          "end_sec": 49.5,
+          "text": "Both hands hold the coffee maker and cup with brewed tea, completing the pouring action."
+        }
+      ]
+    },
+    {
+      "index": 16,
+      "video_id": "sample_0017",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 65.1,
+      "length_frames": 1952,
+      "task": "run dishwasher",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 4.1,
+          "text": "Both hands reach for and grasp the dishwasher drawer handle to open it."
+        },
+        {
+          "start_sec": 4.1,
+          "end_sec": 8.13,
+          "text": "Right hand manipulates the golden basket inside the dishwasher while the drawer remains open."
+        },
+        {
+          "start_sec": 8.13,
+          "end_sec": 12.2,
+          "text": "Right hand continues to adjust items inside the dishwasher basket."
+        },
+        {
+          "start_sec": 12.2,
+          "end_sec": 20.33,
+          "text": "Both hands remove a white plate from the dishwasher basket."
+        },
+        {
+          "start_sec": 20.33,
+          "end_sec": 24.4,
+          "text": "Right hand places the white plate back into the dishwasher basket."
+        },
+        {
+          "start_sec": 24.4,
+          "end_sec": 32.53,
+          "text": "Both hands hold and manipulate a blue detergent bottle above the dishwasher."
+        },
+        {
+          "start_sec": 32.53,
+          "end_sec": 44.73,
+          "text": "Both hands dispense detergent from the bottle into the dishwasher compartment."
+        },
+        {
+          "start_sec": 44.73,
+          "end_sec": 52.9,
+          "text": "Left hand holds the detergent bottle while right hand closes the dishwasher drawer."
+        },
+        {
+          "start_sec": 52.9,
+          "end_sec": 65.07,
+          "text": "Both hands grasp the dishwasher drawer handle to fully close it."
+        }
+      ]
+    },
+    {
+      "index": 17,
+      "video_id": "sample_0018",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 65.7,
+      "length_frames": 1970,
+      "task": "wash rice pot",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 4.1,
+          "text": "Right hand holds the black pot under running water from the faucet."
+        },
+        {
+          "start_sec": 4.1,
+          "end_sec": 8.23,
+          "text": "Right hand scrubs the inside of the pot with a red sponge under running water."
+        },
+        {
+          "start_sec": 8.23,
+          "end_sec": 16.43,
+          "text": "Both hands scrub the pot vigorously with the red sponge under running water."
+        },
+        {
+          "start_sec": 16.43,
+          "end_sec": 24.63,
+          "text": "Both hands continue scrubbing the pot with the sponge under running water."
+        },
+        {
+          "start_sec": 24.63,
+          "end_sec": 32.83,
+          "text": "Both hands hold and rinse the pot under running water to remove soap and debris."
+        },
+        {
+          "start_sec": 32.83,
+          "end_sec": 53.37,
+          "text": "Both hands continue rinsing the pot thoroughly under running water."
+        },
+        {
+          "start_sec": 53.37,
+          "end_sec": 57.47,
+          "text": "Right hand lifts the wet pot out of the sink."
+        },
+        {
+          "start_sec": 57.47,
+          "end_sec": 65.67,
+          "text": "Both hands hold the clean pot over the sink."
+        }
+      ]
+    },
+    {
+      "index": 18,
+      "video_id": "sample_0019",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 4.7,
+      "length_frames": 141,
+      "task": "turn on light",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 4.7,
+          "text": "Right hand reaches toward and activates the light switch on the wall."
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "video_id": "sample_0020",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 4.8,
+      "length_frames": 143,
+      "task": "turn off light",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.5,
+          "text": "Right hand reaches toward the light switch on the wall."
+        },
+        {
+          "start_sec": 1.5,
+          "end_sec": 4.77,
+          "text": "Right hand presses the light switch to turn off the light."
+        }
+      ]
+    },
+    {
+      "index": 20,
+      "video_id": "sample_0021",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 22.8,
+      "length_frames": 683,
+      "task": "serve rice",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Left hand holds an empty white bowl while right hand reaches toward the rice cooker."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand scoops cooked rice from the rice cooker into the white bowl."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 12.0,
+          "text": "Both hands continue transferring rice from the cooker pot to the bowl with multiple scoops."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 15.0,
+          "text": "Right hand completes the final scoop of rice into the bowl while left hand holds it steady."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 22.77,
+          "text": "Both hands hold the bowl filled with rice and move it away from the rice cooker."
+        }
+      ]
+    },
+    {
+      "index": 21,
+      "video_id": "sample_0022",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 51.2,
+      "length_frames": 1536,
+      "task": "make greentea",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.2,
+          "text": "Both hands hold and examine a green tea packet with the blender visible on the counter."
+        },
+        {
+          "start_sec": 3.2,
+          "end_sec": 12.8,
+          "text": "Both hands manipulate and open the green tea packet, extracting individual tea sachets."
+        },
+        {
+          "start_sec": 12.8,
+          "end_sec": 19.2,
+          "text": "Right hand places a tea sachet into a white cup while left hand holds the cup steady."
+        },
+        {
+          "start_sec": 19.2,
+          "end_sec": 25.6,
+          "text": "Both hands hold the black blender pitcher and position it above the white cup with the tea sachet."
+        },
+        {
+          "start_sec": 25.6,
+          "end_sec": 41.6,
+          "text": "Both hands pour hot water from the black blender pitcher into the white cup containing the tea sachet."
+        },
+        {
+          "start_sec": 41.6,
+          "end_sec": 51.2,
+          "text": "Left hand holds the cup with brewed green tea while right hand sets down the blender pitcher."
+        }
+      ]
+    },
+    {
+      "index": 22,
+      "video_id": "sample_0023",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 11.4,
+      "length_frames": 343,
+      "task": "close tea bottle",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands reach for and grasp a white cup with a lid on the table."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands manipulate the cup lid, positioning it to close the cup."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 11.43,
+          "text": "Both hands press down on the cup lid to secure it closed."
+        }
+      ]
+    },
+    {
+      "index": 23,
+      "video_id": "sample_0024",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 5.6,
+      "length_frames": 168,
+      "task": "open tea bottle",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.5,
+          "text": "Both hands reach for and grasp a white cup containing dark liquid on the table."
+        },
+        {
+          "start_sec": 1.5,
+          "end_sec": 5.6,
+          "text": "Both hands lift and hold the cup up from the table surface."
+        }
+      ]
+    },
+    {
+      "index": 24,
+      "video_id": "sample_0025",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 5.3,
+      "length_frames": 159,
+      "task": "put bottle into fridge",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.5,
+          "text": "Right hand reaches for a bottle on the counter."
+        },
+        {
+          "start_sec": 1.5,
+          "end_sec": 5.3,
+          "text": "Right hand carries the bottle toward the refrigerator."
+        }
+      ]
+    },
+    {
+      "index": 25,
+      "video_id": "sample_0026",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 173.8,
+      "length_frames": 5215,
+      "task": "wash pan",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 10.87,
+          "text": "Right hand holds a white bowl while left hand reaches toward the sink area."
+        },
+        {
+          "start_sec": 10.87,
+          "end_sec": 21.73,
+          "text": "Both hands stir and mix contents inside a cream-colored pan with a spoon."
+        },
+        {
+          "start_sec": 21.73,
+          "end_sec": 32.6,
+          "text": "Right hand pours water from the faucet into the cream-colored pan while holding it."
+        },
+        {
+          "start_sec": 32.6,
+          "end_sec": 43.47,
+          "text": "Both hands scrub and wash the interior of the cream-colored pan under running water."
+        },
+        {
+          "start_sec": 43.47,
+          "end_sec": 65.2,
+          "text": "Both hands continue scrubbing the pan with water flowing from the faucet."
+        },
+        {
+          "start_sec": 65.2,
+          "end_sec": 86.93,
+          "text": "Right hand holds the pan while left hand scrubs the bottom and sides under water."
+        },
+        {
+          "start_sec": 86.93,
+          "end_sec": 108.67,
+          "text": "Both hands rinse the pan thoroughly under the running faucet water."
+        },
+        {
+          "start_sec": 108.67,
+          "end_sec": 173.83,
+          "text": "Both hands continue rinsing and inspecting the clean pan under running water."
+        }
+      ]
+    },
+    {
+      "index": 26,
+      "video_id": "sample_0027",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 76.3,
+      "length_frames": 2288,
+      "task": "wash rice pot",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 4.8,
+          "text": "Both hands hold and examine a white plate over the sink."
+        },
+        {
+          "start_sec": 4.8,
+          "end_sec": 9.53,
+          "text": "Both hands place the white plate down and reach for a dark pot with a lid."
+        },
+        {
+          "start_sec": 9.53,
+          "end_sec": 14.3,
+          "text": "Both hands lift and hold the dark pot over the sink."
+        },
+        {
+          "start_sec": 14.3,
+          "end_sec": 19.1,
+          "text": "Both hands continue holding the dark pot and begin rinsing it under running water."
+        },
+        {
+          "start_sec": 19.1,
+          "end_sec": 28.6,
+          "text": "Both hands scrub and wash the inside of the dark pot with water running."
+        },
+        {
+          "start_sec": 28.6,
+          "end_sec": 38.13,
+          "text": "Both hands continue scrubbing the pot with a sponge or cloth under running water."
+        },
+        {
+          "start_sec": 38.13,
+          "end_sec": 52.43,
+          "text": "Both hands scrub the pot vigorously, rotating it to clean all surfaces."
+        },
+        {
+          "start_sec": 52.43,
+          "end_sec": 76.27,
+          "text": "Both hands rinse the pot thoroughly under running water to remove soap and debris."
+        }
+      ]
+    },
+    {
+      "index": 27,
+      "video_id": "sample_0028",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 28.5,
+      "length_frames": 854,
+      "task": "boil water in a kettle",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold and examine cookware in the sink, with the left hand holding a white-lidded pot and the right hand holding a dark pot."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 9.0,
+          "text": "Right hand pours water from a dark kettle into the white pot while left hand holds the pot steady."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 15.0,
+          "text": "Both hands continue to position and hold the dark kettle and white pot in the sink during the pouring action."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 21.0,
+          "text": "Right hand lifts and tilts the dark kettle to pour remaining water into the white pot while left hand stabilizes the pot."
+        },
+        {
+          "start_sec": 21.0,
+          "end_sec": 28.47,
+          "text": "Right hand sets down the dark kettle and both hands release the cookware in the sink."
+        }
+      ]
+    },
+    {
+      "index": 28,
+      "video_id": "sample_0029",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 141.3,
+      "length_frames": 4238,
+      "task": "make tea",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 8.83,
+          "text": "Both hands hold and examine a black tea infuser device."
+        },
+        {
+          "start_sec": 8.83,
+          "end_sec": 26.5,
+          "text": "Both hands manipulate and open the tea infuser, separating its components."
+        },
+        {
+          "start_sec": 26.5,
+          "end_sec": 88.3,
+          "text": "The person stands at the sink with various dishes and cookware visible, preparing the tea-making setup."
+        },
+        {
+          "start_sec": 88.3,
+          "end_sec": 105.97,
+          "text": "Both hands hold and position the black tea infuser over a cup on the counter."
+        },
+        {
+          "start_sec": 105.97,
+          "end_sec": 114.8,
+          "text": "Right hand reaches toward and grasps a large black pot or kettle from the sink area."
+        },
+        {
+          "start_sec": 114.8,
+          "end_sec": 123.63,
+          "text": "Both hands hold the black tea infuser device while examining or adjusting it."
+        },
+        {
+          "start_sec": 123.63,
+          "end_sec": 141.27,
+          "text": "Both hands place the tea infuser into a cabinet or storage drawer."
+        }
+      ]
+    },
+    {
+      "index": 29,
+      "video_id": "sample_0030",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 13.2,
+      "length_frames": 395,
+      "task": "take milk from fridge",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches toward and grasps the refrigerator door handle."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand pulls the refrigerator door open, revealing shelves with various food items and bottles."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 13.17,
+          "text": "Right hand reaches into the refrigerator and grasps a milk carton from the shelf."
+        }
+      ]
+    },
+    {
+      "index": 30,
+      "video_id": "sample_0031",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 14.4,
+      "length_frames": 432,
+      "task": "mix milk in tea",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold a carton of milk and a white cup containing dark tea."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand pours milk from the carton into the white cup with tea."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Right hand continues pouring milk into the cup while left hand steadies the cup."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 14.4,
+          "text": "Both hands lower the milk carton as the pouring is completed."
+        }
+      ]
+    },
+    {
+      "index": 31,
+      "video_id": "sample_0032",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 5.2,
+      "length_frames": 155,
+      "task": "put milk back in fridge",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.5,
+          "text": "Right hand holds a milk carton while standing in front of an open refrigerator."
+        },
+        {
+          "start_sec": 1.5,
+          "end_sec": 5.17,
+          "text": "Right hand places the milk carton onto the refrigerator shelf."
+        }
+      ]
+    },
+    {
+      "index": 32,
+      "video_id": "sample_0033",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 10.5,
+      "length_frames": 315,
+      "task": "throw teabag into trash bag",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold a cup of tea with a teabag steeping inside."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand removes the teabag from the cup by lifting it out."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 10.5,
+          "text": "Right hand carries the teabag over to the trash bag and discards it."
+        }
+      ]
+    },
+    {
+      "index": 33,
+      "video_id": "sample_0034",
+      "category": "kitchen",
+      "region": "Japan",
+      "duration_sec": 3.1,
+      "length_frames": 93,
+      "task": "turn on light",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.1,
+          "text": "Right hand reaches toward the light switch on the wall."
+        }
+      ]
+    },
+    {
+      "index": 34,
+      "video_id": "sample_0035",
+      "category": "cleaning",
+      "region": "Japan",
+      "duration_sec": 15.3,
+      "length_frames": 459,
+      "task": "wipe floor with tissue",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand holds a tissue and wipes the wooden floor in front."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand continues wiping the floor with the tissue, moving across the surface."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Both hands hold tissues and wipe different areas of the wooden floor."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 15.3,
+          "text": "Right hand continues wiping the floor with tissue while left hand rests."
+        }
+      ]
+    },
+    {
+      "index": 35,
+      "video_id": "sample_0036",
+      "category": "cleaning",
+      "region": "Japan",
+      "duration_sec": 3.4,
+      "length_frames": 102,
+      "task": "throw tissue into trash can",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.4,
+          "text": "Right hand holds a tissue above a wooden table with a trash can visible in the background."
+        }
+      ]
+    },
+    {
+      "index": 36,
+      "video_id": "sample_0037",
+      "category": "bathroom",
+      "region": "Japan",
+      "duration_sec": 18.2,
+      "length_frames": 545,
+      "task": "open bathtub lid",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands reach upward toward the bathtub lid."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands grasp and lift the bathtub lid upward."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Right hand continues to hold and push the lid further open."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 12.0,
+          "text": "Right hand guides the lid to the side as it opens wider."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 18.17,
+          "text": "Right hand releases the bathtub lid in the open position."
+        }
+      ]
+    },
+    {
+      "index": 37,
+      "video_id": "sample_0038",
+      "category": "bathroom",
+      "region": "Japan",
+      "duration_sec": 15.2,
+      "length_frames": 456,
+      "task": "close bathtub lid",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches toward the bathtub lid."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands grasp and lift the white bathtub lid."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 9.0,
+          "text": "Both hands position and lower the lid over the bathtub opening."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 15.2,
+          "text": "Both hands press down to fully close the bathtub lid."
+        }
+      ]
+    },
+    {
+      "index": 38,
+      "video_id": "sample_0039",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 1.6,
+      "length_frames": 49,
+      "task": "turn on light",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.63,
+          "text": "Right hand reaches toward a red object on the counter."
+        }
+      ]
+    },
+    {
+      "index": 39,
+      "video_id": "sample_0040",
+      "category": "bathroom",
+      "region": "Japan",
+      "duration_sec": 10.9,
+      "length_frames": 328,
+      "task": "open bathroom door",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches toward the bathroom door handle."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Right hand grasps the bathroom door and pulls it open."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 10.93,
+          "text": "Right hand continues pulling the bathroom door fully open."
+        }
+      ]
+    },
+    {
+      "index": 40,
+      "video_id": "sample_0041",
+      "category": "bathroom",
+      "region": "Japan",
+      "duration_sec": 7.6,
+      "length_frames": 227,
+      "task": "close bathroom door",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches toward and grasps the bathroom door handle."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 7.57,
+          "text": "Right hand pulls the bathroom door closed."
+        }
+      ]
+    },
+    {
+      "index": 41,
+      "video_id": "sample_0042",
+      "category": "bedroom",
+      "region": "Japan",
+      "duration_sec": 3.7,
+      "length_frames": 110,
+      "task": "push in chair",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.67,
+          "text": "Right hand pushes the chair seat inward toward the table."
+        }
+      ]
+    },
+    {
+      "index": 42,
+      "video_id": "sample_0043",
+      "category": "bedroom",
+      "region": "Japan",
+      "duration_sec": 36.0,
+      "length_frames": 1080,
+      "task": "close the window",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Right hand reaches up toward the overhead compartment."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 9.0,
+          "text": "Right hand grasps and pulls the overhead compartment door closed."
+        },
+        {
+          "start_sec": 9.0,
+          "end_sec": 15.0,
+          "text": "Right hand continues pushing the compartment door to fully close it."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 21.0,
+          "text": "Right hand adjusts and secures the closed compartment door."
+        },
+        {
+          "start_sec": 21.0,
+          "end_sec": 27.0,
+          "text": "Both hands manipulate items in the lower storage area."
+        },
+        {
+          "start_sec": 27.0,
+          "end_sec": 36.0,
+          "text": "Right hand reaches toward and closes the lower storage compartment."
+        }
+      ]
+    },
+    {
+      "index": 43,
+      "video_id": "sample_0044",
+      "category": "bedroom",
+      "region": "Japan",
+      "duration_sec": 9.2,
+      "length_frames": 275,
+      "task": "put glasses in case",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands hold and manipulate the glasses in front of the body."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 9.17,
+          "text": "Both hands insert the glasses into the black case."
+        }
+      ]
+    },
+    {
+      "index": 44,
+      "video_id": "sample_0045",
+      "category": "bedroom",
+      "region": "Japan",
+      "duration_sec": 80.8,
+      "length_frames": 2424,
+      "task": "fold clothes",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 10.1,
+          "text": "Both hands gather and arrange black and checkered clothing items on the white surface."
+        },
+        {
+          "start_sec": 10.1,
+          "end_sec": 20.2,
+          "text": "Both hands fold a black garment by bringing edges together and creasing the fabric."
+        },
+        {
+          "start_sec": 20.2,
+          "end_sec": 30.3,
+          "text": "Both hands continue folding the black garment into a compact rectangular shape."
+        },
+        {
+          "start_sec": 30.3,
+          "end_sec": 40.4,
+          "text": "Both hands lift and manipulate a checkered shirt, preparing it for folding."
+        },
+        {
+          "start_sec": 40.4,
+          "end_sec": 50.5,
+          "text": "Both hands fold the checkered shirt by bringing the sides inward and creasing the fabric."
+        },
+        {
+          "start_sec": 50.5,
+          "end_sec": 60.6,
+          "text": "Both hands continue folding the checkered shirt into a neat rectangular bundle."
+        },
+        {
+          "start_sec": 60.6,
+          "end_sec": 70.7,
+          "text": "Both hands fold a white garment and arrange it with the other folded clothes."
+        },
+        {
+          "start_sec": 70.7,
+          "end_sec": 80.8,
+          "text": "Both hands organize and stack the folded garments together on the surface."
+        }
+      ]
+    },
+    {
+      "index": 45,
+      "video_id": "sample_0046",
+      "category": "bedroom",
+      "region": "Japan",
+      "duration_sec": 31.6,
+      "length_frames": 947,
+      "task": "make bed",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 3.0,
+          "text": "Both hands gather and lift the plaid blanket from the bed surface."
+        },
+        {
+          "start_sec": 3.0,
+          "end_sec": 6.0,
+          "text": "Both hands shake and spread the blanket to straighten it out."
+        },
+        {
+          "start_sec": 6.0,
+          "end_sec": 12.0,
+          "text": "Both hands smooth and arrange the blanket across the bed surface."
+        },
+        {
+          "start_sec": 12.0,
+          "end_sec": 15.0,
+          "text": "Right hand tucks the blanket edge under the mattress on the right side."
+        },
+        {
+          "start_sec": 15.0,
+          "end_sec": 21.0,
+          "text": "Both hands continue smoothing and adjusting the blanket on the bed."
+        },
+        {
+          "start_sec": 21.0,
+          "end_sec": 27.0,
+          "text": "Both hands fold and tuck the blanket edges neatly along the sides and bottom of the bed."
+        },
+        {
+          "start_sec": 27.0,
+          "end_sec": 31.57,
+          "text": "Both hands make final adjustments to smooth the blanket across the bed."
+        }
+      ]
+    },
+    {
+      "index": 46,
+      "video_id": "sample_0047",
+      "category": "laundry",
+      "region": "Japan",
+      "duration_sec": 1.9,
+      "length_frames": 56,
+      "task": "turn off light",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.87,
+          "text": "Right hand reaches toward the light switch on the wall."
+        }
+      ]
+    },
+    {
+      "index": 47,
+      "video_id": "sample_0048",
+      "category": "hallway",
+      "region": "Japan",
+      "duration_sec": 1.9,
+      "length_frames": 57,
+      "task": "turn off light",
+      "phases": [
+        {
+          "start_sec": 0.0,
+          "end_sec": 1.9,
+          "text": "Right hand reaches toward the light switch on the wall."
+        }
+      ]
+    }
+  ]
+}
