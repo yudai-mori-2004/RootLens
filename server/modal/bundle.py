@@ -214,7 +214,7 @@ def _build_lerobot_v3_skeleton(
     width = int(rgb_meta.get("width", 1280))
     height = int(rgb_meta.get("height", 720))
 
-    # meta/info.json
+    # meta/info.json (= task 17 README で定義した完全 schema)
     info = {
         "codebase_version": "v3.0",
         "robot_type": "rootlens-iphone-ego",
@@ -246,6 +246,14 @@ def _build_lerobot_v3_skeleton(
                 "shape": [7],
                 "names": ["x", "y", "z", "qx", "qy", "qz", "qw"],
             },
+            "observation.imu_orientation": {"dtype": "float32", "shape": [4]},
+            "observation.imu_angular_velocity": {"dtype": "float32", "shape": [3]},
+            "observation.imu_linear_acceleration": {"dtype": "float32", "shape": [3]},
+            "observation.tracking_state": {"dtype": "int8", "shape": [1]},
+            "observation.hand_pose_mano": {"dtype": "float32", "shape": [2, 48]},
+            "observation.hand_shape_mano": {"dtype": "float32", "shape": [2, 10]},
+            "observation.hand_keypoints_3d": {"dtype": "float32", "shape": [2, 21, 3]},
+            "observation.hand_present": {"dtype": "bool", "shape": [2]},
             "action": {
                 "dtype": "float32",
                 "shape": [14],
@@ -277,20 +285,48 @@ def _build_lerobot_v3_skeleton(
     frame_indices = list(range(nb_frames))
     timestamps = [i / fps for i in frame_indices]
 
-    # sensors.jsonl から camera pose を取り出す (= 行不足は zeros で埋める)
-    states = []
+    # sensors.jsonl から camera pose / IMU / tracking_state を取り出す。
+    # 行不足 (= 端末側で sensor が無かった、 旧 mp4 のみ clip) は zeros で埋める。
+    tracking_state_map = {"normal": 2, "limited": 1, "notAvailable": 0}
+    states: list[list[float]] = []
+    imu_orientations: list[list[float]] = []
+    imu_ang_vels: list[list[float]] = []
+    imu_lin_accs: list[list[float]] = []
+    tracking_states: list[list[int]] = []
     for i in range(nb_frames):
-        if i < len(sensors_lines):
-            t = sensors_lines[i].get("camera_transform")
+        line = sensors_lines[i] if i < len(sensors_lines) else None
+        # state (= camera 6-DoF)
+        if line:
+            t = line.get("camera_transform")
             if t and len(t) == 4 and len(t[0]) == 4:
-                # translation + rotation matrix → quaternion (= scipy 無しの 4-element 近似)
                 tx, ty, tz = t[0][3], t[1][3], t[2][3]
                 qx, qy, qz, qw = _rot_to_quat(t)
                 states.append([float(tx), float(ty), float(tz), qx, qy, qz, qw])
-                continue
-        states.append([0.0] * 7)
+            else:
+                states.append([0.0] * 7)
+        else:
+            states.append([0.0] * 7)
+        # IMU snapshot
+        imu = (line or {}).get("imu") or {}
+        ori = imu.get("orientation") or [0.0, 0.0, 0.0, 1.0]
+        ang = imu.get("angular_velocity") or [0.0, 0.0, 0.0]
+        acc = imu.get("linear_acceleration") or [0.0, 0.0, 0.0]
+        imu_orientations.append([float(x) for x in ori[:4]] + [0.0] * max(0, 4 - len(ori)))
+        imu_ang_vels.append([float(x) for x in ang[:3]] + [0.0] * max(0, 3 - len(ang)))
+        imu_lin_accs.append([float(x) for x in acc[:3]] + [0.0] * max(0, 3 - len(acc)))
+        # tracking_state
+        ts_state = (line or {}).get("tracking_state", "notAvailable")
+        tracking_states.append([tracking_state_map.get(ts_state, 0)])
 
-    # action (= 両手手首 6-DoF) は WiLoR 統合まで zeros
+    # hand 系列は WiLoR 統合まで zeros プレースホルダ。 schema は確定済なので
+    # 後で値だけ実データに差し替える形になる (= LeRobot 側 schema は不変)。
+    zero_pose = [[[0.0] * 48, [0.0] * 48]] * nb_frames
+    zero_shape = [[[0.0] * 10, [0.0] * 10]] * nb_frames
+    zero_kp = [[[[0.0] * 3 for _ in range(21)], [[0.0] * 3 for _ in range(21)]]] * nb_frames
+    zero_present = [[False, False]] * nb_frames
+
+    # action (= 両手手首 6-DoF) は WiLoR から hand_keypoints_3d[*, 0, :] を拾って組む。
+    # WiLoR 統合まで zeros。
     actions = [[0.0] * 14 for _ in range(nb_frames)]
 
     data_table = pa.table({
@@ -300,6 +336,16 @@ def _build_lerobot_v3_skeleton(
         "index": pa.array(frame_indices, type=pa.int64()),
         "task_index": pa.array([0] * nb_frames, type=pa.int64()),
         "observation.state": pa.array(states, type=pa.list_(pa.float32(), 7)),
+        "observation.imu_orientation": pa.array(imu_orientations, type=pa.list_(pa.float32(), 4)),
+        "observation.imu_angular_velocity": pa.array(imu_ang_vels, type=pa.list_(pa.float32(), 3)),
+        "observation.imu_linear_acceleration": pa.array(imu_lin_accs, type=pa.list_(pa.float32(), 3)),
+        "observation.tracking_state": pa.array(tracking_states, type=pa.list_(pa.int8(), 1)),
+        "observation.hand_pose_mano": pa.array(zero_pose, type=pa.list_(pa.list_(pa.float32(), 48), 2)),
+        "observation.hand_shape_mano": pa.array(zero_shape, type=pa.list_(pa.list_(pa.float32(), 10), 2)),
+        "observation.hand_keypoints_3d": pa.array(
+            zero_kp, type=pa.list_(pa.list_(pa.list_(pa.float32(), 3), 21), 2),
+        ),
+        "observation.hand_present": pa.array(zero_present, type=pa.list_(pa.bool_(), 2)),
         "action": pa.array(actions, type=pa.list_(pa.float32(), 14)),
     })
     os.makedirs(f"{ds_root}/data/chunk-000", exist_ok=True)
