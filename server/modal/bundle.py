@@ -35,7 +35,8 @@ import modal
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg", "libgl1", "libglib2.0-0")
+    # git は WiLoR-mini を git+https で取るのに必要
+    .apt_install("ffmpeg", "libgl1", "libglib2.0-0", "git")
     .pip_install(
         # WiLoR-mini が auto-download する MANO + 検出器込み weight に依存。 manual setup 不要。
         # GitHub install (= PyPI 配布なし)。

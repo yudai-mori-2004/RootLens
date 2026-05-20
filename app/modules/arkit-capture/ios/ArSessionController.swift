@@ -4,6 +4,7 @@ import CoreImage
 import CoreMotion
 import CoreVideo
 import Foundation
+import ImageIO
 import UIKit
 import simd
 
@@ -232,6 +233,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let sensorsHandle = try FileHandle(forWritingTo: sensorsURL)
     let imuHandle = try FileHandle(forWritingTo: imuURL)
 
+    // depth ディレクトリ (= Pro 機の sceneDepth は LiDAR、 非 Pro 機では空のまま)
+    let depthDir = sessionDir.appendingPathComponent("depth")
+    try? FileManager.default.removeItem(at: depthDir)
+    try FileManager.default.createDirectory(at: depthDir, withIntermediateDirectories: true)
+
     // camera_intrinsics.json は intrinsics 確定するまで待ちたいので、 初回 frame で書く
     // (= ARFrame の camera.intrinsics は最初の didUpdate まで埋まらない可能性)
 
@@ -383,6 +389,64 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     if frameIndex == 0, let dir = sessionDirURL {
       writeCameraIntrinsicsJson(into: dir, frame: frame)
     }
+
+    // LiDAR depth を depth/<frameIndex:06>.png に書き出す (= sceneDepth がある場合のみ)
+    if let sceneDepth = frame.sceneDepth, let dir = sessionDirURL {
+      let depthDir = dir.appendingPathComponent("depth")
+      let depthURL = depthDir.appendingPathComponent(String(format: "%06d.png", frameIndex))
+      // pixelBuffer は CVPixelBuffer の参照、 retain して queue に流す
+      let buffer = sceneDepth.depthMap
+      sensorFileQueue.async {
+        self.writeDepthPng(depthMap: buffer, to: depthURL)
+      }
+    }
+  }
+
+  /// CVPixelBuffer (= ARKit sceneDepth、 kCVPixelFormatType_DepthFloat32) を
+  /// 16-bit gray PNG として書き出す。 値は float32 m → uint16 mm に量子化。
+  private func writeDepthPng(depthMap: CVPixelBuffer, to url: URL) {
+    CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+
+    let width = CVPixelBufferGetWidth(depthMap)
+    let height = CVPixelBufferGetHeight(depthMap)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+    guard let base = CVPixelBufferGetBaseAddress(depthMap) else { return }
+
+    let floatStride = bytesPerRow / MemoryLayout<Float32>.size
+    let floatPtr = base.assumingMemoryBound(to: Float32.self)
+
+    // float32 (= m) → uint16 (= mm)
+    var u16 = [UInt16](repeating: 0, count: width * height)
+    for y in 0..<height {
+      let srcRow = y * floatStride
+      let dstRow = y * width
+      for x in 0..<width {
+        let m = floatPtr[srcRow + x]
+        let mm = m.isNaN ? 0 : m * 1000.0
+        let clamped = max(0.0, min(65535.0, Double(mm)))
+        u16[dstRow + x] = UInt16(clamped)
+      }
+    }
+
+    // CGImage 16-bit gray を組み立て、 ImageIO で PNG として書く
+    let cs = CGColorSpaceCreateDeviceGray()
+    let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue | CGBitmapInfo.byteOrder16Little.rawValue)
+    let data = NSData(bytes: u16, length: u16.count * 2)
+    guard let provider = CGDataProvider(data: data as CFData) else { return }
+    guard let cgImage = CGImage(
+      width: width, height: height,
+      bitsPerComponent: 16, bitsPerPixel: 16,
+      bytesPerRow: width * 2,
+      space: cs, bitmapInfo: bitmapInfo,
+      provider: provider,
+      decode: nil, shouldInterpolate: false,
+      intent: .defaultIntent
+    ) else { return }
+
+    guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else { return }
+    CGImageDestinationAddImage(dest, cgImage, nil)
+    CGImageDestinationFinalize(dest)
   }
 
   private func appendImuLine(motion: CMDeviceMotion) {
