@@ -15,8 +15,8 @@ import { Buffer } from 'buffer';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
 import Svg, { Path } from 'react-native-svg';
 import { getBuyerPubkey, getBuyerSigner, getDemoWalletPubkey } from '../domain/wallet';
-import { TASKS, type TaskDef } from '../domain/taskCatalog';
 import { config } from '../config';
+import { LICENSE_URLS, LICENSE_PRICE_USDC } from '../domain/licenseCatalog';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 // 一時的な「買い手シミュレーター」画面。
@@ -33,24 +33,19 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 // 価格 / license type はカタログ依存。今は commercial-v1 だけハードコード ($1)。
 
 const ENV = process.env as Record<string, string | undefined>;
-const SOLANA_RPC_URL = ENV.EXPO_PUBLIC_SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
+const SOLANA_RPC_URL = ENV.EXPO_PUBLIC_SOLANA_RPC_URL;
+if (!SOLANA_RPC_URL) {
+  throw new Error('EXPO_PUBLIC_SOLANA_RPC_URL is not set.');
+}
 const DAS_URL = ENV.EXPO_PUBLIC_DAS_URL ?? SOLANA_RPC_URL;
 
-// catalog の wildcard 行と一致する URL。zero-hash placeholder 部分は catalog でも同じ。
-const COMMERCIAL_LICENSE_URL =
-  'https://rootlens.io/licenses/commercial-v1/0000000000000000000000000000000000000000000000000000000000000000.json';
-const COMMERCIAL_PRICE_USDC = 1.0;
+// licenseCatalog (= web 側 catalog のミラー) から URL と価格を取る。
+// 旧版は 0000...0000 の placeholder URL を焼いていたので co-sign API でマッチせず常に reject
+// される silent fake になっていた。
+const COMMERCIAL_LICENSE_URL = LICENSE_URLS['commercial-v1'];
+const COMMERCIAL_PRICE_USDC = LICENSE_PRICE_USDC['commercial-v1'];
 
 // ----- helpers ---------------------------------------------------------
-
-function simpleHash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) | 0;
-  return h >>> 0;
-}
-function taskForAsset(assetId: string): TaskDef {
-  return TASKS[simpleHash(assetId) % TASKS.length];
-}
 
 interface ListedClip {
   assetId: string;
@@ -251,17 +246,18 @@ const ClipCard: React.FC<{
   error: string | null;
   onBuy: () => void;
 }> = ({ clip, buying, bought, txSig, error, onBuy }) => {
-  const task = useMemo(() => taskForAsset(clip.assetId), [clip.assetId]);
+  // Root NFT の signedJson には task_id を焼き込んでいないので、 ここでは
+  // 「タスク不明」 として扱う (= 以前の simpleHash による推測は乱数同然だったので撤去)。
+  // 将来 Title Protocol register 時に task_id を extensionInputs に含めて、 ここで
+  // DAS の json_uri 経由で取得するか、 別 endpoint で解決する。
   const canBuy = clip.staked && !buying && !bought;
 
   return (
     <View style={[styles.card, bought && styles.cardBought]}>
       <View style={styles.cardTop}>
-        <View style={styles.thumb}>
-          <Image source={task.illustration} style={styles.thumbImg} resizeMode="contain" />
-        </View>
+        <View style={[styles.thumb, styles.thumbPlaceholder]} />
         <View style={styles.cardMid}>
-          <Text style={styles.cardName} numberOfLines={1}>{task.name}</Text>
+          <Text style={styles.cardName} numberOfLines={1}>タスク不明</Text>
           <Text style={styles.cardId} numberOfLines={1}>{clip.assetId}</Text>
           <View style={styles.cardChips}>
             <View
@@ -448,6 +444,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   thumbImg: { width: '80%', height: '80%' },
+  thumbPlaceholder: { opacity: 0.5 },
   cardMid: { flex: 1, gap: 2 },
   cardName: {
     fontFamily: fonts.serifMedium,

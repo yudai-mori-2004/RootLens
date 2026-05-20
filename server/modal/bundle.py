@@ -232,15 +232,21 @@ def bundle_dataset(
         region_name="auto",
     )
 
-    # 冪等性チェック: output_prefix 配下に meta/info.json が既に居れば cached 返す
+    # 冪等性チェック: output_prefix 配下に meta/info.json が既に居れば cached 返す。
+    # placeholder (totalFrames=0 等) は silent fake になるので、 info.json を読み戻して
+    # 実値を返す。 handsDetectedAvg / uploadedFiles は info.json に保存していないので
+    # cached 経路では null (= 不明) を返す。
     info_key = f"{output_prefix.rstrip('/')}/meta/info.json"
     try:
         s3.head_object(Bucket=bucket_datasets, Key=info_key)
+        info_obj = s3.get_object(Bucket=bucket_datasets, Key=info_key)
+        info_doc = json.loads(info_obj["Body"].read().decode())
         return {
-            "totalFrames": 0,
-            "fps": 0.0,
-            "handsDetectedAvg": 0.0,
-            "durationMs": 0,
+            "totalFrames": int(info_doc.get("total_frames", 0)),
+            "fps": float(info_doc.get("fps", 0.0)),
+            "handsDetectedAvg": None,
+            "durationMs": None,
+            "uploadedFiles": None,
             "cached": True,
         }
     except s3.exceptions.ClientError:

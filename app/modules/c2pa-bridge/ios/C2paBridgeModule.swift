@@ -68,7 +68,11 @@ public class C2paBridgeModule: Module {
             }
           } else {
             #if DEBUG
-            NSLog("[C2paBridge] No TEE cert — falling back to legacy PEM signing (DEBUG only)")
+            // 警告: TEE 証明書なしでの legacy PEM 署名は 仕様 §4.6 で本来許されない。
+            // C2PA manifest は焼かれるが、 leaf cert chain が dev PEM root のものになるので、
+            // 下流 (= サーバ Pipeline 2 / Title Protocol) の検証は別の trust anchor で通している前提。
+            // この経路で署名されたコンテンツは production リリースに混入させてはならない。
+            NSLog("⚠️ [C2paBridge] FALLING BACK TO LEGACY PEM SIGNING (DEBUG ONLY) — output is NOT production-grade. Provision a real TEE cert via useCertificateProvisioning.")
             Self.signWithLegacy(inputPath: inputPath, outputPath: outputPath, promise: promise)
             #else
             promise.reject("CERT_ERROR", "Device Certificateが未取得です。ネットワーク接続を確認してください")

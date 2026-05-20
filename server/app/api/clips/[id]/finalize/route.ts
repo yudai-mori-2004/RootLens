@@ -26,10 +26,16 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const { id } = await ctx.params;
 
-  const raw = await req.json().catch(() => null);
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch (e) {
+    console.warn(`[POST /api/clips/${id}/finalize] body JSON parse failed:`, e);
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid body", details: parsed.error.format() }, { status: 400 });
   }
 
   const rows = await db.select().from(clips)

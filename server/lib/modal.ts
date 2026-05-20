@@ -67,9 +67,12 @@ interface BundleResult {
   totalFrames: number;
   /// fps (= rgb.mp4 から取った値)
   fps: number;
-  /// hands detected per frame の平均
-  handsDetectedAvg: number;
-  durationMs: number;
+  /// hands detected per frame の平均。 cached 経路では info.json に保存していないので null。
+  handsDetectedAvg: number | null;
+  /// Modal 処理時間 (= ms)。 cached 経路では実行していないので null。
+  durationMs: number | null;
+  /// R2 にアップロードしたファイル数。 cached 経路では null。
+  uploadedFiles: number | null;
   cached: boolean;
 }
 

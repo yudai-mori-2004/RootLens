@@ -209,17 +209,25 @@ export async function registerOnTitleProtocol(
 
   // Sanity check: GET back from S3, verify byte count matches what we PUT.
   // gateway が "payload too short" を返すのは大抵この段階のサイズ齟齬。
+  // HEAD 自体の network 失敗 (= S3 reach できない等) は warning だが、 サイズ齟齬を
+  // 検出したら絶対に throw して止める (= silent corruption を放置すると下流の verify が
+  // 別の理由で失敗して原因追跡が困難になる)。
+  let headLenHdr: string | null = null;
+  let headStatus: number | null = null;
+  let headOk = false;
   try {
     const verifyHead = await fetch(downloadUrl, { method: 'HEAD' });
-    const lenHdr = verifyHead.headers.get('content-length');
-    console.log('[TP upload verify] S3 HEAD status=', verifyHead.status, 'content-length=', lenHdr);
-    if (verifyHead.ok && lenHdr && Number(lenHdr) !== payloadSize) {
-      throw new Error(
-        `[TP upload verify] S3 stored ${lenHdr} bytes but we PUT ${payloadSize} bytes — upload corrupted`,
-      );
-    }
+    headStatus = verifyHead.status;
+    headLenHdr = verifyHead.headers.get('content-length');
+    headOk = verifyHead.ok;
+    console.log('[TP upload verify] S3 HEAD status=', headStatus, 'content-length=', headLenHdr);
   } catch (e: any) {
-    console.warn('[TP upload verify] HEAD failed (continuing):', e?.message ?? e);
+    console.warn('[TP upload verify] HEAD network failed (continuing):', e?.message ?? e);
+  }
+  if (headOk && headLenHdr && Number(headLenHdr) !== payloadSize) {
+    throw new Error(
+      `[TP upload verify] S3 stored ${headLenHdr} bytes but we PUT ${payloadSize} bytes (status=${headStatus}). upload corrupted.`,
+    );
   }
 
   // verify

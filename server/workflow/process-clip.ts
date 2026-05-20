@@ -120,14 +120,20 @@ async function callTp(args: {
   idempotencyKey: string;
 }) {
   "use step";
+  const tosVersion = process.env.ROOTLENS_TOS_VERSION;
+  const tosHash = process.env.ROOTLENS_TOS_HASH;
+  if (!tosVersion || !tosHash) {
+    // ToS の同意検証は Root NFT 発行の legal chain の根拠 (= SPECS_JA §4.4.2)。
+    // env 未設定で進めると placeholder ハッシュが焼き込まれて検証不能になるので fail-loud。
+    throw new Error(
+      "ROOTLENS_TOS_VERSION and ROOTLENS_TOS_HASH must both be set before TP submission.",
+    );
+  }
   return await submitToTp({
     blurredR2Key: args.blurredR2Key,
     blurredContentHash: args.blurredContentHash,
     ownerWalletPubkey: args.ownerWalletPubkey,
-    rootlensLicenseInput: {
-      tosVersion: process.env.ROOTLENS_TOS_VERSION ?? "v1.0.0",
-      tosHash: process.env.ROOTLENS_TOS_HASH ?? "",
-    },
+    rootlensLicenseInput: { tosVersion, tosHash },
     idempotencyKey: args.idempotencyKey,
   });
 }

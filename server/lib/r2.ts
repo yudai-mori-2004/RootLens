@@ -31,6 +31,12 @@ if (!process.env.R2_ACCOUNT_ID) {
 if (!process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
   throw new Error("R2 credentials are not set.");
 }
+if (!process.env.R2_BUCKET_RAW) {
+  throw new Error("R2_BUCKET_RAW is not set.");
+}
+if (!process.env.R2_BUCKET_BLURRED) {
+  throw new Error("R2_BUCKET_BLURRED is not set.");
+}
 
 const r2 = new S3Client({
   region: "auto",
@@ -41,8 +47,9 @@ const r2 = new S3Client({
   },
 });
 
-const BUCKET_RAW = process.env.R2_BUCKET_RAW ?? "rootlens-mcap-raw";
-const BUCKET_BLURRED = process.env.R2_BUCKET_BLURRED ?? "rootlens-mcap-blurred";
+const BUCKET_RAW = process.env.R2_BUCKET_RAW;
+const BUCKET_BLURRED = process.env.R2_BUCKET_BLURRED;
+/// データセット出力先は省略可 (= 設定されていなければ blurred バケットを流用)。
 const BUCKET_DATASETS = process.env.R2_BUCKET_DATASETS ?? BUCKET_BLURRED;
 
 // key / prefix 命名関数は lib/r2-keys.ts に分離。 互換性のためここからも re-export する。

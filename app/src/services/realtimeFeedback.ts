@@ -88,8 +88,8 @@ class RealtimeFeedbackImpl {
     this.stopTickLoop();
     this.clearVoicePromptTimer();
     if (this.bgm) {
-      await this.bgm.stopAsync().catch(() => {});
-      await this.bgm.unloadAsync().catch(() => {});
+      await this.bgm.stopAsync().catch((e) => console.warn('[realtimeFeedback] bgm.stop failed:', e));
+      await this.bgm.unloadAsync().catch((e) => console.warn('[realtimeFeedback] bgm.unload failed:', e));
       this.bgm = null;
     }
     Speech.stop();
@@ -158,7 +158,9 @@ class RealtimeFeedbackImpl {
     // 適用音量が前回と十分違うときだけ setVolumeAsync を呼ぶ (= async storm 抑制)
     if (Math.abs(this.currentVolume - this.lastAppliedVolume) > 0.01 || absDelta < 0.05) {
       this.lastAppliedVolume = this.currentVolume;
-      this.bgm.setVolumeAsync(this.currentVolume).catch(() => {});
+      this.bgm.setVolumeAsync(this.currentVolume).catch((e) =>
+        console.warn('[realtimeFeedback] bgm.setVolume failed:', e),
+      );
     }
   }
 

@@ -134,12 +134,13 @@ class ClipStore {
           // なので失敗扱いにする (= 本物 server だったら再 query するところ)
           if (c.state === 'uploading' || c.state === 'processing') {
             c.state = 'error';
+            c.errorMessage = 'アプリ再起動中に中断されました';
           }
           this.clips.set(c.id, c);
         }
       }
-    } catch {
-      // 破損データは諦める
+    } catch (e) {
+      console.error('[clipPipeline] hydrate failed (persisted clips ignored):', e);
     }
     this.notify();
   }
@@ -348,6 +349,10 @@ class ClipStore {
     this.startHttpPolling(clipId);
   }
 
+  /// polling 1 件あたりの連続失敗回数。 閾値を超えたら state を error にして撮影者に通知する。
+  private pollFailureCount: Map<string, number> = new Map();
+  private static readonly POLL_FAILURE_THRESHOLD = 5;
+
   private startHttpPolling(clipId: string): void {
     if (this.httpPollers.has(clipId)) return;
     const serverUrl = getServerBaseUrl();
@@ -359,14 +364,26 @@ class ClipStore {
         const res = await fetch(`${serverUrl}/api/clips/${clipId}`, {
           headers: { 'X-Wallet-Pubkey': walletPubkey },
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          throw new Error(`GET /api/clips/${clipId} failed: ${res.status}`);
+        }
         const { clip } = await res.json();
+        this.pollFailureCount.delete(clipId);
         this.applyServerClip(clip);
         if (clip.state === 'ready' || clip.state === 'error' || clip.state === 'staked') {
           this.stopHttpPolling(clipId);
         }
-      } catch {
-        // 一時的なネットワークエラーは黙って次の tick に任せる
+      } catch (e) {
+        const next = (this.pollFailureCount.get(clipId) ?? 0) + 1;
+        this.pollFailureCount.set(clipId, next);
+        console.warn(`[clipPipeline] poll tick failed (${next}/${ClipStore.POLL_FAILURE_THRESHOLD}):`, e);
+        if (next >= ClipStore.POLL_FAILURE_THRESHOLD) {
+          this.stopHttpPolling(clipId);
+          this.update(clipId, {
+            state: 'error',
+            errorMessage: `サーバへの問い合わせに ${ClipStore.POLL_FAILURE_THRESHOLD} 回連続で失敗しました`,
+          });
+        }
       }
     };
     tick();  // 即時 1 回
@@ -379,6 +396,7 @@ class ClipStore {
       clearInterval(t);
       this.httpPollers.delete(clipId);
     }
+    this.pollFailureCount.delete(clipId);
   }
 
   /// サーバ DTO を ローカル Clip 型に正規化して update。

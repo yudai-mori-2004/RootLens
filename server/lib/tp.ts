@@ -28,7 +28,6 @@ export interface TpSubmitRequest {
 export interface TpSubmitResult {
   rootAssetId: string;
   signedJsonUri: string;
-  alreadyIssued: boolean;
 }
 
 // ─── GlobalConfig + TitleClient のキャッシュ ────────────────────────
@@ -38,8 +37,13 @@ let cachedClient: any = null;
 async function getClient(): Promise<any> {
   if (cachedClient) return cachedClient;
   const { fetchGlobalConfig, TitleClient } = await import("@title-protocol/sdk");
-  const network = (process.env.TP_NETWORK ?? "devnet") as "devnet" | "mainnet";
-  const config = await fetchGlobalConfig(network);
+  const networkRaw = process.env.TP_NETWORK;
+  if (networkRaw !== "devnet" && networkRaw !== "mainnet") {
+    throw new Error(
+      `TP_NETWORK must be 'devnet' or 'mainnet' (got: ${JSON.stringify(networkRaw)}).`,
+    );
+  }
+  const config = await fetchGlobalConfig(networkRaw);
   cachedClient = new TitleClient(config);
   return cachedClient;
 }
@@ -50,15 +54,21 @@ async function downloadFromR2(key: string): Promise<Uint8Array> {
   const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
   const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
 
+  if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY) {
+    throw new Error("R2 credentials are not set (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY).");
+  }
+  if (!process.env.R2_BUCKET_BLURRED) {
+    throw new Error("R2_BUCKET_BLURRED is not set.");
+  }
   const r2 = new S3Client({
     region: "auto",
     endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
     credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.R2_ACCESS_KEY_ID,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
     },
   });
-  const bucket = process.env.R2_BUCKET_BLURRED ?? "rootlens-mcap-blurred";
+  const bucket = process.env.R2_BUCKET_BLURRED;
   const url = await getSignedUrl(r2, new GetObjectCommand({ Bucket: bucket, Key: key }), {
     expiresIn: 600,
   });
@@ -90,7 +100,8 @@ export async function submitToTp(req: TpSubmitRequest): Promise<TpSubmitResult> 
     },
   });
 
-  // SDK の register 結果 schema は version で揺れるので、 候補 field 名から最初に見つかったものを採用
+  // SDK の register 結果 schema は version で揺れるので、 候補 field 名から最初に見つかったものを採用。
+  // 空文字 fallback は silent fake になるので、 どの field でも取れなければ throw する。
   const first = result?.contents?.[0];
   if (!first) throw new Error("TP register returned no contents");
 
@@ -98,16 +109,16 @@ export async function submitToTp(req: TpSubmitRequest): Promise<TpSubmitResult> 
     (first as any).rootAssetId ??
     (first as any).cnftAssetId ??
     (first as any).signedJson?.payload?.cnft_asset_id ??
-    (first as any).signedJson?.payload?.content_hash ??
-    "";
-  const signedJsonUri =
-    (first as any).storageUri ??
-    (first as any).signedJsonUri ??
-    "";
+    (first as any).signedJson?.payload?.content_hash;
+  if (!rootAssetId || typeof rootAssetId !== "string") {
+    throw new Error(
+      `TP register returned no rootAssetId. result.contents[0] keys=[${Object.keys(first ?? {}).join(",")}]`,
+    );
+  }
+  const signedJsonUri = (first as any).storageUri ?? (first as any).signedJsonUri;
+  if (!signedJsonUri || typeof signedJsonUri !== "string") {
+    throw new Error("TP register returned no signedJsonUri (storageUri / signedJsonUri both missing).");
+  }
 
-  return {
-    rootAssetId,
-    signedJsonUri,
-    alreadyIssued: false,
-  };
+  return { rootAssetId, signedJsonUri };
 }

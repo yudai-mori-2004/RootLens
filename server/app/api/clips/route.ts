@@ -44,7 +44,13 @@ export async function POST(req: Request) {
     return r as Response;
   }
 
-  const raw = await req.json().catch(() => null);
+  let raw: unknown;
+  try {
+    raw = await req.json();
+  } catch (e) {
+    console.warn("[POST /api/clips] body JSON parse failed:", e);
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const parsed = createSchema.safeParse(raw);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body", details: parsed.error.format() }, { status: 400 });

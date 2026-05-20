@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { COUNTDOWN_MS } from '../domain/captureStateMachine';
+import { COUNTDOWN_MS } from '../domain/captureFlow';
 import { colors, typography, spacing } from '../theme';
 
 // Center overlay during 3 → 2 → 1 countdown.

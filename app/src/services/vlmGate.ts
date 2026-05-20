@@ -90,14 +90,20 @@ function buildUserText(taskName: string, conditionText: string): string {
 function parseJsonResponse(rawText: string): { score: number; match: boolean; reason: string } {
   const m = rawText.match(/\{[\s\S]*\}/);
   const cleaned = m ? m[0] : rawText;
-  const parsed = JSON.parse(cleaned);
-  const score =
-    typeof parsed.score === 'number' ? Math.max(0, Math.min(100, Math.round(parsed.score))) : 0;
-  return {
-    score,
-    match: typeof parsed.match === 'boolean' ? parsed.match : score >= 70,
-    reason: typeof parsed.reason === 'string' ? parsed.reason : '',
-  };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch (e) {
+    throw new Error(`VLM response is not JSON: ${(e as Error).message}. raw=${rawText.slice(0, 200)}`);
+  }
+  const obj = parsed as { score?: unknown; match?: unknown; reason?: unknown };
+  if (typeof obj.score !== 'number' || typeof obj.match !== 'boolean' || typeof obj.reason !== 'string') {
+    throw new Error(
+      `VLM response missing required fields { score:number, match:boolean, reason:string }. raw=${rawText.slice(0, 200)}`,
+    );
+  }
+  const score = Math.max(0, Math.min(100, Math.round(obj.score)));
+  return { score, match: obj.match, reason: obj.reason };
 }
 
 /**

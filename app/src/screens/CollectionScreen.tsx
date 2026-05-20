@@ -13,6 +13,7 @@ import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 import { getDemoWalletPubkey } from '../domain/wallet';
 import { ClipCard } from '../components/ClipCard';
 import { StakeSheet } from '../components/StakeSheet';
+import { priceFromLicenseUrl } from '../domain/licenseCatalog';
 import { clipStore, useClips, type Clip } from '../services/clipPipeline';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
@@ -27,21 +28,15 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 // 状態にのみ作用する (= SPECS §4.2 で UI 上の入口がここに統合された)。
 
 const ENV = process.env as Record<string, string | undefined>;
-const DAS_URL =
-  ENV.EXPO_PUBLIC_DAS_URL ?? ENV.EXPO_PUBLIC_SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
+const DAS_URL = ENV.EXPO_PUBLIC_DAS_URL ?? ENV.EXPO_PUBLIC_SOLANA_RPC_URL;
+if (!DAS_URL) {
+  throw new Error('EXPO_PUBLIC_DAS_URL (or EXPO_PUBLIC_SOLANA_RPC_URL) is not set.');
+}
 
 const LICENSE_COLLECTION_MINT = 'BvhuJiTWDW6n5cSzE4XmzYcwLry7vcstS1U7fD7n9N1b';
 
-const LICENSE_PRICE_BY_SLUG: Record<string, number> = {
-  'commercial-v1': 1.0,
-  'training-only-v1': 0.5,
-};
-
 function priceFromUri(uri: string | null | undefined): number {
-  if (!uri) return 0;
-  const m = uri.match(/\/licenses\/([^/]+)\//);
-  if (!m) return 0;
-  return LICENSE_PRICE_BY_SLUG[m[1]] ?? 0;
+  return priceFromLicenseUrl(uri) ?? 0;
 }
 
 function rootMintFromUri(uri: string | null | undefined): string | null {

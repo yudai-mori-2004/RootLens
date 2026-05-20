@@ -13,8 +13,10 @@ export async function clipToDto(row: Clip): Promise<ClipDto> {
   if (row.blurredMp4Key) {
     try {
       previewVideoUrl = await presignBlurredGet(row.blurredMp4Key, 3600);
-    } catch {
-      // signing 失敗時は null (= client は local snapshot に fallback)
+    } catch (e) {
+      // signing 失敗時は null (= client は local snapshot に fallback)。
+      // ただ silent には流さず、 サーバ側 log には残す (= 認証 / バケット設定 ミスの早期検知)。
+      console.error(`[mapper] presignBlurredGet failed for ${row.blurredMp4Key}:`, e);
     }
   }
   return {
