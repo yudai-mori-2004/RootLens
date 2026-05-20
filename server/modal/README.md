@@ -5,7 +5,9 @@ SPECS §6.2 で定義した 2 つのサーバ側パイプラインを Modal で�
 | 関数 | パイプライン | resource | 役割 |
 |---|---|---|---|
 | `blur.py` (= `rootlens-blur`) | Pipeline 2 | CPU 4 / 2 GB | YuNet 顔ぼかし + C2PA 「署名 S」 |
-| `bundle.py` (= `rootlens-bundle`) | Pipeline 3 | CPU 4 / 4 GB (= WiLoR 統合後に GPU 化) | LeRobot v3 dataset 構築 |
+| `bundle.py` (= `rootlens-bundle`) | Pipeline 3 | GPU A10G / 16 GB memory | LeRobot v3 dataset 構築 + WiLoR-mini hand pose |
+
+`bundle.py` の手姿勢推定は [WiLoR-mini (warmshao/WiLoR-mini)](https://github.com/warmshao/WiLoR-mini) を使う。 pip install 経由 (= `git+https://github.com/warmshao/WiLoR-mini.git`) で、 weight は HuggingFace から auto-download (= MANO 含む)、 manual 登録なし。 1 clip ~$0.02 (= A10G 15-20 FPS × clip 1 分相当)。
 
 Pipeline 1 (= 撮影) は端末側、 Modal は触らない。
 
