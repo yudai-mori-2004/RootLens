@@ -84,3 +84,10 @@ app/modules/hand-pose/android/build/
 # Pipeline node_modules
 pipeline/**/node_modules/
 
+# LP sample 配信物 (= 元 .mp4 1.6 GB + 生成 dataset 554 MB)。
+# git 管理せず、 R2 / 別配信経路で扱う。
+# メタ JSON (json/rootlens_sample_videos.json) は contributor が付けた task ラベルで
+# build スクリプトの入力なので git に残す。
+web/public/lp/sample/*.mp4
+web/public/lp/sample/dataset/
+

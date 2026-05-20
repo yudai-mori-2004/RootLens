@@ -46,7 +46,7 @@ LeRobotDataset v3.0 naming conventions throughout (`observation.*`, `action`, `t
 | `frame_index` | int64 | scalar | Index within the episode, starting at 0. |
 | `episode_index` | int64 | scalar | Always 0 in the per-clip distribution shape. |
 | `index` | int64 | scalar | Global row index (equal to `frame_index` for single-episode datasets). |
-| `task_index` | int64 | scalar | Index into `tasks.jsonl`. |
+| `task_index` | int64 | scalar | Index into `tasks.jsonl` identifying the sub-task (phase) currently in progress for this frame. See "Phase labels" below. |
 | `observation.images.ego_cam` | video (file ref) | [3, H, W] | Reference to the corresponding frame in `videos/observation.images.ego_cam/...`. |
 | `observation.state` | float32 | [7] | Camera 6-DoF in the ARKit world frame: `[tx, ty, tz, qx, qy, qz, qw]`. Translation extracted from `ARFrame.camera.transform.columns.3`; quaternion derived from the upper-left 3x3 of the same transform. `ARWorldTrackingConfiguration.worldAlignment` is set to `.gravity`; see the [Apple ARKit documentation](https://developer.apple.com/documentation/arkit/arconfiguration/worldalignment/gravity) for the exact axis convention. |
 | `observation.imu_orientation` | float32 | [4] | Quaternion `[qx, qy, qz, qw]` from `CMDeviceMotion.attitude.quaternion`, sampled at the RGB frame instant. |
@@ -71,6 +71,23 @@ ty = 2 * (cy - h/2) / (box_size * cam_bbox[0]) + cam_bbox[2]
 
 The inputs (`box_size`, `cx`, `cy`, `w`, `h`, `focal_length`) are all in pixels, and `cam_bbox[0:3]` is the unitless weak-perspective camera prediction from the network. The result is a dimensionless triplet tied to the MANO canonical mesh scale; it is not in metric meters. Converting to metric coordinates requires either a known scale for the MANO hand used at training time or a depth measurement at the wrist (for example, sampling `depth/{frame_index}.png` at the wrist pixel on LiDAR-equipped devices).
 
+## Phase labels (semantic sub-tasks)
+
+`task_index` resolves to a natural-language phase description for the current frame, looked up in `meta/tasks.jsonl`. A single episode is segmented into multiple phases, and `task_index` changes from frame to frame as the action progresses.
+
+Phase text is free-form English in the style of Ego4D narrations (e.g. `"Right hand reaches for the kettle handle."`). The vocabulary is intentionally open: no fixed closed taxonomy is imposed, so phases can describe whatever happens in the clip at whatever granularity the labeler chose.
+
+Phases are produced server-side from the blurred RGB video by a vision-language model invoked at bundle time. They are not derived from raw measurements and are not deterministic re-computable from the parquet columns; consumers who want a different segmentation should re-segment the video themselves.
+
+`meta/tasks.jsonl` typically contains both:
+
+- One entry naming the episode-level task that the contributor chose (e.g. `"pour tea into a cup"`).
+- Multiple entries naming the per-segment phases that occurred during the episode.
+
+`meta/episodes/chunk-XXX/file-YYY.parquet` lists, per episode, the full set of phase strings that appear in that episode in its `tasks` column (string array).
+
+The `rootlens` block in `meta/info.json` records which vision-language model produced the phase labels (see below).
+
 ## `meta/info.json` extensions
 
 In addition to the standard LeRobotDataset v3.0 fields (`features`, `fps`, `total_episodes`, `total_frames`, `data_path`, `video_path`, ...) the file contains a `rootlens` block written by the bundler:
@@ -80,12 +97,13 @@ In addition to the standard LeRobotDataset v3.0 fields (`features`, `fps`, `tota
   "rootlens": {
     "root_nft_asset_id": "<asset id of the Title Protocol cNFT>",
     "pipeline_version": "v0.1.2",
-    "bundler_version": "v1-wilor-mano"
+    "bundler_version": "v1-wilor-mano",
+    "phase_labeler": "claude-haiku-4-5"
   }
 }
 ```
 
-The bundler (`server/modal/bundle.py`) writes exactly these three fields.
+`phase_labeler` records the model identifier used to generate the per-segment phase strings stored in `meta/tasks.jsonl` (see "Phase labels" above). The other three fields identify the dataset release, the upstream RootLens server pipeline version, and the bundler that produced the per-frame columns.
 
 ## Companion sidecar files (not part of the LeRobot loader contract)
 
