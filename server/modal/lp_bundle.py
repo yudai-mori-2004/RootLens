@@ -64,7 +64,8 @@ _face_detector = None
 
 
 def get_face_detector():
-    """OpenCV 同梱 YuNet を遅延 init (= blur.py と同パラメータ)。"""
+    """OpenCV 同梱 YuNet を遅延 init (= blur.py と同パラメータ)。
+    score_threshold は egocentric の拳誤検出を抑えるため 0.85 (= blur.py 詳細参照)。"""
     global _face_detector
     if _face_detector is None:
         import cv2
@@ -75,7 +76,7 @@ def get_face_detector():
             )
         _face_detector = cv2.FaceDetectorYN.create(
             YUNET_MODEL_PATH, "", (320, 320),
-            score_threshold=0.6, nms_threshold=0.3, top_k=5000,
+            score_threshold=0.85, nms_threshold=0.3, top_k=5000,
         )
     return _face_detector
 

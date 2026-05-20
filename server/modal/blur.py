@@ -71,7 +71,18 @@ _face_detector = None
 
 def get_face_detector():
     """OpenCV 同梱 YuNet (= cv2.FaceDetectorYN) を遅延 init。
-    score_threshold 0.6 / NMS IoU 0.3 は OpenCV demo の標準値。
+
+    score_threshold:
+      - OpenCV demo の default は 0.6 (= 正面の典型的な顔向け)。
+      - egocentric / chest-mounted では 拳 / 食器 / 物体が「顔っぽい形」 として
+        confidence 0.60-0.86 のレンジで誤検出される。 3 本のサンプル動画で
+        全 frame 計測したところ 0.6 では 12-51 % frame で誤検出、 0.85 まで
+        上げると 0.1 % まで落ちた。 contributor の顔は一人称視点で映らない
+        前提なので 0.85 に上げる。 他人の顔の遠距離・横向きの検出率は
+        多少下がるが、 chest-mounted の egocentric では他人の顔がアップで
+        映る場面が少なく、 拳の連続誤検出を抑えるメリットが上回る。
+
+    NMS IoU 0.3 は OpenCV demo 標準のまま。
     input size は frame ごとに setInputSize で書き換える (= dummy 320×320 で create)。
     """
     global _face_detector
@@ -86,7 +97,7 @@ def get_face_detector():
             YUNET_MODEL_PATH,
             "",                      # config (= unused for YuNet)
             (320, 320),              # dummy 初期 input size
-            score_threshold=0.6,
+            score_threshold=0.85,
             nms_threshold=0.3,
             top_k=5000,
         )
