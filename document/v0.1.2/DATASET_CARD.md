@@ -51,9 +51,9 @@ All columns use LeRobotDataset v3 naming conventions (`observation.*`, `action`,
 | `observation.tracking_state` | int8 | [1] | ARCamera tracking state: `0 = notAvailable`, `1 = limited`, `2 = normal`. Filter on `>= 1` for usable frames. |
 | `observation.hand_keypoints_3d` | float32 | [2, 21, 3] | 21-joint 3D hand keypoints per hand `[left, right]` in MANO canonical hand-local space (origin at wrist). Joints follow the MANO ordering. |
 | `observation.hand_present` | bool | [2] | Per-hand detection flag `[left, right]`. |
-| `observation.hand_pose_mano` | float32 | [2, 48] | MANO axis-angle pose (global rotation 3 + 15 joint rotations x 3). v1 ships zeros; reserved for the next release. |
-| `observation.hand_shape_mano` | float32 | [2, 10] | MANO shape coefficients (beta). v1 ships zeros; reserved for the next release. |
-| `action` | float32 | [14] | Two-hand wrist 6-DoF concatenated: `[lh_x, lh_y, lh_z, lh_qx, lh_qy, lh_qz, lh_qw, rh_x, rh_y, rh_z, rh_qx, rh_qy, rh_qz, rh_qw]`. Compatible with EgoMimic-style action representations. |
+| `observation.hand_pose_mano` | float32 | [2, 48] | MANO axis-angle pose: global rotation (3) concatenated with 15 finger joint rotations (15 x 3 = 45). Extracted from WiLoR-mini `global_orient` + `hand_pose`. |
+| `observation.hand_shape_mano` | float32 | [2, 10] | MANO shape coefficients (beta). Zero-filled (neutral hand mean shape) since the upstream hand pose model does not return per-subject shape parameters. |
+| `action` | float32 | [14] | Two-hand wrist 6-DoF concatenated: `[lh_x, lh_y, lh_z, lh_qx, lh_qy, lh_qz, lh_qw, rh_x, rh_y, rh_z, rh_qx, rh_qy, rh_qz, rh_qw]`. Wrist translation comes from WiLoR-mini's `pred_cam_t_full` and lives in the model's pinhole projection space (the inherent scale ambiguity of monocular hand pose; the z component is not metric meters). For metric world coordinates, compose `action` with `observation.state` plus a depth source (`observation.depth` on LiDAR-equipped devices, or `camera_intrinsics.json` + your own depth estimator). Wrist rotation is the unit quaternion form of WiLoR-mini's `global_orient` axis-angle. Compatible with EgoMimic / EgoVLA action conventions. |
 
 Companion side files (uploaded alongside the dataset, not part of the LeRobot loader contract):
 
@@ -139,12 +139,12 @@ For streaming-from-Hub workflows (`StreamingLeRobotDataset`, `lerobot-imgtransfo
 
 This document describes RootLens dataset format version `v0.1.2`. Bundler version is recorded per dataset in `meta/info.json` (`rootlens.bundler_version`). Buyer-side loaders should treat unknown bundler versions as forward-compatible: schema is fixed (LeRobot v3 + the `rootlens.*` block), only column values evolve.
 
-## Roadmap (v0.2 candidates, schema unchanged)
+## Roadmap (schema unchanged)
 
-- Real values for `observation.hand_pose_mano` (48-dim) and `observation.hand_shape_mano` (10-dim) extracted from WiLoR-mini's `global_orient` + `hand_pose` + `pred_betas`.
-- `action` column resolved into camera-space wrist 6-DoF using `pred_cam_t_full` (currently MANO canonical).
+- Per-subject MANO shape estimation (currently `observation.hand_shape_mano` is the neutral mean): could be added when a hand-shape estimator becomes available without a non-commercial license attached to MANO outputs.
 - Optional `observation.hand_vertices` column for the 778-vertex MANO mesh (off by default; large parquet impact).
-- Higher-rate IMU as a parallel parquet alongside the RGB-aligned 30 Hz `observation.imu_*` columns.
+- Higher-rate IMU as a parallel parquet alongside the RGB-aligned 30 Hz `observation.imu_*` columns (raw 100 Hz samples are shipped in `imu_high_rate.jsonl`).
+- World-space wrist 6-DoF derivable by composing `action` (camera-space wrist) with `observation.state` (camera 6-DoF). Loaders can do this on the fly; we intentionally ship raw camera-space values for forward compatibility.
 
 ## Contact / access
 

@@ -200,16 +200,23 @@ iOS アプリが 1 セッションごとに以下を出力:
 
 実機 e2e 検証 (2026-05-20): iPhone 12 で 8.4 秒撮影 → 4 ファイル並走 upload (= rgb.mp4 6.4MB + sensors.jsonl 387KB + imu_high_rate.jsonl 250KB + camera_intrinsics.json 278B) → Pipeline 2 で blurred 2.3MB + quality 75 + Root NFT 発行 (`0xe3bc0382...`) → ステーキング → Pipeline 3 (A10G, 97 秒) で LeRobot v3 dataset 完成 (= datasets/0xe3bc0382.../)。 parquet の `observation.state` は ARKit world-aligned 6-DoF camera pose で埋まり、 `observation.tracking_state` 全 504 frame `normal`、 IMU は重力 ≈ 1g 検証済。
 
-## 後続改善 (= v2 候補、 schema 維持して値だけ精度向上)
+## 出力品質の現状 (= bundler_version `v1-wilor-mano`)
 
-WiLoR-mini の output dict (= `wilor_preds.global_orient` + `hand_pose` + `pred_cam_t_full`) を更に拾うと:
+WiLoR-mini の output から以下を per-frame で抽出済:
 
-- **`observation.hand_pose_mano` [2, 48]** を実値に: 現在 zeros の MANO axis-angle (= `global_orient` 3-dim + `hand_pose` 45-dim) を per-frame で詰める
-- **`observation.hand_shape_mano` [2, 10]** を実値に: `pred_betas` (= WiLoR-mini が exposed していれば) を拾う、 出してなければ neutral β を埋める
-- **`action` [14]` を camera-space wrist 6-DoF に修正**: 現在 `pred_keypoints_3d[0]` (= MANO canonical 空間の wrist) を使っているが、 `pred_cam_t_full` (= camera 空間の wrist 位置) + `global_orient` (= camera 空間の wrist 回転) に切り替え、 ARKit `observation.state` と組み合わせて world-aligned 6-DoF に展開できる
-- **`pred_vertices` (= 778 mesh 頂点)** を別 column (= 任意) として保存する選択肢、 ただし parquet が ~50× 大きくなるので default は外す
+- `observation.hand_pose_mano` [2, 48]: `global_orient` (3) + `hand_pose` (15×3=45) concat、 axis-angle
+- `observation.hand_keypoints_3d` [2, 21, 3]: `pred_keypoints_3d`、 MANO canonical (= hand-local) 空間
+- `action` [14]: camera-space wrist 6-DoF = `pred_cam_t_full` (位置) + `global_orient` を quat 変換 (回転)、 両手分
+- `observation.hand_present` [2]: detection flag
 
-これらは LeRobot v3 schema を変えずに値だけ差し替える形 (= buyer 側のローダーは何も変えない)。
+MANO shape (betas) は WiLoR-mini が exposed していない (= GitHub source [`wilor_hand_pose3d_estimation_pipeline.py`](https://github.com/warmshao/WiLoR-mini/blob/main/wilor_mini/pipelines/wilor_hand_pose3d_estimation_pipeline.py) で確認済)。 そのため `observation.hand_shape_mano [2, 10]` は zeros で出す。 MANO 規約で β=0 は neutral hand mean shape を意味するため、 「shape を推定しない (= 中立形状を仮定)」 の明示シグナルとして妥当。
+
+## さらに先 (= schema 変更を要するもの)
+
+これらは parquet 列を増やすので、 互換性壊さない時期に判断:
+
+- 別 column `observation.hand_vertices` [2, 778, 3] で MANO mesh を保持 (= 大幅サイズ増のため default off の予定)
+- 100 Hz IMU の RGB-非同期 stream を別 parquet として並走 (= 現在は `imu_high_rate.jsonl` のサイドカーで配布、 buyer 側で必要に応じて parquet 変換)
 
 ## 参考
 

@@ -16,12 +16,10 @@ rootlens-server サーバパイプライン Pipeline 3 (= 販売データ整形)
 
 実装段階:
   v1 (= 本ファイル): LeRobot v3 ディレクトリレイアウト + RGB MP4 配置 + sensors.jsonl → parquet 展開
-                    + WiLoR-mini per-frame inference (= hand keypoints 3D + handedness 検出)。
-                    MANO pose / shape の per-frame 値は WiLoR-mini の output から取れる場合があるが、
-                    version 差異が大きいので zeros placeholder (= schema は確定済)。
-  v2 (= 候補): WiLoR-mini output から 'pred_mano_params' を拾って hand_pose_mano / hand_shape_mano
-              を実値に。 wrist orientation を forearm 方向から計算して action quaternion を改善。
-  v3: depth / IMU 高 rate と RGB の frame index 同期、 stats.json 自動生成
+                    + WiLoR-mini per-frame inference (= hand keypoints 3D + handedness +
+                    MANO pose 48-dim + camera-space wrist 6-DoF action)。
+                    MANO shape (betas) は WiLoR-mini が exposed していないため zeros 固定
+                    (= MANO 規約で β=0 は neutral hand mean shape を意味する)。
 """
 
 import json
@@ -75,18 +73,31 @@ def get_wilor_pipeline():
     return _wilor_pipeline
 
 
-def _extract_hand_observations(rgb_bgr) -> tuple[list[list[float]], list[list[float]], list[list[float]]] :
-    """1 frame の BGR 画像から WiLoR で hand pose を抽出し、 LeRobot v3 schema 用の
-    per-frame 値を返す:
-      hand_keypoints_3d: [2, 21, 3]   (= [left, right]、 未検出なら zeros)
-      hand_present:      [2] bool      (= [left, right])
-      action_wrist:      [14]          (= 両手手首 6-DoF、 xyz + quat × 2、 quat は identity 仮)
+def _extract_hand_observations(rgb_bgr) -> dict:
+    """1 frame の BGR 画像から WiLoR-mini で hand pose を抽出。 LeRobot v3 schema 用の
+    per-frame 値を辞書で返す。
 
-    WiLoR-mini API:
-      pipe.predict(image) → List[dict { 'is_right': bool, 'wilor_preds': {...} }]
-      wilor_preds 内の keypoint 場所は version によって 'pred_keypoints_3d' か内部計算が必要。
-      mini が直接 3D keypoints を出さない場合は pred_vertices + MANO regressor で
-      再計算する fallback を入れる (= MANO regressor は wilor-mini 同梱の HF asset を使用)。
+    Returns:
+      {
+        "keypoints":   [2, 21, 3] (= [left, right] keypoint 3D、 MANO canonical hand-local space)
+        "present":     [2] bool   (= [left, right])
+        "action":      [14]       (= 両手手首 6-DoF camera-space [xyz + quat] × 2)
+        "mano_pose":   [2, 48]    (= global_orient 3 + hand_pose 15×3=45 concat、 axis-angle)
+      }
+
+    WiLoR-mini source ([1] 参照) の wilor_preds dict:
+      - "pred_keypoints_3d": [1, 21, 3]  canonical space (= hand-local)
+      - "global_orient":     [1, 1, 3]   axis-angle、 手の global 回転
+      - "hand_pose":         [1, 15, 3]  axis-angle × 15 finger 関節
+      - "pred_cam_t_full":   [1, 3]      camera-space wrist 位置
+      - "pred_vertices":     [1, 778, 3] mesh (= 本関数では取得せず、 dataset へ含めない)
+      - "pred_keypoints_2d": [1, 21, 2]  画像投影
+      - "scaled_focal_length": scalar
+
+    MANO shape (betas) は WiLoR-mini が exposed していないので neutral (= zeros) を caller で詰める。
+    MANO 規約で β=0 は neutral hand mean shape を意味する (= 「shape 推定していない」 を明示)。
+
+    [1] https://github.com/warmshao/WiLoR-mini/blob/main/wilor_mini/pipelines/wilor_hand_pose3d_estimation_pipeline.py
     """
     import numpy as np
 
@@ -94,51 +105,90 @@ def _extract_hand_observations(rgb_bgr) -> tuple[list[list[float]], list[list[fl
     try:
         outputs = pipe.predict(rgb_bgr)
     except Exception as e:
-        # 検出 0 でも例外を起こさず空 list を返す pipeline 想定だが、 念のため fail-safe
         print(f"[bundle] wilor predict failed: {e}")
         outputs = []
 
-    left_kp = [[0.0, 0.0, 0.0] for _ in range(21)]
-    right_kp = [[0.0, 0.0, 0.0] for _ in range(21)]
-    left_present = False
-    right_present = False
+    # 既定値 (= 未検出 frame は zeros)
+    zeros_kp = [[0.0, 0.0, 0.0] for _ in range(21)]
+    zero_pose48 = [0.0] * 48
+    zero_quat = [0.0, 0.0, 0.0, 1.0]
+    keypoints = [list(zeros_kp), list(zeros_kp)]
+    mano_pose = [list(zero_pose48), list(zero_pose48)]
+    present = [False, False]
+    wrist_pos = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+    wrist_quat = [list(zero_quat), list(zero_quat)]
 
     for out in outputs:
-        preds = out.get("wilor_preds", {}) if isinstance(out, dict) else {}
-        is_right = bool(out.get("is_right", False)) if isinstance(out, dict) else False
+        if not isinstance(out, dict):
+            continue
+        preds = out.get("wilor_preds", {})
+        is_right = bool(out.get("is_right", False))
+        idx = 1 if is_right else 0
 
-        # 3D keypoint の field 名候補 (= mini version 差異吸収)
+        # keypoint 3D (= canonical) [1, 21, 3]
         kp_3d = preds.get("pred_keypoints_3d")
         if kp_3d is None:
-            # fallback: vertices から MANO J_regressor で derive する path は未実装。
-            # 今は keypoint 取れなければ未検出扱い。
             continue
-
-        # numpy / torch tensor を [21, 3] の list に
-        if hasattr(kp_3d, "detach"):
-            kp_arr = kp_3d.detach().cpu().numpy()
-        else:
-            kp_arr = np.asarray(kp_3d)
+        kp_arr = _to_numpy(kp_3d)
         if kp_arr.ndim == 3 and kp_arr.shape[0] == 1:
             kp_arr = kp_arr[0]
         if kp_arr.shape != (21, 3):
             continue
+        keypoints[idx] = kp_arr.astype(np.float32).tolist()
+        present[idx] = True
 
-        if is_right:
-            right_kp = kp_arr.astype(np.float32).tolist()
-            right_present = True
-        else:
-            left_kp = kp_arr.astype(np.float32).tolist()
-            left_present = True
+        # camera-space wrist 位置 (= pred_cam_t_full)
+        ct = preds.get("pred_cam_t_full")
+        if ct is not None:
+            ct_arr = _to_numpy(ct).reshape(-1)
+            if ct_arr.size >= 3:
+                wrist_pos[idx] = [float(ct_arr[0]), float(ct_arr[1]), float(ct_arr[2])]
 
-    # action wrist 6-DoF: 位置 = keypoint[0] (= wrist joint)、 rotation は forearm
-    # direction が無いので identity quat。 後で elbow / palm normal を組み合わせて改善余地。
+        # MANO pose: global_orient (3) + hand_pose (15 × 3 = 45) → 48-dim axis-angle
+        go = preds.get("global_orient")
+        hp = preds.get("hand_pose")
+        if go is not None and hp is not None:
+            go_arr = _to_numpy(go).reshape(-1)
+            hp_arr = _to_numpy(hp).reshape(-1)
+            if go_arr.size >= 3 and hp_arr.size >= 45:
+                pose48 = np.concatenate([go_arr[:3], hp_arr[:45]]).astype(np.float32)
+                mano_pose[idx] = pose48.tolist()
+                # wrist rotation quaternion = global_orient axis-angle → quat
+                wrist_quat[idx] = _axis_angle_to_quat(go_arr[:3].astype(np.float32))
+
+    # action wrist 6-DoF: 位置 (camera-space) + rotation (= global_orient quaternion)、 左右 concat
     action: list[float] = []
-    for kp in (left_kp, right_kp):
-        wrist = kp[0]
-        action.extend([float(wrist[0]), float(wrist[1]), float(wrist[2]), 0.0, 0.0, 0.0, 1.0])
+    for hand in (0, 1):
+        action.extend([float(wrist_pos[hand][0]), float(wrist_pos[hand][1]), float(wrist_pos[hand][2])])
+        action.extend([float(wrist_quat[hand][0]), float(wrist_quat[hand][1]), float(wrist_quat[hand][2]), float(wrist_quat[hand][3])])
 
-    return ([left_kp, right_kp], [left_present, right_present], action)
+    return {
+        "keypoints": keypoints,
+        "present": present,
+        "action": action,
+        "mano_pose": mano_pose,
+    }
+
+
+def _to_numpy(x):
+    """torch.Tensor / numpy / list を numpy array に揃える。"""
+    import numpy as np
+    if hasattr(x, "detach"):
+        return x.detach().cpu().numpy()
+    return np.asarray(x)
+
+
+def _axis_angle_to_quat(axis_angle) -> list[float]:
+    """3-dim axis-angle (= rotation vector) を quaternion (qx, qy, qz, qw) に変換。
+    angle = ||axis_angle||、 axis = axis_angle / angle。"""
+    import numpy as np
+    aa = np.asarray(axis_angle, dtype=np.float32).reshape(-1)
+    angle = float(np.linalg.norm(aa))
+    if angle < 1e-8:
+        return [0.0, 0.0, 0.0, 1.0]
+    axis = aa / angle
+    s = float(np.sin(angle / 2.0))
+    return [float(axis[0] * s), float(axis[1] * s), float(axis[2] * s), float(np.cos(angle / 2.0))]
 
 
 # ─── Modal function (HTTP endpoint) ────────────────────────────────────
@@ -362,7 +412,7 @@ def _build_lerobot_v3_dataset(
         "rootlens": {
             "root_nft_asset_id": root_asset_id,
             "pipeline_version": "v0.1.2",
-            "bundler_version": "v1-wilor",
+            "bundler_version": "v1-wilor-mano",
         },
     }
     os.makedirs(f"{ds_root}/meta", exist_ok=True)
@@ -393,6 +443,7 @@ def _build_lerobot_v3_dataset(
     hand_kp_all: list[list[list[list[float]]]] = []
     hand_present_all: list[list[bool]] = []
     actions: list[list[float]] = []
+    mano_pose_all: list[list[list[float]]] = []
     hands_detected_total = 0
 
     cap = _cv2.VideoCapture(rgb_mp4)
@@ -425,22 +476,26 @@ def _build_lerobot_v3_dataset(
             # WiLoR hand pose
             ok, frame = cap.read()
             if ok:
-                kp, present, action = _extract_hand_observations(frame)
+                hand = _extract_hand_observations(frame)
             else:
-                kp = [[[0.0, 0.0, 0.0] for _ in range(21)], [[0.0, 0.0, 0.0] for _ in range(21)]]
-                present = [False, False]
-                action = [0.0] * 14
-            hand_kp_all.append(kp)
-            hand_present_all.append(present)
-            actions.append(action)
-            hands_detected_total += int(present[0]) + int(present[1])
+                hand = {
+                    "keypoints": [[[0.0, 0.0, 0.0] for _ in range(21)], [[0.0, 0.0, 0.0] for _ in range(21)]],
+                    "present": [False, False],
+                    "action": [0.0] * 14,
+                    "mano_pose": [[0.0] * 48, [0.0] * 48],
+                }
+            hand_kp_all.append(hand["keypoints"])
+            hand_present_all.append(hand["present"])
+            actions.append(hand["action"])
+            mano_pose_all.append(hand["mano_pose"])
+            hands_detected_total += int(hand["present"][0]) + int(hand["present"][1])
     finally:
         cap.release()
 
-    # MANO pose / shape の per-frame 値は WiLoR-mini の output から取れる場合がある
-    # (= 'pred_mano_params' 等の field) が version 差異が大きいので、 当面は zeros 保持。
-    # schema は既に [2, 48] / [2, 10] で焼けているので、 後で値だけ実データに差し替えれば良い。
-    zero_pose = [[[0.0] * 48, [0.0] * 48] for _ in range(nb_frames)]
+    # MANO pose は WiLoR-mini の (global_orient 3 + hand_pose 45) を concat した
+    # 48-dim axis-angle として mano_pose_all に集めてある。
+    # MANO shape (betas) は WiLoR-mini が exposed していないので zeros (= MANO 規約で
+    # β=0 は neutral hand mean shape)。
     zero_shape = [[[0.0] * 10, [0.0] * 10] for _ in range(nb_frames)]
 
     data_table = pa.table({
@@ -454,7 +509,7 @@ def _build_lerobot_v3_dataset(
         "observation.imu_angular_velocity": pa.array(imu_ang_vels, type=pa.list_(pa.float32(), 3)),
         "observation.imu_linear_acceleration": pa.array(imu_lin_accs, type=pa.list_(pa.float32(), 3)),
         "observation.tracking_state": pa.array(tracking_states, type=pa.list_(pa.int8(), 1)),
-        "observation.hand_pose_mano": pa.array(zero_pose, type=pa.list_(pa.list_(pa.float32(), 48), 2)),
+        "observation.hand_pose_mano": pa.array(mano_pose_all, type=pa.list_(pa.list_(pa.float32(), 48), 2)),
         "observation.hand_shape_mano": pa.array(zero_shape, type=pa.list_(pa.list_(pa.float32(), 10), 2)),
         "observation.hand_keypoints_3d": pa.array(
             hand_kp_all, type=pa.list_(pa.list_(pa.list_(pa.float32(), 3), 21), 2),
