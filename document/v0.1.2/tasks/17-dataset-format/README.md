@@ -200,6 +200,57 @@ iOS アプリが 1 セッションごとに以下を出力:
 
 実機 e2e 検証 (2026-05-20): iPhone 12 で 8.4 秒撮影 → 4 ファイル並走 upload (= rgb.mp4 6.4MB + sensors.jsonl 387KB + imu_high_rate.jsonl 250KB + camera_intrinsics.json 278B) → Pipeline 2 で blurred 2.3MB + quality 75 + Root NFT 発行 (`0xe3bc0382...`) → ステーキング → Pipeline 3 (A10G, 97 秒) で LeRobot v3 dataset 完成 (= datasets/0xe3bc0382.../)。 parquet の `observation.state` は ARKit world-aligned 6-DoF camera pose で埋まり、 `observation.tracking_state` 全 504 frame `normal`、 IMU は重力 ≈ 1g 検証済。
 
+## lerobot v0.5.1 互換性修正 (= 2026-05-21 達成)
+
+LP サンプル dataset (48 episodes, 38,059 frames) を `lerobot.datasets.lerobot_dataset.LeRobotDataset` で実読み込みし、 不整合を全て修正した。
+
+### 発見した問題と修正
+
+1. **path テンプレ変数名の不一致**: info.json の `data_path` / `video_path` に `{episode_chunk}` / `{episode_index}` を使用していたが、 lerobot v0.5.1 は `{chunk_index}` / `{file_index}` を要求する (`dataset_metadata.py:243,269`)。 全パイプライン (`build_lp_sample.py`, `bundle.py`) + 既存 dataset の info.json を修正。
+
+2. **DEFAULT_FEATURES 欠落**: lerobot の `get_hf_features_from_features()` は info.json の `features` dict から HF features を構築する。 `timestamp`, `frame_index`, `episode_index`, `index`, `task_index` の 5 フィールドが info.json に未宣言だったため、 parquet 読み込み時に column mismatch が起きた。
+
+3. **`meta/tasks.parquet` の欠落**: lerobot v0.5.1 は `meta/tasks.jsonl` ではなく `meta/tasks.parquet` を読む。 jsonl と parquet の両方を生成するように修正。
+
+4. **episodes parquet のカラム不足**: lerobot v0.5.1 は `data/chunk_index`, `data/file_index`, `dataset_from_index`, `dataset_to_index`, `videos/{key}/chunk_index`, `videos/{key}/file_index`, `videos/{key}/from_timestamp`, `videos/{key}/to_timestamp` を要求する。 全て追加。
+
+5. **parquet の Arrow 型不一致**: pyarrow の `fixed_size_list` で書いた多次元配列を HF datasets が `Array2D` / `Array3D` extension type として読めなかった。 `datasets.Dataset.from_dict()` + `Features` 定義で書き直し。
+
+6. **`observation.tracking_state` のスカラー/リスト不一致**: info.json で `shape: [1]` と宣言すると lerobot はスカラー `Value` に変換する (`feature_utils.py:54`)。 parquet 側を `Sequence(int8, length=1)` ではなくスカラー `Value("int8")` に修正。
+
+7. **stats.json が空**: `build_lp_sample.py` と `bundle.py` の両方で `{}` を出力していた。 全 feature の min/max/mean/std を numpy で計算して埋めるように修正。
+
+8. **データ整合性の問題**: codec 表記が H.265 だったが実際は H.264 (ffprobe で確認)。 task 数が 225 だったが episode-level task を除外すると 188。 スペルミス修正 ("make greentea" 等)。
+
+### 修正範囲
+
+| ファイル | 修正内容 |
+|---|---|
+| `server/scripts/build_lp_sample.py` | path テンプレ、 DEFAULT_FEATURES、 tasks.parquet、 episodes カラム、 HF datasets 型、 stats 計算 |
+| `server/scripts/add_phase_labels.py` | tasks.parquet 生成追加 |
+| `server/modal/bundle.py` | 上記全て + tracking_state スカラー化 + Modal image に datasets/pandas 追加 |
+| `web/public/lp/sample/dataset/meta/info.json` | path テンプレ + DEFAULT_FEATURES |
+| `web/public/lp/sample/dataset/meta/stats.json` | 空 → 実値 |
+| `web/public/lp/sample/dataset/meta/tasks.parquet` | 新規生成 |
+| `web/public/lp/sample/dataset/meta/tasks.jsonl` | episode-level task 除去、 スペル修正 |
+| `web/public/lp/sample/dataset/data/chunk-000/file-000.parquet` | HF datasets 型で再構築 + task_index 振り直し |
+| `web/public/lp/sample/dataset/meta/episodes/chunk-000/file-000.parquet` | 必須カラム追加 |
+| `web/public/lp/sample/dataset/README.md` | codec/size/labels 修正 |
+| `web/components/lp/SamplePage.tsx` | codec/size/labels 修正 |
+| `web/messages/{en,ja}.json` | 同上 |
+
+### 検証結果
+
+```python
+from lerobot.datasets.lerobot_dataset import LeRobotDataset
+ds = LeRobotDataset(repo_id='rootlens/sample-v0.1', root='...', download_videos=False)
+# 48 episodes, 38059 frames, 188 tasks, fps=30.0
+# 全 feature の shape/dtype が info.json 宣言と一致
+# frame 0, 1000, 20000, 38058 にアクセスして値を確認済み
+```
+
+bundle.py の出力も同様に合成データ (3 episodes, sensor + IMU + hand pose) で検証し、 lerobot v0.5.1 で読み込み成功を確認。
+
 ## 出力品質の現状 (= bundler_version `v1-wilor-mano`)
 
 WiLoR-mini の output から以下を per-frame で抽出済:
