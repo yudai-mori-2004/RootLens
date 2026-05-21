@@ -300,15 +300,9 @@ def apply_phase_labels(dataset_dir: Path, concurrency: int) -> None:
                 raise
     results.sort(key=lambda r: r["episode_index"])
 
-    # ─── tasks.jsonl 再構築 (= 既存 episode-level + 全 phase 文 を dedupe で並べる) ───
+    # ─── tasks.jsonl 再構築 (= phase 文のみ。episode-level タスクはフレームから参照されないので含めない) ───
     all_phase_texts: list[str] = []
     seen: set[str] = set()
-    # 既存 episode-level の文を先頭に保持
-    for t in existing_tasks:
-        s = t["task"]
-        if s not in seen:
-            seen.add(s)
-            all_phase_texts.append(s)
     for res in results:
         for ph in res["phases"]:
             s = ph["phase_text"]
@@ -336,14 +330,8 @@ def apply_phase_labels(dataset_dir: Path, concurrency: int) -> None:
     for ei, ep_idx in enumerate(episodes_table["episode_index"]):
         ep_idx = int(ep_idx)
         res = results[ep_idx]
-        # episode-level の文 (= 既存) + その episode に出現した phase 文 を dedupe で集める
         ep_strings: list[str] = []
         ep_seen: set[str] = set()
-        # まず contributor 設定の episode-level task を頭に
-        for t in episodes_table["tasks"][ei]:
-            if t not in ep_seen:
-                ep_seen.add(t)
-                ep_strings.append(t)
         for ph in res["phases"]:
             if ph["phase_text"] not in ep_seen:
                 ep_seen.add(ph["phase_text"])
@@ -357,7 +345,13 @@ def apply_phase_labels(dataset_dir: Path, concurrency: int) -> None:
         for i, s in enumerate(all_phase_texts):
             f.write(json.dumps({"task_index": i, "task": s}) + "\n")
 
-    # data parquet (= schema 維持しつつ task_index 列だけ書き換え)
+    # tasks.parquet (lerobot v0.5 expects parquet)
+    import pandas as pd
+    tasks_df = pd.DataFrame({"task": all_phase_texts})
+    tasks_df.index.name = "task_index"
+    tasks_df.to_parquet(dataset_dir / "meta" / "tasks.parquet")
+
+    # data parquet (schema 維持しつつ task_index 列だけ書き換え)
     orig_schema = pq.read_schema(data_pq_path)
     new_arrays = []
     for field in orig_schema:
@@ -368,7 +362,7 @@ def apply_phase_labels(dataset_dir: Path, concurrency: int) -> None:
     new_data_table = pa.Table.from_arrays(new_arrays, schema=orig_schema)
     pq.write_table(new_data_table, data_pq_path)
 
-    # episodes parquet
+    # episodes parquet (schema 維持しつつ tasks 列だけ書き換え)
     orig_ep_schema = pq.read_schema(episodes_pq_path)
     new_ep_arrays = []
     for field in orig_ep_schema:
@@ -385,7 +379,7 @@ def apply_phase_labels(dataset_dir: Path, concurrency: int) -> None:
     with open(info_path, "w") as f:
         json.dump(info, f, indent=2)
 
-    print(f"\ndone. tasks.jsonl now has {len(all_phase_texts)} entries (= {len(existing_tasks)} original + phase strings).")
+    print(f"\ndone. tasks.jsonl now has {len(all_phase_texts)} phase-level entries.")
 
 
 # ─── main ──────────────────────────────────────────────────────────────

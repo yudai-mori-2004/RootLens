@@ -289,29 +289,37 @@ def assemble_dataset(processed: list[dict], s3, output_dir: Path) -> None:
     zero_shape = [[[0.0] * 10, [0.0] * 10] for _ in range(total_frames)]
 
     # ─── data parquet を書く ────────────────────────────────────────────
-    # video_path テンプレ: videos/{video_key}/chunk-XXX/episode_XXX.mp4
-    # data_path テンプレ: data/chunk-XXX/file-XXX.parquet
-    data_table = pa.table({
-        "timestamp": pa.array(timestamps_all, type=pa.float32()),
-        "frame_index": pa.array(frame_indices_all, type=pa.int64()),
-        "episode_index": pa.array(episode_indices_all, type=pa.int64()),
-        "index": pa.array(index_all, type=pa.int64()),
-        "task_index": pa.array(task_indices_all, type=pa.int64()),
-        "observation.hand_pose_mano": pa.array(
-            mano_pose_all, type=pa.list_(pa.list_(pa.float32(), 48), 2),
-        ),
-        "observation.hand_shape_mano": pa.array(
-            zero_shape, type=pa.list_(pa.list_(pa.float32(), 10), 2),
-        ),
-        "observation.hand_keypoints_3d": pa.array(
-            hand_kp_all, type=pa.list_(pa.list_(pa.list_(pa.float32(), 3), 21), 2),
-        ),
-        "observation.hand_present": pa.array(hand_present_all, type=pa.list_(pa.bool_(), 2)),
-        "action": pa.array(actions_all, type=pa.list_(pa.float32(), 14)),
+    # HF datasets の Array2D/Array3D 拡張型を使う (lerobot v0.5.1 が要求)
+    from datasets import Dataset, Features, Value, Sequence, Array2D, Array3D
+    hf_features = Features({
+        "timestamp": Value("float32"),
+        "frame_index": Value("int64"),
+        "episode_index": Value("int64"),
+        "index": Value("int64"),
+        "task_index": Value("int64"),
+        "observation.hand_pose_mano": Array2D(shape=(2, 48), dtype="float32"),
+        "observation.hand_shape_mano": Array2D(shape=(2, 10), dtype="float32"),
+        "observation.hand_keypoints_3d": Array3D(shape=(2, 21, 3), dtype="float32"),
+        "observation.hand_present": Sequence(Value("bool"), length=2),
+        "action": Sequence(Value("float32"), length=14),
     })
+    hf_ds = Dataset.from_dict({
+        "timestamp": timestamps_all,
+        "frame_index": frame_indices_all,
+        "episode_index": episode_indices_all,
+        "index": index_all,
+        "task_index": task_indices_all,
+        "observation.hand_pose_mano": mano_pose_all,
+        "observation.hand_shape_mano": zero_shape,
+        "observation.hand_keypoints_3d": hand_kp_all,
+        "observation.hand_present": hand_present_all,
+        "action": actions_all,
+    }, features=hf_features)
     (output_dir / "data" / f"chunk-{chunk_idx:03d}").mkdir(parents=True, exist_ok=True)
-    pq.write_table(
-        data_table,
+    data_table = hf_ds.to_parquet(
+        output_dir / "data" / f"chunk-{chunk_idx:03d}" / f"file-{file_idx:03d}.parquet",
+    )
+    data_table = pq.read_table(
         output_dir / "data" / f"chunk-{chunk_idx:03d}" / f"file-{file_idx:03d}.parquet",
     )
 
@@ -327,10 +335,14 @@ def assemble_dataset(processed: list[dict], s3, output_dir: Path) -> None:
         "chunks_size": chunks_size,
         "fps": fps_for_info,
         "splits": {"train": f"0:{total_episodes}"},
-        "data_path": "data/chunk-{episode_chunk:03d}/file-{file_index:03d}.parquet",
-        # episode_XXX.mp4 形式で出すため video_path テンプレを書き換え
-        "video_path": "videos/{video_key}/chunk-{episode_chunk:03d}/episode_{episode_index:03d}.mp4",
+        "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+        "video_path": "videos/{video_key}/chunk-{chunk_index:03d}/episode_{file_index:03d}.mp4",
         "features": {
+            "timestamp": {"dtype": "float32", "shape": [1], "names": None},
+            "frame_index": {"dtype": "int64", "shape": [1], "names": None},
+            "episode_index": {"dtype": "int64", "shape": [1], "names": None},
+            "index": {"dtype": "int64", "shape": [1], "names": None},
+            "task_index": {"dtype": "int64", "shape": [1], "names": None},
             "observation.images.ego_cam": {
                 "dtype": "video",
                 "shape": [3, height_for_info, width_for_info],
@@ -357,16 +369,9 @@ def assemble_dataset(processed: list[dict], s3, output_dir: Path) -> None:
             },
         },
         "rootlens": {
-            "release": "lp-sample-v0.1",
+            "release": "rootlens-sample-v0.1",
             "pipeline_version": "v0.1.2",
             "bundler_version": "v1-wilor-mano",
-            "capture_source": "external-iphone-native-camera",
-            "notes": (
-                "First-person household task clips shot with the stock iPhone Camera app. "
-                "Contains video, server-applied face blur, server C2PA signature S, "
-                "and per-frame WiLoR-mini hand pose. Does NOT contain IMU, camera 6DoF, "
-                "depth, or ARKit tracking state (= those require the RootLens capture app)."
-            ),
         },
     }
     (output_dir / "meta").mkdir(parents=True, exist_ok=True)
@@ -378,15 +383,37 @@ def assemble_dataset(processed: list[dict], s3, output_dir: Path) -> None:
         for ti, name in enumerate(task_names):
             f.write(json.dumps({"task_index": ti, "task": name}) + "\n")
 
+    # ─── meta/tasks.parquet (lerobot v0.5 expects parquet, not just jsonl) ───
+    import pandas as pd
+    tasks_df = pd.DataFrame({"task": task_names})
+    tasks_df.index.name = "task_index"
+    tasks_df.to_parquet(output_dir / "meta" / "tasks.parquet")
+
     # ─── meta/episodes/chunk-000/file-000.parquet ──────────────────────
+    running_from = 0
+    ep_from_indices = []
+    ep_to_indices = []
+    ep_video_from_ts = []
+    ep_video_to_ts = []
+    for e in episode_rows:
+        ep_from_indices.append(running_from)
+        running_from += e["length"]
+        ep_to_indices.append(running_from)
+        ep_video_from_ts.append(0.0)
+        ep_video_to_ts.append(e["length"] / fps_for_info)
+
     episodes_table = pa.table({
         "episode_index": pa.array([e["episode_index"] for e in episode_rows], type=pa.int64()),
         "length": pa.array([e["length"] for e in episode_rows], type=pa.int64()),
         "tasks": pa.array([e["tasks"] for e in episode_rows], type=pa.list_(pa.string())),
-        # 拡張 (= LP 用)。 LeRobot loader は無視する。
-        "video_id": pa.array([e["video_id"] for e in episode_rows], type=pa.string()),
-        "category": pa.array([e["category"] for e in episode_rows], type=pa.string()),
-        "region": pa.array([e["region"] for e in episode_rows], type=pa.string()),
+        "data/chunk_index": pa.array([chunk_idx] * total_episodes, type=pa.int64()),
+        "data/file_index": pa.array([file_idx] * total_episodes, type=pa.int64()),
+        "dataset_from_index": pa.array(ep_from_indices, type=pa.int64()),
+        "dataset_to_index": pa.array(ep_to_indices, type=pa.int64()),
+        "videos/observation.images.ego_cam/chunk_index": pa.array([chunk_idx] * total_episodes, type=pa.int64()),
+        "videos/observation.images.ego_cam/file_index": pa.array([e["episode_index"] for e in episode_rows], type=pa.int64()),
+        "videos/observation.images.ego_cam/from_timestamp": pa.array(ep_video_from_ts, type=pa.float32()),
+        "videos/observation.images.ego_cam/to_timestamp": pa.array(ep_video_to_ts, type=pa.float32()),
     })
     (output_dir / "meta" / "episodes" / f"chunk-{chunk_idx:03d}").mkdir(parents=True, exist_ok=True)
     pq.write_table(
@@ -394,9 +421,36 @@ def assemble_dataset(processed: list[dict], s3, output_dir: Path) -> None:
         output_dir / "meta" / "episodes" / f"chunk-{chunk_idx:03d}" / f"file-{file_idx:03d}.parquet",
     )
 
-    # ─── meta/stats.json (= v0 は空、 統計計算は別タスク) ───────────────
+    # ─── meta/stats.json ─────────────────────────────────────────────────
+    import numpy as np
+    data_dict = data_table.to_pydict()
+    stats_out: dict = {}
+    for col in ["observation.hand_pose_mano", "observation.hand_shape_mano",
+                "observation.hand_keypoints_3d", "observation.hand_present"]:
+        arr = np.array(data_dict[col], dtype=np.float32)
+        stats_out[col] = {
+            "min": arr.min(axis=0).tolist(),
+            "max": arr.max(axis=0).tolist(),
+            "mean": arr.mean(axis=0).tolist(),
+            "std": arr.std(axis=0).tolist(),
+        }
+    arr = np.array(data_dict["action"], dtype=np.float32)
+    stats_out["action"] = {
+        "min": arr.min(axis=0).tolist(),
+        "max": arr.max(axis=0).tolist(),
+        "mean": arr.mean(axis=0).tolist(),
+        "std": arr.std(axis=0).tolist(),
+    }
+    for col in ["timestamp", "frame_index", "episode_index", "index", "task_index"]:
+        arr = np.array(data_dict[col], dtype=np.float64)
+        stats_out[col] = {
+            "min": [float(arr.min())],
+            "max": [float(arr.max())],
+            "mean": [float(arr.mean())],
+            "std": [float(arr.std())],
+        }
     with open(output_dir / "meta" / "stats.json", "w") as f:
-        json.dump({}, f)
+        json.dump(stats_out, f, indent=2)
 
     print(f"\ndataset assembled at {output_dir}")
     print(f"  total_episodes={total_episodes} total_frames={total_frames} total_tasks={total_tasks}")

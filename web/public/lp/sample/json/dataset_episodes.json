@@ -174,7 +174,7 @@
       "region": "Japan",
       "duration_sec": 29.7,
       "length_frames": 890,
-      "task": "wash the cup",
+      "task": "wash cup",
       "phases": [
         {
           "start_sec": 0.0,
@@ -210,7 +210,7 @@
       "region": "Japan",
       "duration_sec": 7.6,
       "length_frames": 229,
-      "task": "open the door",
+      "task": "open door",
       "phases": [
         {
           "start_sec": 0.0,
@@ -231,7 +231,7 @@
       "region": "Japan",
       "duration_sec": 9.3,
       "length_frames": 279,
-      "task": "open the door",
+      "task": "open door",
       "phases": [
         {
           "start_sec": 0.0,
@@ -252,7 +252,7 @@
       "region": "Japan",
       "duration_sec": 7.7,
       "length_frames": 231,
-      "task": "close the door",
+      "task": "close door",
       "phases": [
         {
           "start_sec": 0.0,
@@ -273,7 +273,7 @@
       "region": "Japan",
       "duration_sec": 7.4,
       "length_frames": 222,
-      "task": "close the door",
+      "task": "close door",
       "phases": [
         {
           "start_sec": 0.0,
@@ -417,7 +417,7 @@
       "region": "Japan",
       "duration_sec": 17.3,
       "length_frames": 520,
-      "task": "take out from microwave",
+      "task": "take out of microwave",
       "phases": [
         {
           "start_sec": 0.0,
@@ -453,7 +453,7 @@
       "region": "Japan",
       "duration_sec": 19.7,
       "length_frames": 591,
-      "task": "put into microwave",
+      "task": "put food into microwave",
       "phases": [
         {
           "start_sec": 0.0,
@@ -720,7 +720,7 @@
       "region": "Japan",
       "duration_sec": 51.2,
       "length_frames": 1536,
-      "task": "make greentea",
+      "task": "make green tea",
       "phases": [
         {
           "start_sec": 0.0,
@@ -1326,7 +1326,7 @@
       "region": "Japan",
       "duration_sec": 36.0,
       "length_frames": 1080,
-      "task": "close the window",
+      "task": "close window",
       "phases": [
         {
           "start_sec": 0.0,

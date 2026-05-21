@@ -168,13 +168,13 @@
     "sample": {
       "meta": {
         "title": "RootLens sample (v0.1)",
-        "description": "48 first-person clips of household tasks with per-frame 3D hand pose and natural-language action labels. ~580 MB. LeRobotDataset v3.0."
+        "description": "48 first-person clips of household tasks with per-frame 3D hand pose and natural-language action labels. ~560 MB. LeRobotDataset v3.0."
       },
       "pageTitle": "RootLens Sample Data",
       "pageIntro": "Sample sets to verify the format and quality of data captured with the RootLens iOS app. New versions will be added as recording conditions and contributor scale expand.",
       "heroTitle": "RootLens sample (v0.1)",
       "heroSubtitle": "48 first-person video clips of household tasks with per-frame 3D hand pose, wrist 6-DoF actions, and natural-language action labels.",
-      "ctaDownloadAll": "Download dataset (~580 MB)",
+      "ctaDownloadAll": "Download dataset (~560 MB)",
       "statEpisodes": "Episodes",
       "statFrames": "Total frames",
       "statLabels": "Action labels",
@@ -188,11 +188,10 @@
       "s1Title": "Per-frame contents",
       "s1p1Lead": "48 clips recorded by a single operator from the development team using the RootLens iOS app, performing representative household tasks from a head-mounted camera in Japan. Faces are blurred using the Vision framework before encoding. Each frame contains:",
       "s1p1Items": [
-        "Blurred RGB video (HEVC)",
+        "Blurred RGB video (H.264)",
         "21 hand joints in 3D per hand, in MANO canonical hand-local coordinates (`observation.hand_keypoints_3d`)",
         "Per-hand detection flag (`observation.hand_present`)",
         "MANO axis-angle pose per hand (`observation.hand_pose_mano`)",
-        "MANO shape coefficients per hand (`observation.hand_shape_mano`)",
         "14-dimensional two-hand wrist 6-DoF action vector (`action`)",
         "`task_index` into `meta/tasks.jsonl` pointing to a natural-language action label"
       ],

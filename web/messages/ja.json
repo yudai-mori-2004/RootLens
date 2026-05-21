@@ -168,13 +168,13 @@
     "sample": {
       "meta": {
         "title": "RootLens サンプル (v0.1)",
-        "description": "一人称視点の家事動画48本。各フレームに3Dハンドポーズと自然言語の行動ラベルを格納。約580 MB。LeRobotDataset v3.0形式。"
+        "description": "一人称視点の家事動画48本。各フレームに3Dハンドポーズと自然言語の行動ラベルを格納。約560 MB。LeRobotDataset v3.0形式。"
       },
       "pageTitle": "RootLens サンプルデータ",
       "pageIntro": "RootLens iOS アプリで撮影できるデータの形式と品質を確認するためのサンプルセットです。撮影条件やコントリビューター規模を段階的に拡大しながら、新しいバージョンを追加していきます。",
       "heroTitle": "RootLens sample (v0.1)",
       "heroSubtitle": "一人称視点の家事動画48本。各フレームに3Dハンドポーズ、手首の6DoFアクションベクトル、自然言語の行動ラベルを収録。",
-      "ctaDownloadAll": "データセット一括ダウンロード (約580MB)",
+      "ctaDownloadAll": "データセット一括ダウンロード (約560MB)",
       "statEpisodes": "エピソード数",
       "statFrames": "合計フレーム数",
       "statLabels": "行動ラベル数",
@@ -188,11 +188,10 @@
       "s1Title": "各フレームの内容",
       "s1p1Lead": "開発チーム1名がRootLens iOSアプリを使用し、ユーザーが行う家事操作を想定して頭部装着カメラで撮影した48本のクリップです。顔はVisionフレームワークでぼかし処理済み。各フレームには次の情報を収録しています。",
       "s1p1Items": [
-        "ぼかし処理済みRGB映像 (HEVC)",
+        "ぼかし処理済みRGB映像 (H.264)",
         "両手それぞれ21関節の3D座標、MANOの標準手ローカル座標系 (`observation.hand_keypoints_3d`)",
         "各手の検出フラグ (`observation.hand_present`)",
         "各手のMANO axis-angle姿勢 (`observation.hand_pose_mano`)",
-        "各手のMANO shape係数 (`observation.hand_shape_mano`)",
         "両手首の6DoFを連結した14次元のアクションベクトル (`action`)",
         "`meta/tasks.jsonl`の行動ラベル文を指す`task_index`"
       ],

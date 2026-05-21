@@ -42,12 +42,13 @@ image = (
         "torch==2.4.0",
         "torchvision==0.19.0",
         "ultralytics",
-        # parquet / numpy / opencv は WiLoR-mini が引っ張るので明示固定だけ
         "pyarrow",
         "numpy<2",
         "opencv-python-headless==4.10.0.84",
         "boto3==1.35.50",
         "fastapi[standard]",
+        "datasets",
+        "pandas",
     )
 )
 
@@ -344,19 +345,7 @@ def _build_lerobot_v3_dataset(
     nb_frames: int,
     root_asset_id: str,
 ) -> int:
-    """LeRobot v3 ディレクトリレイアウトを書き出す (= v1 skeleton)。
-
-    生成物:
-      meta/info.json
-      meta/tasks.jsonl
-      meta/stats.json (= empty placeholder)
-      meta/episodes/chunk-000/file-000.parquet (= 1 episode の length / task / offsets)
-      data/chunk-000/file-000.parquet (= per-frame の observation.state + timestamp 等)
-      videos/observation.images.ego_cam/chunk-000/file-000.mp4 (= 入力 rgb.mp4 を配置)
-
-    WiLoR 統合後に追加:
-      data parquet の observation.hand_pose_mano / hand_shape_mano / hand_keypoints_3d 列
-    """
+    """LeRobot v3 (lerobot v0.5.1 互換) ディレクトリレイアウトを書き出す。"""
     import pyarrow as pa
     import pyarrow.parquet as pq
     import shutil
@@ -377,9 +366,14 @@ def _build_lerobot_v3_dataset(
         "chunks_size": 1000,
         "fps": fps,
         "splits": {"train": "0:1"},
-        "data_path": "data/chunk-{episode_chunk:03d}/file-{file_index:03d}.parquet",
-        "video_path": "videos/{video_key}/chunk-{episode_chunk:03d}/file-{file_index:03d}.mp4",
+        "data_path": "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet",
+        "video_path": "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4",
         "features": {
+            "timestamp": {"dtype": "float32", "shape": [1], "names": None},
+            "frame_index": {"dtype": "int64", "shape": [1], "names": None},
+            "episode_index": {"dtype": "int64", "shape": [1], "names": None},
+            "index": {"dtype": "int64", "shape": [1], "names": None},
+            "task_index": {"dtype": "int64", "shape": [1], "names": None},
             "observation.images.ego_cam": {
                 "dtype": "video",
                 "shape": [3, height, width],
@@ -424,13 +418,14 @@ def _build_lerobot_v3_dataset(
     with open(f"{ds_root}/meta/info.json", "w") as f:
         json.dump(info, f, indent=2)
 
-    # meta/tasks.jsonl (= 1 タスク。 v1 は固定文言、 task id は呼出側で渡せるよう後で拡張)
+    # meta/tasks.jsonl + tasks.parquet
+    task_text = "household ego-centric capture"
     with open(f"{ds_root}/meta/tasks.jsonl", "w") as f:
-        f.write(json.dumps({"task_index": 0, "task": "household ego-centric capture"}) + "\n")
-
-    # meta/stats.json (= 空 placeholder、 v1 では計算しない)
-    with open(f"{ds_root}/meta/stats.json", "w") as f:
-        json.dump({}, f)
+        f.write(json.dumps({"task_index": 0, "task": task_text}) + "\n")
+    import pandas as pd
+    pd.DataFrame({"task": [task_text]}).rename_axis("task_index").to_parquet(
+        f"{ds_root}/meta/tasks.parquet",
+    )
 
     # data parquet (= per-frame observation.state + action + index 列)
     frame_indices = list(range(nb_frames))
@@ -444,7 +439,7 @@ def _build_lerobot_v3_dataset(
     imu_orientations: list[list[float]] = []
     imu_ang_vels: list[list[float]] = []
     imu_lin_accs: list[list[float]] = []
-    tracking_states: list[list[int]] = []
+    tracking_states: list[int] = []
     hand_kp_all: list[list[list[list[float]]]] = []
     hand_present_all: list[list[bool]] = []
     actions: list[list[float]] = []
@@ -476,7 +471,7 @@ def _build_lerobot_v3_dataset(
             imu_lin_accs.append([float(x) for x in acc[:3]] + [0.0] * max(0, 3 - len(acc)))
             # tracking_state
             ts_state = (line or {}).get("tracking_state", "notAvailable")
-            tracking_states.append([tracking_state_map.get(ts_state, 0)])
+            tracking_states.append(tracking_state_map.get(ts_state, 0))
 
             # WiLoR hand pose
             ok, frame = cap.read()
@@ -503,37 +498,92 @@ def _build_lerobot_v3_dataset(
     # β=0 は neutral hand mean shape)。
     zero_shape = [[[0.0] * 10, [0.0] * 10] for _ in range(nb_frames)]
 
-    data_table = pa.table({
-        "timestamp": pa.array(timestamps, type=pa.float32()),
-        "frame_index": pa.array(frame_indices, type=pa.int64()),
-        "episode_index": pa.array([0] * nb_frames, type=pa.int64()),
-        "index": pa.array(frame_indices, type=pa.int64()),
-        "task_index": pa.array([0] * nb_frames, type=pa.int64()),
-        "observation.state": pa.array(states, type=pa.list_(pa.float32(), 7)),
-        "observation.imu_orientation": pa.array(imu_orientations, type=pa.list_(pa.float32(), 4)),
-        "observation.imu_angular_velocity": pa.array(imu_ang_vels, type=pa.list_(pa.float32(), 3)),
-        "observation.imu_linear_acceleration": pa.array(imu_lin_accs, type=pa.list_(pa.float32(), 3)),
-        "observation.tracking_state": pa.array(tracking_states, type=pa.list_(pa.int8(), 1)),
-        "observation.hand_pose_mano": pa.array(mano_pose_all, type=pa.list_(pa.list_(pa.float32(), 48), 2)),
-        "observation.hand_shape_mano": pa.array(zero_shape, type=pa.list_(pa.list_(pa.float32(), 10), 2)),
-        "observation.hand_keypoints_3d": pa.array(
-            hand_kp_all, type=pa.list_(pa.list_(pa.list_(pa.float32(), 3), 21), 2),
-        ),
-        "observation.hand_present": pa.array(hand_present_all, type=pa.list_(pa.bool_(), 2)),
-        "action": pa.array(actions, type=pa.list_(pa.float32(), 14)),
+    from datasets import Dataset, Features, Value, Sequence, Array2D, Array3D
+    hf_features = Features({
+        "timestamp": Value("float32"),
+        "frame_index": Value("int64"),
+        "episode_index": Value("int64"),
+        "index": Value("int64"),
+        "task_index": Value("int64"),
+        "observation.state": Sequence(Value("float32"), length=7),
+        "observation.imu_orientation": Sequence(Value("float32"), length=4),
+        "observation.imu_angular_velocity": Sequence(Value("float32"), length=3),
+        "observation.imu_linear_acceleration": Sequence(Value("float32"), length=3),
+        "observation.tracking_state": Value("int8"),
+        "observation.hand_pose_mano": Array2D(shape=(2, 48), dtype="float32"),
+        "observation.hand_shape_mano": Array2D(shape=(2, 10), dtype="float32"),
+        "observation.hand_keypoints_3d": Array3D(shape=(2, 21, 3), dtype="float32"),
+        "observation.hand_present": Sequence(Value("bool"), length=2),
+        "action": Sequence(Value("float32"), length=14),
     })
+    hf_ds = Dataset.from_dict({
+        "timestamp": timestamps,
+        "frame_index": frame_indices,
+        "episode_index": [0] * nb_frames,
+        "index": frame_indices,
+        "task_index": [0] * nb_frames,
+        "observation.state": states,
+        "observation.imu_orientation": imu_orientations,
+        "observation.imu_angular_velocity": imu_ang_vels,
+        "observation.imu_linear_acceleration": imu_lin_accs,
+        "observation.tracking_state": tracking_states,
+        "observation.hand_pose_mano": mano_pose_all,
+        "observation.hand_shape_mano": zero_shape,
+        "observation.hand_keypoints_3d": hand_kp_all,
+        "observation.hand_present": hand_present_all,
+        "action": actions,
+    }, features=hf_features)
     os.makedirs(f"{ds_root}/data/chunk-000", exist_ok=True)
-    pq.write_table(data_table, f"{ds_root}/data/chunk-000/file-000.parquet")
+    hf_ds.to_parquet(f"{ds_root}/data/chunk-000/file-000.parquet")
 
-    # meta/episodes/chunk-000/file-000.parquet (= 1 行: episode の length / task / offsets)
+    # meta/stats.json
+    import numpy as np
+    data_dict = pq.read_table(f"{ds_root}/data/chunk-000/file-000.parquet").to_pydict()
+    stats_out: dict = {}
+    for col in ["observation.state", "observation.imu_orientation",
+                "observation.imu_angular_velocity", "observation.imu_linear_acceleration",
+                "observation.hand_pose_mano", "observation.hand_shape_mano",
+                "observation.hand_keypoints_3d", "observation.hand_present",
+                "action"]:
+        arr = np.array(data_dict[col], dtype=np.float32)
+        stats_out[col] = {
+            "min": arr.min(axis=0).tolist(),
+            "max": arr.max(axis=0).tolist(),
+            "mean": arr.mean(axis=0).tolist(),
+            "std": arr.std(axis=0).tolist(),
+        }
+    for col in ["observation.tracking_state"]:
+        arr = np.array(data_dict[col], dtype=np.float64)
+        stats_out[col] = {
+            "min": arr.min(axis=0).tolist(),
+            "max": arr.max(axis=0).tolist(),
+            "mean": arr.mean(axis=0).tolist(),
+            "std": arr.std(axis=0).tolist(),
+        }
+    for col in ["timestamp", "frame_index", "episode_index", "index", "task_index"]:
+        arr = np.array(data_dict[col], dtype=np.float64)
+        stats_out[col] = {
+            "min": [float(arr.min())],
+            "max": [float(arr.max())],
+            "mean": [float(arr.mean())],
+            "std": [float(arr.std())],
+        }
+    with open(f"{ds_root}/meta/stats.json", "w") as f:
+        json.dump(stats_out, f, indent=2)
+
+    # meta/episodes/chunk-000/file-000.parquet
     episodes_table = pa.table({
         "episode_index": pa.array([0], type=pa.int64()),
-        "tasks": pa.array([["household ego-centric capture"]], type=pa.list_(pa.string())),
+        "tasks": pa.array([[task_text]], type=pa.list_(pa.string())),
         "length": pa.array([nb_frames], type=pa.int64()),
         "data/chunk_index": pa.array([0], type=pa.int64()),
         "data/file_index": pa.array([0], type=pa.int64()),
         "dataset_from_index": pa.array([0], type=pa.int64()),
         "dataset_to_index": pa.array([nb_frames], type=pa.int64()),
+        "videos/observation.images.ego_cam/chunk_index": pa.array([0], type=pa.int64()),
+        "videos/observation.images.ego_cam/file_index": pa.array([0], type=pa.int64()),
+        "videos/observation.images.ego_cam/from_timestamp": pa.array([0.0], type=pa.float32()),
+        "videos/observation.images.ego_cam/to_timestamp": pa.array([nb_frames / fps], type=pa.float32()),
     })
     os.makedirs(f"{ds_root}/meta/episodes/chunk-000", exist_ok=True)
     pq.write_table(episodes_table, f"{ds_root}/meta/episodes/chunk-000/file-000.parquet")

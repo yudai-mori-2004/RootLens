@@ -89,7 +89,7 @@ export default async function SamplePage() {
   const doc = loadEpisodes();
 
   const totalFrames = doc.episodes.reduce((sum, ep) => sum + ep.length_frames, 0);
-  const totalLabels = 225;
+  const totalLabels = 188;
 
   const stats: [string, string][] = [
     [t("statEpisodes"), String(doc.total_episodes)],
@@ -97,8 +97,8 @@ export default async function SamplePage() {
     [t("statLabels"), String(totalLabels)],
     [t("statFps"), String(doc.fps)],
     [t("statResolution"), "1920 × 1080"],
-    [t("statCodec"), "H.265 / HEVC"],
-    [t("statSize"), "~580 MB"],
+    [t("statCodec"), "H.264 / AVC"],
+    [t("statSize"), "~560 MB"],
     [t("statRegion"), "Japan"],
     [t("statViewpoint"), "Head-mounted, first-person"],
     [t("statFormat"), "LeRobotDataset v3.0"],
