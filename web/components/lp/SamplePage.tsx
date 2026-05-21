@@ -2,8 +2,32 @@ import fs from "fs";
 import path from "path";
 import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
+import { EpisodeListClient } from "./EpisodeListClient";
+import { SyncedVideoPair } from "./SyncedVideoPair";
 
 const R2_PUBLIC = "https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev/lp-sample/v0.1";
+const ZIP_URL = `${R2_PUBLIC}/rootlens-sample-v0.1.zip`;
+
+const TAGS = ["robotics", "egocentric", "first-person", "household", "hand-pose", "mano", "c2pa", "lerobot"];
+
+const DIR_TREE = `<root>/
+├── meta/
+│   ├── info.json
+│   ├── tasks.jsonl
+│   ├── stats.json
+│   └── episodes/chunk-000/file-000.parquet
+├── data/chunk-000/file-000.parquet
+└── videos/observation.images.ego_cam/chunk-000/
+    ├── episode_000.mp4
+    ├── episode_001.mp4
+    └── ...`;
+
+const LOADING_CODE = `import pyarrow.parquet as pq
+
+data = pq.read_table("data/chunk-000/file-000.parquet")
+print(data.column_names)
+# ['timestamp', 'frame_index', 'episode_index', 'index',
+#  'task_index', 'observation.hand_pose_mano', ...]`;
 
 interface Phase {
   start_sec: number;
@@ -37,85 +61,154 @@ function videoUrl(idx: number): string {
   return `${R2_PUBLIC}/videos/observation.images.ego_cam/chunk-000/episode_${String(idx).padStart(3, "0")}.mp4`;
 }
 
+function skeletonUrl(idx: number): string {
+  return `${R2_PUBLIC}/skeleton/episode_${String(idx).padStart(3, "0")}_skeleton.mp4`;
+}
+
 function fmtTimestamp(sec: number): string {
   const m = Math.floor(sec / 60);
-  const s = sec - m * 60;
-  return m > 0 ? `${m}:${s.toFixed(1).padStart(4, "0")}` : `${s.toFixed(1)}s`;
+  const rs = sec - m * 60;
+  return m > 0 ? `${m}:${rs.toFixed(1).padStart(4, "0")}` : `${rs.toFixed(1)}s`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderInlineCode(str: string): string {
+  return escapeHtml(str).replace(/`([^`]+)`/g, "<code>$1</code>");
 }
 
 export default async function SamplePage() {
   const t = await getTranslations("pages.sample");
   const doc = loadEpisodes();
 
+  const totalFrames = doc.episodes.reduce((sum, ep) => sum + ep.length_frames, 0);
+  const totalLabels = 225;
+
+  const stats: [string, string][] = [
+    [t("statEpisodes"), String(doc.total_episodes)],
+    [t("statFrames"), new Intl.NumberFormat("en-US").format(totalFrames)],
+    [t("statLabels"), String(totalLabels)],
+    [t("statFps"), String(doc.fps)],
+    [t("statResolution"), "1920 × 1080"],
+    [t("statCodec"), "H.265 / HEVC"],
+    [t("statSize"), "~580 MB"],
+    [t("statRegion"), "Japan"],
+    [t("statViewpoint"), "Head-mounted, first-person"],
+    [t("statFormat"), "LeRobotDataset v3.0"],
+  ];
+
   return (
     <div className={s.page}>
-      {/* Hero */}
-      <section className={s.hero}>
-        <div className={s.heroInner}>
-          <div className={s.heroMain}>
-            <div className={s.heroEyebrow}>
-              <span>{t("heroEyebrow")}</span>
-              <span className={s.heroEyebrowDot}>·</span>
-              <span className={s.heroEyebrowDesc}>{t("heroEyebrowDesc")}</span>
-            </div>
-            <h1 className={s.heroTitleArticle}>{t("heroTitle")}</h1>
-            <p className={s.heroDescription}>{t("heroSubtitle")}</p>
+      {/* Page-level intro */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h1 className={s.sectionTitle}>{t("pageTitle")}</h1>
+          <p className={s.prose}>{t("pageIntro")}</p>
+        </div>
+      </section>
+
+      {/* v0.1 Header */}
+      <section className={s.datasetHero}>
+        <div className={s.datasetHeroInner}>
+          <h2 className={s.datasetTitle}>{t("heroTitle")}</h2>
+          <p className={s.datasetSubtitle}>{t("heroSubtitle")}</p>
+          <div className={s.tagList}>
+            {TAGS.map((tag) => (
+              <span key={tag} className={s.tag}>{tag}</span>
+            ))}
+          </div>
+          <a
+            href={ZIP_URL}
+            download="rootlens-sample-v0.1.zip"
+            className={s.ctaPrimary}
+          >
+            {t("ctaDownloadAll")}
+          </a>
+        </div>
+      </section>
+
+      {/* Stats grid */}
+      <section className={s.sectionFlush}>
+        <div className={s.sectionInner}>
+          <div className={s.statsGrid}>
+            {stats.map(([label, value]) => (
+              <div key={label} className={s.statCell}>
+                <div className={s.statLabel}>{label}</div>
+                <div className={s.statValue}>{value}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* §What it's for */}
+      {/* Per-frame contents */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{t("s1Title")}</h2>
-          <p className={s.prose}>{t("s1p1")}</p>
+          <h3 className={s.sectionTitle}>{t("s1Title")}</h3>
+          <p className={s.prose}>{t("s1p1Lead")}</p>
+          <ul className={s.bulletList}>
+            {(t.raw("s1p1Items") as string[]).map((item, i) => (
+              <li key={i} className={s.bulletItem} dangerouslySetInnerHTML={{ __html: renderInlineCode(item) }} />
+            ))}
+          </ul>
         </div>
       </section>
 
-      {/* §Per-frame contents */}
+      {/* Directory layout */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{t("s2Title")}</h2>
-          <p className={s.prose}>{t("s2p1")}</p>
-          <p className={s.prose}>{t("s2p2")}</p>
+          <h3 className={s.sectionTitle}>{t("s2Title")}</h3>
+          <p className={s.prose} dangerouslySetInnerHTML={{ __html: renderInlineCode(t("s2p1")) }} />
+          <pre className={s.codeBlock}><code>{DIR_TREE}</code></pre>
         </div>
       </section>
 
-      {/* §Phase labels (explanation, sets up the episode list below) */}
+      {/* Action labels */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{t("s3Title")}</h2>
-          <p className={s.prose}>{t("s3p1")}</p>
+          <h3 className={s.sectionTitle}>{t("s3Title")}</h3>
+          <p className={s.prose} dangerouslySetInnerHTML={{ __html: renderInlineCode(t("s3p1")) }} />
           <p className={s.prose}>{t("s3p2")}</p>
         </div>
       </section>
 
-      {/* §Episodes — all 48 episodes with full per-phase narration */}
+      {/* Loading */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{t("episodesHeading")}</h2>
+          <h3 className={s.sectionTitle}>{t("loadingTitle")}</h3>
+          <pre className={s.codeBlock}><code>{LOADING_CODE}</code></pre>
+          <p className={s.proseSmall} dangerouslySetInnerHTML={{ __html: renderInlineCode(t("loadingNote")) }} />
+        </div>
+      </section>
+
+      {/* Episodes */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <h3 className={s.sectionTitle}>{t("episodesHeading")}</h3>
           <p className={s.prose}>{t("episodesSubheading")}</p>
 
-          <div className={s.episodeList}>
+          <EpisodeListClient total={doc.total_episodes} showAllLabel={t("showAll")}>
             {doc.episodes.map((ep) => (
               <article key={ep.index} className={s.episodeCard}>
-                <div className={s.episodeVideoWrap}>
-                  <video
-                    controls
-                    preload="none"
-                    playsInline
-                    className={s.episodeVideo}
-                    src={videoUrl(ep.index)}
-                  />
-                </div>
+                <SyncedVideoPair
+                  videoSrc={videoUrl(ep.index)}
+                  skeletonSrc={skeletonUrl(ep.index)}
+                />
                 <div className={s.episodeBody}>
                   <div className={s.episodeMeta}>
                     <span className={s.episodeId}>episode_{String(ep.index).padStart(3, "0")}</span>
-                    <span className={s.episodeMetaDot}>·</span>
+                    <span className={s.episodeMetaDot}>&middot;</span>
                     <span>{ep.category}</span>
-                    <span className={s.episodeMetaDot}>·</span>
+                    <span className={s.episodeMetaDot}>&middot;</span>
                     <span>{ep.duration_sec.toFixed(1)}s</span>
-                    <span className={s.episodeMetaDot}>·</span>
+                    <span className={s.episodeMetaDot}>&middot;</span>
                     <span>{ep.length_frames} {t("episodesFrameLabel")}</span>
                   </div>
                   <p className={s.episodeTask}>{ep.task}</p>
@@ -127,7 +220,7 @@ export default async function SamplePage() {
                       {ep.phases.map((p, i) => (
                         <li key={i} className={s.episodePhasesItem}>
                           <span className={s.episodePhasesTime}>
-                            {fmtTimestamp(p.start_sec)}–{fmtTimestamp(p.end_sec)}
+                            {fmtTimestamp(p.start_sec)}&ndash;{fmtTimestamp(p.end_sec)}
                           </span>
                           <span className={s.episodePhasesText}>{p.text}</span>
                         </li>
@@ -144,85 +237,28 @@ export default async function SamplePage() {
                 </div>
               </article>
             ))}
-          </div>
+          </EpisodeListClient>
         </div>
       </section>
 
-      {/* §What is NOT in this preview */}
+      {/* Planned next release */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{t("s4Title")}</h2>
-          <p className={s.prose}>{t("s4p1")}</p>
-        </div>
-      </section>
-
-      {/* §Files — every file in the dataset, direct links */}
-      <section className={s.section}>
-        <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{t("s5Title")}</h2>
-          <p className={s.prose}>{t("s5p1")}</p>
-
-          {/* Meta + parquet + README をすべて並べる */}
-          <h3 className={s.filesGroupHeading}>{t("filesMetaHeading")}</h3>
-          <div className={s.faqList}>
-            <div className={s.faqRow}>
-              <p className={s.faqQuestion}>README.md</p>
-              <a href={`${R2_PUBLIC}/README.md`} target="_blank" rel="noopener noreferrer" className={`${s.ctaSecondary} ${s.faqButton}`}>{t("ctaOpen")}</a>
-            </div>
-            <div className={s.faqRow}>
-              <p className={s.faqQuestion}>meta/info.json</p>
-              <a href={`${R2_PUBLIC}/meta/info.json`} target="_blank" rel="noopener noreferrer" className={`${s.ctaSecondary} ${s.faqButton}`}>{t("ctaOpen")}</a>
-            </div>
-            <div className={s.faqRow}>
-              <p className={s.faqQuestion}>meta/tasks.jsonl</p>
-              <a href={`${R2_PUBLIC}/meta/tasks.jsonl`} target="_blank" rel="noopener noreferrer" className={`${s.ctaSecondary} ${s.faqButton}`}>{t("ctaOpen")}</a>
-            </div>
-            <div className={s.faqRow}>
-              <p className={s.faqQuestion}>meta/stats.json</p>
-              <a href={`${R2_PUBLIC}/meta/stats.json`} target="_blank" rel="noopener noreferrer" className={`${s.ctaSecondary} ${s.faqButton}`}>{t("ctaOpen")}</a>
-            </div>
-            <div className={s.faqRow}>
-              <p className={s.faqQuestion}>meta/episodes/chunk-000/file-000.parquet</p>
-              <a href={`${R2_PUBLIC}/meta/episodes/chunk-000/file-000.parquet`} className={`${s.ctaSecondary} ${s.faqButton}`}>{t("ctaDownload")}</a>
-            </div>
-            <div className={s.faqRow}>
-              <p className={s.faqQuestion}>data/chunk-000/file-000.parquet</p>
-              <a href={`${R2_PUBLIC}/data/chunk-000/file-000.parquet`} className={`${s.ctaSecondary} ${s.faqButton}`}>{t("ctaDownload")}</a>
-            </div>
-          </div>
-
-          {/* 全 48 動画ファイルの直リンク */}
-          <h3 className={s.filesGroupHeading}>{t("filesVideosHeading")}</h3>
-          <p className={s.prose} style={{ fontSize: "0.92rem", color: "var(--lp-text-secondary)" }}>
-            {t("filesVideosDescription")}
-          </p>
-          <ul className={s.videoFilesList}>
-            {doc.episodes.map((ep) => {
-              const name = `episode_${String(ep.index).padStart(3, "0")}.mp4`;
-              return (
-                <li key={ep.index} className={s.videoFilesItem}>
-                  <span className={s.videoFilesName}>videos/observation.images.ego_cam/chunk-000/{name}</span>
-                  <a
-                    href={videoUrl(ep.index)}
-                    download={name}
-                    className={`${s.ctaSecondary} ${s.faqButton}`}
-                  >
-                    {t("ctaDownload")}
-                  </a>
-                </li>
-              );
-            })}
+          <h3 className={s.sectionTitle}>{t("s4Title")}</h3>
+          <p className={s.prose}>{t("s4p1Lead")}</p>
+          <ul className={s.bulletList}>
+            {(t.raw("s4p1Items") as string[]).map((item, i) => (
+              <li key={i} className={s.bulletItem} dangerouslySetInnerHTML={{ __html: renderInlineCode(item) }} />
+            ))}
           </ul>
         </div>
       </section>
 
-      {/* §License */}
+      {/* License */}
       <section className={s.section}>
         <div className={s.sectionInner}>
-          <h2 className={s.sectionTitle}>{t("licenseHeading")}</h2>
-          <p className={s.prose}>
-            <span className={s.emphasis}>{t("licenseP1")}</span>
-          </p>
+          <h3 className={s.sectionTitle}>{t("licenseHeading")}</h3>
+          <p className={s.prose}>{t("licenseP1")}</p>
         </div>
       </section>
     </div>
