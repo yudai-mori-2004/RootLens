@@ -14,6 +14,7 @@ const DIR_TREE = `<root>/
 ├── meta/
 │   ├── info.json
 │   ├── tasks.jsonl
+│   ├── tasks.parquet
 │   ├── stats.json
 │   └── episodes/chunk-000/file-000.parquet
 ├── data/chunk-000/file-000.parquet
@@ -22,12 +23,14 @@ const DIR_TREE = `<root>/
     ├── episode_001.mp4
     └── ...`;
 
-const LOADING_CODE = `import pyarrow.parquet as pq
+const LOADING_CODE = `from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-data = pq.read_table("data/chunk-000/file-000.parquet")
-print(data.column_names)
-# ['timestamp', 'frame_index', 'episode_index', 'index',
-#  'task_index', 'observation.hand_pose_mano', ...]`;
+ds = LeRobotDataset("path/to/rootlens-sample-v0.1")
+print(ds[0].keys())
+# dict_keys(['timestamp', 'frame_index', 'episode_index', 'index',
+#  'task_index', 'observation.images.ego_cam',
+#  'observation.hand_pose_mano', 'observation.hand_keypoints_3d',
+#  'observation.hand_present', 'action'])`;
 
 interface Phase {
   start_sec: number;
