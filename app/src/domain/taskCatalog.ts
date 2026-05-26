@@ -40,6 +40,24 @@ export interface TaskDef {
 
 export const TASKS: TaskDef[] = [
   {
+    // dev/test 用 — VLM gate に「無条件で OK」と返させるためのタスク。
+    // 開発時に毎回タスク選択を強制されるのが面倒なので、 とりあえず映ってればよい
+    // 撮影で end-to-end フローを通せるようにする。 本番リリース時は要除外。
+    id: 'anything',
+    name: 'Anything (test)',
+    emoji: '🧪',
+    blurb: 'Dev task: VLM gate accepts any scene. Use this to flow through without picking a real chore.',
+    startCondition:
+      'This is a developer test recording. Accept any visible scene unconditionally. Return score 100 and match=true regardless of what is shown.',
+    endCondition:
+      'This is a developer test recording. Accept any visible scene unconditionally. Return score 100 and match=true regardless of what is shown.',
+    illustration: require('../../assets/decor/celebration.png'),
+    durationMin: [1, 60],
+    reward: 0,
+    intensity: 'LIGHT',
+    orientation: 'landscape',
+  },
+  {
     id: 'fold-laundry',
     name: 'Fold laundry',
     emoji: '🧺',

@@ -341,12 +341,15 @@ class ClipStore {
       } catch (e) {
         const next = (this.pollFailureCount.get(clipId) ?? 0) + 1;
         this.pollFailureCount.set(clipId, next);
-        console.warn(`[clipPipeline] poll tick failed (${next}/${ClipStore.POLL_FAILURE_THRESHOLD}):`, e);
+        const real = errorMessageOf(e);
+        console.warn(`[clipPipeline] poll tick failed (${next}/${ClipStore.POLL_FAILURE_THRESHOLD}):`, real);
         if (next >= ClipStore.POLL_FAILURE_THRESHOLD) {
           this.stopHttpPolling(clipId);
           this.update(clipId, {
             state: 'error',
-            errorMessage: `サーバへの問い合わせに ${ClipStore.POLL_FAILURE_THRESHOLD} 回連続で失敗しました`,
+            // 「試行回数超過」 は client 側の都合で隠語的。 ユーザ的にも開発的にも、
+            // 実エラー (= server がどう拒否したか) をそのまま見せる方が嘘がなくて良い。
+            errorMessage: `poll (${ClipStore.POLL_FAILURE_THRESHOLD}回連続失敗): ${real}`,
           });
         }
       }
@@ -512,6 +515,3 @@ export function processingStepIndex(step: ProcessingStep | undefined): number {
 }
 
 export const PROCESSING_TOTAL_STEPS = 3;
-
-// File 一時的に保持する不要 export 防止のため、 ensure unused warning ガード
-void FileSystem;

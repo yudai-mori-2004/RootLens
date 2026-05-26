@@ -62,7 +62,11 @@ export async function POST(req: NextRequest) {
     const upstream = await fetch(`${TP_GATEWAY.replace(/\/$/, "")}/process`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content_url: contentUrl }),
+      body: JSON.stringify({
+        input_type: "single",
+        content_url: contentUrl,
+        processor_ids: ["c2pa-verify"],
+      }),
       signal: AbortSignal.timeout(120_000),
     });
     if (!upstream.ok) {

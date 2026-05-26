@@ -398,8 +398,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     sensorFileQueue.async {
       do {
         let data = try JSONSerialization.data(withJSONObject: line, options: [])
-        handle.write(data)
-        handle.write(Data("\n".utf8))
+        // NSFileHandle.write(_:) は EAGAIN 等で ObjC 例外 (NSFileHandleOperationException)
+        // を投げ、 Swift do/try/catch では捕まらず即クラッシュする。 iOS 13.4+ の
+        // throwing 版 write(contentsOf:) を使うと Swift error として catch できる。
+        try handle.write(contentsOf: data)
+        try handle.write(contentsOf: Data("\n".utf8))
       } catch {
         NSLog("[ArkitCaptureController] sensors.jsonl write failed: %@", "\(error)")
       }
@@ -484,8 +487,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     sensorFileQueue.async {
       do {
         let data = try JSONSerialization.data(withJSONObject: line, options: [])
-        handle.write(data)
-        handle.write(Data("\n".utf8))
+        // 同様: ObjC 例外を Swift error 化するため throwing 版を使う。
+        try handle.write(contentsOf: data)
+        try handle.write(contentsOf: Data("\n".utf8))
       } catch {
         NSLog("[ArkitCaptureController] imu_high_rate.jsonl write failed: %@", "\(error)")
       }
