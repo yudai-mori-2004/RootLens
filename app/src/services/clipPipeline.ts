@@ -21,11 +21,12 @@ export type ClipState =
   | 'staked'
   | 'error';
 
-/// サーバ shared/api-types.ts の ProcessingStep と完全一致させる。
+/// サーバ shared/api-types.ts の ProcessingStep と完全一致させる (v0.1.3 = 4-layer scoring)。
 export type ProcessingStep =
-  | 'anonymize'
-  | 'quality-eval'
-  | 'tp-submit';
+  | 'metadata-scan'    // Layer 1: メタデータ解析
+  | 'frame-sampling'   // Layer 2: フレームサンプリング画像解析
+  | 'vlm-score'        // Layer 3: VLM Claude Haiku 4.5 セマンティック採点
+  | 'gtsam-eval';      // Layer 4: GTSAM Video-IMU 整合性検証
 
 export interface QualityBreakdown {
   /// いずれかの手が出ているフレーム比率 (0..1)。 Pipeline 2 では未計算で null、
@@ -498,20 +499,22 @@ export function describeState(s: ClipState): string {
 
 export function describeProcessingStep(step: ProcessingStep | undefined): string {
   switch (step) {
-    case 'anonymize':       return '顔をぼかし中';
-    case 'quality-eval':    return '品質を評価中';
-    case 'tp-submit':       return 'TP に提出して Root NFT 発行中';
+    case 'metadata-scan':   return 'メタデータ解析中';
+    case 'frame-sampling':  return 'フレームサンプル解析中';
+    case 'vlm-score':       return 'VLM セマンティック採点中';
+    case 'gtsam-eval':      return 'Video-IMU 整合性検証中';
     default:                return '';
   }
 }
 
 export function processingStepIndex(step: ProcessingStep | undefined): number {
   switch (step) {
-    case 'anonymize':       return 1;
-    case 'quality-eval':    return 2;
-    case 'tp-submit':       return 3;
+    case 'metadata-scan':   return 1;
+    case 'frame-sampling':  return 2;
+    case 'vlm-score':       return 3;
+    case 'gtsam-eval':      return 4;
     default:                return 0;
   }
 }
 
-export const PROCESSING_TOTAL_STEPS = 3;
+export const PROCESSING_TOTAL_STEPS = 4;
