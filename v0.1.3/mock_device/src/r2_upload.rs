@@ -8,9 +8,11 @@ use anyhow::{anyhow, Context, Result};
 use aws_config::BehaviorVersion;
 use aws_credential_types::Credentials;
 use aws_sdk_s3::config::Region;
+use aws_sdk_s3::presigning::PresigningConfig;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// R2 PUT 1 ファイルあたりの最大同時実行 (= aws-sdk-s3 内部 connection pool で十分)。
 const MAX_CONCURRENT_UPLOADS: usize = 4;
@@ -143,4 +145,45 @@ pub async fn upload_clip_files(
     }
 
     upload_files(client, bucket, files).await
+}
+
+/// 指定 key に対する presigned GET URL を発行する。 TP Gateway が R2 から Range Request で
+/// fetch するのに使う。 expires_secs は 5 分以上が安全 (= TEE fetch + 検証で時間取る)。
+pub async fn presign_get_url(
+    client: &Client,
+    bucket: &str,
+    key: &str,
+    expires_secs: u64,
+) -> Result<String> {
+    let cfg = PresigningConfig::expires_in(Duration::from_secs(expires_secs))
+        .context("PresigningConfig::expires_in")?;
+    let req = client
+        .get_object()
+        .bucket(bucket)
+        .key(key)
+        .presigned(cfg)
+        .await
+        .with_context(|| format!("presign GET {bucket}/{key}"))?;
+    Ok(req.uri().to_string())
+}
+
+/// 任意 bytes を R2 に PUT する。 ProcessResponse を JSON 化して signed-json/<content_id>.json に
+/// 保存する用。
+pub async fn put_bytes(
+    client: &Client,
+    bucket: &str,
+    key: &str,
+    bytes: Vec<u8>,
+    content_type: &'static str,
+) -> Result<()> {
+    client
+        .put_object()
+        .bucket(bucket)
+        .key(key)
+        .body(ByteStream::from(bytes))
+        .content_type(content_type)
+        .send()
+        .await
+        .with_context(|| format!("PUT {bucket}/{key}"))?;
+    Ok(())
 }

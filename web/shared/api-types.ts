@@ -5,12 +5,13 @@
 export type ClipState = "uploading" | "processing" | "ready" | "staked" | "error";
 
 // ─── Pipeline 2 の進行ステップ (= DATA_SPECS §3) ────────────────
+// Title Protocol register はサーバ flow に載らず、 端末 (= mock-device) が R2 アップロード
+// 後に並列で /process Gateway を直接叩く構造。 サーバ flow は 4 層スコアリングのみ。
 export type ProcessingStep =
   | "metadata-scan"       // Layer 1: メタデータ解析 (= sensors.jsonl + imu_high_rate.jsonl のみ)
   | "frame-sampling"      // Layer 2: フレームサンプリング画像解析
   | "vlm-score"           // Layer 3: VLM (Claude Haiku 4.5) でセマンティック採点
-  | "gtsam-eval"          // GTSAM: Video-IMU 整合性検証
-  | "tp-submit";          // Title Protocol register で Root NFT 発行
+  | "gtsam-eval";         // GTSAM: Video-IMU 整合性検証
 
 // ─── 品質スコア内訳 (= DATA_SPECS §3.2) ──────────────────────────
 

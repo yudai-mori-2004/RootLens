@@ -17,6 +17,7 @@ mod c2pa_sign;
 mod content_id;
 mod jumbf;
 mod r2_upload;
+mod tp_register;
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, ValueEnum};
@@ -90,6 +91,18 @@ struct Output {
     r2_keys: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     r2_bucket: Option<String>,
+
+    // ─── Title Protocol register 結果 (prod profile のみ) ─────────────────
+    /// TP Gateway が返した signature_hash (= "sha256:<hex>")。 mock-device 側の content_id と
+    /// 一致するはず (= 両方 D2 active manifest signature の SHA-256)。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tp_signature_hash: Option<String>,
+    /// ProcessResponse JSON を保存した R2 key (= signed-json/<content_id>.json)。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tp_offchain_key: Option<String>,
+    /// TP register 自体が成功したか (= 失敗してもアップロード自体は完了)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tp_register_error: Option<String>,
 }
 
 #[tokio::main]
@@ -179,6 +192,9 @@ async fn main() -> Result<()> {
         output_paths: None,
         r2_keys: None,
         r2_bucket: None,
+        tp_signature_hash: None,
+        tp_offchain_key: None,
+        tp_register_error: None,
     };
 
     match args.profile {
@@ -220,7 +236,27 @@ async fn main() -> Result<()> {
                 upload_result.total_bytes
             ));
             output.r2_keys = Some(upload_result.keys);
-            output.r2_bucket = Some(bucket);
+            output.r2_bucket = Some(bucket.clone());
+
+            // ─── 並列 step: Title Protocol register ─────────────────────
+            // R2 upload 完了後、 mock-device が直接 TP Gateway を叩く。 サーバ flow には
+            // 載らない。 失敗してもアップロード自体は完了、 tp_register_error に記録する。
+            log("step 5/5: Title Protocol register (= POST /process via Gateway)");
+            let signed_key = format!("raw/{content_id_hex}/rgb.mp4");
+            let gateway = std::env::var("TP_GATEWAY_URL").ok();
+            match register_tp(&client, &bucket, &signed_key, &content_id_hex, gateway.as_deref()).await {
+                Ok((sig_hash, offchain_key)) => {
+                    log(&format!("  tp signature_hash = {sig_hash}"));
+                    log(&format!("  tp offchain JSON  = s3://{bucket}/{offchain_key}"));
+                    output.tp_signature_hash = Some(sig_hash);
+                    output.tp_offchain_key = Some(offchain_key);
+                }
+                Err(e) => {
+                    let err_msg = format!("{e:#}");
+                    log(&format!("  WARN: TP register failed: {err_msg}"));
+                    output.tp_register_error = Some(err_msg);
+                }
+            }
         }
     }
 
@@ -231,6 +267,28 @@ async fn main() -> Result<()> {
 
 fn require_env(name: &str) -> Result<String> {
     std::env::var(name).map_err(|_| anyhow!("{name} env var is required for prod profile"))
+}
+
+/// presigned GET URL を発行して TP /process を呼び、 ProcessResponse を R2 signed-json/ に PUT する。
+/// 戻り値は (signature_hash, offchain_key)。
+async fn register_tp(
+    client: &aws_sdk_s3::Client,
+    bucket: &str,
+    signed_key: &str,
+    content_id_hex: &str,
+    gateway: Option<&str>,
+) -> Result<(String, String)> {
+    // TEE fetch + 検証で時間取るので 600 秒持たせる
+    let content_url = r2_upload::presign_get_url(client, bucket, signed_key, 600).await?;
+    let resp = tp_register::register_with_tp(&content_url, gateway).await?;
+
+    // ProcessResponse をそのまま JSON 化して R2 に保存。 cNFT 発行が必要になった時に
+    // ここに保存された offchain JSON URL を /extension/solana に渡せばよい。
+    let offchain_key = format!("signed-json/{content_id_hex}.json");
+    let body = serde_json::to_vec_pretty(&resp).context("serialize ProcessResponse")?;
+    r2_upload::put_bytes(client, bucket, &offchain_key, body, "application/json").await?;
+
+    Ok((resp.signature_hash, offchain_key))
 }
 
 #[allow(dead_code)]
