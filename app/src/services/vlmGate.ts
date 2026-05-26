@@ -4,7 +4,7 @@
  * デバイスから直接 Anthropic API を叩いて画像と条件文の match を判定する。
  * server proxy (web/app/api/v1/vlm-gate) は機能としては残してあるが、本ラッパーは使わない。
  *
- * 鍵: process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY (bundle に inline される)。
+ * 鍵: src/env.ts の ANTHROPIC_API_KEY (= EXPO_PUBLIC_ANTHROPIC_API_KEY 必須)。
  *     bundle 解析で漏洩可能なので **dev/demo 限定**。production では server proxy 戻し or
  *     ephemeral token 化が必要。
  *
@@ -19,9 +19,8 @@
  */
 
 import * as ImageManipulator from 'expo-image-manipulator';
+import { ANTHROPIC_API_KEY } from '../env';
 
-const ENV = process.env as Record<string, string | undefined>;
-const ANTHROPIC_API_KEY = ENV.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 const DEFAULT_CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 // 旧 server-route とは互換のため型を維持。provider/model field は無視 (Claude 固定)。

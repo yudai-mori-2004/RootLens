@@ -1,45 +1,85 @@
-import React from 'react';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../app/types';
-import { colors, typography, spacing, radii } from '../theme';
-import { getDemoWalletPubkey } from '../domain/wallet';
+// Login screen。 認証 provider (= debug / Privy / ...) の login() を起動する。
+//
+// DebugAuthProvider の場合は SecureStore から keypair を復元 / 生成するだけなので、
+// 「Continue」 押下で即 authenticated になる。 Privy 等を入れた時は web flow を
+// provider.login() の中で開く想定。
+//
+// UI_SPECS_JA §9 のオンボーディング (KYC, ToS, チュートリアル) は task 16 で実装。
 
-// SPECS_JA §1.2: 供給者は KYC 済みの個人。本来は Privy embedded wallet で login。
-// 統合検証フェーズでは EXPO_PUBLIC_DEMO_WALLET_ADDRESS から固定 pubkey を使う。
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Svg, { Circle, Path } from 'react-native-svg';
+
+import type { RootStackParamList } from '../app/types';
+import { useAuth } from '../services/auth';
+import { colors, fonts, radii, spacing, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const pubkey = getDemoWalletPubkey();
-  const pubkeyShort = pubkey
-    ? `${pubkey.toBase58().slice(0, 6)}…${pubkey.toBase58().slice(-6)}`
-    : null;
+  const { provider, state } = useAuth();
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // すでに authenticated なら Main に飛ぶ (= AuthGate の初期化が間に合った場合)
+  useEffect(() => {
+    if (state.status === 'authenticated') {
+      navigation.replace('Main');
+    }
+  }, [state.status, navigation]);
+
+  const onContinue = async () => {
+    setLoggingIn(true);
+    setError(null);
+    try {
+      await provider.login();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const providerLabel = provider.id === 'debug' ? 'Debug wallet · auto-generated' : provider.id;
 
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.body}>
-        <Text style={styles.eyebrow}>ROOTLENS</Text>
-        <Text style={styles.heading}>Physical AI training-data collection</Text>
+        <View style={styles.markRow}>
+          <Mark />
+          <Text style={styles.markText}>ROOTLENS</Text>
+        </View>
+
+        <View style={styles.heroBlock}>
+          <Text style={styles.heroLineA}>Capture chores.</Text>
+          <Text style={styles.heroLineB}>Earn from <Text style={styles.heroLineBAccent}>AI labs.</Text></Text>
+        </View>
+
         <Text style={styles.lede}>
-          Record household chores. Mint a Root NFT. Earn revenue when AI labs license your clip.
+          Record household tasks while wearing the phone. The clip is signed, blurred,
+          and minted on Solana as a Root NFT you own.
         </Text>
 
-        {pubkey ? (
-          <View style={styles.walletBlock}>
-            <Text style={styles.walletLabel}>DEMO WALLET (devnet)</Text>
-            <Text style={styles.walletPubkey}>{pubkeyShort}</Text>
-            <Text style={styles.walletNote}>
-              Privy login bypassed — using fixed wallet from .env
-            </Text>
-          </View>
-        ) : (
+        <View style={styles.providerCard}>
+          <Text style={styles.providerEyebrow}>AUTH PROVIDER</Text>
+          <Text style={styles.providerValue}>{providerLabel}</Text>
+          <Text style={styles.providerNote}>
+            Privy embedded wallet は次の更新で。 今は端末ローカルにデバッグ wallet を作成して使う。
+          </Text>
+        </View>
+
+        {error && (
           <View style={styles.errorBlock}>
-            <Text style={styles.errorLabel}>NO WALLET CONFIGURED</Text>
-            <Text style={styles.errorBody}>
-              Set EXPO_PUBLIC_DEMO_WALLET_ADDRESS in app/.env to a base58 Solana pubkey, then
-              reload.
-            </Text>
+            <Text style={styles.errorLabel}>SIGN-IN FAILED</Text>
+            <Text style={styles.errorBody}>{error}</Text>
           </View>
         )}
       </View>
@@ -48,69 +88,132 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         <Pressable
           style={({ pressed }) => [
             styles.cta,
-            !pubkey && styles.ctaDisabled,
-            pressed && pubkey && styles.ctaPressed,
+            loggingIn && styles.ctaDisabled,
+            pressed && !loggingIn && styles.ctaPressed,
           ]}
-          onPress={() => navigation.replace('Main')}
-          disabled={!pubkey}
+          onPress={onContinue}
+          disabled={loggingIn}
         >
-          <Text style={styles.ctaLabel}>Continue</Text>
+          {loggingIn ? (
+            <ActivityIndicator color={colors.textOnInk} />
+          ) : (
+            <Text style={styles.ctaLabel}>SIGN IN</Text>
+          )}
         </Pressable>
+        <Text style={styles.tos}>
+          続行することで利用規約と Privacy Policy に同意したものとみなされます。
+        </Text>
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, justifyContent: 'space-between' },
-  body: { padding: spacing.xl, gap: spacing.md },
-  eyebrow: {
-    ...typography.label,
-    color: colors.textSecondary,
-    letterSpacing: 1.6,
-    marginTop: spacing.xl,
-  },
-  heading: { ...typography.heading, color: colors.textPrimary },
-  lede: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm },
+const Mark: React.FC = () => (
+  <Svg width={28} height={28} viewBox="0 0 28 28" fill="none">
+    <Circle cx={14} cy={14} r={13} stroke={colors.ink} strokeWidth={1.4} />
+    <Circle cx={14} cy={14} r={6.5} stroke={colors.ink} strokeWidth={1.4} />
+    <Path d="M14 1v6.5M14 20.5V27M1 14h6.5M20.5 14H27" stroke={colors.ink} strokeWidth={1.4} strokeLinecap="round" />
+  </Svg>
+);
 
-  walletBlock: {
-    marginTop: spacing.xl,
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.paper, justifyContent: 'space-between' },
+  body: { padding: spacing.xl, gap: spacing.lg },
+
+  markRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+  },
+  markText: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 12,
+    letterSpacing: 2.4,
+    color: colors.ink,
+  },
+
+  heroBlock: {
+    marginTop: spacing.xxl,
+    gap: 2,
+  },
+  heroLineA: {
+    fontFamily: fonts.serifLight,
+    fontSize: 44,
+    lineHeight: 50,
+    letterSpacing: -0.8,
+    color: colors.ink,
+  },
+  heroLineB: {
+    fontFamily: fonts.serifLight,
+    fontSize: 44,
+    lineHeight: 50,
+    letterSpacing: -0.8,
+    color: colors.ink,
+  },
+  heroLineBAccent: {
+    fontFamily: fonts.serifMedium,
+    color: colors.emeraldDeep,
+  },
+
+  lede: {
+    ...typography.body,
+    color: colors.textBody,
+    maxWidth: 360,
+  },
+
+  providerCard: {
+    marginTop: spacing.lg,
     padding: spacing.lg,
-    backgroundColor: colors.accentLight,
-    borderRadius: radii.md,
-    gap: 4,
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 6,
   },
-  walletLabel: {
-    ...typography.label,
-    color: colors.accent,
-    letterSpacing: 1.4,
-  },
-  walletPubkey: {
+  providerEyebrow: { ...typography.labelSmall, color: colors.textMute },
+  providerValue: {
+    fontFamily: fonts.mono,
     fontSize: 14,
-    fontFamily: 'Menlo',
-    color: colors.textPrimary,
-    marginTop: spacing.xs,
+    color: colors.ink,
   },
-  walletNote: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
+  providerNote: {
+    ...typography.caption,
+    color: colors.textMute,
+    marginTop: 2,
+  },
 
   errorBlock: {
-    marginTop: spacing.xl,
-    padding: spacing.lg,
-    backgroundColor: colors.errorLight,
+    marginTop: spacing.md,
+    padding: spacing.md,
     borderRadius: radii.md,
-    gap: 4,
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.danger,
   },
-  errorLabel: { ...typography.label, color: colors.error, letterSpacing: 1.4 },
-  errorBody: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
+  errorLabel: { ...typography.labelSmall, color: colors.danger },
+  errorBody: { ...typography.caption, color: colors.danger, marginTop: 4 },
 
-  footer: { padding: spacing.xl },
+  footer: { padding: spacing.xl, gap: spacing.md },
   cta: {
-    backgroundColor: colors.accent,
-    paddingVertical: spacing.lg,
+    backgroundColor: colors.ink,
+    paddingVertical: 18,
     borderRadius: radii.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  ctaPressed: { backgroundColor: colors.accentDark },
-  ctaDisabled: { backgroundColor: colors.textDisabled },
-  ctaLabel: { color: colors.white, fontSize: 16, fontWeight: '600' },
+  ctaPressed: { backgroundColor: colors.inkSoft },
+  ctaDisabled: { opacity: 0.6 },
+  ctaLabel: {
+    color: colors.textOnInk,
+    fontFamily: fonts.sansSemibold,
+    fontSize: 12,
+    letterSpacing: 2.4,
+  },
+  tos: {
+    ...typography.caption,
+    color: colors.textMute,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
 });

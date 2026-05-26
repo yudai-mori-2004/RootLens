@@ -23,7 +23,7 @@ import {
 
 import { RootNavigator } from './src/app/RootNavigator';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
-import { getDemoWalletPubkey } from './src/domain/wallet';
+import { AuthGate } from './src/services/auth';
 import { colors, fonts, typography } from './src/theme';
 
 // 統合フェーズ entry point。
@@ -70,12 +70,14 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <CertGate>
-        <NavigationContainer theme={navTheme}>
-          <RootNavigator />
-          <StatusBar style="dark" />
-        </NavigationContainer>
-      </CertGate>
+      <AuthGate>
+        <CertGate>
+          <NavigationContainer theme={navTheme}>
+            <RootNavigator />
+            <StatusBar style="dark" />
+          </NavigationContainer>
+        </CertGate>
+      </AuthGate>
     </SafeAreaProvider>
   );
 }
@@ -118,10 +120,7 @@ const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
-// ---- 起動 route 振り分け用 helper (RootNavigator 側で使う) ------------
-// wallet が env から読めれば Main へ直行、なければ Login で待つ。
-export const initialRouteForApp = (): 'Main' | 'Login' =>
-  getDemoWalletPubkey() ? 'Main' : 'Login';
+// initialRouteForApp は廃止 (= RootNavigator が AuthGate の useAuth() で判定する)。
 
 const styles = StyleSheet.create({
   center: {

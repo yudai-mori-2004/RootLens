@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Constants from 'expo-constants';
 import { config } from '../config';
-import { getDemoSigner, getDemoWalletPubkey } from '../domain/wallet';
+import { COSIGN_AUTHORITY, SOLANA_RPC_URL } from '../env';
+import { useAuth } from '../services/auth';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 // SETTINGS タブ — wallet, network, app version など読み取り専用情報。
@@ -10,27 +11,52 @@ import { colors, fonts, radii, spacing, typography } from '../theme';
 //
 // セクション:
 //   • Wallet      pubkey + signer 有無 + Solscan link
-//   • Network     Solana RPC, DAS, TP gateway proxy URL
+//   • Network     Solana RPC (= DAS と同居), TP gateway proxy URL
 //   • Servers     web (rootlens.io) endpoints
 //   • About       app version, build channel
 
-const ENV = process.env as Record<string, string | undefined>;
 
 export const SettingsScreen: React.FC = () => {
-  const ownerPubkey = useMemo(() => getDemoWalletPubkey(), []);
-  const signer = useMemo(() => getDemoSigner(), []);
-  const ownerStr = ownerPubkey?.toBase58() ?? null;
+  const { provider, state } = useAuth();
+  const ownerStr = state.status === 'authenticated' ? state.session.pubkey.toBase58() : null;
+  const [signingOut, setSigningOut] = useState(false);
 
-  const rpc = ENV.EXPO_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com';
-  const das = ENV.EXPO_PUBLIC_DAS_URL || rpc;
-  const cosignAuthority = ENV.EXPO_PUBLIC_COSIGN_AUTHORITY || '—';
+  const rpc = SOLANA_RPC_URL;
+  const cosignAuthority = COSIGN_AUTHORITY;
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.1.0';
+
+  const onLogout = () => {
+    Alert.alert(
+      'Sign out',
+      provider.id === 'debug'
+        ? 'デバッグウォレットを削除して再生成します。 撮影済みクリップは新しい wallet からは見えなくなります。'
+        : 'ログアウトします。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: 'サインアウト',
+          style: 'destructive',
+          onPress: async () => {
+            setSigningOut(true);
+            try {
+              await provider.logout();
+            } finally {
+              setSigningOut(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Read-only — login & switching deferred to next phase.</Text>
+        <Text style={styles.subtitle}>
+          認証 provider: <Text style={styles.subtitleMono}>{provider.id}</Text>
+          {provider.id === 'debug' && '  (= 仮実装、 Privy は task で差し替え予定)'}
+        </Text>
 
         <Section title="Wallet">
           <Row
@@ -43,9 +69,9 @@ export const SettingsScreen: React.FC = () => {
             }
           />
           <Row
-            label="SIGNER"
-            value={signer ? 'available (env keypair)' : 'missing — stake disabled'}
-            tone={signer ? 'ok' : 'warn'}
+            label="AUTH STATUS"
+            value={state.status}
+            tone={state.status === 'authenticated' ? 'ok' : state.status === 'loading' ? 'mute' : 'warn'}
           />
           <Row label="COSIGN AUTHORITY" value={cosignAuthority} />
         </Section>
@@ -53,7 +79,6 @@ export const SettingsScreen: React.FC = () => {
         <Section title="Network">
           <Row label="CLUSTER" value="devnet" tone="ok" />
           <Row label="RPC" value={rpc} />
-          <Row label="DAS" value={das} />
         </Section>
 
         <Section title="Servers">
@@ -72,9 +97,23 @@ export const SettingsScreen: React.FC = () => {
           />
         </Section>
 
+        <Pressable
+          onPress={onLogout}
+          disabled={signingOut || state.status !== 'authenticated'}
+          style={({ pressed }) => [
+            styles.signOutBtn,
+            pressed && styles.signOutBtnPressed,
+            (signingOut || state.status !== 'authenticated') && styles.signOutBtnDisabled,
+          ]}
+        >
+          <Text style={styles.signOutLabel}>
+            {signingOut ? 'SIGNING OUT…' : 'SIGN OUT'}
+          </Text>
+        </Pressable>
+
         <View style={styles.footnote}>
           <Text style={styles.footnoteText}>
-            RootLens · Physical AI training-data marketplace · v0.1.2 sandbox
+            RootLens · Physical AI training-data marketplace · v0.1.3
           </Text>
         </View>
       </ScrollView>
@@ -145,6 +184,30 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   subtitle: { ...typography.body, color: colors.textBody },
+  subtitleMono: { fontFamily: fonts.mono, fontSize: 13, color: colors.ink },
+
+  signOutBtn: {
+    marginTop: spacing.lg,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  signOutBtnPressed: {
+    backgroundColor: colors.paperDeep,
+  },
+  signOutBtnDisabled: {
+    opacity: 0.4,
+  },
+  signOutLabel: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 11.5,
+    letterSpacing: 1.6,
+    color: colors.danger,
+  },
 
   section: {
     marginTop: spacing.md,

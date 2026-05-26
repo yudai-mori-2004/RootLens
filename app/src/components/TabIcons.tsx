@@ -53,6 +53,42 @@ export const CollectionIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
   );
 };
 
+// Home (= ライブラリ感のあるアーチ / 円弧)。 旧 Collection を踏まえつつ「ホーム」 らしい
+// ニュアンスを足す。 ファインダー風のコーナーティック + アパチャ中央ドット。
+export const HomeIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
+  const stroke = active ? colors.ink : colors.textMute;
+  const accent = active ? colors.emerald : colors.textMute;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      {/* Viewfinder ticks (= 4 corners) */}
+      <Path d="M4 8.5V5h3.5" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
+      <Path d="M16.5 5H20v3.5" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
+      <Path d="M20 15.5V19h-3.5" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
+      <Path d="M7.5 19H4v-3.5" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
+      {/* Aperture core */}
+      <Circle cx={12} cy={12} r={3.4} stroke={stroke} strokeWidth={STROKE} fill={active ? colors.emeraldSoft : 'transparent'} />
+      {active && <Circle cx={12} cy={12} r={1.2} fill={accent} />}
+    </Svg>
+  );
+};
+
+// Center Camera tab (= 撮影モード入口)。 タブバー上の他アイコンと違い、 リング型で
+// 一段大きく扱う想定 (= MainTabs 側で size=32 + 余白)。 active 時は emerald で塗る。
+export const CameraIcon: React.FC<IconProps> = ({ active, size = 28 }) => {
+  const ring = active ? colors.emerald : colors.ink;
+  const inner = active ? colors.paper : colors.emerald;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+      {/* Outer ring */}
+      <Circle cx={14} cy={14} r={11.5} stroke={ring} strokeWidth={1.8} fill={active ? colors.emerald : 'transparent'} />
+      {/* Aperture petal hint */}
+      <Circle cx={14} cy={14} r={6.5} stroke={inner} strokeWidth={1.6} fill="transparent" />
+      {/* Shutter dot */}
+      <Circle cx={14} cy={14} r={2.2} fill={inner} />
+    </Svg>
+  );
+};
+
 export const SettingsIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
   const stroke = active ? colors.ink : colors.textMute;
   const fill = active ? colors.emeraldSoft : 'transparent';

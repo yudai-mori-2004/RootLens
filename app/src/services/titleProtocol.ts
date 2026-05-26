@@ -13,11 +13,7 @@ import { sha256 } from '@noble/hashes/sha256';
 import { Connection } from '@solana/web3.js';
 import * as FileSystem from 'expo-file-system';
 import { AesGcmBridge, nativeCryptoProvider } from './nativeCryptoProvider';
-
-// Devnet RPC は env で上書き可能 (.env の EXPO_PUBLIC_SOLANA_RPC_URL)。
-// Helius は devnet サポートを縮退したので公式 RPC を default に。DAS API も同 endpoint で出る。
-const SOLANA_RPC_URL =
-  process.env.EXPO_PUBLIC_SOLANA_RPC_URL ?? 'https://api.devnet.solana.com';
+import { SOLANA_RPC_URL, TP_GATEWAY_URL } from '../env';
 
 // iOS app から TP gateway (plain HTTP) に直 fetch すると iOS 26.x で
 // "Network request failed" になる (ATS=arbitrary loads でも IP literal + plain HTTP
@@ -134,11 +130,10 @@ export async function registerOnTitleProtocol(
   // で endpoint を強制 pin することも可能。
   const teeNodes = client.getTrustedTeeNodes();
   if (teeNodes.length === 0) throw new Error('No TEE nodes registered on-chain');
-  const pinned = (process.env as Record<string, string | undefined>).EXPO_PUBLIC_TP_GATEWAY_ENDPOINT;
-  const picked = pinned
-    ? teeNodes.find((n) => n.gateway_endpoint.replace(/\/$/, '') === pinned.replace(/\/$/, ''))
-    : teeNodes[0];
-  if (!picked) throw new Error(`Pinned endpoint ${pinned} not in on-chain TEE node list`);
+  const pinned = TP_GATEWAY_URL.replace(/\/$/, '');
+  const picked =
+    teeNodes.find((n) => n.gateway_endpoint.replace(/\/$/, '') === pinned) ?? teeNodes[0];
+  if (!picked) throw new Error(`No TEE node found (pinned=${pinned})`);
   const node = {
     gatewayUrl: picked.gateway_endpoint.replace(/\/$/, ''),
     encryptionPubkey: picked.encryption_pubkey,

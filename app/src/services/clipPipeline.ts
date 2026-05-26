@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
-import { getDemoWalletPubkey } from '../domain/wallet';
+import { getCurrentSession, requireCurrentSession } from './auth';
+import { SERVER_URL } from '../env';
 
 // クリップの状態機械とパイプラインの抽象。
 //
@@ -100,10 +101,9 @@ interface EnqueueInput {
   snapshotUri?: string;
 }
 
-/// rootlens-server の base URL。 環境変数 EXPO_PUBLIC_SERVER_URL から取得。
-/// 未設定なら全 API 呼び出しが throw する。
-export function getServerBaseUrl(): string | null {
-  return process.env.EXPO_PUBLIC_SERVER_URL ?? null;
+/// rootlens-server の base URL。 src/env.ts から取得 (default は本番)。
+export function getServerBaseUrl(): string {
+  return SERVER_URL;
 }
 
 // ─── store 実装 ─────────────────────────────────────────────────────────
@@ -219,9 +219,7 @@ class ClipStore {
 
   private async httpEnqueue(localId: string, input: EnqueueInput): Promise<void> {
     const serverUrl = getServerBaseUrl();
-    if (!serverUrl) throw new Error('EXPO_PUBLIC_SERVER_URL not set');
-    const walletPubkey = getDemoWalletPubkey()?.toBase58();
-    if (!walletPubkey) throw new Error('No wallet pubkey available');
+    const walletPubkey = requireCurrentSession().pubkey.toBase58();
 
     // 1. sessionDir 配下の 4 ファイルの存在確認 + rgb.mp4 のサイズ + hash
     const sessionDir = input.sessionDirUri.endsWith('/') ? input.sessionDirUri : `${input.sessionDirUri}/`;
@@ -305,9 +303,7 @@ class ClipStore {
 
   private async httpStake(clipId: string): Promise<void> {
     const serverUrl = getServerBaseUrl();
-    if (!serverUrl) throw new Error('EXPO_PUBLIC_SERVER_URL not set');
-    const walletPubkey = getDemoWalletPubkey()?.toBase58();
-    if (!walletPubkey) throw new Error('No wallet pubkey available');
+    const walletPubkey = requireCurrentSession().pubkey.toBase58();
 
     const res = await fetch(`${serverUrl}/api/clips/${clipId}/stake`, {
       method: 'POST',
@@ -328,9 +324,7 @@ class ClipStore {
   /// 'error' クリップを再投入。 サーバ側で state を 'processing' に戻し workflow を再起動する。
   private async httpRetry(clipId: string): Promise<void> {
     const serverUrl = getServerBaseUrl();
-    if (!serverUrl) throw new Error('EXPO_PUBLIC_SERVER_URL not set');
-    const walletPubkey = getDemoWalletPubkey()?.toBase58();
-    if (!walletPubkey) throw new Error('No wallet pubkey available');
+    const walletPubkey = requireCurrentSession().pubkey.toBase58();
 
     const res = await fetch(`${serverUrl}/api/clips/${clipId}/retry`, {
       method: 'POST',
@@ -355,9 +349,10 @@ class ClipStore {
 
   private startHttpPolling(clipId: string): void {
     if (this.httpPollers.has(clipId)) return;
+    const session = getCurrentSession();
+    if (!session) return;
     const serverUrl = getServerBaseUrl();
-    const walletPubkey = getDemoWalletPubkey()?.toBase58();
-    if (!serverUrl || !walletPubkey) return;
+    const walletPubkey = session.pubkey.toBase58();
 
     const tick = async () => {
       try {

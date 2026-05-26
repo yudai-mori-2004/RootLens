@@ -14,7 +14,8 @@ import {
 import { Buffer } from 'buffer';
 import { Connection, VersionedTransaction } from '@solana/web3.js';
 import Svg, { Path } from 'react-native-svg';
-import { getBuyerPubkey, getBuyerSigner, getDemoWalletPubkey } from '../domain/wallet';
+import { getBuyerPubkey, getBuyerSigner } from '../debug/buyerWallet';
+import { useAuth } from '../services/auth';
 import { config } from '../config';
 import { LICENSE_URLS, LICENSE_PRICE_USDC } from '../domain/licenseCatalog';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
@@ -32,12 +33,9 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 //
 // 価格 / license type はカタログ依存。今は commercial-v1 だけハードコード ($1)。
 
-const ENV = process.env as Record<string, string | undefined>;
-const SOLANA_RPC_URL = ENV.EXPO_PUBLIC_SOLANA_RPC_URL;
-if (!SOLANA_RPC_URL) {
-  throw new Error('EXPO_PUBLIC_SOLANA_RPC_URL is not set.');
-}
-const DAS_URL = ENV.EXPO_PUBLIC_DAS_URL ?? SOLANA_RPC_URL;
+import { SOLANA_RPC_URL } from '../env';
+
+const DAS_URL = SOLANA_RPC_URL;
 
 // licenseCatalog (= web 側 catalog のミラー) から URL と価格を取る。
 // 旧版は 0000...0000 の placeholder URL を焼いていたので co-sign API でマッチせず常に reject
@@ -63,7 +61,8 @@ type BuyState =
 export const BuyerScreen: React.FC = () => {
   const buyerPubkey = useMemo(() => getBuyerPubkey(), []);
   const buyerSigner = useMemo(() => getBuyerSigner(), []);
-  const supplierPubkey = useMemo(() => getDemoWalletPubkey(), []);
+  const { state } = useAuth();
+  const supplierPubkey = state.status === 'authenticated' ? state.session.pubkey : null;
 
   const [clips, setClips] = useState<ListedClip[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -355,7 +354,7 @@ const EmptyState: React.FC<{ loading: boolean; error: string | null; hasSupplier
       <View style={styles.empty}>
         <Text style={styles.emptyEyebrow}>NO SUPPLIER WALLET</Text>
         <Text style={styles.emptyText}>
-          Set EXPO_PUBLIC_DEMO_WALLET_ADDRESS so the buyer knows whose clips to browse.
+          Sign in to load supplier clips. (Buyer simulator needs EXPO_PUBLIC_BUYER_* env.)
         </Text>
       </View>
     );

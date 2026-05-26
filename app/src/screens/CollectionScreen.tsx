@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Path, Polyline } from 'react-native-svg';
-import { getDemoWalletPubkey } from '../domain/wallet';
+import { useAuth } from '../services/auth';
 import { ClipCard } from '../components/ClipCard';
 import { StakeSheet } from '../components/StakeSheet';
 import { priceFromLicenseUrl } from '../domain/licenseCatalog';
@@ -27,11 +27,9 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 // 両方を 1 つの Clip[] にマージして ClipCard に渡す。 タップして開く Stake シートは「準備完了」
 // 状態にのみ作用する (= SPECS §4.2 で UI 上の入口がここに統合された)。
 
-const ENV = process.env as Record<string, string | undefined>;
-const DAS_URL = ENV.EXPO_PUBLIC_DAS_URL ?? ENV.EXPO_PUBLIC_SOLANA_RPC_URL;
-if (!DAS_URL) {
-  throw new Error('EXPO_PUBLIC_DAS_URL (or EXPO_PUBLIC_SOLANA_RPC_URL) is not set.');
-}
+import { SOLANA_RPC_URL } from '../env';
+
+const DAS_URL = SOLANA_RPC_URL;
 
 const LICENSE_COLLECTION_MINT = 'BvhuJiTWDW6n5cSzE4XmzYcwLry7vcstS1U7fD7n9N1b';
 
@@ -55,7 +53,8 @@ interface OnChainStakedClip {
 }
 
 export const CollectionScreen: React.FC = () => {
-  const ownerPubkey = useMemo(() => getDemoWalletPubkey(), []);
+  const { state } = useAuth();
+  const ownerPubkey = state.status === 'authenticated' ? state.session.pubkey : null;
   const pipelineClips = useClips();
 
   const [onChain, setOnChain] = useState<OnChainStakedClip[] | null>(null);
@@ -363,7 +362,7 @@ const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: 
       <View style={styles.empty}>
         <Text style={styles.emptyEyebrow}>NO WALLET</Text>
         <Text style={styles.emptyText}>
-          Set EXPO_PUBLIC_DEMO_WALLET_ADDRESS in .env, then reload.
+          認証 provider が初期化中、 もしくは未認証です。 設定画面で確認してください。
         </Text>
       </View>
     );
