@@ -34,9 +34,20 @@ aws-config = "1"
 aws-sdk-s3 = { version = "1", features = ["sigv4a"] }
 aws-credential-types = "1"
 
-# Title Protocol Gateway (= http://13.113.217.17:3000/process) を叩く HTTP client。
-# サーバ flow には載らない並列 register: R2 upload 後に mock-device 自身が呼ぶ。
+# Title Protocol Gateway (= http://13.113.217.17:3000/process + /extension/solana) を叩く HTTP client。
+# サーバ flow には載らない: R2 upload 後に mock-device 自身が /process と /extension/solana を呼ぶ。
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# v0.1.3 step 6 (= cNFT 発行) で使う Solana 周り。
+# TP Gateway `POST /extension/solana` で受け取った partial_tx (= base64 VersionedTransaction)
+# を deserialize → payer 鍵で署名 → RPC に broadcast する。 title-protocol/crates/cli と同じ
+# version 2 系を採用。
+solana-sdk = "~2.2"
+solana-client = "~2.2"
+base64 = "0.22"
+bincode = "1.3"
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+bs58 = "0.5"
 
 [dev-dependencies]
 # テストで一時ディレクトリを扱う

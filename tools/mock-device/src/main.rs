@@ -14,6 +14,8 @@
 
 mod blur;
 mod c2pa_sign;
+mod clips_register;
+mod cnft_mint;
 mod content_id;
 mod jumbf;
 mod r2_upload;
@@ -62,6 +64,39 @@ struct Args {
     #[arg(long)]
     bucket: Option<String>,
 
+    /// Solana payer keypair JSON path (= prod profile で cNFT 発行に必須、 既定 keys/deployer.json)。
+    #[arg(long, default_value = "keys/deployer.json")]
+    solana_keypair: PathBuf,
+
+    /// Solana RPC URL (= cNFT broadcast 用、 既定は devnet)。
+    #[arg(long, default_value = "https://api.devnet.solana.com")]
+    solana_rpc_url: String,
+
+    /// TP Gateway base URL (= /process + /extension/solana を叩く、 既定は固定 IP)。
+    /// 環境変数 TP_GATEWAY_URL でも override 可。
+    #[arg(long)]
+    tp_gateway: Option<String>,
+
+    /// cNFT mint 先 Merkle tree pubkey (= prod profile で必須、 既定なし)。
+    #[arg(long)]
+    merkle_tree: Option<String>,
+
+    /// Root NFT collection pubkey (= 既定で devnet root_nft_collection)。
+    #[arg(long, default_value = "Dfg52e4aG9zusPedUSMQ7q8kRs3W4QebNCQqJf3GjYBy")]
+    collection: String,
+
+    /// RootLens API base URL (= /api/clips を叩く)。
+    #[arg(long, default_value = "https://www.rootlens.io")]
+    api_base: String,
+
+    /// タスクカタログ ID (= /api/clips の taskId field)。
+    #[arg(long, default_value = "dishes")]
+    task_id: String,
+
+    /// 端末側 VLM 達成確度 (= 0..100)。
+    #[arg(long, default_value_t = 85)]
+    achievement: u32,
+
     /// 進捗ログを抑制
     #[arg(long)]
     quiet: bool,
@@ -103,6 +138,30 @@ struct Output {
     /// TP register 自体が成功したか (= 失敗してもアップロード自体は完了)
     #[serde(skip_serializing_if = "Option::is_none")]
     tp_register_error: Option<String>,
+
+    // ─── cNFT 発行 + /api/clips register 結果 (prod profile のみ) ─────────
+    /// Solana cNFT asset id (= /api/clips の rootAssetId に渡す、 base58)。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    root_asset_id: Option<String>,
+    /// R2 signed-json/<content_id>.json への 7 日有効 presigned GET URL (= /api/clips の signedJsonUri)。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    signed_json_uri: Option<String>,
+    /// /api/clips POST で得たクリップ ID (= サーバ DB 内 primary key)。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    clip_id: Option<String>,
+    /// cNFT 発行 broadcast tx の Solana signature。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    solana_tx_signature: Option<String>,
+    /// cNFT 発行失敗 (= /extension/solana or Solana broadcast 失敗)。 これがあれば clip_id は不在
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cnft_mint_error: Option<String>,
+    /// /api/clips POST 失敗。 cNFT 成功時にのみ呼ぶので、 これが出るのは server 側 validation 失敗
+    #[serde(skip_serializing_if = "Option::is_none")]
+    clips_register_error: Option<String>,
+    /// payer keypair から derive した Solana wallet pubkey (= 後段 finalize / GET の
+    /// X-Wallet-Pubkey header に渡す値、 base58)。 prod profile でのみ出る。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    wallet_pubkey: Option<String>,
 }
 
 #[tokio::main]
@@ -195,6 +254,13 @@ async fn main() -> Result<()> {
         tp_signature_hash: None,
         tp_offchain_key: None,
         tp_register_error: None,
+        root_asset_id: None,
+        signed_json_uri: None,
+        clip_id: None,
+        solana_tx_signature: None,
+        cnft_mint_error: None,
+        clips_register_error: None,
+        wallet_pubkey: None,
     };
 
     match args.profile {
@@ -238,23 +304,137 @@ async fn main() -> Result<()> {
             output.r2_keys = Some(upload_result.keys);
             output.r2_bucket = Some(bucket.clone());
 
-            // ─── 並列 step: Title Protocol register ─────────────────────
-            // R2 upload 完了後、 mock-device が直接 TP Gateway を叩く。 サーバ flow には
-            // 載らない。 失敗してもアップロード自体は完了、 tp_register_error に記録する。
-            log("step 5/5: Title Protocol register (= POST /process via Gateway)");
+            // ─── step 5: Title Protocol register (= /process) ───────────────
+            log("step 5/7: Title Protocol register (= POST /process via Gateway)");
             let signed_key = format!("raw/{content_id_hex}/rgb.mp4");
-            let gateway = std::env::var("TP_GATEWAY_URL").ok();
-            match register_tp(&client, &bucket, &signed_key, &content_id_hex, gateway.as_deref()).await {
+            let env_gateway = std::env::var("TP_GATEWAY_URL").ok();
+            let tp_gateway_url: String = args
+                .tp_gateway
+                .clone()
+                .or(env_gateway)
+                .unwrap_or_else(|| tp_register::DEFAULT_TP_GATEWAY.to_string());
+
+            let tp_ok = match register_tp(
+                &client,
+                &bucket,
+                &signed_key,
+                &content_id_hex,
+                Some(&tp_gateway_url),
+            )
+            .await
+            {
                 Ok((sig_hash, offchain_key)) => {
                     log(&format!("  tp signature_hash = {sig_hash}"));
                     log(&format!("  tp offchain JSON  = s3://{bucket}/{offchain_key}"));
                     output.tp_signature_hash = Some(sig_hash);
-                    output.tp_offchain_key = Some(offchain_key);
+                    output.tp_offchain_key = Some(offchain_key.clone());
+                    Some(offchain_key)
                 }
                 Err(e) => {
                     let err_msg = format!("{e:#}");
-                    log(&format!("  WARN: TP register failed: {err_msg}"));
+                    log(&format!("  ERROR: TP register failed: {err_msg}"));
                     output.tp_register_error = Some(err_msg);
+                    None
+                }
+            };
+
+            // ─── step 6: cNFT 発行 (= /extension/solana + Solana broadcast) ─
+            // tp register が失敗していた場合は cNFT 発行できない (= offchain_data_url が無い)
+            let mut cnft_ok = false;
+            if let Some(offchain_key) = tp_ok {
+                log("step 6/7: cNFT mint (= POST /extension/solana + Solana broadcast)");
+                let merkle_tree = match args.merkle_tree.as_deref() {
+                    Some(s) => s,
+                    None => {
+                        let msg = "--merkle-tree required for prod profile cNFT mint";
+                        log(&format!("  ERROR: {msg}"));
+                        output.cnft_mint_error = Some(msg.to_string());
+                        ""
+                    }
+                };
+
+                if !merkle_tree.is_empty() {
+                    // signed_json_uri = R2 presigned GET URL、 7 日有効 (= sigv4 上限)
+                    let signed_json_uri = r2_upload::presign_get_url(
+                        &client,
+                        &bucket,
+                        &offchain_key,
+                        7 * 24 * 60 * 60,
+                    )
+                    .await?;
+                    output.signed_json_uri = Some(signed_json_uri.clone());
+
+                    let keypair = cnft_mint::load_keypair(&args.solana_keypair);
+                    match keypair {
+                        Ok(payer) => {
+                            let outcome = cnft_mint::mint_cnft(
+                                &tp_gateway_url,
+                                &signed_json_uri,
+                                &payer,
+                                merkle_tree,
+                                Some(&args.collection),
+                                &args.solana_rpc_url,
+                            )
+                            .await;
+                            match outcome {
+                                Ok(m) => {
+                                    log(&format!("  root_asset_id = {}", m.root_asset_id));
+                                    log(&format!("  solana tx     = {}", m.tx_signature));
+                                    output.root_asset_id = Some(m.root_asset_id);
+                                    output.solana_tx_signature = Some(m.tx_signature);
+                                    cnft_ok = true;
+                                }
+                                Err(e) => {
+                                    let err_msg = format!("{e:#}");
+                                    log(&format!("  ERROR: cNFT mint failed: {err_msg}"));
+                                    output.cnft_mint_error = Some(err_msg);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let err_msg = format!("load keypair: {e:#}");
+                            log(&format!("  ERROR: {err_msg}"));
+                            output.cnft_mint_error = Some(err_msg);
+                        }
+                    }
+                }
+            }
+
+            // ─── step 7: POST /api/clips (= サーバ DB 行作成) ──────────────
+            if cnft_ok {
+                log("step 7/7: POST /api/clips (= server clip registration)");
+                let root_asset_id = output.root_asset_id.clone().unwrap();
+                let signed_json_uri = output.signed_json_uri.clone().unwrap();
+                let content_size = std::fs::metadata(&final_rgb)
+                    .with_context(|| format!("stat {}", final_rgb.display()))?
+                    .len();
+
+                // wallet pubkey は payer keypair から derive (= mock-device は 1 wallet)
+                let payer = cnft_mint::load_keypair(&args.solana_keypair)?;
+                let wallet_pubkey = cnft_mint::pubkey(&payer).to_string();
+                output.wallet_pubkey = Some(wallet_pubkey.clone());
+
+                match clips_register::register_clip(
+                    &args.api_base,
+                    &wallet_pubkey,
+                    &args.task_id,
+                    args.achievement,
+                    &content_id_hex,
+                    content_size,
+                    &root_asset_id,
+                    &signed_json_uri,
+                )
+                .await
+                {
+                    Ok(id) => {
+                        log(&format!("  clip_id = {id}"));
+                        output.clip_id = Some(id);
+                    }
+                    Err(e) => {
+                        let err_msg = format!("{e:#}");
+                        log(&format!("  ERROR: /api/clips failed: {err_msg}"));
+                        output.clips_register_error = Some(err_msg);
+                    }
                 }
             }
         }
@@ -262,6 +442,12 @@ async fn main() -> Result<()> {
 
     log(&format!("total elapsed: {:.0} ms", t0.elapsed().as_millis()));
     println!("{}", serde_json::to_string(&output)?);
+    // prod profile で cNFT or clips register が失敗していたら exit 1
+    if args.profile == Profile::Prod
+        && (output.cnft_mint_error.is_some() || output.clips_register_error.is_some())
+    {
+        std::process::exit(1);
+    }
     Ok(())
 }
 

@@ -1,50 +1,62 @@
 #!/usr/bin/env bash
-# End-to-end smoke test (= task 10)。
+# End-to-end smoke test (= task 10、 TP-first flow)。
+#
+# v0.1.3 で TP register + cNFT mint + /api/clips を mock-device 側に統合したので、
+# smoke は mock-device prod プロファイル → finalize → polling → Pipeline 3 だけになる。
 #
 # 流れ:
-#   1. mock-device で raw MP4 + dummy sensors を R2 にアップロード (= prod profile)
-#   2. POST /api/clips で DB 行作成 + presigned URL 取得 (= 既に R2 に上がっているので URL は使わない)
-#   3. POST /api/clips/:id/finalize で Pipeline 2 workflow を起動
+#   1. dummy sensors / IMU / intrinsics 生成
+#   2. mock-device prod (= C2PA D1+D2 + blur + R2 upload + TP /process + cNFT mint + POST /api/clips)
+#      ここで clip 行は既にできていて、 rootAssetId + signedJsonUri も入っている
+#   3. POST /api/clips/:id/finalize で Pipeline 2 workflow 起動
 #   4. GET /api/clips/:id を 2 秒ごとに polling、 state == "ready" まで待つ
 #   5. Pipeline 3 endpoint を手動トリガで叩いて LeRobot v3 dataset を生成
-#   6. 結果サマリを print
 #
 # 前提:
 #   - Vercel deploy 済 (= rootlens.io/api 経由 もしくは preview URL)
-#   - web/.env.local に R2 credential が入っている (= mock-device の prod profile 用)。 無ければ
-#     `cd web && vercel env pull .env.local --yes` で取得
+#   - web/.env.local に R2 credential + MODAL_BUNDLE_ENDPOINT (= mock-device prod 用)。
+#     無ければ `cd web && vercel env pull .env.local --yes` で取得
 #   - mock-device の release build 済 (= cargo build --release in tools/mock-device)
-#   - macos_blur の release build 済 (= tools/macos-blur/.build/.../MacOsBlur)
+#   - MERKLE_TREE env (= cNFT mint 先 tree pubkey、 devnet)
+#   - SOLANA_KEYPAIR env (= 既定 root-lens/keys/deployer.json)
 #
 # 使い方:
-#   bash tools/smoke-test.sh [--input <path/to/raw.mp4>] [--wallet <pubkey>]
-#   API_BASE=https://rootlens.io bash tools/smoke-test.sh
+#   MERKLE_TREE=<pubkey> bash tools/smoke-test.sh [--input <path>] [--api-base <url>]
 
 set -euo pipefail
-
-# ─── 引数 ──────────────────────────────────────────────────────────
-INPUT_MP4="${INPUT_MP4:-/Users/forest/WebCreations/title-protocol/legacy/v0.1.0/tests/fixtures/minimal/test_5s_640x480.mp4}"
-WALLET="${WALLET:-11111111111111111111111111111111}"  # base58 32 文字、 dev mock 用
-TASK_ID="${TASK_ID:-dishes}"
-ACHIEVEMENT="${ACHIEVEMENT:-85}"
-API_BASE="${API_BASE:-http://localhost:3000}"
 
 REPO_ROOT="/Users/forest/WebCreations/root-lens"
 MOCK_DEVICE="$REPO_ROOT/tools/mock-device/target/release/mock-device"
 GEN_DUMMY="$REPO_ROOT/tools/gen-dummy-sensors.py"
 
+# ─── 引数 ──────────────────────────────────────────────────────────
+INPUT_MP4="${INPUT_MP4:-/Users/forest/WebCreations/title-protocol/legacy/v0.1.0/tests/fixtures/minimal/test_5s_640x480.mp4}"
+TASK_ID="${TASK_ID:-dishes}"
+ACHIEVEMENT="${ACHIEVEMENT:-85}"
+API_BASE="${API_BASE:-https://www.rootlens.io}"
+SOLANA_KEYPAIR="${SOLANA_KEYPAIR:-$REPO_ROOT/keys/deployer.json}"
+SOLANA_RPC_URL="${SOLANA_RPC_URL:-https://api.devnet.solana.com}"
+TP_GATEWAY="${TP_GATEWAY:-http://13.113.217.17:3000}"
+COLLECTION="${COLLECTION:-Dfg52e4aG9zusPedUSMQ7q8kRs3W4QebNCQqJf3GjYBy}"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --input) INPUT_MP4="$2"; shift 2 ;;
-    --wallet) WALLET="$2"; shift 2 ;;
     --task-id) TASK_ID="$2"; shift 2 ;;
     --api-base) API_BASE="$2"; shift 2 ;;
+    --merkle-tree) MERKLE_TREE="$2"; shift 2 ;;
+    --keypair) SOLANA_KEYPAIR="$2"; shift 2 ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
 
-# ─── env を web/.env.local から読む (= mock-device prod 用 R2 credential + Pipeline 3 用 MODAL_BUNDLE_ENDPOINT) ──
-# 無ければ `cd web && vercel env pull .env.local --yes` で取得
+if [ -z "${MERKLE_TREE:-}" ]; then
+  echo "MERKLE_TREE 必須 (= cNFT mint 先 tree pubkey、 devnet)"
+  echo "  例: MERKLE_TREE=<pubkey> bash tools/smoke-test.sh"
+  exit 1
+fi
+
+# ─── env を web/.env.local から読む ────────────────────────────────
 ENV_FILE="${ENV_FILE:-$REPO_ROOT/web/.env.local}"
 if [ ! -f "$ENV_FILE" ]; then
   echo "ENV_FILE not found: $ENV_FILE"
@@ -53,51 +65,73 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 set -a; source "$ENV_FILE"; set +a
 
+if [ -z "${MODAL_BUNDLE_ENDPOINT:-}" ]; then
+  echo "MODAL_BUNDLE_ENDPOINT が .env.local に無い (= Pipeline 3 を叩けない)"
+  exit 1
+fi
+
 # ─── tmp 出力場所 ────────────────────────────────────────────────
 TMP_DIR="$(mktemp -d -t rootlens-smoke-XXXXXX)"
 echo "tmp dir: $TMP_DIR"
 
 # ─── Step 1: dummy sensors 生成 ─────────────────────────────────
 echo ""
-echo "=== Step 1/6: dummy sensors 生成 ==="
+echo "=== Step 1/5: dummy sensors 生成 ==="
 python3 "$GEN_DUMMY" --input "$INPUT_MP4" --output-dir "$TMP_DIR" >/dev/null
 echo "  ok: sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json"
 
-# ─── Step 2: mock-device で R2 アップロード ─────────────────────
+# ─── Step 2: mock-device prod (= R2 + TP + cNFT + /api/clips) ───
 echo ""
-echo "=== Step 2/6: mock-device prod (= R2 upload + 2 段 C2PA + blur) ==="
-MOCK_OUT=$("$MOCK_DEVICE" \
+echo "=== Step 2/5: mock-device prod (= R2 + TP /process + cNFT mint + POST /api/clips) ==="
+MOCK_JSON_PATH="$TMP_DIR/mock_device.json"
+set +e
+"$MOCK_DEVICE" \
   --input "$INPUT_MP4" \
   --sensors "$TMP_DIR/sensors.jsonl" \
   --imu "$TMP_DIR/imu_high_rate.jsonl" \
   --intrinsics "$TMP_DIR/camera_intrinsics.json" \
   --output-dir "$TMP_DIR" \
   --profile prod \
-  --quiet)
-CONTENT_ID=$(echo "$MOCK_OUT" | python3 -c "import json,sys; print(json.load(sys.stdin)['content_id_hex'])")
-echo "  ok: content_id = $CONTENT_ID"
+  --solana-keypair "$SOLANA_KEYPAIR" \
+  --solana-rpc-url "$SOLANA_RPC_URL" \
+  --tp-gateway "$TP_GATEWAY" \
+  --merkle-tree "$MERKLE_TREE" \
+  --collection "$COLLECTION" \
+  --api-base "$API_BASE" \
+  --task-id "$TASK_ID" \
+  --achievement "$ACHIEVEMENT" \
+  --quiet >"$MOCK_JSON_PATH"
+MOCK_EXIT=$?
+set -e
+if [ "$MOCK_EXIT" -ne 0 ]; then
+  echo "  mock-device exit=$MOCK_EXIT"
+  cat "$MOCK_JSON_PATH" | python3 -m json.tool | sed 's/^/    /' || true
+  exit 1
+fi
 
-# ─── Step 3: POST /api/clips で DB 行作成 ───────────────────────
-echo ""
-echo "=== Step 3/6: POST /api/clips ==="
-CREATE_RES=$(curl -fsS -X POST "$API_BASE/api/clips" \
-  -H "Content-Type: application/json" \
-  -H "X-Wallet-Pubkey: $WALLET" \
-  -d "{\"taskId\":\"$TASK_ID\",\"achievementConfidence\":$ACHIEVEMENT,\"contentId\":\"$CONTENT_ID\",\"contentSize\":$(stat -f %z "$TMP_DIR/$CONTENT_ID/rgb.mp4")}")
-CLIP_ID=$(echo "$CREATE_RES" | python3 -c "import json,sys; print(json.load(sys.stdin)['clip']['id'])")
-echo "  ok: clip_id = $CLIP_ID"
+CONTENT_ID=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['content_id_hex'])")
+ROOT_ASSET=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['root_asset_id'])")
+CLIP_ID=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['clip_id'])")
+WALLET=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['wallet_pubkey'])")
+TX_SIG=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['solana_tx_signature'])")
+echo "  ok: content_id    = $CONTENT_ID"
+echo "      root_asset_id = $ROOT_ASSET"
+echo "      clip_id       = $CLIP_ID"
+echo "      wallet_pubkey = $WALLET"
+echo "      solana tx     = $TX_SIG"
 
-# ─── Step 4: POST /api/clips/:id/finalize ───────────────────────
+# ─── Step 3: POST /api/clips/:id/finalize ───────────────────────
 echo ""
-echo "=== Step 4/6: POST /api/clips/$CLIP_ID/finalize (= workflow キック) ==="
+echo "=== Step 3/5: POST /api/clips/$CLIP_ID/finalize (= Pipeline 2 workflow キック) ==="
 curl -fsS -X POST "$API_BASE/api/clips/$CLIP_ID/finalize" \
   -H "Content-Type: application/json" \
   -H "X-Wallet-Pubkey: $WALLET" \
-  -d "{\"contentId\":\"$CONTENT_ID\"}" | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ok: state={d[\"clip\"][\"state\"]} processingStep={d[\"clip\"][\"processingStep\"]}')"
+  -d "{\"contentId\":\"$CONTENT_ID\"}" \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ok: state={d[\"clip\"][\"state\"]} processingStep={d[\"clip\"][\"processingStep\"]}')"
 
-# ─── Step 5: ready 待ち polling ──────────────────────────────────
+# ─── Step 4: ready 待ち polling ──────────────────────────────────
 echo ""
-echo "=== Step 5/6: ready 待ち (= 2 秒間隔 polling) ==="
+echo "=== Step 4/5: ready 待ち (= 2 秒間隔 polling) ==="
 DEADLINE=$(( $(date +%s) + 1800 ))  # 最大 30 分
 PREV_STEP=""
 while true; do
@@ -114,15 +148,7 @@ while true; do
   fi
   if [ "$STATE" = "ready" ]; then
     SCORE=$(echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['clip']['qualityScore'])")
-    # rootAssetId は cNFT 発行 (= TP /extension/solana) 後にのみ入る。 サーバ flow に
-    # TP register は無いので、 smoke では未発行のままで bundle を回す。 dataset prefix の
-    # キーとしては content_id を代用する。
-    ROOT_ASSET=$(echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['clip']['rootAssetId'] or '')")
-    if [ -z "$ROOT_ASSET" ]; then
-      ROOT_ASSET="$CONTENT_ID"
-      echo "  (rootAssetId 未発行、 content_id を bundle key として使う)"
-    fi
-    echo "  ok: state=ready, qualityScore=$SCORE, rootAssetId=$ROOT_ASSET"
+    echo "  ok: state=ready, qualityScore=$SCORE"
     BREAKDOWN=$(echo "$STATUS" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['clip']['qualityBreakdown'], indent=2))")
     echo "  qualityBreakdown:"
     echo "$BREAKDOWN" | sed 's/^/    /'
@@ -136,9 +162,9 @@ while true; do
   sleep 2
 done
 
-# ─── Step 6: Pipeline 3 を手動トリガ ────────────────────────────
+# ─── Step 5: Pipeline 3 を手動トリガ ────────────────────────────
 echo ""
-echo "=== Step 6/6: Pipeline 3 (= WiLoR + LeRobot v3 bundle) を手動トリガ ==="
+echo "=== Step 5/5: Pipeline 3 (= WiLoR + LeRobot v3 bundle) を手動トリガ ==="
 RAW_PREFIX="raw/$CONTENT_ID/"
 SIGNED_KEY="raw/$CONTENT_ID/rgb.mp4"
 OUTPUT_PREFIX="datasets/$ROOT_ASSET/"
@@ -151,5 +177,6 @@ echo "=== smoke test 完了 ==="
 echo "  clip_id:        $CLIP_ID"
 echo "  content_id:     $CONTENT_ID"
 echo "  root_asset_id:  $ROOT_ASSET"
+echo "  wallet_pubkey:  $WALLET"
 echo "  dataset prefix: $OUTPUT_PREFIX"
-echo "  preview: $API_BASE/api/clips/$CLIP_ID"
+echo "  preview:        $API_BASE/api/clips/$CLIP_ID"
