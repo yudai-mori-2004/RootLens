@@ -114,7 +114,14 @@ while true; do
   fi
   if [ "$STATE" = "ready" ]; then
     SCORE=$(echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['clip']['qualityScore'])")
-    ROOT_ASSET=$(echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['clip']['rootAssetId'])")
+    # rootAssetId は cNFT 発行 (= TP /extension/solana) 後にのみ入る。 サーバ flow に
+    # TP register は無いので、 smoke では未発行のままで bundle を回す。 dataset prefix の
+    # キーとしては content_id を代用する。
+    ROOT_ASSET=$(echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['clip']['rootAssetId'] or '')")
+    if [ -z "$ROOT_ASSET" ]; then
+      ROOT_ASSET="$CONTENT_ID"
+      echo "  (rootAssetId 未発行、 content_id を bundle key として使う)"
+    fi
     echo "  ok: state=ready, qualityScore=$SCORE, rootAssetId=$ROOT_ASSET"
     BREAKDOWN=$(echo "$STATUS" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['clip']['qualityBreakdown'], indent=2))")
     echo "  qualityBreakdown:"

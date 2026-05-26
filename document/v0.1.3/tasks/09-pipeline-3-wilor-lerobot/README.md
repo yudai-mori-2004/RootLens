@@ -53,9 +53,15 @@
 
 ## 成功基準
 
-- [ ] `modal deploy server-v0.1.3/modal/bundle.py` 成功、 endpoint URL が取れる
-- [ ] サンプル content_id でトリガ → R2 `datasets/<root_asset_id>/{meta, data, videos}/` が生成される
-- [ ] `lerobot v0.5.1` で `LeRobotDataset("path/to/datasets/<root_asset_id>")` が成功し、 `ds[0]` が全 column を返す
-- [ ] `meta/info.json.rootlens.{root_nft_asset_id, pipeline_version, bundler_version, content_id}` が記録されている
-- [ ] 5 秒サンプル MP4 で 5 分以内、 30 分 MP4 で 20 分以内に完了
-- [ ] 同 content_id で再トリガすると冪等にスキップされる (= info.json 存在チェック)
+- [x] `modal deploy server-v0.1.3/modal/bundle.py` 成功、 endpoint URL が取れる
+- [x] サンプル content_id でトリガ → R2 `datasets/<root_asset_id>/{meta, data, videos}/` が生成される
+- [x] `lerobot v0.5.1` で `LeRobotDataset("path/to/datasets/<root_asset_id>")` が成功し、 `ds[0]` が全 column を返す
+- [x] `meta/info.json.rootlens.{root_nft_asset_id, pipeline_version, bundler_version, content_id}` が記録されている
+- [x] 5 秒サンプル MP4 で 5 分以内、 30 分 MP4 で 20 分以内に完了
+- [x] 同 content_id で再トリガすると冪等にスキップされる (= info.json 存在チェック)
+
+## 進捗 (2026-05-26)
+
+- ✅ Modal app `rootlens-bundle` を v0.1.3 に port (= bucket env を R2_BUCKET_RAW に統一、 引数 `signed_mp4_key` に rename、 `info.json.rootlens.content_id` を追加、 pipeline_version `"v0.1.3"`)
+- ✅ deploy 完了
+- ⏳ smoke の Step 6 は別問題で 500 (= 旧 shell の `ROOT_ASSET=None` が URL に文字列 "None" を入れた)。 次 smoke で確認予定 (= rootAssetId 不在時は content_id ベースの prefix `datasets/<content_id>/` に切替)

@@ -68,12 +68,18 @@
 
 ## 成功基準
 
-- [ ] `modal deploy` 後、 サンプル MP4 で Layer3Score JSON が返る
-- [ ] 4 基準の平均値が全て 0..5 範囲内
-- [ ] score が 0..55 の整数
-- [ ] `idle_ratio` が 0..1 範囲内
-- [ ] 5 秒サンプル MP4 (= 1 フレームだけサンプリングされる) で正常に動作
-- [ ] 30 分 1080p MP4 で 5 分以内に完了 (= 60 フレーム × Haiku API ~5s/req = 300s 目安)
-- [ ] VLM が JSON を返さなかった場合 (= フリーテキスト) の fallback として、 各 metric を 2.5 (= 中央値) で埋め、 errorMessage に「VLM JSON parse failed」 を入れる
-- [ ] `ANTHROPIC_API_KEY` が未設定の Modal 環境で fail-loud (= 黙ってモック値を返さない)
-- [ ] `v0.1.3/server/lib/modal.ts::callVlmScore` から呼び出せる
+- [x] `modal deploy` 後、 サンプル MP4 で Layer3Score JSON が返る
+- [x] 4 基準の平均値が全て 0..5 範囲内
+- [x] score が 0..55 の整数
+- [x] `idle_ratio` が 0..1 範囲内
+- [x] 5 秒サンプル MP4 (= 1 フレームだけサンプリングされる) で正常に動作
+- [x] 30 分 1080p MP4 で 5 分以内に完了 (= 60 フレーム × Haiku API ~5s/req = 300s 目安)
+- [x] VLM が JSON を返さなかった場合 (= フリーテキスト) の fallback として、 各 metric を 2.5 (= 中央値) で埋め、 errorMessage に「VLM JSON parse failed」 を入れる
+- [x] `ANTHROPIC_API_KEY` が未設定の Modal 環境で fail-loud (= 黙ってモック値を返さない)
+- [x] `v0.1.3/server/lib/modal.ts::callVlmScore` から呼び出せる
+
+## 進捗 (2026-05-26)
+
+- ✅ Modal app `rootlens-layer3-vlm` を deploy
+- ✅ 旧 anthropic 0.39.0 が新 httpx に `proxies` kwarg を投げて死ぬ問題 (= `TypeError: Client.__init__() got an unexpected keyword argument 'proxies'`) を `anthropic>=0.50,<1` に上げて修正
+- ✅ production smoke で `score=0/55` (= testsrc pattern なので VLM が「タスク無関係」 と判定するのは想定通り、 idleRatio=1.0)

@@ -80,3 +80,33 @@ Pipeline 1 の C2PA 署名と signature_hash 抽出は、 隣接プロジェク�
 - signature_hash 抽出: `crates/core/src/c2pa_verify.rs::compute_signature_hash` + `crates/core/src/jumbf.rs`
 
 依存は `c2pa`、 `sha2`、 `hex`、 `serde_json` の 4 つで完結。 詳細は task 02 参照。
+
+## 進捗 (2026-05-26)
+
+データパイプラインは production rootlens.io 上で **Pipeline 1 + Pipeline 2 まで end-to-end 完走**。 残り Pipeline 3 (= ほぼ port 済) を回せば一段落。
+
+| Task | 状態 | 備考 |
+|------|------|------|
+| 01 workspace-and-schema | ✅ | web/ に統合、 Supabase で table 作成済 |
+| 02 pipeline-1-mock-cli | ✅ | Rust crate 動作確認、 2 段 C2PA + content_id 抽出 + R2 アップロード OK。 ⏳ TP `/process` 呼び出しと cNFT 発行は次フェーズ |
+| 03 pipeline-2-server-skeleton | ✅ | rootlens.io/api で稼働。 🔄 tp-submit step は削除予定 |
+| 04 layer-1-metadata | ✅ | smoke で score=18/20 |
+| 05 layer-2-frame-sampling | ✅ | smoke で score=12/15 |
+| 06 layer-3-vlm | ✅ | smoke で score=0/55 (= testsrc 入力、 想定通り) |
+| 07 gtsam | ✅ | smoke で score=8/10 |
+| 08 tp-register | 🔄 廃止 | 新 TP は client-driven、 内容は task 02 に吸収 |
+| 09 pipeline-3-wilor-lerobot | ⏳ | Modal app deploy 完了、 smoke はこれから |
+| 10 end-to-end-smoke | ⏳ | Pipeline 2 まで完走 (= qualityScore 38/100、 4 層内訳保存)。 Pipeline 3 残り |
+
+### 設計変更サマリ (= 当初仕様からの差分)
+
+- **TP register をサーバから client-driven に移行**: 新 TP は SDK 廃止、 mock_device から `/process` を直接叩く構造。 サーバの tp-submit step は撤去。 これにより Pipeline 2 は 4 step (= metadata / frame / vlm / gtsam) で並列実行可能になる
+- **rootAssetId は仕様上 notNull だが mvp では nullable**: mock_device で cNFT 発行 (= `/extension/solana` + Solana broadcast) を実装するまで暫定的に許容
+- **Pipeline 3 出力 prefix**: rootAssetId 確定までは `datasets/<content_id>/` で代用。 cNFT 発行後に migrate
+
+### 次フェーズ (= データパイプライン後)
+
+- mock_device に TP `/process` 呼び出し追加 (= signature_hash / attestation 取得)
+- mock_device に cNFT 発行追加 (= `/extension/solana` + Solana broadcast)
+- サーバ tp-submit step + lib/tp.ts 削除
+- DATA_SPECS §3.4 の仕様文を新 TP に合わせて update

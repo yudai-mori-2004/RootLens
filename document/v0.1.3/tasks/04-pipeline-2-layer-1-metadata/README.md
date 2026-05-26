@@ -65,10 +65,17 @@
 
 ## 成功基準
 
-- [ ] `modal deploy server-v0.1.3/modal/layer1_metadata.py` が成功し、 web endpoint が公開される
-- [ ] サンプル sensors.jsonl + imu_high_rate.jsonl (= mock CLI 出力) で Layer1Score JSON が返る
-- [ ] 全 6 指標が 0..1 にクリップされ、 NaN にならない
-- [ ] score は 0..20 の整数、 全 sub-metric が float
-- [ ] 空ファイル / 不完全なファイル (= 1 行だけ等) で例外を吐かず、 各指標を 0 で返す
-- [ ] 30 分の本物サイズ JSONL (= 100Hz × 1800s = 180,000 行 imu、 30fps × 1800 = 54,000 行 sensors) で 5 秒以内に完了
-- [ ] `v0.1.3/server/lib/modal.ts::callMetadataScore` から呼び出して同じ JSON が得られる (= task 03 と疎通)
+- [x] `modal deploy server-v0.1.3/modal/layer1_metadata.py` が成功し、 web endpoint が公開される
+- [x] サンプル sensors.jsonl + imu_high_rate.jsonl (= mock CLI 出力) で Layer1Score JSON が返る
+- [x] 全 6 指標が 0..1 にクリップされ、 NaN にならない
+- [x] score は 0..20 の整数、 全 sub-metric が float
+- [x] 空ファイル / 不完全なファイル (= 1 行だけ等) で例外を吐かず、 各指標を 0 で返す
+- [x] 30 分の本物サイズ JSONL (= 100Hz × 1800s = 180,000 行 imu、 30fps × 1800 = 54,000 行 sensors) で 5 秒以内に完了
+- [x] `v0.1.3/server/lib/modal.ts::callMetadataScore` から呼び出して同じ JSON が得られる (= task 03 と疎通)
+
+## 進捗 (2026-05-26)
+
+- ✅ Modal app `rootlens-layer1-metadata` を deploy (= POST endpoint、 CPU 2 / 1 GB / 60s)
+- ✅ production smoke (= 5 秒 dummy sensor 入力) で `score=18/20` を返した:
+    - handLandmarkPresenceBoth=1.0、 rgbSensorSyncRatio=1.0、 frameContinuity=1.0、 trackingQuality=1.0、 imuGravityCompliance=1.0
+    - handMovement=0 (= 静止データの理論限界、 想定通り)

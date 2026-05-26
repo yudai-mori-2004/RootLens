@@ -292,6 +292,7 @@ def bundle_dataset(
         fps=fps,
         nb_frames=nb_frames,
         root_asset_id=root_asset_id,
+        content_id=raw_prefix.rstrip("/").split("/")[-1],
     )
 
     # 4. R2 に upload (= output_prefix 配下に meta/ data/ videos/ を全部置く)
@@ -343,6 +344,7 @@ def _build_lerobot_v3_dataset(
     fps: float,
     nb_frames: int,
     root_asset_id: str,
+    content_id: str,
 ) -> int:
     """LeRobot v3 (lerobot v0.5.1 互換) ディレクトリレイアウトを書き出す。"""
     import pyarrow as pa
@@ -409,7 +411,7 @@ def _build_lerobot_v3_dataset(
         },
         "rootlens": {
             "root_nft_asset_id": root_asset_id,
-            "content_id": raw_prefix.rstrip("/").split("/")[-1],
+            "content_id": content_id,
             "pipeline_version": "v0.1.3",
             "bundler_version": "v1-wilor-mano",
         },

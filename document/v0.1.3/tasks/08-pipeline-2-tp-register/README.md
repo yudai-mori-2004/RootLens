@@ -57,3 +57,9 @@
 - [ ] `ROOTLENS_TOS_VERSION` / `ROOTLENS_TOS_HASH` 未設定で fail-loud
 - [ ] R2 raw バケットの key が正しく presigned download URL になり TP に渡る
 - [ ] 全 5 step (= metadata / frame / vlm / gtsam / tp) 完走で clip state が `ready` に
+
+## 進捗 (2026-05-26) — 設計変更
+
+- 🔄 **本 task は v0.1.3 で廃止**: 新 TP は client-driven (= TP SDK 廃止) で、 mock_device 側で `/process` を直接叩く構造に変更
+- ⏳ 次フェーズ: 本 task の内容は `02-pipeline-1-mock-cli` の追加機能として吸収 (= mock_device で `/process` 呼ぶ + cNFT 発行で rootAssetId 確定)
+- 削除対象: web/lib/tp.ts、 web/workflow/process-clip.ts の tp-submit step、 `MODAL_BUNDLE_ENDPOINT` 以外の TP 関連 env

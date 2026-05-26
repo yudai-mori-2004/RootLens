@@ -75,11 +75,18 @@ Pipeline 2 の REST API と WDK durable workflow の骨格を立てる。 各 sc
 
 ## 成功基準
 
-- [ ] 全 API endpoint が型エラーゼロでビルドできる (= `npm run typecheck`)
-- [ ] `curl -X POST /api/clips -H "X-Wallet-Pubkey: <...>" -d '{...}'` で clip 行が作成され、 presigned URL 4 本が返る
-- [ ] 同 wallet で同 contentId を再 POST すると、 既存行が返る (= idempotent)
-- [ ] `POST /api/clips/:id/finalize` で contentId 不一致なら 409、 一致すれば 200 + workflow 起動
-- [ ] workflow が 5 step 全てを順に呼び、 各 step で `processingStep` カラムが更新される (= 各 step の中身は TODO 関数で `await new Promise(r => setTimeout(r, 100))` 程度の placeholder)
-- [ ] 全 step 完走で `state = "ready"`、 失敗で `state = "error"` + `errorMessage`
-- [ ] `POST /api/clips/:id/retry` で error クリップが processing に戻り workflow が再起動
-- [ ] `DELETE /api/clips/:id` で staked クリップは 409、 それ以外は 200
+- [x] 全 API endpoint が型エラーゼロでビルドできる (= `npm run typecheck`)
+- [x] `curl -X POST /api/clips -H "X-Wallet-Pubkey: <...>" -d '{...}'` で clip 行が作成され、 presigned URL 4 本が返る
+- [x] 同 wallet で同 contentId を再 POST すると、 既存行が返る (= idempotent)
+- [x] `POST /api/clips/:id/finalize` で contentId 不一致なら 409、 一致すれば 200 + workflow 起動
+- [x] workflow が 5 step 全てを順に呼び、 各 step で `processingStep` カラムが更新される (= 各 step の中身は TODO 関数で `await new Promise(r => setTimeout(r, 100))` 程度の placeholder)
+- [x] 全 step 完走で `state = "ready"`、 失敗で `state = "error"` + `errorMessage`
+- [x] `POST /api/clips/:id/retry` で error クリップが processing に戻り workflow が再起動
+- [x] `DELETE /api/clips/:id` で staked クリップは 409、 それ以外は 200
+
+## 進捗 (2026-05-26)
+
+- ✅ 5 API endpoint (POST /api/clips、 GET、 finalize、 retry、 stake、 DELETE) を web/ に統合、 rootlens.io/api 経由で 200 確認
+- ✅ WDK durable workflow を web/workflow/process-clip.ts に実装、 state machine が `uploading → processing (metadata-scan → frame-sampling → vlm-score → gtsam-eval → tp-submit) → ready` を遷移
+- ✅ lib/{modal, mapper, clipId, auth, r2, r2-keys}.ts 一式
+- 🔄 設計変更 (= user 指示): tp-submit step は削除予定 (= 新 TP は client-driven、 mock_device 側で `/process` を呼ぶ)。 削除後は 4 step (= metadata / frame / vlm / gtsam) で並列実行も検討

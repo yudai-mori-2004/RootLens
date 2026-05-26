@@ -54,7 +54,15 @@ v0.1.3 server の骨格を 0 から立ち上げ、 全後続 task の前提と�
 - [x] `shared/api-types.ts` で 4 層スコアの型と新 `ProcessingStep` enum が公開されている
 - [x] `lib/r2.ts` の R2 バケット環境変数が `R2_BUCKET_RAW` + `R2_BUCKET_DATASETS` の 2 つに整理されている
 - [x] `lib/auth.ts` が v0.1.2 と完全一致 (= 形式チェックのみ、 challenge-response は MVP 後)
-- [ ] `.env.example` に全環境変数のテンプレートが揃っている (= DATABASE_URL / R2_* / MODAL_*_ENDPOINT / TP_NETWORK / ROOTLENS_TOS_* / ANTHROPIC_API_KEY 等)
-- [ ] `npm install` が通る (= package.json + lockfile が整合)
-- [ ] `npm run typecheck` が通る (= 型エラーゼロ)
-- [ ] `npm run db:generate` が通り、 `drizzle/` に SQL migration が生成される
+- [x] `.env.example` に全環境変数のテンプレートが揃っている (= DATABASE_URL / R2_* / MODAL_*_ENDPOINT / TP_NETWORK / ROOTLENS_TOS_* / ANTHROPIC_API_KEY 等)
+- [x] `npm install` が通る (= package.json + lockfile が整合)
+- [x] `npm run typecheck` が通る (= 型エラーゼロ)
+- [x] `npm run db:generate` が通り、 `drizzle/` に SQL migration が生成される
+
+## 進捗 (2026-05-26)
+
+- ✅ web/ に統合 (= v0.1.3/server を解体して `app/api/clips/` + `db/` + `lib/` + `workflow/` + `shared/` + `drizzle/` を `web/` 配下に移動)。 既存 Vercel project 「web」 (= rootlens.io ドメイン) で 1 つの Next.js アプリとして動作
+- ✅ `npm run build` (= production build) pass、 `tsc --noEmit` pass
+- ✅ Supabase Transaction Pooler (= IPv4 対応) URL で接続、 `apply_migrations.mjs` で SQL 直接 apply (= drizzle-kit push は Supabase auth/storage schema introspection で bug を踏むため)
+- ✅ `clips` + `tos_consents` の 2 table 作成済 (= 4 index 込み)
+- 📝 備考: rootAssetId カラムは仕様としては notNull だが、 mock_device で cNFT 発行を未実装なので、 mvp では nullable のまま運用

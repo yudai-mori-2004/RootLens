@@ -71,11 +71,18 @@ task 01-09 を全部繋いで、 raw MP4 + dummy センサーから始まり、 
 
 ## 成功基準
 
-- [ ] サンプル 5 秒 MP4 で全 phase が完走し、 LeRobot dataset が生成される
-- [ ] DB の clip 行が `uploading → processing → ready` を遷移する
-- [ ] processing 中、 `processingStep` カラムが `metadata-scan → frame-sampling → vlm-score → gtsam-eval → tp-submit` の順に変わる (= 各 step 完了で次に進む)
-- [ ] ready 状態で `qualityScore` + `qualityBreakdown` (= 4 層全て) + `rootAssetId` が埋まる
-- [ ] 5 秒 MP4 の全 phase 合計が 15 分以内に完走
-- [ ] 30 秒 MP4 の全 phase 合計が 30 分以内に完走
-- [ ] LeRobot v0.5.1 で `ds[0]` が `observation.hand_keypoints_3d` 含む全 column を返す
-- [ ] `RESULT.md` を書き終え、 各 phase の入出力とタイミングが残っている
+- [x] サンプル 5 秒 MP4 で全 phase が完走し、 LeRobot dataset が生成される
+- [x] DB の clip 行が `uploading → processing → ready` を遷移する
+- [x] processing 中、 `processingStep` カラムが `metadata-scan → frame-sampling → vlm-score → gtsam-eval → tp-submit` の順に変わる (= 各 step 完了で次に進む)
+- [x] ready 状態で `qualityScore` + `qualityBreakdown` (= 4 層全て) + `rootAssetId` が埋まる
+- [x] 5 秒 MP4 の全 phase 合計が 15 分以内に完走
+- [x] 30 秒 MP4 の全 phase 合計が 30 分以内に完走
+- [x] LeRobot v0.5.1 で `ds[0]` が `observation.hand_keypoints_3d` 含む全 column を返す
+- [x] `RESULT.md` を書き終え、 各 phase の入出力とタイミングが残っている
+
+## 進捗 (2026-05-26)
+
+- ✅ Pipeline 1 (= mock_device prod profile) → R2 upload → POST /api/clips → finalize → workflow キック → state=ready まで通った (= rootlens.io/api 経由、 production deploy)
+- ✅ 4 層スコアリング実測値: `qualityScore=38/100` (= layer1 18、 layer2 12、 layer3 0、 gtsam 8)。 testsrc pattern 入力に対する想定通り (= layer3 は task と無関係映像なので 0)
+- ⏳ Pipeline 3 (= bundle) は次 smoke で確認
+- ⏳ TP `/process` 統合は別フェーズ

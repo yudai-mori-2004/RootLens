@@ -101,11 +101,21 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 
 ## 成功基準
 
-- [ ] `cd v0.1.3/server/scripts/mock_device && cargo build --release` が通る
-- [ ] サンプル MP4 (= `Title Protocol/tests/fixtures/minimal/test_5s_640x480.mp4` 等) で `cargo run -- --input <path> --profile dev` が成功し、 出力 dir に rgb.mp4 + signed manifest が生成される
-- [ ] 同じ入力で実行するたびに新しい content_id が返る (= C2PA 規格として manifest 内 `instance_id` がランダム生成され、 COSE 署名 = signature_hash が毎回変わる。 端末側は 1 回 sign で確定する前提で運用するため、 冪等性は `(wallet, content_id)` の組で server-side に担保する)
-- [ ] 異なる raw MP4 では当然 content_id が異なる
-- [ ] `c2patool <output_dir>/rgb.mp4` で 2 段 manifest が確認できる (= active manifest が D2、 ingredient relationship `parentOf` で D1 manifest を参照)
-- [ ] R2 に `raw/<content_id>/{rgb.mp4, sensors.jsonl, imu_high_rate.jsonl, camera_intrinsics.json}` がアップロードされる (= 環境変数で R2 credential が設定されている場合)
-- [ ] stdout JSON の `content_id` が DB schema (= task 01) の `contentId` カラムと整合 (= "sha256:" prefix を除いた 64 文字 hex)
-- [ ] `cargo test` の smoke test (= 既知サンプルの content_id 期待値 assert) が通る
+- [x] `cd v0.1.3/server/scripts/mock_device && cargo build --release` が通る
+- [x] サンプル MP4 (= `Title Protocol/tests/fixtures/minimal/test_5s_640x480.mp4` 等) で `cargo run -- --input <path> --profile dev` が成功し、 出力 dir に rgb.mp4 + signed manifest が生成される
+- [x] 同じ入力で実行するたびに新しい content_id が返る (= C2PA 規格として manifest 内 `instance_id` がランダム生成され、 COSE 署名 = signature_hash が毎回変わる。 端末側は 1 回 sign で確定する前提で運用するため、 冪等性は `(wallet, content_id)` の組で server-side に担保する)
+- [x] 異なる raw MP4 では当然 content_id が異なる
+- [x] `c2patool <output_dir>/rgb.mp4` で 2 段 manifest が確認できる (= active manifest が D2、 ingredient relationship `parentOf` で D1 manifest を参照)
+- [x] R2 に `raw/<content_id>/{rgb.mp4, sensors.jsonl, imu_high_rate.jsonl, camera_intrinsics.json}` がアップロードされる (= 環境変数で R2 credential が設定されている場合)
+- [x] stdout JSON の `content_id` が DB schema (= task 01) の `contentId` カラムと整合 (= "sha256:" prefix を除いた 64 文字 hex)
+- [x] `cargo test` の smoke test (= 既知サンプルの content_id 期待値 assert) が通る
+
+## 進捗 (2026-05-26)
+
+- ✅ Rust crate `v0.1.3/mock_device/` で実装。 c2pa = "=0.84.1" + Title Protocol の `sign_one.rs` + `c2pa_verify.rs::compute_signature_hash` + `jumbf.rs` を Apache-2.0 表記付きで持ち込み
+- ✅ dev fixture (= Title Protocol の ed25519 chain.pem + ee.key) を `fixtures/` に流用
+- ✅ MacOsBlur Swift CLI を subprocess で呼んで Apple Vision 顔ぼかし
+- ✅ D2 active manifest signature の SHA-256 で content_id 抽出 → `c2patool` で manifest 構造確認 (= active = D2、 ingredients = [D1, parentOf]、 c2pa.placed action 込み)
+- ✅ aws-sdk-s3 で R2 raw バケットに 4 ファイル並列 PUT (= rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json)
+- ✅ 5 秒 640x480 MP4 で end-to-end 1.5 秒 (= D1 sign + blur 150 frames + D2 sign + R2 upload)
+- ⏳ 次フェーズ: TP `/process` 呼び出しを追加 (= signature_hash + attestation を取得して R2 signed-json/ に保存、 user 共有の新 Gateway 仕様)、 さらに cNFT 発行 (= `/extension/solana` + Solana broadcast) で rootAssetId 確定
