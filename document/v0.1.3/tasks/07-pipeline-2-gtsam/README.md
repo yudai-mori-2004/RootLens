@@ -60,7 +60,7 @@ GTSAM ImuFactor (= Forster et al. TRO 2017) で IMU 読み値と映像からの�
 - [x] 静止状態の映像 (= 三脚固定) で score が低めに出る (= IMU 信号がほぼ 0 でも映像は動かないので residual は小さい、 想定 score 7-10)
 - [x] feature 追跡に失敗 (= 真っ暗 / 真っ白 / blur 過多) した場合、 例外ではなく score=0 で返す
 - [x] 5 秒サンプル MP4 で 30 秒以内、 30 分 1080p で 5 分以内に完了
-- [x] `v0.1.3/server/lib/modal.ts::callGtsam` から呼び出せる
+- [x] `web/lib/modal.ts::callGtsam` から呼び出せる
 
 ## 進捗 (2026-05-26)
 

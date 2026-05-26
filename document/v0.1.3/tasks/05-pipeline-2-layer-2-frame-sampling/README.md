@@ -66,7 +66,7 @@
 - [x] 全フレーム同一画像で frame_diversity が 0 / optical_flow_pass_ratio が 0 になる
 - [x] 5 秒 640×480 の MP4 で 10 秒以内に完了 (= mock CLI の小サイズ出力で smoke test)
 - [x] 30 分 1080p の MP4 で 60 秒以内に完了 (= 本番想定サイズ)
-- [x] `v0.1.3/server/lib/modal.ts::callFrameSampling` から呼び出せる
+- [x] `web/lib/modal.ts::callFrameSampling` から呼び出せる
 
 ## 進捗 (2026-05-26)
 

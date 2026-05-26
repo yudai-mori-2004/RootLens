@@ -6,7 +6,7 @@
 
 ```
 Phase A (基盤)
-  01. workspace-and-schema           v0.1.3/server/ の骨格と DB schema
+  01. workspace-and-schema           web/ の骨格と DB schema
 
 Phase B (Pipeline 1: 端末模擬)
   02. pipeline-1-mock-cli             Rust CLI で raw MP4 → 2 段 C2PA + 顔ぼかし + R2 アップロード

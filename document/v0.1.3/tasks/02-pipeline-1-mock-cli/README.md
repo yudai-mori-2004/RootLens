@@ -44,7 +44,7 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 
 ### やること
 
-1. **Cargo crate 作成** (= `v0.1.3/server/scripts/mock_device/`):
+1. **Cargo crate 作成** (= `tools/mock-device/`):
    - `Cargo.toml`: `c2pa = "=0.84.1"`、 `sha2`、 `hex`、 `serde_json`、 `tokio`、 `aws-sdk-s3`、 `clap` (CLI 引数)、 `anyhow`
    - `src/main.rs`: CLI 入口
    - `src/c2pa_sign.rs`: D1 / D2 署名 + signature_hash 抽出 (= title-protocol/`crates/core/src/c2pa_verify.rs` + `jumbf.rs` を Apache 2.0 ライセンス表記付きで取り込み)
@@ -101,7 +101,7 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 
 ## 成功基準
 
-- [x] `cd v0.1.3/server/scripts/mock_device && cargo build --release` が通る
+- [x] `cd tools/mock-device && cargo build --release` が通る
 - [x] サンプル MP4 (= `Title Protocol/tests/fixtures/minimal/test_5s_640x480.mp4` 等) で `cargo run -- --input <path> --profile dev` が成功し、 出力 dir に rgb.mp4 + signed manifest が生成される
 - [x] 同じ入力で実行するたびに新しい content_id が返る (= C2PA 規格として manifest 内 `instance_id` がランダム生成され、 COSE 署名 = signature_hash が毎回変わる。 端末側は 1 回 sign で確定する前提で運用するため、 冪等性は `(wallet, content_id)` の組で server-side に担保する)
 - [x] 異なる raw MP4 では当然 content_id が異なる
@@ -112,7 +112,7 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 
 ## 進捗 (2026-05-26)
 
-- ✅ Rust crate `v0.1.3/mock_device/` で実装。 c2pa = "=0.84.1" + Title Protocol の `sign_one.rs` + `c2pa_verify.rs::compute_signature_hash` + `jumbf.rs` を Apache-2.0 表記付きで持ち込み
+- ✅ Rust crate `tools/mock-device/` で実装。 c2pa = "=0.84.1" + Title Protocol の `sign_one.rs` + `c2pa_verify.rs::compute_signature_hash` + `jumbf.rs` を Apache-2.0 表記付きで持ち込み
 - ✅ dev fixture (= Title Protocol の ed25519 chain.pem + ee.key) を `fixtures/` に流用
 - ✅ MacOsBlur Swift CLI を subprocess で呼んで Apple Vision 顔ぼかし
 - ✅ D2 active manifest signature の SHA-256 で content_id 抽出 → `c2patool` で manifest 構造確認 (= active = D2、 ingredients = [D1, parentOf]、 c2pa.placed action 込み)

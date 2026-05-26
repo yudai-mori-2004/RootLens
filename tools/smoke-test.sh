@@ -13,12 +13,12 @@
 #   - Vercel deploy 済 (= rootlens.io/api 経由 もしくは preview URL)
 #   - web/.env.local に R2 credential が入っている (= mock-device の prod profile 用)。 無ければ
 #     `cd web && vercel env pull .env.local --yes` で取得
-#   - mock-device の release build 済 (= cargo build --release in v0.1.3/mock_device)
+#   - mock-device の release build 済 (= cargo build --release in tools/mock-device)
 #   - macos_blur の release build 済 (= server/scripts/macos_blur/.build/.../MacOsBlur)
 #
 # 使い方:
-#   bash v0.1.3/smoke_test.sh [--input <path/to/raw.mp4>] [--wallet <pubkey>]
-#   API_BASE=https://rootlens.io bash v0.1.3/smoke_test.sh
+#   bash tools/smoke-test.sh [--input <path/to/raw.mp4>] [--wallet <pubkey>]
+#   API_BASE=https://rootlens.io bash tools/smoke-test.sh
 
 set -euo pipefail
 
@@ -30,8 +30,8 @@ ACHIEVEMENT="${ACHIEVEMENT:-85}"
 API_BASE="${API_BASE:-http://localhost:3000}"
 
 REPO_ROOT="/Users/forest/WebCreations/root-lens"
-MOCK_DEVICE="$REPO_ROOT/v0.1.3/mock_device/target/release/mock-device"
-GEN_DUMMY="$REPO_ROOT/v0.1.3/gen_dummy_sensors.py"
+MOCK_DEVICE="$REPO_ROOT/tools/mock-device/target/release/mock-device"
+GEN_DUMMY="$REPO_ROOT/tools/gen-dummy-sensors.py"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

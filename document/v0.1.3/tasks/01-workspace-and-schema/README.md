@@ -18,7 +18,7 @@ v0.1.3 server の骨格を 0 から立ち上げ、 全後続 task の前提と�
 
 ### やること
 
-1. **ディレクトリ構造の作成** (= `v0.1.3/server/{app/api/clips/[id]/{finalize,retry,stake},lib,workflow,modal,db,shared,scripts/mock_device,drizzle}`)
+1. **ディレクトリ構造の作成** (= `web/{app/api/clips/[id]/{finalize,retry,stake},lib,workflow,modal,db,shared,scripts/mock_device,drizzle}`)
 2. **Next.js 設定一式** (= `package.json` / `tsconfig.json` / `next.config.ts` / `drizzle.config.ts` / `.env.example` / `.gitignore`)
 3. **共通型** (= `shared/api-types.ts`):
    - `ClipState`、 `ProcessingStep` (= 5 ステップに刷新)
@@ -48,7 +48,7 @@ v0.1.3 server の骨格を 0 から立ち上げ、 全後続 task の前提と�
 
 ## 成功基準
 
-- [x] `v0.1.3/server/` のディレクトリツリーが揃う
+- [x] `web/` のディレクトリツリーが揃う
 - [x] `package.json` が postgres-js 経由 (= Neon ではなく Supabase) で構築されている
 - [x] `db/schema.ts` の `clips` テーブルが contentId / signedMp4Key / 4 層 qualityBreakdown / signedJsonUri / idleRatio / datasetPrefix を保持
 - [x] `shared/api-types.ts` で 4 層スコアの型と新 `ProcessingStep` enum が公開されている
@@ -61,7 +61,7 @@ v0.1.3 server の骨格を 0 から立ち上げ、 全後続 task の前提と�
 
 ## 進捗 (2026-05-26)
 
-- ✅ web/ に統合 (= v0.1.3/server を解体して `app/api/clips/` + `db/` + `lib/` + `workflow/` + `shared/` + `drizzle/` を `web/` 配下に移動)。 既存 Vercel project 「web」 (= rootlens.io ドメイン) で 1 つの Next.js アプリとして動作
+- ✅ web/ に統合 (= web を解体して `app/api/clips/` + `db/` + `lib/` + `workflow/` + `shared/` + `drizzle/` を `web/` 配下に移動)。 既存 Vercel project 「web」 (= rootlens.io ドメイン) で 1 つの Next.js アプリとして動作
 - ✅ `npm run build` (= production build) pass、 `tsc --noEmit` pass
 - ✅ Supabase Transaction Pooler (= IPv4 対応) URL で接続、 `apply_migrations.mjs` で SQL 直接 apply (= drizzle-kit push は Supabase auth/storage schema introspection で bug を踏むため)
 - ✅ `clips` + `tos_consents` の 2 table 作成済 (= 4 index 込み)

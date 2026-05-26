@@ -22,13 +22,13 @@
 
 ### やること
 
-1. **v0.1.3/server/modal/bundle.py**: v0.1.2 から丸ごとコピー + 以下を更新:
+1. **tools/modal/bundle.py**: v0.1.2 から丸ごとコピー + 以下を更新:
    - L267 `bucket_blurred` 参照 → `bucket_raw` (= 端末から直接 R2 にあがる D2 署名済 MP4 の場所)
    - 引数 `blurred_key` → `signed_mp4_key`
    - L413 `pipeline_version: "v0.1.2"` → `"v0.1.3"`
    - `meta/info.json` の `rootlens.*` 拡張に `content_id` フィールド追加
 
-2. **手動トリガ CLI** (= `v0.1.3/server/scripts/trigger_pipeline_3.py`):
+2. **手動トリガ CLI** (= `tools/trigger_pipeline_3.py`):
    ```
    trigger-pipeline-3 --content-id <hex> --root-asset-id <base58>
                       [--modal-endpoint <url>]

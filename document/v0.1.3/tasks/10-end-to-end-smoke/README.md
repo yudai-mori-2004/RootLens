@@ -29,11 +29,11 @@ task 01-09 を全部繋いで、 raw MP4 + dummy センサーから始まり、 
 
 ### やること
 
-1. **dummy センサー生成スクリプト** (= `v0.1.3/server/scripts/gen_dummy_sensors.py`):
+1. **dummy センサー生成スクリプト** (= `tools/gen_dummy_sensors.py`):
    - 入力: MP4 パス、 出力先 dir
    - 出力: `sensors.jsonl` + `imu_high_rate.jsonl` + `camera_intrinsics.json` (= depth/ は省略)
 
-2. **smoke test スクリプト** (= `v0.1.3/server/scripts/smoke_test.sh` または `.py`):
+2. **smoke test スクリプト** (= `tools/smoke_test.sh` または `.py`):
    ```
    # Phase 1: 端末模擬
    $ ./mock-device --input sample.mp4 --sensors sensors.jsonl --imu imu.jsonl ...

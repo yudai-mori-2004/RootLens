@@ -76,7 +76,7 @@
 - [x] 30 分 1080p MP4 で 5 分以内に完了 (= 60 フレーム × Haiku API ~5s/req = 300s 目安)
 - [x] VLM が JSON を返さなかった場合 (= フリーテキスト) の fallback として、 各 metric を 2.5 (= 中央値) で埋め、 errorMessage に「VLM JSON parse failed」 を入れる
 - [x] `ANTHROPIC_API_KEY` が未設定の Modal 環境で fail-loud (= 黙ってモック値を返さない)
-- [x] `v0.1.3/server/lib/modal.ts::callVlmScore` から呼び出せる
+- [x] `web/lib/modal.ts::callVlmScore` から呼び出せる
 
 ## 進捗 (2026-05-26)
 

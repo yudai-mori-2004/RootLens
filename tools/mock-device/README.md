@@ -7,7 +7,7 @@ iOS 端末で実行される Pipeline 1 を macOS 上で模擬する Rust CLI。
 ## ビルド
 
 ```
-cd v0.1.3/server/scripts/mock_device
+cd tools/mock-device
 cargo build --release
 ```
 

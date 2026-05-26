@@ -15,7 +15,7 @@
 
 ### Pipeline 1 出力スキーマ
 4. `document/v0.1.3/DATA_SPECS_JA.md` §2.2 ─ sensors.jsonl + imu_high_rate.jsonl のフィールド構造
-5. (実装 task 02 後) `v0.1.3/server/scripts/mock_device/` の出力 schema ─ mock CLI が書く JSONL の実際の形
+5. (実装 task 02 後) `tools/mock-device/` の出力 schema ─ mock CLI が書く JSONL の実際の形
 
 ## 指標と配点
 
@@ -71,7 +71,7 @@
 - [x] score は 0..20 の整数、 全 sub-metric が float
 - [x] 空ファイル / 不完全なファイル (= 1 行だけ等) で例外を吐かず、 各指標を 0 で返す
 - [x] 30 分の本物サイズ JSONL (= 100Hz × 1800s = 180,000 行 imu、 30fps × 1800 = 54,000 行 sensors) で 5 秒以内に完了
-- [x] `v0.1.3/server/lib/modal.ts::callMetadataScore` から呼び出して同じ JSON が得られる (= task 03 と疎通)
+- [x] `web/lib/modal.ts::callMetadataScore` から呼び出して同じ JSON が得られる (= task 03 と疎通)
 
 ## 進捗 (2026-05-26)
 

@@ -21,7 +21,7 @@
 
 ### やること
 
-1. **v0.1.3/server/lib/tp.ts**: v0.1.2 の `submitToTp()` を port + 以下を更新:
+1. **web/lib/tp.ts**: v0.1.2 の `submitToTp()` を port + 以下を更新:
    - R2 download 元バケットを `R2_BUCKET_BLURRED` → `R2_BUCKET_RAW` に
    - R2 key を `blurredMp4Key(contentHash)` → `signedMp4Key(contentId)` に
    - `processorIds: ["core-c2pa"]` は維持 (= TP 側で C2PA 検証を走らせる)
