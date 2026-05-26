@@ -41,7 +41,7 @@ app/dev-certs/
 native/c2pa-bridge/target/
 
 # Progress deck (local only)
-progress
+progress/
 
 # Misc
 *.tsbuildinfo

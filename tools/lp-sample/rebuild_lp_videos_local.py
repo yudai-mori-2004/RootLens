@@ -29,7 +29,7 @@ REPO = Path(__file__).resolve().parents[2]
 SAMPLE_DIR = REPO / "web" / "public" / "lp" / "sample"
 META_JSON = SAMPLE_DIR / "json" / "rootlens_sample_videos.json"
 WORK_DIR = Path("/tmp/lp_apple_blurred")
-CLI = REPO / "server" / "scripts" / "macos_blur" / ".build" / "arm64-apple-macosx" / "release" / "MacOsBlur"
+CLI = REPO / "tools" / "macos-blur" / ".build" / "arm64-apple-macosx" / "release" / "MacOsBlur"
 
 R2_BUCKET = "rootlens-public"
 R2_PREFIX = "lp-sample/v0.1/videos/observation.images.ego_cam/chunk-000"
