@@ -1,9 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
-import * as Crypto from 'expo-crypto';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { getCurrentSession, requireCurrentSession } from './auth';
-import { SERVER_URL } from '../env';
+import { runPipeline1, type Pipeline1Step } from './pipeline1';
+import { MERKLE_COLLECTION, MERKLE_TREE, SERVER_URL } from '../env';
 
 // クリップの状態機械とパイプラインの抽象。
 //
@@ -217,88 +216,59 @@ class ClipStore {
 
   private httpPollers: Map<string, ReturnType<typeof setInterval>> = new Map();
 
-  private async httpEnqueue(localId: string, input: EnqueueInput): Promise<void> {
-    const serverUrl = getServerBaseUrl();
-    const walletPubkey = requireCurrentSession().pubkey.toBase58();
+  // UI に出す uploadProgress を Pipeline 1 step 名から段階的に進める。
+  // (true な progress bar ではなく、 段階表示。 失敗時は最後の地点で止まる。)
 
-    // 1. sessionDir 配下の 4 ファイルの存在確認 + rgb.mp4 のサイズ + hash
-    const sessionDir = input.sessionDirUri.endsWith('/') ? input.sessionDirUri : `${input.sessionDirUri}/`;
-    const mp4Uri = `${sessionDir}rgb.mp4`;
-    const sensorsUri = `${sessionDir}sensors.jsonl`;
-    const imuUri = `${sessionDir}imu_high_rate.jsonl`;
-    const intrinsicsUri = `${sessionDir}camera_intrinsics.json`;
-    const info = await FileSystem.getInfoAsync(mp4Uri, { size: true });
-    if (!info.exists) throw new Error(`rgb.mp4 not found in session dir: ${sessionDir}`);
-    const contentSize = (info as any).size ?? 0;
-    const seed = `${mp4Uri}|${contentSize}|${Date.now()}`;
-    const contentHash = await Crypto.digestStringAsync(
-      Crypto.CryptoDigestAlgorithm.SHA256,
-      seed,
-      { encoding: Crypto.CryptoEncoding.HEX },
+  /// v0.1.3 全 7 ステップ Pipeline 1 を device で完走させ、 サーバに登録 → finalize → polling。
+  /// mock-device と同一フロー。 詳細は src/services/pipeline1.ts。
+  private async httpEnqueue(localId: string, input: EnqueueInput): Promise<void> {
+    const sessionDir = input.sessionDirUri.endsWith('/')
+      ? input.sessionDirUri
+      : `${input.sessionDirUri}/`;
+
+    // Step 1-8 (= C2PA D1+D2 + blur + content_id + R2 upload + TP + cNFT + POST /api/clips)
+    const p1 = await runPipeline1(
+      {
+        taskId: input.taskId,
+        rawMp4Uri: `${sessionDir}rgb.mp4`,
+        sensorsUri: `${sessionDir}sensors.jsonl`,
+        imuUri: `${sessionDir}imu_high_rate.jsonl`,
+        intrinsicsUri: `${sessionDir}camera_intrinsics.json`,
+        achievementConfidence: input.achievementConfidence,
+        merkleTree: MERKLE_TREE,
+        collection: MERKLE_COLLECTION,
+      },
+      (p) => {
+        this.update(localId, { uploadProgress: pipelineStepProgress(p.step) });
+      },
     );
 
-    // 2. POST /api/clips → 4 ファイル分の presigned PUT URL を取得
-    const createRes = await fetch(`${serverUrl}/api/clips`, {
+    // local id を サーバ発番 id に rewrite。
+    this.renameLocalId(localId, p1.clipId);
+    this.update(p1.clipId, { id: p1.clipId, uploadProgress: 1 });
+
+    const serverUrl = getServerBaseUrl();
+    const walletPubkey = p1.walletPubkey;
+
+    // Step 9: POST /api/clips/:id/finalize → サーバ workflow 起動
+    const finRes = await fetch(`${serverUrl}/api/clips/${p1.clipId}/finalize`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Wallet-Pubkey': walletPubkey,
       },
-      body: JSON.stringify({
-        taskId: input.taskId,
-        achievementConfidence: input.achievementConfidence,
-        contentHash,
-        contentSize,
-      }),
+      body: JSON.stringify({ contentId: p1.contentId }),
     });
-    if (!createRes.ok) throw new Error(`POST /api/clips failed: ${createRes.status}`);
-    const { clip: serverClip, upload } = await createRes.json();
-
-    // local id (= UI 表示用) を サーバ発番 id に rewrite。 同時に既存 listener の購読を維持。
-    this.renameLocalId(localId, serverClip.id);
-    this.update(serverClip.id, { id: serverClip.id });
-
-    // 3. R2 へ 4 ファイルを並列 PUT (= rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json)。
-    // いずれか 1 つでも失敗したら全体を error 扱い (= 部分成功は禁止、 bundle 整合性が崩れる)。
-    const uploadTasks: Array<{ name: string; uri: string; url: string; contentType: string; required: boolean }> = [
-      { name: 'rgb.mp4', uri: mp4Uri, url: upload.files['rgb.mp4'].url, contentType: upload.files['rgb.mp4'].contentType, required: true },
-      { name: 'sensors.jsonl', uri: sensorsUri, url: upload.files['sensors.jsonl'].url, contentType: upload.files['sensors.jsonl'].contentType, required: true },
-      { name: 'imu_high_rate.jsonl', uri: imuUri, url: upload.files['imu_high_rate.jsonl'].url, contentType: upload.files['imu_high_rate.jsonl'].contentType, required: true },
-      { name: 'camera_intrinsics.json', uri: intrinsicsUri, url: upload.files['camera_intrinsics.json'].url, contentType: upload.files['camera_intrinsics.json'].contentType, required: true },
-    ];
-
-    await Promise.all(uploadTasks.map(async (task) => {
-      const fileInfo = await FileSystem.getInfoAsync(task.uri);
-      if (!fileInfo.exists) {
-        if (task.required) throw new Error(`${task.name} not found in session dir`);
-        return;
-      }
-      const res = await FileSystem.uploadAsync(task.url, task.uri, {
-        httpMethod: 'PUT',
-        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: { 'Content-Type': task.contentType },
-      });
-      if (res.status < 200 || res.status >= 300) {
-        throw new Error(`R2 PUT failed for ${task.name}: ${res.status} ${res.body?.slice(0, 200) ?? ''}`);
-      }
-    }));
-    this.update(serverClip.id, { uploadProgress: 1 });
-
-    // 4. POST /api/clips/:id/finalize → サーバ workflow 起動
-    const finRes = await fetch(`${serverUrl}/api/clips/${serverClip.id}/finalize`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Wallet-Pubkey': walletPubkey,
-      },
-      body: JSON.stringify({ contentHash }),
-    });
-    if (!finRes.ok) throw new Error(`POST /api/clips/${serverClip.id}/finalize failed: ${finRes.status}`);
+    if (!finRes.ok) {
+      throw new Error(
+        `POST /api/clips/${p1.clipId}/finalize ${finRes.status}: ${await finRes.text().catch(() => '')}`,
+      );
+    }
     const { clip: finalized } = await finRes.json();
     this.applyServerClip(finalized);
 
-    // 5. polling 開始 (= 2 秒間隔、 terminal state で停止)
-    this.startHttpPolling(serverClip.id);
+    // Step 10: polling 開始 (= 2 秒間隔、 terminal state で停止)
+    this.startHttpPolling(p1.clipId);
   }
 
   private async httpStake(clipId: string): Promise<void> {
@@ -465,6 +435,21 @@ class ClipStore {
 
 function makeClipId(): string {
   return `clip_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/// Pipeline 1 ステップ名 → UI 上の uploadProgress (= 0..1) 写像。
+/// 厳密な byte 進捗ではなく段階を見せるだけ。
+function pipelineStepProgress(step: Pipeline1Step): number {
+  switch (step) {
+    case 'sign-d1': return 0.1;
+    case 'blur': return 0.25;
+    case 'sign-d2': return 0.4;
+    case 'content-id': return 0.45;
+    case 'r2-upload': return 0.65;
+    case 'tp-process': return 0.8;
+    case 'cnft-mint': return 0.92;
+    case 'register-clip': return 1.0;
+  }
 }
 
 /// 例外 / 文字列 / 任意値 を UI 向けの 1 行 message に正規化。

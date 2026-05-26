@@ -414,11 +414,11 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
       achievementConfidence: state.achievementConfidence,
       snapshotUri: state.snapshotUri ?? undefined,
     });
-    // popToTop() だけだと Main の先頭タブ (= Job) に戻ってしまう。
-    // 明示的に Collection タブを指定して遷移、 user が新クリップを即見られるようにする。
+    // popToTop() だけだと Main の先頭タブに戻る (= 元 Job タブ → 現 Home)。
+    // Home タブを明示的に指定 (= UI_SPECS §2.1)、 user が新クリップを即見られるようにする。
     navigation.reset({
       index: 0,
-      routes: [{ name: 'Main', state: { routes: [{ name: 'Collection' }], index: 0 } as any }],
+      routes: [{ name: 'Main', state: { routes: [{ name: 'Home' }], index: 0 } as any }],
     });
   }, [state, navigation, route.params.taskId]);
 

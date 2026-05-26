@@ -22,15 +22,20 @@ import { NextRequest, NextResponse } from "next/server";
 
 const ALLOWED_GATEWAYS = (
   process.env.TP_GATEWAY_PROXY_TARGETS ??
-  "http://54.250.143.52:3000"
+  "http://13.113.217.17:3000"
 ).split(",").map((u) => u.trim().replace(/\/$/, ""));
 
+// path[0] (= URL の最初のセグメント) で whitelist 判定する。
+// /extension/solana のような multi-segment path は path[0]=extension で許可される。
 const ALLOWED_PATHS = new Set([
+  "process",      // v0.1.3 mock-device 互換 (= TEE fetch + C2PA verify + signed_json 発行)
+  "extension",    // /extension/solana など (cNFT mint 用 partial_tx 発行)
+  "health",
+  // v0.1.2 legacy (= 旧 SDK フロー、 移行中)
   "upload-url",
   "verify",
   "sign",
   "sign-and-mint",
-  "health",
 ]);
 
 export const runtime = "nodejs";

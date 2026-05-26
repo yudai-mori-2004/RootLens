@@ -53,6 +53,13 @@ export const ANTHROPIC_API_KEY = readRequired('EXPO_PUBLIC_ANTHROPIC_API_KEY');
 
 export const COSIGN_AUTHORITY = readRequired('EXPO_PUBLIC_COSIGN_AUTHORITY');
 
+// Bubblegum cNFT 発行先 merkle tree (= Pipeline 1 step 6 で必要)。
+// dev では tests/license-nft/create-smoke-tree.ts で作った public tree を指定。
+export const MERKLE_TREE = readRequired('EXPO_PUBLIC_MERKLE_TREE');
+
+// cNFT collection (省略時 collection なしで mint。 public tree なら不要)。
+export const MERKLE_COLLECTION = readOptional('EXPO_PUBLIC_MERKLE_COLLECTION');
+
 // ─── Debug only ─────────────────────────────────────────────────────────
 // DebugAuthProvider の wallet を env で固定するための optional override。
 // 未設定なら SecureStore から復元 or 新規生成する。
