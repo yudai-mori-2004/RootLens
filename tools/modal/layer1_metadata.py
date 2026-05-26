@@ -409,5 +409,5 @@ def score(content_id: str):
 def main():
     print(
         "Modal app rootlens-layer1-metadata defined. "
-        "Deploy with `modal deploy v0.1.3/server/modal/layer1_metadata.py`."
+        "Deploy with `modal deploy tools/modal/layer1_metadata.py`."
     )

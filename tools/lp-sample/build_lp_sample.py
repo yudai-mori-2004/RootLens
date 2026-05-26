@@ -25,10 +25,10 @@ LP 用 dataset の特性 (= アプリ撮影と異なる):
 
 実行:
   # 1 本だけ動作確認
-  python server/scripts/build_lp_sample.py --only sample_0001
+  python tools/lp-sample/build_lp_sample.py --only sample_0001
 
   # 全件
-  python server/scripts/build_lp_sample.py
+  python tools/lp-sample/build_lp_sample.py
 """
 
 import argparse

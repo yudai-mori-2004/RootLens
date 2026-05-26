@@ -46,16 +46,17 @@ progress/
 # Misc
 *.tsbuildinfo
 .expo/
-native/jarosz-wasm/target/
 .claude
 
 # Sensor session module build artifacts
 app/modules/sensor-session/android/build/
 
-# Python pipeline build artifacts
-pipeline/**/__pycache__/
-pipeline/**/.venv/
-pipeline/**/*.pyc
+# tools/ build artifacts
+tools/mock-device/target/
+tools/macos-blur/.build/
+tools/**/__pycache__/
+tools/**/*.pyc
+tools/**/.venv/
 
 # Solana / Anchor (Unit D 以降)
 /target/
@@ -80,9 +81,6 @@ tests/license-nft/node_modules/
 
 # Hand-pose module build artifacts
 app/modules/hand-pose/android/build/
-
-# Pipeline node_modules
-pipeline/**/node_modules/
 
 # LP sample 配信物 (= 元 .mp4 1.6 GB + 生成 dataset 554 MB)。
 # git 管理せず、 R2 / 別配信経路で扱う。

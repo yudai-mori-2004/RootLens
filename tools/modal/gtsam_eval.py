@@ -460,4 +460,4 @@ def _compute_residual(visual_poses, imu_pim_list) -> tuple[float, int]:
 
 @app.local_entrypoint()
 def main():
-    print("Modal app rootlens-gtsam-eval defined. Deploy with `modal deploy server/modal/gtsam_eval.py`.")
+    print("Modal app rootlens-gtsam-eval defined. Deploy with `modal deploy tools/modal/gtsam_eval.py`.")

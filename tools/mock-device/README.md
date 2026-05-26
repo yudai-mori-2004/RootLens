@@ -14,7 +14,7 @@ cargo build --release
 ## 前提
 
 - macOS (Apple Vision フレームワーク必要)
-- 既存 macos_blur Swift CLI が build 済 (= `server/scripts/macos_blur/.build/arm64-apple-macosx/release/MacOsBlur`)
+- 既存 macos_blur Swift CLI が build 済 (= `tools/macos-blur/.build/arm64-apple-macosx/release/MacOsBlur`)
 - Rust 1.93+ / Cargo 1.93+
 
 ## 使い方

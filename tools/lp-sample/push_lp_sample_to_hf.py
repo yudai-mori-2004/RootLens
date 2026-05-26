@@ -6,10 +6,10 @@ LP 第一弾サンプル dataset を HuggingFace Hub に push する。
   - HF_TOKEN が環境変数か HuggingFace CLI のログインで設定されている
 
 使い方:
-  python server/scripts/push_lp_sample_to_hf.py --repo-id <owner>/<dataset-name>
+  python tools/lp-sample/push_lp_sample_to_hf.py --repo-id <owner>/<dataset-name>
 
 例:
-  python server/scripts/push_lp_sample_to_hf.py --repo-id rootlens/lp-sample-v0.1
+  python tools/lp-sample/push_lp_sample_to_hf.py --repo-id rootlens/lp-sample-v0.1
 
 冪等性: 同じ repo-id で 2 回目実行すると差分のあるファイルだけ upload される (= huggingface_hub の挙動)。
 """

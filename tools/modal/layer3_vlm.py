@@ -529,5 +529,5 @@ def score_layer3(
 def main():
     print(
         "Modal app rootlens-layer3-vlm defined. "
-        "Deploy with `modal deploy v0.1.3/server/modal/layer3_vlm.py`."
+        "Deploy with `modal deploy tools/modal/layer3_vlm.py`."
     )

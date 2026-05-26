@@ -659,4 +659,4 @@ def _upload_tree(s3, bucket: str, key_prefix: str, local_dir: str) -> int:
 
 @app.local_entrypoint()
 def main():
-    print("Modal app rootlens-bundle defined. Deploy with `modal deploy server/modal/bundle.py`.")
+    print("Modal app rootlens-bundle defined. Deploy with `modal deploy tools/modal/bundle.py`.")

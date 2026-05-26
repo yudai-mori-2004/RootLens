@@ -15,7 +15,7 @@ phase 単位の自然言語ナレーションを生成し、 dataset に焼き�
 (= DATASET_CARD.md 「Phase labels」 セクション参照)。
 
 使い方:
-  python server/scripts/add_phase_labels.py
+  python tools/lp-sample/add_phase_labels.py
     --dataset-dir web/public/lp/sample/dataset
 
 env: ANTHROPIC_API_KEY (= web/.env から自動 load)

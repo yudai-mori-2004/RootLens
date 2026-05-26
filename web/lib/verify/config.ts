@@ -13,8 +13,8 @@ import { Connection } from '@solana/web3.js';
 export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL!;
 
 /** PDQ照合の閾値 (ハミング距離, 256bit空間)
- * DCT計算はTEEと同一のWASMバイナリで実行。
- * Jaroszダウンサンプリングも同一Rustソースからビルドしたjarosz.wasmで実行。
+ * PDQ / vPDQ 計算は pdq.ts の pure TypeScript 実装。 TP 側 WASM (= title-protocol/wasm/image-pdq)
+ * と bit-identical な結果を維持する。
  * Meta PDQの推奨閾値: 31 (類似判定) 。RootLensでは同一コンテンツの再エンコード差のみを
  * 許容するため、より厳しい閾値を使用。 */
 export const PDQ_THRESHOLD = 31;

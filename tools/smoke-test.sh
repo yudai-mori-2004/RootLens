@@ -14,7 +14,7 @@
 #   - web/.env.local に R2 credential が入っている (= mock-device の prod profile 用)。 無ければ
 #     `cd web && vercel env pull .env.local --yes` で取得
 #   - mock-device の release build 済 (= cargo build --release in tools/mock-device)
-#   - macos_blur の release build 済 (= server/scripts/macos_blur/.build/.../MacOsBlur)
+#   - macos_blur の release build 済 (= tools/macos-blur/.build/.../MacOsBlur)
 #
 # 使い方:
 #   bash tools/smoke-test.sh [--input <path/to/raw.mp4>] [--wallet <pubkey>]

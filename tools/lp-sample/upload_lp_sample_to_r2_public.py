@@ -14,7 +14,7 @@ R2 bucket の public 化 (= r2.dev subdomain 有効化や custom domain 設定) 
 Cloudflare dashboard 側の作業。 本スクリプトは upload のみ担当。
 
 使い方:
-  python server/scripts/upload_lp_sample_to_r2_public.py
+  python tools/lp-sample/upload_lp_sample_to_r2_public.py
 """
 
 import argparse

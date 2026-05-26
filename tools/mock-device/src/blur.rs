@@ -1,6 +1,6 @@
 // MacOsBlur Swift CLI の subprocess wrapper。
 //
-// 既存 server/scripts/macos_blur/ で build 済のバイナリを呼ぶ。 Apple Vision
+// 既存 tools/macos-blur/ で build 済のバイナリを呼ぶ。 Apple Vision
 // VNDetectFaceRectanglesRequest revision 3 でフレームごとに顔検出 + 拡張 + Gaussian blur。
 // H.264 出力。
 //
@@ -15,7 +15,7 @@ use std::process::Command;
 /// MacOsBlur バイナリの既定パス。 build しなおしたら更新が必要。
 /// 起動時に存在チェック → 無ければ修復方法を即座に提示する fail-loud な runtime error。
 const MACOS_BLUR_BIN: &str =
-    "/Users/forest/WebCreations/root-lens/server/scripts/macos_blur/.build/arm64-apple-macosx/release/MacOsBlur";
+    "/Users/forest/WebCreations/root-lens/tools/macos-blur/.build/arm64-apple-macosx/release/MacOsBlur";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,7 +42,7 @@ pub fn blur_faces<P: AsRef<Path>>(input_mp4: P, output_mp4: P) -> Result<BlurRes
     let bin = binary_path();
     if !bin.exists() {
         return Err(anyhow!(
-            "MacOsBlur binary not found at {}. Build it first: cd server/scripts/macos_blur && swift build -c release",
+            "MacOsBlur binary not found at {}. Build it first: cd tools/macos-blur && swift build -c release",
             bin.display()
         ));
     }

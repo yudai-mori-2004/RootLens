@@ -327,5 +327,5 @@ def analyze(content_id: str, sample_interval_sec: float = 3.0):
 def main():
     print(
         "Modal app rootlens-layer2-frame-sampling defined. "
-        "Deploy with `modal deploy v0.1.3/server/modal/layer2_frame_sampling.py`."
+        "Deploy with `modal deploy tools/modal/layer2_frame_sampling.py`."
     )

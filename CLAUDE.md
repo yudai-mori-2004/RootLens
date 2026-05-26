@@ -17,9 +17,8 @@ root-lens/
 ├── web/                Next.js 16 App Router (= rootlens.io、 Vercel link 済)。 LP + REST API + WDK workflow
 ├── app/                React Native (= Expo)。 撮影端末アプリ
 │
-├── native/             app + web から参照する Rust crate
-│   ├── c2pa-bridge/    iOS / Android FFI
-│   └── jarosz-wasm/    web public/wasm/ 用
+├── native/             app から参照する Rust crate
+│   └── c2pa-bridge/    iOS / Android FFI (= v0.1.4 で iOS 実機統合復活時の起点)
 ├── programs/           Anchor program (= license-nft on Solana)
 ├── crates/             Rust CLI (= license-cli)
 ├── tests/              Anchor program の TS テスト

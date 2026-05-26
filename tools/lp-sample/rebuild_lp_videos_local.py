@@ -11,7 +11,7 @@ YuNet の拳誤検出 (= 12-51 % frame) を Apple Vision に置き換えて品�
 data parquet / tasks.jsonl は WiLoR / phase narration がそのまま使えるので更新不要。
 
 使い方:
-  python server/scripts/rebuild_lp_videos_local.py --concurrency 4
+  python tools/lp-sample/rebuild_lp_videos_local.py --concurrency 4
 """
 import argparse
 import json
@@ -56,7 +56,7 @@ def r2_client():
 
 
 def sign_c2pa(mp4_path: Path, faces_total: int, cert_chain_pem: str, key_pem: str) -> None:
-    """server/modal/blur.py::sign_c2pa と同じロジックで C2PA 「署名 S」 を in-place で埋め込む。"""
+    """tools/modal/blur.py::sign_c2pa と同じロジックで C2PA 「署名 S」 を in-place で埋め込む。"""
     import c2pa
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
