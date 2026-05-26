@@ -1,6 +1,9 @@
 """
-各エピソードの observation.hand_keypoints_3d から
-MANO 21 関節のスケルトンアニメーションを MP4 に書き出す。
+各エピソードの observation.hand_keypoints_3d + action から
+カメラ空間のスケルトンアニメーションを MP4 に書き出す (LP プレビュー用)。
+
+pred_keypoints_3d (MANO forward pass 出力、global_orient 適用済み) に
+pred_cam_t_full を加算してカメラ空間座標を得て、透視投影で 2D 描画する。
 
 出力: web/public/lp/sample/skeleton/ に episode_XXX_skeleton.mp4
 """
@@ -27,94 +30,94 @@ MANO_BONES = [
 LEFT_COLOR = "#4a9eff"
 RIGHT_COLOR = "#ff6b6b"
 BG_COLOR = "#1a1d22"
-JOINT_SIZE = 8
-BONE_WIDTH = 2.5
-FIG_SIZE = (4, 4)
-DPI = 100
+JOINT_SIZE = 40
+BONE_WIDTH = 4.0
 SUBSAMPLE = 2  # render every Nth frame to reduce file size
 
+# 出力サイズ (RGB 動画と同一)
+OUT_W = 1920
+OUT_H = 1080
 
-HAND_OFFSET_X = 0.12
+
+def camera_to_2d(pts_cam: np.ndarray, img_w: int, img_h: int) -> np.ndarray:
+    """カメラ空間の 3D 点を透視投影で 2D ピクセル座標に変換。
+    WiLoR の pred_cam_t_full は cam_crop_to_full() で元画像座標系に変換済み。
+    focal_length は WiLoR の scaled_focal_length と同じ計算:
+      scaled_focal_length = FOCAL_LENGTH / IMAGE_SIZE * max(img_w, img_h)
+    FOCAL_LENGTH=5000, IMAGE_SIZE=256 (WiLoR デフォルト)。
+    """
+    focal = 5000.0 / 256.0 * max(img_w, img_h)
+    cx, cy = img_w / 2.0, img_h / 2.0
+    z = pts_cam[:, 2].clip(min=0.1)
+    x_2d = pts_cam[:, 0] / z * focal + cx
+    y_2d = pts_cam[:, 1] / z * focal + cy
+    return np.stack([x_2d, y_2d], axis=1)
+
+
+def project_hands(frame: dict, img_w: int, img_h: int) -> list[tuple[np.ndarray, str]]:
+    """1 フレームの両手をカメラ空間 → 2D 投影。[(joints_2d, color), ...] を返す。
+
+    pred_keypoints_3d は MANO forward pass の出力なので global_orient 回転は
+    適用済み。ここでは pred_cam_t_full (wrist_pos) による平行移動のみ行う。
+    """
+    results = []
+    present = frame["present"]
+    kp = frame["kp"]
+    action = frame["action"]
+
+    for h, (color, is_present) in enumerate(
+        zip([LEFT_COLOR, RIGHT_COLOR], present)
+    ):
+        if not is_present:
+            continue
+        offset = h * 7
+        wrist_pos = action[offset:offset + 3]
+        # global_orient (action[offset+3:offset+7]) は使わない:
+        # pred_keypoints_3d に既に適用済みのため
+        joints_cam = kp[h] + wrist_pos
+        joints_2d = camera_to_2d(joints_cam, img_w, img_h)
+        results.append((joints_2d, color))
+    return results
 
 
 def render_episode(ep_idx: int, frames: list[dict], fps: float, out_path: Path) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
     frames_to_render = frames[::SUBSAMPLE]
     render_fps = fps / SUBSAMPLE
 
-    all_kp = np.array([f["kp"] for f in frames_to_render])  # [T, 2, 21, 3]
-    all_present = [f["present"] for f in frames_to_render]
-    present_mask = np.array([[p[0] for p in all_present], [p[1] for p in all_present]])  # [2, T]
-
-    norm_kp = all_kp.copy()
-    for h in range(2):
-        for t in range(len(frames_to_render)):
-            if present_mask[h, t]:
-                wrist = norm_kp[t, h, 0].copy()
-                norm_kp[t, h] -= wrist
-
-    valid_kp = []
-    for h in range(2):
-        for t in range(len(frames_to_render)):
-            if present_mask[h, t]:
-                valid_kp.append(norm_kp[t, h])
-    if not valid_kp:
-        print(f"  episode {ep_idx}: no hands detected, skipping")
-        return
-    valid_kp = np.concatenate(valid_kp, axis=0)  # [N, 3]
-    rng = valid_kp.max(axis=0) - valid_kp.min(axis=0)
-    scale = float(rng.max()) * 0.35
-    if scale < 1e-6:
-        scale = 1.0
-
-    has_both = bool(present_mask[0].any() and present_mask[1].any())
-
     tmp_dir = out_path.parent / f"_tmp_ep{ep_idx:03d}"
     tmp_dir.mkdir(parents=True, exist_ok=True)
 
+    # DPI を調整して 1920x1080 のフレームを出力
+    dpi = 150
+    fig_w = OUT_W / dpi
+    fig_h = OUT_H / dpi
+
     for i, frame in enumerate(frames_to_render):
-        fig = plt.figure(figsize=FIG_SIZE, dpi=DPI, facecolor=BG_COLOR)
-        ax = fig.add_subplot(111, projection="3d", facecolor=BG_COLOR)
-        ax.set_proj_type("ortho")
-
-        cx = 0.0
-        if has_both:
-            ax.set_xlim(-HAND_OFFSET_X - scale, HAND_OFFSET_X + scale)
-        else:
-            ax.set_xlim(cx - scale, cx + scale)
-        ax.set_ylim(-scale, scale)
-        ax.set_zlim(-scale, scale)
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi, facecolor=BG_COLOR)
+        ax.set_facecolor(BG_COLOR)
+        ax.set_xlim(0, OUT_W)
+        ax.set_ylim(OUT_H, 0)  # y 軸反転 (画像座標系)
+        ax.set_aspect("equal")
         ax.set_axis_off()
-        ax.view_init(elev=25, azim=-90)
+        fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
-        present = frame["present"]
-
-        for h, (color, is_present) in enumerate(
-            zip([LEFT_COLOR, RIGHT_COLOR], present)
-        ):
-            if not is_present:
-                continue
-            joints = norm_kp[i, h].copy()  # [21, 3] wrist-normalized
-            if has_both:
-                offset = -HAND_OFFSET_X if h == 0 else HAND_OFFSET_X
-                joints[:, 0] += offset
+        for joints_2d, color in project_hands(frame, OUT_W, OUT_H):
             ax.scatter(
-                joints[:, 0], joints[:, 1], joints[:, 2],
-                c=color, s=JOINT_SIZE, depthshade=False, alpha=0.9,
+                joints_2d[:, 0], joints_2d[:, 1],
+                c=color, s=JOINT_SIZE, zorder=3, alpha=0.9,
             )
             for a, b in MANO_BONES:
                 ax.plot(
-                    [joints[a, 0], joints[b, 0]],
-                    [joints[a, 1], joints[b, 1]],
-                    [joints[a, 2], joints[b, 2]],
-                    color=color, linewidth=BONE_WIDTH, alpha=0.7,
+                    [joints_2d[a, 0], joints_2d[b, 0]],
+                    [joints_2d[a, 1], joints_2d[b, 1]],
+                    color=color, linewidth=BONE_WIDTH, alpha=0.7, zorder=2,
                 )
 
-        fig.savefig(tmp_dir / f"{i:06d}.png", facecolor=BG_COLOR, bbox_inches="tight", pad_inches=0.02)
+        fig.savefig(tmp_dir / f"{i:06d}.png", facecolor=BG_COLOR, dpi=dpi)
         plt.close(fig)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -124,7 +127,6 @@ def render_episode(ep_idx: int, frames: list[dict], fps: float, out_path: Path) 
         "-i", str(tmp_dir / "%06d.png"),
         "-c:v", "libx264", "-preset", "fast",
         "-crf", "28", "-pix_fmt", "yuv420p",
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         str(out_path),
     ]
     subprocess.run(cmd, capture_output=True, check=True)
@@ -155,6 +157,7 @@ def main():
             "frame_index": int(d["frame_index"][i]),
             "kp": np.array(d["observation.hand_keypoints_3d"][i]),
             "present": list(d["observation.hand_present"][i]),
+            "action": np.array(d["action"][i]),
         })
 
     for ep_frames in by_ep.values():

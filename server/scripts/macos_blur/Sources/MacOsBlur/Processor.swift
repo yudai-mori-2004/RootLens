@@ -143,14 +143,14 @@ public final class PrivacyBlurProcessor: @unchecked Sendable {
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
         let outW = Int(displaySize.width)
         let outH = Int(displaySize.height)
-        let bitrate = max(2_000_000, Int(displaySize.width * displaySize.height * 6.0))
+        let bitrate = max(2_000_000, Int(displaySize.width * displaySize.height * 3.0))
         let videoSettings: [String: Any] = [
-            AVVideoCodecKey: AVVideoCodecType.hevc,
+            AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: outW,
             AVVideoHeightKey: outH,
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: bitrate,
-                AVVideoProfileLevelKey: kVTProfileLevel_HEVC_Main_AutoLevel,
+                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                 AVVideoMaxKeyFrameIntervalKey: 60,
             ] as [String: Any]
         ]

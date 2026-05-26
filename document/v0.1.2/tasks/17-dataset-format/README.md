@@ -11,20 +11,20 @@ RootLens の出力を、 そのまま HuggingFace Hub にアップロード可�
 処理は 3 つの独立した パイプラインに分かれる。 各パイプラインは入力 (= データへのリンク) を受け取り、 出力 (= 別のデータへのリンク) を返す純粋な関数。 互いに疎結合。
 
 ```
-┌── Pipeline 1: 撮影 ─────────────────────────────────────────────────┐
+┌── Pipeline 1: 撮影 + プライバシー ──────────────────────────────────┐
 │  端末で完結。 ARKit で同期した RGB + sensor stream を記録、         │
-│  ストレージにアップロードする。                                       │
+│  Apple Vision (VNDetectFaceRectangles) で顔ぼかしを適用、          │
+│  ぼかし済みデータをストレージにアップロードする。                     │
 │                                                                       │
-│  Output: 生データへのリンク (= rgb.mp4 + sensors.jsonl)               │
+│  Output: ぼかし済みデータへのリンク (= blurred.mp4 + sensors.jsonl)   │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌── Pipeline 2: 品質評価 ─────────────────────────────────────────────┐
-│  Input: 生データへのリンク                                            │
+│  Input: ぼかし済みデータへのリンク                                    │
 │  処理:                                                                 │
-│    a. 顔ぼかし (= YuNet)                                             │
-│    b. C2PA サーバ署名 「署名 S」 (= SPECS §2.10 段階 1)              │
-│    c. quality score 算出 (= SPECS §6.3 の閾値)                        │
-│    d. Title Protocol register → Root NFT 発行                        │
+│    a. C2PA サーバ署名 「署名 S」 (= SPECS §2.10 段階 1)              │
+│    b. quality score 算出 (= SPECS §6.3 の閾値)                        │
+│    c. Title Protocol register → Root NFT 発行                        │
 │  Output: blurred-rgb.mp4 へのリンク + quality_score + root_asset_id  │
 └─────────────────────────────────────────────────────────────────────┘
 
@@ -131,7 +131,7 @@ Pipeline 3 では:
 
 | 関数 | 用途 | resource |
 |---|---|---|
-| `evaluate_clip` | Pipeline 2 (= YuNet + C2PA + quality + TP register) | CPU 4 / 2 GB |
+| `evaluate_clip` | Pipeline 2 (= C2PA + quality + TP register) | CPU 4 / 2 GB |
 | `bundle_dataset` | Pipeline 3 (= WiLoR + LeRobot v3 構築) | GPU A10G / 16 GB |
 
 両関数とも 入力に data link を取る純粋関数。

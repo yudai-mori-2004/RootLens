@@ -168,13 +168,13 @@
     "sample": {
       "meta": {
         "title": "RootLens サンプル (v0.1)",
-        "description": "一人称視点の家事動画48本。各フレームに3Dハンドポーズと自然言語の行動ラベルを格納。約560 MB。LeRobotDataset v3.0形式。"
+        "description": "一人称視点の家事動画48本。各フレームに3Dハンドポーズと自然言語の行動ラベルを格納。約1 GB。LeRobotDataset v3.0形式。"
       },
       "pageTitle": "RootLens サンプルデータ",
       "pageIntro": "RootLens iOS アプリで撮影できるデータの形式と品質を確認するためのサンプルセットです。撮影条件やコントリビューター規模を段階的に拡大しながら、新しいバージョンを追加していきます。",
       "heroTitle": "RootLens sample (v0.1)",
       "heroSubtitle": "一人称視点の家事動画48本。各フレームに3Dハンドポーズ、手首の6DoFアクションベクトル、自然言語の行動ラベルを収録。",
-      "ctaDownloadAll": "データセット一括ダウンロード (約560MB)",
+      "ctaDownloadAll": "データセット一括ダウンロード (約1 GB)",
       "statEpisodes": "エピソード数",
       "statFrames": "合計フレーム数",
       "statLabels": "行動ラベル数",

@@ -101,7 +101,7 @@ export default async function SamplePage() {
     [t("statFps"), String(doc.fps)],
     [t("statResolution"), "1920 × 1080"],
     [t("statCodec"), "H.264 / AVC"],
-    [t("statSize"), "~560 MB"],
+    [t("statSize"), "~1 GB"],
     [t("statRegion"), "Japan"],
     [t("statViewpoint"), "Head-mounted, first-person"],
     [t("statFormat"), "LeRobotDataset v3.0"],
