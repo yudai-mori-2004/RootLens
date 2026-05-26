@@ -9,15 +9,15 @@ Phase A (基盤)
   01. workspace-and-schema           web/ の骨格と DB schema
 
 Phase B (Pipeline 1: 端末模擬)
-  02. pipeline-1-mock-cli             Rust CLI で raw MP4 → 2 段 C2PA + 顔ぼかし + R2 アップロード
+  02. pipeline-1-mock-cli             Rust CLI で raw MP4 → 2 段 C2PA + 顔ぼかし + R2 アップロード + TP /process + cNFT 発行
 
 Phase C (Pipeline 2: サーバ自動)
-  03. pipeline-2-server-skeleton      API endpoints + WDK workflow 骨格 + lib/mapper
+  03. pipeline-2-server-skeleton      API endpoints (= rootAssetId 必須) + WDK workflow 骨格 (= 4 step) + lib/mapper
   04. pipeline-2-layer-1-metadata     第 1 層 (sensors.jsonl + imu_high_rate.jsonl で 20 点)
   05. pipeline-2-layer-2-frame-sampling 第 2 層 (フレームサンプル画像解析で 15 点)
   06. pipeline-2-layer-3-vlm          第 3 層 (Claude Haiku 4.5 で 55 点)
   07. pipeline-2-gtsam                Video-IMU 整合性 (= 10 点) + 画面再撮影攻撃検出
-  08. pipeline-2-tp-register          Title Protocol register で Root NFT 発行
+  08. pipeline-2-tp-register          [廃止] TP register は task 02 (= Pipeline 1) に統合
 
 Phase D (Pipeline 3: 手動)
   09. pipeline-3-wilor-lerobot        WiLoR 手ポーズ推定 + LeRobot v3 dataset 構築
@@ -29,16 +29,15 @@ Phase E (検証)
 ## 依存関係
 
 ```
-01 ──┬─→ 02
+01 ──┬─→ 02 ──┐
      ├─→ 03 ─→ 04 ─┐
-     │            ├──→ 08 ──┐
-     │       05 ─┤          │
-     │       06 ─┤          ├──→ 10
-     │       07 ─┘          │
-     └─→ 09 ─────────────────┘
+     │       05 ─┤
+     │       06 ─┼──→ 10
+     │       07 ─┤
+     └─→ 09 ─────┘
 ```
 
-01 (= 基盤) が完了すれば 02 / 03 / 09 は並列で進められる。 04-08 は 03 完了後に開始、 04-07 は相互に並列。 08 は 04-07 全完了後。 10 は 02 / 08 / 09 全完了後。
+01 (= 基盤) が完了すれば 02 / 03 / 09 は並列で進められる。 04-07 は 03 完了後に開始 (= 相互に並列)。 10 は 02 / 04-07 / 09 全完了後。 08 は廃止 (= 内容は 02 に吸収)。 Pipeline 2 は 02 完了 (= rootAssetId 確定) に依存する点に注意 (= 10 で初めて統合確認)。
 
 ## CUI レベルの定義
 
@@ -83,30 +82,35 @@ Pipeline 1 の C2PA 署名と signature_hash 抽出は、 隣接プロジェク�
 
 ## 進捗 (2026-05-26)
 
-データパイプラインは production rootlens.io 上で **Pipeline 1 + Pipeline 2 まで end-to-end 完走**。 残り Pipeline 3 (= ほぼ port 済) を回せば一段落。
+データパイプラインは production rootlens.io 上で **Pipeline 1 (= R2 upload + TP `/process` まで) + Pipeline 2 まで end-to-end 完走**。 残りは Pipeline 1 末尾の cNFT 発行 (= rootAssetId 確定) と Pipeline 3 (= ほぼ port 済) を回せば一段落。
 
 | Task | 状態 | 備考 |
 |------|------|------|
-| 01 workspace-and-schema | ✅ | web/ に統合、 Supabase で table 作成済 |
-| 02 pipeline-1-mock-cli | ✅ | Rust crate 動作確認、 2 段 C2PA + content_id 抽出 + R2 アップロード OK。 ⏳ TP `/process` 呼び出しと cNFT 発行は次フェーズ |
-| 03 pipeline-2-server-skeleton | ✅ | rootlens.io/api で稼働。 🔄 tp-submit step は削除予定 |
+| 01 workspace-and-schema | ✅ | web/ に統合、 Supabase で table 作成済。 🔄 `rootAssetId.notNull()` への migration 必要 |
+| 02 pipeline-1-mock-cli | 🔄 | 2 段 C2PA + content_id 抽出 + R2 アップロード OK、 TP `/process` 呼び出しも `tools/mock-device/src/tp_register.rs` に実装済。 ⏳ 残り: cNFT 発行 (= `/extension/solana` + Solana broadcast) → rootAssetId 確定 |
+| 03 pipeline-2-server-skeleton | 🔄 | rootlens.io/api で稼働、 tp-submit step は削除済。 ⏳ 残り: `POST /api/clips` の rootAssetId 必須化 + finalize の前提条件 check |
 | 04 layer-1-metadata | ✅ | smoke で score=18/20 |
 | 05 layer-2-frame-sampling | ✅ | smoke で score=12/15 |
 | 06 layer-3-vlm | ✅ | smoke で score=0/55 (= testsrc 入力、 想定通り) |
 | 07 gtsam | ✅ | smoke で score=8/10 |
-| 08 tp-register | 🔄 廃止 | 新 TP は client-driven、 内容は task 02 に吸収 |
-| 09 pipeline-3-wilor-lerobot | ⏳ | Modal app deploy 完了、 smoke はこれから |
-| 10 end-to-end-smoke | ⏳ | Pipeline 2 まで完走 (= qualityScore 38/100、 4 層内訳保存)。 Pipeline 3 残り |
+| 08 tp-register | ✅ 廃止 | 内容は task 02 に完全吸収。 サーバ tp-submit step 削除済 |
+| 09 pipeline-3-wilor-lerobot | ⏳ | Modal app deploy 完了、 smoke はこれから。 入力 rootAssetId 必須 |
+| 10 end-to-end-smoke | ⏳ | Pipeline 2 まで完走 (= qualityScore 38/100、 4 層内訳保存)。 cNFT 発行統合 + Pipeline 3 残り |
 
 ### 設計変更サマリ (= 当初仕様からの差分)
 
-- **TP register をサーバから client-driven に移行**: 新 TP は SDK 廃止、 mock_device から `/process` を直接叩く構造。 サーバの tp-submit step は撤去。 これにより Pipeline 2 は 4 step (= metadata / frame / vlm / gtsam) で並列実行可能になる
-- **rootAssetId は仕様上 notNull だが mvp では nullable**: mock_device で cNFT 発行 (= `/extension/solana` + Solana broadcast) を実装するまで暫定的に許容
-- **Pipeline 3 出力 prefix**: rootAssetId 確定までは `datasets/<content_id>/` で代用。 cNFT 発行後に migrate
+- **TP register を Pipeline 1 内に前倒し、 Pipeline 2 開始前に rootAssetId 必須**: 新 TP は SDK 廃止、 mock-device が R2 upload 後に `/process` + `/extension/solana` + Solana broadcast を直接実行して rootAssetId を確定させる。 サーバの tp-submit step は撤去済。 サーバへの登録 (= `POST /api/clips`) は rootAssetId 確定後にのみ行う
+- **rootAssetId は notNull、 Pipeline 2 起動の前提条件**: `POST /api/clips` の必須フィールド、 DB schema 上も `notNull()`。 不在で finalize した場合サーバは 400 を返し Pipeline 2 を起動しない
+- **Pipeline 3 出力 prefix は必ず `datasets/<rootAssetId>/`**: rootAssetId が Pipeline 1 完了時点で確定しているため、 content_id ベースの prefix への切替経路は存在しない
+
+### 現フェーズで実施中
+
+- mock-device に cNFT 発行追加 (= `/extension/solana` + Solana broadcast、 rootAssetId 確定)
+- `POST /api/clips` の入力スキーマに `rootAssetId` (= notNull) 追加
+- DB schema migration (= `rootAssetId` を nullable → notNull)
+- end-to-end smoke を新フローに合わせて書き換え
 
 ### 次フェーズ (= データパイプライン後)
 
-- mock_device に TP `/process` 呼び出し追加 (= signature_hash / attestation 取得)
-- mock_device に cNFT 発行追加 (= `/extension/solana` + Solana broadcast)
-- サーバ tp-submit step + lib/tp.ts 削除
-- DATA_SPECS §3.4 の仕様文を新 TP に合わせて update
+- 実機 iOS で同じフローを再現 (= Secure Enclave 鍵 + Background URLSession + Solana wallet 連携)
+- 撮影者向け Web ダッシュボード

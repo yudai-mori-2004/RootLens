@@ -117,8 +117,8 @@ export interface ClipDto {
 // ─── API リクエスト / レスポンス ─────────────────────────────────────
 
 /// POST /api/clips
-/// 撮影者「送る」 押下時に呼ぶ。 サーバはクリップ行を作成し、 端末出力 4 ファイル分の
-/// presigned PUT URL を返す。
+/// 撮影者 mock-device で R2 upload + TP /process + cNFT 発行が完了した直後に呼ぶ。
+/// rootAssetId が確定済の状態でのみクリップ行が作成される (= Pipeline 2 の前提条件)。
 export interface CreateClipRequest {
   taskId: string;
   achievementConfidence: number;
@@ -127,6 +127,11 @@ export interface CreateClipRequest {
   contentId: string;
   /// rgb.mp4 のサイズ (bytes)
   contentSize: number;
+  /// cNFT 発行で確定した Root NFT の cNFT asset ID (= base58)。 必須。
+  /// Pipeline 1 末尾の `POST /extension/solana` + Solana broadcast で確定。
+  rootAssetId: string;
+  /// TP `/process` 応答を保存した R2 オブジェクト URL (= signed-json/<content_id>.json)。 必須。
+  signedJsonUri: string;
 }
 
 /// Pipeline 1 が並走出力する 4 ファイル分の presigned PUT URL。

@@ -35,24 +35,37 @@ task 01-09 を全部繋いで、 raw MP4 + dummy センサーから始まり、 
 
 2. **smoke test スクリプト** (= `tools/smoke_test.sh` または `.py`):
    ```
-   # Phase 1: 端末模擬
-   $ ./mock-device --input sample.mp4 --sensors sensors.jsonl --imu imu.jsonl ...
-   {"content_id": "abc123...", "r2_keys": [...]}
+   # Phase 1: 端末模擬 (= R2 upload + TP /process + cNFT 発行 → rootAssetId 確定)
+   $ ./mock-device --input sample.mp4 --sensors sensors.jsonl --imu imu.jsonl \
+                   --tp-gateway https://tp.example/process \
+                   --solana-rpc https://api.devnet.solana.com \
+                   --api-base https://rootlens.io ...
+   {"content_id": "abc123...", "root_asset_id": "BgT...", "signed_json_url": "https://.../signed-json/abc123.json", "r2_keys": [...]}
+   # mock-device 内部で:
+   #   1. R2 に raw/<content_id>/ + signed-json/<content_id>.json を PUT
+   #   2. TP Gateway POST /process で signature_hash + attestation 取得
+   #   3. TP Gateway POST /extension/solana → Solana wallet 署名 → broadcast → rootAssetId 確定
+   #   4. POST /api/clips で content_id + root_asset_id + signed_json_uri をサーバ登録
 
-   # Phase 2: 仕上げ + サーバキック
-   $ curl POST /api/clips ...
-   $ <端末模擬の続き: presigned PUT URL 4 本に PUT、 ただし mock-device は既に R2 に直接 PUT してるので skip>
+   # Phase 2: finalize (= Pipeline 2 キック)
+   # mock-device の POST /api/clips が 201 を返した後、 同じ smoke script から finalize を叩く
    $ curl POST /api/clips/:id/finalize -d '{"contentId": "abc123..."}'
+   # サーバ側で clip.rootAssetId が not null であることを確認 → uploading → processing 遷移 + workflow 起動
+   # rootAssetId 不在なら 400 で smoke 失敗
 
-   # Phase 3: Pipeline 2 完走待ち
+   # Phase 3: Pipeline 2 (= 4 step) 完走待ち
    $ while true; do curl GET /api/clips/:id | jq .state; sleep 2; done
-   # state: uploading → processing (= step が metadata-scan → frame-sampling → vlm-score → gtsam-eval → tp-submit) → ready
+   # state: uploading → processing (= step が metadata-scan → frame-sampling → vlm-score → gtsam-eval) → ready
+   # tp-submit step は廃止済 (= rootAssetId は Pipeline 1 で確定済み)
 
-   # Phase 4: Pipeline 3 手動トリガ
-   $ python trigger_pipeline_3.py --content-id abc123... --root-asset-id <ready 後に DB から取れる>
+   # Phase 4: ready 待ち polling 完了
+   # qualityScore + qualityBreakdown (= 4 層全て) が DB に書かれていることを確認
+
+   # Phase 5: Pipeline 3 手動トリガ (= rootAssetId は Phase 1 で確定済の値を使う)
+   $ python trigger_pipeline_3.py --content-id abc123... --root-asset-id BgT...
    # R2 datasets/<root_asset_id>/ に LeRobot v3 ファイル群が出る
 
-   # Phase 5: LeRobot v0.5.1 で load 確認
+   # Phase 5 末尾: LeRobot v0.5.1 で load 確認
    $ python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset; ds = LeRobotDataset('s3://.../datasets/<root_asset_id>'); print(ds[0].keys())"
    ```
 
@@ -72,9 +85,12 @@ task 01-09 を全部繋いで、 raw MP4 + dummy センサーから始まり、 
 ## 成功基準
 
 - [x] サンプル 5 秒 MP4 で全 phase が完走し、 LeRobot dataset が生成される
+- [ ] Phase 1 完了時点で `rootAssetId` (= base58) + `signedJsonUrl` が確定し、 stdout に出る
+- [ ] Phase 2 で `POST /api/clips` が `rootAssetId` 必須 field 込みで 201 を返す
+- [ ] `rootAssetId` を欠落させて finalize すると 400 が返る (= 防御 path 検証)
 - [x] DB の clip 行が `uploading → processing → ready` を遷移する
-- [x] processing 中、 `processingStep` カラムが `metadata-scan → frame-sampling → vlm-score → gtsam-eval → tp-submit` の順に変わる (= 各 step 完了で次に進む)
-- [x] ready 状態で `qualityScore` + `qualityBreakdown` (= 4 層全て) + `rootAssetId` が埋まる
+- [ ] processing 中、 `processingStep` カラムが `metadata-scan → frame-sampling → vlm-score → gtsam-eval` の順に変わる (= 4 step、 tp-submit step は廃止済)
+- [x] ready 状態で `qualityScore` + `qualityBreakdown` (= 4 層全て) + `rootAssetId` (= Pipeline 1 で確定済の値) が埋まる
 - [x] 5 秒 MP4 の全 phase 合計が 15 分以内に完走
 - [x] 30 秒 MP4 の全 phase 合計が 30 分以内に完走
 - [x] LeRobot v0.5.1 で `ds[0]` が `observation.hand_keypoints_3d` 含む全 column を返す
@@ -84,5 +100,6 @@ task 01-09 を全部繋いで、 raw MP4 + dummy センサーから始まり、 
 
 - ✅ Pipeline 1 (= mock_device prod profile) → R2 upload → POST /api/clips → finalize → workflow キック → state=ready まで通った (= rootlens.io/api 経由、 production deploy)
 - ✅ 4 層スコアリング実測値: `qualityScore=38/100` (= layer1 18、 layer2 12、 layer3 0、 gtsam 8)。 testsrc pattern 入力に対する想定通り (= layer3 は task と無関係映像なので 0)
-- ⏳ Pipeline 3 (= bundle) は次 smoke で確認
-- ⏳ TP `/process` 統合は別フェーズ
+- ✅ TP `/process` 呼び出しは mock-device 側に実装済 (= `src/tp_register.rs`)、 動作確認は smoke で
+- ⏳ 残り: cNFT 発行 (= `/extension/solana` + Solana broadcast) を mock-device に追加 → rootAssetId 確定経路の end-to-end 確認
+- ⏳ 残り: Pipeline 3 (= bundle) を rootAssetId 込みでトリガして確認

@@ -46,6 +46,11 @@ export async function processClip(input: ProcessClipInput) {
   if (!clip.contentId || !clip.signedMp4Key) {
     throw new FatalError(`Clip ${input.clipId} missing contentId / signedMp4Key`);
   }
+  if (!clip.rootAssetId) {
+    // v0.1.3: Pipeline 2 開始の前提条件 = rootAssetId 確定済 (= Pipeline 1 末尾 cNFT 発行で確定)。
+    // 通常 finalize endpoint で先に弾かれるが、 防御として workflow 自体でも fail-loud。
+    throw new FatalError(`Clip ${input.clipId} missing rootAssetId (Pipeline 1 incomplete)`);
+  }
 
   // ステップ 1: 第 1 層 (= メタデータ解析)
   await setStep(input.clipId, "metadata-scan");

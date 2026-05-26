@@ -15,19 +15,23 @@
 ```
 Pipeline 1 (iOS デバイス)
   撮影 → C2PA 署名 → 顔ぼかし → C2PA 再署名 → R2 アップロード
+        → TP /process → cNFT 発行 (= rootAssetId 確定)
+        → POST /api/clips (rootAssetId + contentId 込み)
                               ↓
 Pipeline 2 (サーバー, CPU)
-  品質スコアリング → Video-IMU 整合性検証 → Title Protocol 登録
+  品質スコアリング (= 4 層) → Video-IMU 整合性検証
                               ↓
 Pipeline 3 (サーバー, GPU)        ← 手動トリガー
   手ポーズ推定 → データセット組み立て
 ```
 
-Pipeline 1 はデバイス上で完結する。Pipeline 2 はアップロード完了を契機にサーバー側で自動実行される。Pipeline 3 は RootLens チームが手動でトリガーする。Pipeline 2 と Pipeline 3 は独立しており、Pipeline 3 は Pipeline 1 の出力（ぼかし済みデータ + センサーデータ）と Pipeline 2 の出力（root_asset_id 等）を入力に取る。
+Pipeline 1 はデバイス上で完結する。Title Protocol への登録 (= `/process` 呼び出しと cNFT 発行) も Pipeline 1 の末尾に含まれ、`rootAssetId` が確定してから `POST /api/clips` でサーバーに登録される。Pipeline 2 は、サーバーへの登録 (= `rootAssetId` 付きのクリップレコードが作成された状態) を契機に自動実行される。Pipeline 3 は RootLens チームが手動でトリガーする。Pipeline 2 と Pipeline 3 は独立しており、両者とも Pipeline 1 で確定した `rootAssetId` をキーとしてデータを参照する。
 
 ### 1.1 コンテンツ識別子
 
 各クリップの一意な識別子は、ぼかし済み MP4 の C2PA アクティブマニフェスト署名の SHA-256 ハッシュである。この値を `content_id` と呼ぶ。`content_id` は Pipeline 1 のぼかし処理・再署名完了時点でデバイス上で確定し、以降すべてのパイプラインを通じて不変のキーとなる。
+
+Title Protocol 登録の完了後、`content_id` に対応する Solana cNFT の asset id (= `root_asset_id`) が確定する。`root_asset_id` は Pipeline 2 の起動条件であり、Pipeline 3 のデータセット出力 prefix のキーでもある。
 
 ### 1.2 対象プラットフォーム
 
@@ -102,9 +106,29 @@ C2PA 署名はデバイス上で 2 段階に分けて付与される。
 
 アップロード完了をサーバーが確認した時点で、デバイス上の生データ（ぼかし前の MP4）を削除する。ぼかし済みデータはユーザーの意思でデバイスに残すことができるが、サーバー上のデータが正本となる。
 
-### 2.6 Pipeline 1 の出力
+### 2.6 Title Protocol への登録 (= `/process` 呼び出し)
 
-Pipeline 1 の出力は、R2 上の以下のファイル群へのリンクである。
+R2 アップロード完了後、デバイスは Title Protocol Gateway の `POST /process` を直接呼び出す。リクエストには R2 上のぼかし済み MP4 への presigned GET URL を含める。
+
+Title Protocol は C2PA 署名を TEE 内で検証し、`signature_hash` (= `content_id` と同じ値、デバイス側で算出済みの値と一致することを確認) と attestation を返す。デバイスはこの応答を `signed-json/<content_id>.json` として R2 raw バケットに保存する。
+
+この時点ではまだ cNFT は発行されていない。`/process` は検証と attestation 生成のみを行う。
+
+### 2.7 cNFT 発行 (= `rootAssetId` 確定)
+
+デバイスは続いて Title Protocol Gateway の `POST /extension/solana` を呼び出し、cNFT 発行用の partial transaction を取得する。デバイスは Solana wallet 秘密鍵で署名し、Solana RPC に broadcast する。
+
+トランザクション確定後、`rootAssetId` (= cNFT の asset id、base58 文字列) が確定する。`rootAssetId` は以降の全パイプラインを通じてクリップを参照する主キーである。
+
+### 2.8 サーバーへの登録 (= `POST /api/clips`)
+
+`rootAssetId` 確定後、デバイスは `POST /api/clips` でサーバーにクリップを登録する。リクエストには `content_id`、`root_asset_id`、`signed_json_uri` を必須フィールドとして含める。`root_asset_id` 未確定のままサーバーへ登録することは仕様上認められない。
+
+サーバーは登録を契機に Pipeline 2 を起動する (= §3.1)。
+
+### 2.9 Pipeline 1 の出力
+
+Pipeline 1 の出力は、R2 上の以下のファイル群へのリンクと、確定した `root_asset_id` および `signed_json_uri` である。
 
 ```
 raw/<content_id>/
@@ -116,9 +140,10 @@ raw/<content_id>/
     000000.png
     000001.png
     ...
+signed-json/<content_id>.json    # TP /process の応答 (= signature_hash + attestation)
 ```
 
-加えて、DB に以下のメタデータが記録される: `content_id`、デバイス情報（機種 / OS / アプリバージョン）、タスク ID、撮影開始・終了の VLM 達成確度、撮影日時。
+加えて、DB に以下のメタデータが記録される: `content_id`、`root_asset_id` (= notNull)、`signed_json_uri`、デバイス情報 (機種 / OS / アプリバージョン)、タスク ID、撮影開始・終了の VLM 達成確度、撮影日時。
 
 ---
 
@@ -126,7 +151,9 @@ raw/<content_id>/
 
 ### 3.1 トリガーと実行環境
 
-Pipeline 2 は、Pipeline 1 のアップロード完了を契機に自動実行される。`POST /api/clips/:id/finalize` をエントリポイントとし、サーバー側で順次処理する。実行環境は CPU インスタンス（Modal）を想定する。
+Pipeline 2 は、Pipeline 1 完了後の `POST /api/clips` (= §2.8) によるクリップ登録、およびそれに続く `POST /api/clips/:id/finalize` を契機に自動実行される。実行環境は CPU インスタンス (Modal) を想定する。
+
+起動の前提条件として、対象クリップの `root_asset_id` が DB に確定済みであること (= notNull) を要求する。`root_asset_id` 不在のまま finalize が呼ばれた場合、サーバーは 400 を返し Pipeline 2 を開始しない。Pipeline 2 自身が Title Protocol を呼ぶ経路は v0.1.3 では存在しない。
 
 ### 3.2 品質スコアリング
 
@@ -247,36 +274,30 @@ GTSAM ImuFactor（Forster et al., TRO 2017）を使用する。映像からの�
 
 検証結果は `imu_visual_consistency` スコアとして品質スコアの一部に組み込む。異常値のしきい値設定は運用データの蓄積に基づいて調整する。
 
-### 3.4 Title Protocol 登録
+### 3.4 ステータス更新と通知
 
-品質スコアリングと Video-IMU 検証が完了したクリップを Title Protocol に登録し、Root NFT を発行する。
+Pipeline 2 の全ステップが完了すると、DB 上のクリップ状態を `ready` に遷移し、以下の情報を保存する: 品質スコア (総合 + 全サブ指標)、`blurred_mp4_key`。`root_asset_id` と `signed_json_uri` は Pipeline 1 完了時点で既に DB に書き込まれているため、Pipeline 2 では更新しない。
 
-登録の入力は R2 上のぼかし済み MP4 の URL である。Title Protocol は C2PA 署名を TEE 内で検証し、コンテンツハッシュと cNFT の暗号学的バインディングを確立した Root NFT（cNFT）を Solana 上に発行する。Title Protocol の内部処理の詳細は Title Protocol 仕様書を参照すること。
+撮影者には push 通知で完了を通知する (`expo-notifications` 経由、APNs)。通知設定がオフの場合のフォールバックとして、アプリがフォアグラウンドに戻ったタイミングで全クリップの最新状態を取得する。
 
-出力として `root_asset_id` と `signed_json_uri` を取得する。
+### 3.5 Pipeline 2 の入出力まとめ
 
-### 3.5 ステータス更新と通知
-
-Pipeline 2 の全ステップが完了すると、DB 上のクリップ状態を `ready` に遷移し、以下の情報を保存する: `root_asset_id`、`signed_json_uri`、品質スコア（総合 + 全サブ指標）、`blurred_mp4_key`。
-
-撮影者には push 通知で完了を通知する（`expo-notifications` 経由、APNs）。通知設定がオフの場合のフォールバックとして、アプリがフォアグラウンドに戻ったタイミングで全クリップの最新状態を取得する。
-
-### 3.6 Pipeline 2 の入出力まとめ
-
-**入力**: `raw/<content_id>/` 配下の全ファイル（Pipeline 1 の出力）
+**入力**:
+- `raw/<content_id>/` 配下の全ファイル (= Pipeline 1 の出力)
+- DB レコード: `content_id`、`root_asset_id` (= notNull、Pipeline 1 で確定済み)、`signed_json_uri`
 
 **出力**:
-- DB レコード: `content_id`, `root_asset_id`, `signed_json_uri`, 品質スコア群, ステータス `ready`
+- DB レコード更新: 品質スコア群、ステータス `ready`
 
-**コスト目安（1 クリップ 30 分あたり）**:
+**コスト目安 (1 クリップ 30 分あたり)**:
 - 第 1 層 + 第 2 層: < $0.01
-- 第 3 層 VLM（n=30 秒）: 約 $0.18
+- 第 3 層 VLM (n=30 秒): 約 $0.18
 - GTSAM: 約 $0.05〜0.10
 - 合計: 約 $0.20〜0.30
 
-### 3.7 冪等性
+### 3.6 冪等性
 
-Pipeline 2 のうち、メタデータ解析・フレームサンプリング・GTSAM は決定論的であり同じ入力に対して同じ出力を返す。VLM スコアリングは非決定的（temperature > 0）なため、再実行時にスコアが微小に変動しうる。スコアリングロジック更新時の再採点は意図的な再実行であり、この変動は許容する。Root NFT の発行は同一 `content_id` に対する重複発行を防ぐ（既発行の `root_asset_id` が存在すれば短絡する）。
+Pipeline 2 のうち、メタデータ解析・フレームサンプリング・GTSAM は決定論的であり同じ入力に対して同じ出力を返す。VLM スコアリングは非決定的 (temperature > 0) なため、再実行時にスコアが微小に変動しうる。スコアリングロジック更新時の再採点は意図的な再実行であり、この変動は許容する。
 
 ---
 
@@ -290,7 +311,15 @@ Pipeline 3 は、買い手に納品するデータセットを構築するパイ
 
 ### 4.2 トリガー条件
 
-Pipeline 3 は、Pipeline 2 が完了しクリップが `ready` 状態にあるものに対してのみ実行可能である。ステーキング（delegate 設定）の有無は Pipeline 3 の実行に影響しない。ステーキングは License NFT 発行の前提条件であり、データセット構築自体は事前に行える。
+Pipeline 3 は、Pipeline 2 が完了しクリップが `ready` 状態にあるものに対してのみ実行可能である。`root_asset_id` は Pipeline 1 完了時点で既に確定しているため、Pipeline 3 では必ず存在することを前提とする。ステーキング (delegate 設定) の有無は Pipeline 3 の実行に影響しない。ステーキングは License NFT 発行の前提条件であり、データセット構築自体は事前に行える。
+
+### 4.2.1 入力
+
+Pipeline 3 の入力は以下とする。`root_asset_id` は必須であり、不在の場合 Pipeline 3 は起動しない。
+
+- `content_id` (= R2 raw バケットのキー解決用)
+- `root_asset_id` (= データセット出力 prefix のキー)
+- `signed_json_uri` (= `meta/info.json` の `rootlens.*` 拡張への記録用)
 
 ### 4.3 Type 1: WiLoR 手ポーズ推定 + LeRobot v3
 
@@ -381,7 +410,7 @@ datasets/<root_asset_id>/
     observation.images.ego_cam/chunk-000/episode_XXX.mp4
 ```
 
-`meta/info.json` には Pipeline 2 で取得した `root_asset_id`、`content_hash`、`signed_json_uri` を `rootlens.*` 拡張フィールドとして記録する。
+`meta/info.json` には Pipeline 1 で確定した `root_asset_id`、`content_hash`、`signed_json_uri` を `rootlens.*` 拡張フィールドとして記録する。
 
 ### 4.4 冪等性
 
@@ -395,15 +424,17 @@ Pipeline 3 は同じ入力に対して同じ出力を返す。WiLoR の推論は
 
 | バケット | キープレフィックス | 内容 | アクセス |
 |---------|-------------------|------|---------|
-| `rootlens-raw` | `raw/<content_id>/` | Pipeline 1 出力（ぼかし済み MP4 + センサーデータ） | サーバーのみ |
-| `rootlens-datasets` | `datasets/<root_asset_id>/` | Pipeline 3 出力（LeRobot v3 データセット） | 購入者に対して RootLens 経由で提供 |
+| `rootlens-raw` | `raw/<content_id>/` | Pipeline 1 出力 (ぼかし済み MP4 + センサーデータ) | サーバーのみ |
+| `rootlens-raw` | `signed-json/<content_id>.json` | Pipeline 1 末尾、Title Protocol `/process` の応答 (= signature_hash + attestation) | サーバーのみ |
+| `rootlens-datasets` | `datasets/<root_asset_id>/` | Pipeline 3 出力 (LeRobot v3 データセット) | 購入者に対して RootLens 経由で提供 |
 
 ### 5.2 DB（Supabase）に保存される情報
 
 | カテゴリ | 内容 |
 |---------|------|
 | クリップメタデータ | `content_id`, タスク ID, 撮影日時, デバイス情報, ステータス |
-| Pipeline 2 出力 | 品質スコア（総合 + 全サブ指標）, GTSAM 整合性スコア, `root_asset_id`, `signed_json_uri` |
+| Pipeline 1 出力 | `root_asset_id` (= notNull), `signed_json_uri` |
+| Pipeline 2 出力 | 品質スコア (総合 + 全サブ指標), GTSAM 整合性スコア |
 | ユーザー情報 | ウォレットアドレス, KYC リファレンス |
 | タスク定義 | タスク名, 開始条件, 終了条件, VLM チェック間隔 (n_vlm 秒), VLM プロンプト, 推奨 orientation, min/max_duration_sec |
 
@@ -421,12 +452,14 @@ Pipeline 3 は同じ入力に対して同じ出力を返す。WiLoR の推論は
 
 | 状態 | 遷移条件 | ユーザー操作 |
 |------|---------|-------------|
-| アップロード中 | Pipeline 1 のアップロード実行中 | キャンセル可能 |
-| アップロード失敗 | ネットワーク障害等で再試行上限超過 | リトライ、削除 |
-| 処理中 | Pipeline 2 実行中 | 待機（現在のステップが表示される） |
+| アップロード中 | Pipeline 1 のアップロード + TP `/process` + cNFT 発行を実行中 (= `root_asset_id` 確定前) | キャンセル可能 |
+| アップロード失敗 | ネットワーク障害、TP 呼び出し失敗、cNFT 発行失敗等で再試行上限超過 | リトライ、削除 |
+| 処理中 | Pipeline 2 実行中 (= `root_asset_id` 確定済みかつ finalize 完了) | 待機 (現在のステップが表示される) |
 | ready | Pipeline 2 正常完了 | ステーキング、または削除 |
-| staked | Bubblegum delegate を RootLens に設定済み | delegate 解除（アンステーク）、売上引き出し |
+| staked | Bubblegum delegate を RootLens に設定済み | delegate 解除 (アンステーク)、売上引き出し |
 | 処理エラー | Pipeline 2 の技術的失敗で再試行上限超過 | サポートへの連絡、削除 |
+
+「アップロード中 → 処理中」 への遷移トリガは、`POST /api/clips/:id/finalize` の成功である。finalize は `root_asset_id` が DB に存在することを前提条件として要求し、不在の場合は 400 を返して状態遷移を行わない。
 
 ---
 
@@ -446,11 +479,11 @@ Pipeline 3 は同じ入力に対して同じ出力を返す。WiLoR の推論は
 
 | パイプライン | 実行タイミング | 対象 | 1 クリップあたりコスト目安 |
 |-------------|--------------|------|------------------------|
-| Pipeline 1 | 撮影直後（デバイス） | 全クリップ | 約 $0.01（VLM 開始・終了チェック 2 回） |
-| Pipeline 2 | アップロード完了後（自動） | 全クリップ | $0.20〜0.30 |
+| Pipeline 1 | 撮影直後 (デバイス) | 全クリップ | 約 $0.01 (VLM 開始・終了チェック 2 回) + cNFT 発行の Solana 手数料 |
+| Pipeline 2 | クリップ登録 + finalize 後 (自動) | 全クリップ | $0.20〜0.30 |
 | Pipeline 3 Type 1 | 手動トリガー | 販売対象クリップ | $0.10〜0.20 |
 
-Pipeline 2 + Pipeline 3 の合計は 1 クリップあたり $0.50 以下で、$1 の予算に対して十分な余裕がある。Pipeline 2 の VLM 呼び出し（第 3 層）が最大のコスト要因であり、VLM チェック間隔 n_vlm の調整で制御可能。
+Pipeline 2 + Pipeline 3 の合計は 1 クリップあたり $0.50 以下で、$1 の予算に対して十分な余裕がある。Pipeline 2 の VLM 呼び出し (第 3 層) が最大のコスト要因であり、VLM チェック間隔 n_vlm の調整で制御可能。
 
 ### 8.1 補足: 録画時間
 

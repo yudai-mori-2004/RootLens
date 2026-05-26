@@ -2,9 +2,11 @@
 
 ## 目的
 
-iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で模擬する。 raw MP4 を入力に取り、 C2PA D1 署名 → Apple Vision 顔ぼかし → C2PA D2 署名 (= D1 を ingredient で参照) → content_id 算出 → R2 アップロードまでを 1 コマンドで通す。
+iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で模擬する。 raw MP4 を入力に取り、 C2PA D1 署名 → Apple Vision 顔ぼかし → C2PA D2 署名 (= D1 を ingredient で参照) → content_id 算出 → R2 アップロード → Title Protocol Gateway `POST /process` → cNFT 発行 (= `POST /extension/solana` + Solana broadcast) → rootAssetId 確定 → `POST /api/clips` でサーバ登録までを 1 コマンドで通す。
 
-実機 iOS の Pipeline 1 (= Secure Enclave 鍵管理 + Background URLSession 等) は後続フェーズ。 本 task ではサーバ側 Pipeline 2/3 を動かすために必要な R2 上のクリップを生成できれば足りる。
+v0.1.3 では Title Protocol 登録 + cNFT 発行を Pipeline 1 内に前倒したため、 本 task で rootAssetId を確定させるまでが Pipeline 1 のスコープとなる。 サーバ Pipeline 2 は rootAssetId 確定後の `POST /api/clips` + finalize を契機に起動する。
+
+実機 iOS の Pipeline 1 (= Secure Enclave 鍵管理 + Background URLSession + iOS Solana wallet 連携等) は後続フェーズ。 本 task ではサーバ側 Pipeline 2/3 を動かすために必要な R2 上のクリップと cNFT を生成できれば足りる。
 
 ## 読むべきファイル
 
@@ -45,11 +47,14 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 ### やること
 
 1. **Cargo crate 作成** (= `tools/mock-device/`):
-   - `Cargo.toml`: `c2pa = "=0.84.1"`、 `sha2`、 `hex`、 `serde_json`、 `tokio`、 `aws-sdk-s3`、 `clap` (CLI 引数)、 `anyhow`
+   - `Cargo.toml`: `c2pa = "=0.84.1"`、 `sha2`、 `hex`、 `serde_json`、 `tokio`、 `aws-sdk-s3`、 `reqwest` (= TP Gateway 呼び出し)、 `solana-sdk` + `solana-client` (= cNFT 発行 broadcast)、 `clap` (CLI 引数)、 `anyhow`
    - `src/main.rs`: CLI 入口
    - `src/c2pa_sign.rs`: D1 / D2 署名 + signature_hash 抽出 (= title-protocol/`crates/core/src/c2pa_verify.rs` + `jumbf.rs` を Apache 2.0 ライセンス表記付きで取り込み)
    - `src/blur.rs`: macos_blur subprocess wrapper
-   - `src/r2_upload.rs`: aws-sdk-s3 で raw バケットに 4-5 ファイルを並列 PUT
+   - `src/r2_upload.rs`: aws-sdk-s3 で raw バケットに 4-5 ファイル + `signed-json/<content_id>.json` を並列 PUT
+   - `src/tp_register.rs`: TP Gateway `POST /process` 呼び出し (= R2 presigned GET URL を渡して signature_hash + attestation を取得) ─ 既に実装済
+   - `src/cnft_mint.rs`: TP Gateway `POST /extension/solana` で partial_tx 取得 → Solana wallet 秘密鍵で署名 → Solana RPC に broadcast → rootAssetId 抽出
+   - `src/clips_register.rs`: `POST /api/clips` を叩いて rootAssetId + content_id + signedJsonUri をサーバ登録
 
 2. **CLI 仕様**:
    ```
@@ -60,9 +65,11 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
                [--depth-dir <path/to/depth>]
                [--task-id <id>] [--wallet <pubkey>]
                [--bucket <R2_BUCKET_RAW>]
+               [--tp-gateway <url>] [--solana-rpc <url>]
+               [--api-base <url>]
                [--profile dev]
    ```
-   stdout に 1 行 JSON で `{content_id, faces_blurred, frames_processed, duration_ms, r2_keys: [...]}`
+   stdout に 1 行 JSON で `{content_id, root_asset_id, signed_json_url, faces_blurred, frames_processed, duration_ms, r2_keys: [...]}`
 
 3. **処理フロー**:
    ```
@@ -77,6 +84,16 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
    content_id = compute_signature_hash(blurred_d2.mp4) (= "sha256:<hex>" 形式の hex 部分のみ抽出)
      ↓
    R2 アップロード並列 4-5 ファイル (= rgb.mp4 = blurred_d2.mp4、 sensors.jsonl、 imu_high_rate.jsonl、 camera_intrinsics.json、 + depth/ ディレクトリ)
+     ↓
+   TP Gateway POST /process (= R2 presigned GET URL を渡す、 signature_hash + attestation を受け取る)
+     ↓
+   R2 PUT signed-json/<content_id>.json (= /process の応答を保存)
+     ↓
+   TP Gateway POST /extension/solana (= cNFT 発行用 partial_tx 取得)
+     ↓
+   Solana wallet 署名 + RPC broadcast (= confirmed まで待機)
+     ↓ root_asset_id 確定
+   POST /api/clips (= content_id + root_asset_id + signed_json_uri をサーバ登録)
      ↓
    stdout JSON
    ```
@@ -98,6 +115,8 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 - **sensors.jsonl / imu_high_rate.jsonl の生成** (= 入力として与える、 task 10 で作る dummy で十分)
 - **Background URLSession のような中断耐性** (= mock は同期実行、 失敗時は再実行)
 - **CLI の対話的 UX** (= stdin / TTY 操作はなし)
+- **TP Gateway 自体の実装 / 運用** (= 隣接 title-protocol repo のサービスを呼ぶだけ)
+- **Solana wallet の UX 統合** (= 環境変数で渡す秘密鍵を読んで署名するのみ、 walletconnect 等はなし)
 
 ## 成功基準
 
@@ -108,6 +127,11 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 - [x] `c2patool <output_dir>/rgb.mp4` で 2 段 manifest が確認できる (= active manifest が D2、 ingredient relationship `parentOf` で D1 manifest を参照)
 - [x] R2 に `raw/<content_id>/{rgb.mp4, sensors.jsonl, imu_high_rate.jsonl, camera_intrinsics.json}` がアップロードされる (= 環境変数で R2 credential が設定されている場合)
 - [x] stdout JSON の `content_id` が DB schema (= task 01) の `contentId` カラムと整合 (= "sha256:" prefix を除いた 64 文字 hex)
+- [x] TP Gateway `POST /process` を叩いて signature_hash + attestation を取得できる (= `tools/mock-device/src/tp_register.rs` 実装済)
+- [ ] `/process` の応答を `signed-json/<content_id>.json` として R2 raw バケットに PUT する
+- [ ] TP Gateway `POST /extension/solana` で partial_tx を取得 → Solana wallet 秘密鍵で署名 → RPC に broadcast → confirmed まで待機 → rootAssetId 抽出
+- [ ] `POST /api/clips` を叩いて `{content_id, root_asset_id, signed_json_uri, task_id, ...}` をサーバ登録、 201 が返る
+- [ ] stdout JSON に `root_asset_id` (= base58) + `signed_json_url` が含まれる
 - [x] `cargo test` の smoke test (= 既知サンプルの content_id 期待値 assert) が通る
 
 ## 進捗 (2026-05-26)
@@ -118,4 +142,7 @@ iOS 端末で実行される Pipeline 1 を、 macOS 上で動く Rust CLI で�
 - ✅ D2 active manifest signature の SHA-256 で content_id 抽出 → `c2patool` で manifest 構造確認 (= active = D2、 ingredients = [D1, parentOf]、 c2pa.placed action 込み)
 - ✅ aws-sdk-s3 で R2 raw バケットに 4 ファイル並列 PUT (= rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json)
 - ✅ 5 秒 640x480 MP4 で end-to-end 1.5 秒 (= D1 sign + blur 150 frames + D2 sign + R2 upload)
-- ⏳ 次フェーズ: TP `/process` 呼び出しを追加 (= signature_hash + attestation を取得して R2 signed-json/ に保存、 user 共有の新 Gateway 仕様)、 さらに cNFT 発行 (= `/extension/solana` + Solana broadcast) で rootAssetId 確定
+- ✅ TP Gateway `POST /process` 呼び出しを `src/tp_register.rs` に実装 (= R2 presigned GET URL を渡して signature_hash + attestation を取得、 動作確認は別 step)
+- ⏳ 次の実装対象: `/process` 応答を `signed-json/<content_id>.json` として R2 に保存
+- ⏳ 次の実装対象: cNFT 発行 (= `POST /extension/solana` + Solana wallet 署名 + RPC broadcast) で rootAssetId 確定
+- ⏳ 次の実装対象: `POST /api/clips` 呼び出し (= rootAssetId 確定後にサーバ登録)

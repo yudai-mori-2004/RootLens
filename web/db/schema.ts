@@ -57,10 +57,12 @@ export const clips = pgTable(
     idleRatio: numeric("idle_ratio", { precision: 5, scale: 4 }),
 
     /// TP 発行された Root NFT の asset id (= Bubblegum cNFT id、 base58)。
-    rootAssetId: text("root_asset_id"),
+    /// v0.1.3 で Pipeline 1 末尾の cNFT 発行で確定する前提条件 (= Pipeline 2 起動の必須条件)。
+    rootAssetId: text("root_asset_id").notNull(),
 
     /// TP が返した signed_json_uri (= TEE 署名済メタデータ JSON への URI)。
-    signedJsonUri: text("signed_json_uri"),
+    /// v0.1.3 で R2 上の signed-json/<content_id>.json を指す。 cNFT 発行と同時に確定。
+    signedJsonUri: text("signed_json_uri").notNull(),
 
     /// Bubblegum delegate (= owner と等しければ unstaked、 異なれば staked)。
     delegate: text("delegate"),

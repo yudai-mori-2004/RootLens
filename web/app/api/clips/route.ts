@@ -36,13 +36,18 @@ export async function GET(req: Request) {
 }
 
 // POST /api/clips
-// 撮影者「送る」 押下。 クリップ行作成 + Pipeline 1 出力 4 ファイル分の事前署名 PUT URL を返す。
+// mock-device が R2 upload + TP /process + cNFT 発行を終え、 rootAssetId 確定後に呼ぶ。
+// rootAssetId + signedJsonUri は v0.1.3 で必須 (= Pipeline 2 起動の前提条件)。
 const createSchema = z.object({
   taskId: z.string().min(1),
   achievementConfidence: z.number().int().min(0).max(100),
   // content_id は SHA-256 hex 64 文字 (= "sha256:" prefix なしの hex 部分のみ受ける)
   contentId: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
   contentSize: z.number().int().positive(),
+  // Solana cNFT asset id (= base58 32-44 文字、 Pipeline 1 末尾で確定済)
+  rootAssetId: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Solana cNFT asset id (base58)"),
+  // R2 signed-json/<content_id>.json への URL (= TP /process 応答保存先)
+  signedJsonUri: z.string().url(),
 }) satisfies z.ZodType<CreateClipRequest>;
 
 export async function POST(req: Request) {
@@ -99,6 +104,9 @@ export async function POST(req: Request) {
       achievementConfidence: parsed.data.achievementConfidence,
       contentId: parsed.data.contentId,
       signedMp4Key: signedMp4Key(parsed.data.contentId),
+      rootAssetId: parsed.data.rootAssetId,
+      signedJsonUri: parsed.data.signedJsonUri,
+      datasetPrefix: `datasets/${parsed.data.rootAssetId}/`,
     })
     .returning();
 

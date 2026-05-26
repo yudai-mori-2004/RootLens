@@ -59,6 +59,14 @@ export async function POST(req: Request, ctx: Ctx) {
       { status: 409 },
     );
   }
+  // v0.1.3: rootAssetId が DB に存在しないクリップで finalize すると 400 (= Pipeline 2 の前提
+  // 条件未満たし)。 schema 上 notNull だが、 古い行 / 異常系の防御として実行時にも check する。
+  if (!clip.rootAssetId) {
+    return NextResponse.json(
+      { error: "rootAssetId is required before finalize (Pipeline 1 cNFT mint incomplete)" },
+      { status: 400 },
+    );
+  }
   if (clip.state !== "uploading") {
     // 既に processing 以降に進んでいる場合は冪等に成功を返す
     const body: FinalizeUploadResponse = { clip: await clipToDto(clip) };

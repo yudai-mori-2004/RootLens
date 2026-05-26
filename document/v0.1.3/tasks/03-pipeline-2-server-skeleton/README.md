@@ -32,24 +32,25 @@ Pipeline 2 の REST API と WDK durable workflow の骨格を立てる。 各 sc
 ### やること
 
 1. **API endpoints** (= `app/api/clips/`):
-   - `route.ts` POST: `taskId` + `achievementConfidence` + `contentId` + `contentSize` を受け、 clips 行を作成、 presigned PUT URL 4 本を返す。 同 wallet × 同 contentId は idempotent
+   - `route.ts` POST: `taskId` + `achievementConfidence` + `contentId` + `rootAssetId` + `signedJsonUri` + `contentSize` を受ける。 **`rootAssetId` は必須 field** (= Pipeline 1 末尾の cNFT 発行で確定済みの値、 不在なら 400)。 clips 行を作成し、 presigned PUT URL 4 本を返す。 同 wallet × 同 contentId は idempotent。 ただし mock-device は既に R2 に直接 PUT 済のため presigned URL は smoke では使わない (= 将来の iOS 実機実装で利用)
    - `route.ts` GET: wallet の全クリップを `ClipDto[]` で返す
    - `[id]/route.ts` GET: 単件取得 (= presigned preview URL 付き)
    - `[id]/route.ts` DELETE: ready 以下は削除可、 staked は 409
-   - `[id]/finalize/route.ts` POST: contentId 照合 + clips を `uploading → processing` に遷移 + workflow キック
+   - `[id]/finalize/route.ts` POST: contentId 照合 + `rootAssetId` not null check + clips を `uploading → processing` に遷移 + workflow キック。 `rootAssetId` が null の場合は 400 を返し state 遷移しない
    - `[id]/retry/route.ts` POST: state = "error" のみ、 workflow 再キック
    - `[id]/stake/route.ts` POST: `state = "ready"` のみ、 delegate に env の pubkey を書く mock
 
 2. **WDK durable workflow** (= `workflow/process-clip.ts`):
    - 関数全体に `"use workflow"`
+   - workflow 開始条件: `clip.rootAssetId` が not null。 null の場合 `FatalError` で即座に error 状態に遷移
    - step 1: `metadata-scan` ─ task 04 で実装、 ここでは TODO 関数 + state 更新
    - step 2: `frame-sampling` ─ task 05 で実装、 ここでは TODO 関数 + state 更新
    - step 3: `vlm-score` ─ task 06 で実装、 ここでは TODO 関数 + state 更新
    - step 4: `gtsam-eval` ─ task 07 で実装、 ここでは TODO 関数 + state 更新
-   - step 5: `tp-submit` ─ task 08 で実装、 ここでは TODO 関数 + state 更新
    - 最後: `state = "ready"`、 `processingStep = null`、 `qualityScore` と `qualityBreakdown` を集計して保存
    - エラー経路: `FatalError` で `state = "error"` + `errorMessage`、 retry は外側 endpoint で対応
    - workflow runId を DB の `workflowRunId` に記録
+   - **tp-submit step は v0.1.3 で完全削除済** (= rootAssetId は Pipeline 1 で確定するため、 サーバから TP を呼ぶ経路は存在しない)
 
 3. **lib/modal.ts**:
    - `callMetadataScore(opts) → Layer1Score` (= task 04 が実装する Modal endpoint を叩く HTTP wrapper)
@@ -58,6 +59,7 @@ Pipeline 2 の REST API と WDK durable workflow の骨格を立てる。 各 sc
    - `callGtsam(opts) → GtsamScore` (= task 07)
    - `callBundle(opts) → BundleResponse` (= task 09)
    - 共通 helper として `callModal(endpoint, params)` を 1 つ作る (= query string + fetch + JSON parse)
+   - **TP 関連 wrapper は無し** (= v0.1.3 ではサーバから TP を呼ばない)
 
 4. **lib/mapper.ts**:
    - `clipToDto(row) → Promise<ClipDto>` (= signedMp4Key があれば `presignSignedMp4Get` で preview URL 生成)
@@ -66,27 +68,34 @@ Pipeline 2 の REST API と WDK durable workflow の骨格を立てる。 各 sc
 
 5. **lib/clipId.ts** (新規): `clip_<contentId 12 文字>_<unixms>` の id 生成関数
 
+6. **DB schema** (= `web/db/schema.ts`): `rootAssetId` カラムを `notNull()` 必須に変更。 migration を `web/drizzle/` に追加し `apply_migrations.mjs` で Supabase に反映する。 `signedJsonUri` も同様に必須化する。 旧データ (= 既に作成済みの nullable レコード) には backfill が必要だが、 v0.1.3 production では smoke 検証のみのため drop / re-seed で対応可
+
 ### やらないこと
 
-- 各 step の実体 (= task 04-08 で実装)
+- 各 step の実体 (= task 04-07 で実装)
 - Pipeline 3 トリガ (= task 09 内)
 - Push 通知 (= 後続 task、 expo-notifications APNs)
 - ToS consent 記録 (= 既存 v0.1.2 のものを別 task で port)
+- TP register をサーバから呼ぶ経路 (= v0.1.3 で完全廃止、 mock-device 側で完結)
 
 ## 成功基準
 
 - [x] 全 API endpoint が型エラーゼロでビルドできる (= `npm run typecheck`)
-- [x] `curl -X POST /api/clips -H "X-Wallet-Pubkey: <...>" -d '{...}'` で clip 行が作成され、 presigned URL 4 本が返る
+- [ ] `curl -X POST /api/clips -H "X-Wallet-Pubkey: <...>" -d '{"contentId": "...", "rootAssetId": "...", "signedJsonUri": "...", ...}'` で clip 行が作成され、 presigned URL 4 本が返る
+- [ ] `rootAssetId` を省いて POST すると 400 (= 必須 field)
 - [x] 同 wallet で同 contentId を再 POST すると、 既存行が返る (= idempotent)
-- [x] `POST /api/clips/:id/finalize` で contentId 不一致なら 409、 一致すれば 200 + workflow 起動
-- [x] workflow が 5 step 全てを順に呼び、 各 step で `processingStep` カラムが更新される (= 各 step の中身は TODO 関数で `await new Promise(r => setTimeout(r, 100))` 程度の placeholder)
+- [ ] `POST /api/clips/:id/finalize` で contentId 不一致なら 409、 `rootAssetId` 不在なら 400、 両方揃って一致すれば 200 + workflow 起動
+- [ ] workflow が 4 step 全てを順に呼び、 各 step で `processingStep` カラムが更新される (= 各 step の中身は TODO 関数で `await new Promise(r => setTimeout(r, 100))` 程度の placeholder)
 - [x] 全 step 完走で `state = "ready"`、 失敗で `state = "error"` + `errorMessage`
 - [x] `POST /api/clips/:id/retry` で error クリップが processing に戻り workflow が再起動
 - [x] `DELETE /api/clips/:id` で staked クリップは 409、 それ以外は 200
+- [ ] DB schema 上 `rootAssetId.notNull()` + `signedJsonUri.notNull()` が反映され、 migration が適用済み
 
 ## 進捗 (2026-05-26)
 
 - ✅ 5 API endpoint (POST /api/clips、 GET、 finalize、 retry、 stake、 DELETE) を web/ に統合、 rootlens.io/api 経由で 200 確認
-- ✅ WDK durable workflow を web/workflow/process-clip.ts に実装、 state machine が `uploading → processing (metadata-scan → frame-sampling → vlm-score → gtsam-eval → tp-submit) → ready` を遷移
-- ✅ lib/{modal, mapper, clipId, auth, r2, r2-keys}.ts 一式
-- 🔄 設計変更 (= user 指示): tp-submit step は削除予定 (= 新 TP は client-driven、 mock_device 側で `/process` を呼ぶ)。 削除後は 4 step (= metadata / frame / vlm / gtsam) で並列実行も検討
+- ✅ WDK durable workflow を web/workflow/process-clip.ts に実装、 tp-submit step は削除済。 state machine は `uploading → processing (metadata-scan → frame-sampling → vlm-score → gtsam-eval) → ready` を遷移
+- ✅ lib/{modal, mapper, clipId, auth, r2, r2-keys}.ts 一式 (= lib/tp.ts は削除済)
+- ⏳ 残り: `POST /api/clips` の入力スキーマに `rootAssetId` + `signedJsonUri` を必須として追加
+- ⏳ 残り: `finalize` で `rootAssetId` not null の前提条件 check (= 不在なら 400)
+- ⏳ 残り: DB schema migration (= `rootAssetId` を nullable → notNull、 `signedJsonUri` も同様)

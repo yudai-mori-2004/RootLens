@@ -46,11 +46,11 @@ root-lens/
 
 | Pipeline | 場所 | 役割 |
 |---|---|---|
-| 1 (端末) | `tools/mock-device/` (= iOS 実機実装は別フェーズ) | 撮影 → C2PA D1 → 顔ぼかし → C2PA D2 → content_id 抽出 → R2 アップロード → TP `/process` 並列呼び出し |
-| 2 (サーバ、 自動) | `web/workflow/process-clip.ts` + `tools/modal/{layer1_metadata,layer2_frame_sampling,layer3_vlm,gtsam_eval}.py` | 4 層スコアリング (= metadata 20 + frame sampling 15 + VLM 55 + GTSAM 10) で 0..100 点 |
-| 3 (サーバ、 手動) | `tools/modal/bundle.py` | WiLoR 手ポーズ推定 + LeRobot v3 dataset 構築 |
+| 1 (端末) | `tools/mock-device/` (= iOS 実機実装は別フェーズ) | 撮影 → C2PA D1 → 顔ぼかし → C2PA D2 → content_id 抽出 → R2 アップロード → TP `/process` (= signature_hash + attestation 取得 + R2 signed-json/ 保存) → cNFT 発行 (= `/extension/solana` + Solana wallet 署名 + broadcast) → rootAssetId 確定 → `POST /api/clips` でサーバ登録 |
+| 2 (サーバ、 自動) | `web/workflow/process-clip.ts` + `tools/modal/{layer1_metadata,layer2_frame_sampling,layer3_vlm,gtsam_eval}.py` | 4 層スコアリング (= metadata 20 + frame sampling 15 + VLM 55 + GTSAM 10) で 0..100 点。 起動条件は `clip.rootAssetId` not null |
+| 3 (サーバ、 手動) | `tools/modal/bundle.py` | WiLoR 手ポーズ推定 + LeRobot v3 dataset 構築。 出力 prefix は `datasets/<rootAssetId>/` |
 
-TP register は v0.1.3 で client-driven 化された (= 新 Gateway は `POST /process` を直叩き、 SDK 廃止)。 サーバ workflow からは tp-submit step を削除済、 mock-device が R2 upload 後に並列で TP を呼ぶ。
+TP register + cNFT 発行は v0.1.3 で Pipeline 1 内に前倒し済 (= 新 Gateway は `POST /process` 直叩き、 SDK 廃止)。 サーバ workflow からは tp-submit step を完全削除済、 mock-device が R2 upload 後に TP `/process` + cNFT 発行を実行して rootAssetId を確定させてから `POST /api/clips` でサーバに登録する。
 
 ## 動作確認 (= production)
 
@@ -93,13 +93,15 @@ API_BASE=https://rootlens.io bash tools/smoke-test.sh
 
 ## Key Design Decisions
 
-### TP register は client-driven
+### TP register + cNFT 発行は Pipeline 1 末尾
 
-v0.1.3 で Title Protocol が SDK 廃止 + `POST /process` 直叩き経路に切替。 サーバ workflow は scoring に集中 (= 4 step)、 TP register は mock-device 側で R2 upload 後に並列実行。 cNFT 発行 (= `POST /extension/solana` + Solana broadcast) は次フェーズで mock-device に追加予定。 仕様上 `rootAssetId` は notNull だが MVP では nullable 許容。
+v0.1.3 で Title Protocol が SDK 廃止 + `POST /process` 直叩き経路に切替したのを契機に、 TP register + cNFT 発行を Pipeline 1 内に前倒した。 mock-device は R2 upload 後に `POST /process` (= signature_hash + attestation 取得 → R2 signed-json/ 保存) → `POST /extension/solana` (= partial_tx 取得 → Solana wallet 署名 → RPC broadcast) を実行して `rootAssetId` を確定させる。 確定後にのみ `POST /api/clips` でサーバに登録する。
+
+`rootAssetId` は Pipeline 2 起動の前提条件として扱う (= DB schema 上 notNull、 `POST /api/clips` の必須 field、 finalize で not null check)。 確定するまで `POST /api/clips` は叩かない。 サーバから TP を呼ぶ経路は v0.1.3 で完全廃止 (= サーバ workflow は scoring 4 step のみ)。
 
 ### Pipeline 3 出力 prefix
 
-rootAssetId が確定するまでは `datasets/<content_id>/` で代用 (= bundle.py が content_id を引数で受ける)。 cNFT 発行後に rename / migrate。
+出力 prefix は必ず `datasets/<rootAssetId>/`。 `rootAssetId` は Pipeline 1 末尾で確定するため、 Pipeline 3 起動時には必ず存在する (= 不在で起動した場合 fail-loud)。
 
 ### オフチェーンストレージについて
 
