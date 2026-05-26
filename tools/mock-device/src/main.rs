@@ -81,9 +81,9 @@ struct Args {
     #[arg(long)]
     merkle_tree: Option<String>,
 
-    /// Root NFT collection pubkey (= 既定で devnet root_nft_collection)。
-    #[arg(long, default_value = "Dfg52e4aG9zusPedUSMQ7q8kRs3W4QebNCQqJf3GjYBy")]
-    collection: String,
+    /// Root NFT collection pubkey (= 省略時 collection なしで mint)。
+    #[arg(long)]
+    collection: Option<String>,
 
     /// RootLens API base URL (= /api/clips を叩く)。
     #[arg(long, default_value = "https://www.rootlens.io")]
@@ -323,12 +323,13 @@ async fn main() -> Result<()> {
             )
             .await
             {
-                Ok((sig_hash, offchain_key)) => {
+                Ok((sig_hash, offchain_key, public_url)) => {
                     log(&format!("  tp signature_hash = {sig_hash}"));
                     log(&format!("  tp offchain JSON  = s3://{bucket}/{offchain_key}"));
+                    log(&format!("  tp public URL     = {public_url}"));
                     output.tp_signature_hash = Some(sig_hash);
                     output.tp_offchain_key = Some(offchain_key.clone());
-                    Some(offchain_key)
+                    Some((offchain_key, public_url))
                 }
                 Err(e) => {
                     let err_msg = format!("{e:#}");
@@ -341,7 +342,7 @@ async fn main() -> Result<()> {
             // ─── step 6: cNFT 発行 (= /extension/solana + Solana broadcast) ─
             // tp register が失敗していた場合は cNFT 発行できない (= offchain_data_url が無い)
             let mut cnft_ok = false;
-            if let Some(offchain_key) = tp_ok {
+            if let Some((offchain_key, public_url)) = tp_ok {
                 log("step 6/7: cNFT mint (= POST /extension/solana + Solana broadcast)");
                 let merkle_tree = match args.merkle_tree.as_deref() {
                     Some(s) => s,
@@ -354,14 +355,13 @@ async fn main() -> Result<()> {
                 };
 
                 if !merkle_tree.is_empty() {
-                    // signed_json_uri = R2 presigned GET URL、 7 日有効 (= sigv4 上限)
-                    let signed_json_uri = r2_upload::presign_get_url(
-                        &client,
-                        &bucket,
-                        &offchain_key,
-                        7 * 24 * 60 * 60,
-                    )
-                    .await?;
+                    // offchain_data_url = rootlens-public バケットの公開 URL
+                    // (Bubblegum metadata URI 200 文字制限内、 永続)。
+                    let offchain_data_url = &public_url;
+
+                    // signed_json_uri = public バケットの永続 URL。
+                    // /api/clips にもこれを渡す (永続、 cNFT metadata と同一 URL)。
+                    let signed_json_uri = public_url.clone();
                     output.signed_json_uri = Some(signed_json_uri.clone());
 
                     let keypair = cnft_mint::load_keypair(&args.solana_keypair);
@@ -369,10 +369,10 @@ async fn main() -> Result<()> {
                         Ok(payer) => {
                             let outcome = cnft_mint::mint_cnft(
                                 &tp_gateway_url,
-                                &signed_json_uri,
+                                &offchain_data_url,
                                 &payer,
                                 merkle_tree,
-                                Some(&args.collection),
+                                args.collection.as_deref(),
                                 &args.solana_rpc_url,
                             )
                             .await;
@@ -455,26 +455,34 @@ fn require_env(name: &str) -> Result<String> {
     std::env::var(name).map_err(|_| anyhow!("{name} env var is required for prod profile"))
 }
 
-/// presigned GET URL を発行して TP /process を呼び、 ProcessResponse を R2 signed-json/ に PUT する。
-/// 戻り値は (signature_hash, offchain_key)。
+/// presigned GET URL を発行して TP /process を呼び、 ProcessResponse を R2 に保存。
+/// raw バケット + public バケットの両方に PUT する。
+/// 戻り値は (signature_hash, offchain_key, public_url)。
 async fn register_tp(
     client: &aws_sdk_s3::Client,
     bucket: &str,
     signed_key: &str,
     content_id_hex: &str,
     gateway: Option<&str>,
-) -> Result<(String, String)> {
-    // TEE fetch + 検証で時間取るので 600 秒持たせる
+) -> Result<(String, String, String)> {
     let content_url = r2_upload::presign_get_url(client, bucket, signed_key, 600).await?;
     let resp = tp_register::register_with_tp(&content_url, gateway).await?;
 
-    // ProcessResponse をそのまま JSON 化して R2 に保存。 cNFT 発行が必要になった時に
-    // ここに保存された offchain JSON URL を /extension/solana に渡せばよい。
     let offchain_key = format!("signed-json/{content_id_hex}.json");
     let body = serde_json::to_vec_pretty(&resp).context("serialize ProcessResponse")?;
-    r2_upload::put_bytes(client, bucket, &offchain_key, body, "application/json").await?;
 
-    Ok((resp.signature_hash, offchain_key))
+    // raw バケットに保存 (サーバ内部参照用)
+    r2_upload::put_bytes(client, bucket, &offchain_key, body.clone(), "application/json").await?;
+
+    // public バケットにも保存 (cNFT metadata URI 用、 公開アクセス可)
+    let public_bucket = std::env::var("R2_PUBLIC_BUCKET")
+        .unwrap_or_else(|_| "rootlens-public".to_string());
+    let public_url_base = std::env::var("R2_PUBLIC_URL")
+        .unwrap_or_else(|_| "https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev".to_string());
+    r2_upload::put_bytes(client, &public_bucket, &offchain_key, body, "application/json").await?;
+
+    let public_url = format!("{}/{offchain_key}", public_url_base.trim_end_matches('/'));
+    Ok((resp.signature_hash, offchain_key, public_url))
 }
 
 #[allow(dead_code)]
