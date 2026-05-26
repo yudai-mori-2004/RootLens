@@ -145,7 +145,7 @@ def main():
     args = p.parse_args()
 
     if not CLI.exists():
-        sys.exit(f"CLI not built: {CLI}\nRun: cd server/scripts/macos_blur && swift build -c release")
+        sys.exit(f"CLI not built: {CLI}\nRun: cd tools/macos-blur && swift build -c release")
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     load_env()
     s3 = r2_client()
