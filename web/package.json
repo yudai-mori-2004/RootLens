@@ -31,12 +31,18 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "sharp": "^0.34.5",
-    "yaml": "^2.6.0"
+    "yaml": "^2.6.0",
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5",
+    "workflow": "^4.2.4",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "typescript": "^5",

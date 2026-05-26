@@ -1,0 +1,10 @@
+# Cargo build outputs
+/target/
+*.rs.bk
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
