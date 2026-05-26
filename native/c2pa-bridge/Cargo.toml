@@ -1,3 +1,6 @@
+# 親 workspace に取り込まれないように切り離す。
+[workspace]
+
 [package]
 name = "c2pa-bridge"
 version = "0.1.0"
@@ -7,9 +10,15 @@ edition = "2021"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
-c2pa = { version = "0.78", default-features = false, features = ["rust_native_crypto", "http_ureq"] }
+# mock-device と version を揃える (= 0.84.1)。 byte-deterministic な C2PA 出力のため pin。
+c2pa = { version = "=0.84.1", default-features = false, features = ["rust_native_crypto", "http_ureq"] }
 serde_json = "1"
 ureq = "3"
+
+# pipeline1 (D1/D2/content_id) で使う
+sha2 = "0.10"
+hex = "0.4"
+anyhow = "1"
 
 [profile.release]
 lto = true

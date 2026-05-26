@@ -443,6 +443,65 @@ public class C2paBridgeModule: Module {
       defaults.removeObject(forKey: Self.rootCaCertKey)
       NSLog("[C2paBridge] Stored certificates cleared for re-provisioning")
     }
+
+    // ─── v0.1.3 Pipeline 1: mock-device 互換 D1/D2/content_id ────────────
+
+    /// D1 署名 (= c2pa.actions.v2 [c2pa.created])。 戻り値は output_mp4 のパス。
+    AsyncFunction("signD1") { (inputMp4: String, outputMp4: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        let inputPath = Self.stripFileScheme(inputMp4)
+        let outputPath = Self.stripFileScheme(outputMp4)
+        NSLog("[C2paBridge] signD1: \(inputPath) → \(outputPath)")
+        let rc = pipeline1_sign_d1(inputPath, outputPath)
+        if rc == 0 {
+          promise.resolve(outputPath)
+        } else {
+          promise.reject("SIGN_D1_ERROR", "pipeline1_sign_d1 failed: rc=\(rc)")
+        }
+      }
+    }
+
+    /// D2 署名 (= c2pa.actions.v2 [c2pa.placed] + D1 ingredient parentOf)。
+    /// 戻り値は output_mp4 のパス。
+    AsyncFunction("signD2") {
+      (blurredMp4: String, parentD1Mp4: String, outputMp4: String, facesBlurred: Int, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        let blurredPath = Self.stripFileScheme(blurredMp4)
+        let parentPath = Self.stripFileScheme(parentD1Mp4)
+        let outputPath = Self.stripFileScheme(outputMp4)
+        NSLog("[C2paBridge] signD2: \(blurredPath) (parent=\(parentPath)) → \(outputPath), faces=\(facesBlurred)")
+        let rc = pipeline1_sign_d2(blurredPath, parentPath, outputPath, UInt32(facesBlurred))
+        if rc == 0 {
+          promise.resolve(outputPath)
+        } else {
+          promise.reject("SIGN_D2_ERROR", "pipeline1_sign_d2 failed: rc=\(rc)")
+        }
+      }
+    }
+
+    /// content_id 抽出 (= SHA-256(active manifest signature))。
+    /// 戻り値は "sha256:<64 hex>" の文字列。
+    AsyncFunction("computeContentId") { (inputMp4: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        let inputPath = Self.stripFileScheme(inputMp4)
+        NSLog("[C2paBridge] computeContentId: \(inputPath)")
+        guard let cstr = pipeline1_content_id(inputPath) else {
+          promise.reject("CONTENT_ID_ERROR", "pipeline1_content_id returned NULL")
+          return
+        }
+        let result = String(cString: cstr)
+        c2pa_free_string(cstr)
+        promise.resolve(result)
+      }
+    }
+  }
+
+  /// `file://` prefix 付きの URI を pure path に直す。 native FFI は path 文字列を期待。
+  private static func stripFileScheme(_ uri: String) -> String {
+    if uri.hasPrefix("file://") {
+      return String(uri.dropFirst("file://".count))
+    }
+    return uri
   }
 
   // MARK: - TEE Operations

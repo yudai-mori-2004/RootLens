@@ -78,6 +78,10 @@ interface C2paBridgeInterface {
   getDeviceCertificateExpiry(): Promise<string | null>;
   verifyStoredCertChain(): Promise<boolean>;
   clearStoredCertificates(): Promise<void>;
+  // v0.1.3 Pipeline 1 (= mock-device 互換 D1/D2/content_id)
+  signD1(inputMp4: string, outputMp4: string): Promise<string>;
+  signD2(blurredMp4: string, parentD1Mp4: string, outputMp4: string, facesBlurred: number): Promise<string>;
+  computeContentId(inputMp4: string): Promise<string>;
 }
 
 // Expo Modules API (iOS) or legacy NativeModules (Android)
@@ -238,4 +242,33 @@ export async function clearStoredCertificates(): Promise<void> {
     return;
   }
   return C2paBridge.clearStoredCertificates();
+}
+
+// ─── v0.1.3 Pipeline 1 ──────────────────────────────────────────────────
+// mock-device の C2PA 2 段署名 + content_id 抽出を iOS 上で再現する。
+// DATA_SPECS §2.4 / §1.1 を参照。
+
+/// D1 署名: 生 MP4 → c2pa.actions.v2 [c2pa.created] の C2PA manifest 付き MP4 を出力。
+export async function signD1(inputMp4: string, outputMp4: string): Promise<string> {
+  if (!C2paBridge) throw new Error('C2paBridge native module not available');
+  return C2paBridge.signD1(inputMp4, outputMp4);
+}
+
+/// D2 署名: ぼかし済 MP4 と親 D1 MP4 を渡し、 ingredient parentOf で D1 を参照する
+/// D2 C2PA manifest 付き MP4 を出力する。
+export async function signD2(
+  blurredMp4: string,
+  parentD1Mp4: string,
+  outputMp4: string,
+  facesBlurred: number,
+): Promise<string> {
+  if (!C2paBridge) throw new Error('C2paBridge native module not available');
+  return C2paBridge.signD2(blurredMp4, parentD1Mp4, outputMp4, facesBlurred);
+}
+
+/// content_id = SHA-256(active manifest signature)。 "sha256:<64 hex>" を返す。
+/// "sha256:" prefix を除いた hex 64 文字部分が DB / R2 key で使う form。
+export async function computeContentId(inputMp4: string): Promise<string> {
+  if (!C2paBridge) throw new Error('C2paBridge native module not available');
+  return C2paBridge.computeContentId(inputMp4);
 }

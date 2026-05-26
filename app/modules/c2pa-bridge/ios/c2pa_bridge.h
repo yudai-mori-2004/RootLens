@@ -60,6 +60,32 @@ char *c2pa_get_version(void);
 /** c2pa_free_stringで返された文字列を解放する */
 void c2pa_free_string(char *s);
 
+/* ─── v0.1.3 Pipeline 1 (= mock-device 互換 D1/D2/content_id) ──────────── */
+
+/**
+ * D1 署名: 生 MP4 → c2pa.actions.v2 = [c2pa.created] の C2PA manifest 付き MP4。
+ * 戻り値: 0 = 成功, それ以外 = 失敗。
+ */
+int32_t pipeline1_sign_d1(const char *input_mp4, const char *output_mp4);
+
+/**
+ * D2 署名: ぼかし済 MP4 + 親 D1 MP4 → c2pa.actions.v2 = [c2pa.placed]
+ *           + D1 を ingredient parentOf 参照した C2PA manifest 付き MP4。
+ * 戻り値: 0 = 成功, それ以外 = 失敗。
+ */
+int32_t pipeline1_sign_d2(
+    const char *blurred_mp4,
+    const char *parent_d1_mp4,
+    const char *output_mp4,
+    uint32_t faces_blurred
+);
+
+/**
+ * content_id 抽出: SHA-256(active manifest の COSE 署名 bytes)。
+ * 戻り値: "sha256:<64 hex>" の C string (要 c2pa_free_string) または NULL on error。
+ */
+char *pipeline1_content_id(const char *input_mp4);
+
 #ifdef __cplusplus
 }
 #endif
