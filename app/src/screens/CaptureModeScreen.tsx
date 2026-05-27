@@ -642,6 +642,10 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
 const AGENT_FADE_AFTER_MS = 8_000;
 const USER_FADE_AFTER_MS = 4_000;
 
+// 音声 STT が来るまでの暫定: mic タップで isListening が toggle し、 waveform をアニメする。
+// sherpa-onnx 統合時はこの state を実際の VAD 状態に bind する。
+const DEMO_LISTEN_MS = 4_000;
+
 const DialogueOverlay: React.FC<{
   onSelectTask: (taskId: string) => void;
   onExit: () => void;
@@ -652,7 +656,16 @@ const DialogueOverlay: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [agentMsg, setAgentMsg] = useState<{ text: string; id: number } | null>(null);
   const [userMsg, setUserMsg] = useState<{ text: string; id: number } | null>(null);
+  // 音声入力 listening 状態。 task 13b で sherpa-onnx と bind する。 暫定は demo timer。
+  const [isListening, setIsListening] = useState(false);
   const historyRef = useRef<AgentTurn[]>([]);
+
+  // listening ON で DEMO_LISTEN_MS 後に自動 OFF (= sherpa-onnx 入るまでの仮挙動)
+  useEffect(() => {
+    if (!isListening) return;
+    const t = setTimeout(() => setIsListening(false), DEMO_LISTEN_MS);
+    return () => clearTimeout(t);
+  }, [isListening]);
 
   // 自動 fade out (= 履歴感を出さないため必須)
   useEffect(() => {
@@ -756,26 +769,43 @@ const DialogueOverlay: React.FC<{
         </View>
 
         <View style={dialogueStyles.inputRow}>
-          <Animated.View style={[dialogueStyles.inputWrap, thinking && { borderColor: pulseBorderColor as unknown as string }]}>
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={thinking ? '考え中…' : '例: 洗い物しよう'}
-              placeholderTextColor="rgba(255,255,255,0.45)"
-              style={dialogueStyles.input}
-              editable={!thinking}
-              onSubmitEditing={() => sendToAgent(draft)}
-              returnKeyType="send"
-              autoCorrect={false}
-              autoCapitalize="none"
+          <Animated.View
+            style={[
+              dialogueStyles.inputWrap,
+              isListening && dialogueStyles.inputWrapListening,
+              thinking && !isListening && { borderColor: pulseBorderColor as unknown as string },
+            ]}
+          >
+            <MicButton
+              listening={isListening}
+              onPress={() => setIsListening((v) => !v)}
+              disabled={thinking}
             />
+            <View style={dialogueStyles.inputCenter}>
+              {isListening ? (
+                <Waveform />
+              ) : (
+                <TextInput
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder={thinking ? '考え中…' : 'Hey Lens、 タップして話す'}
+                  placeholderTextColor="rgba(255,255,255,0.45)"
+                  style={dialogueStyles.input}
+                  editable={!thinking}
+                  onSubmitEditing={() => sendToAgent(draft)}
+                  returnKeyType="send"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+              )}
+            </View>
           </Animated.View>
           <Pressable
             onPress={() => sendToAgent(draft)}
-            disabled={thinking || !draft.trim()}
+            disabled={thinking || !draft.trim() || isListening}
             style={({ pressed }) => [
               dialogueStyles.sendBtn,
-              (thinking || !draft.trim()) && dialogueStyles.sendBtnDisabled,
+              (thinking || !draft.trim() || isListening) && dialogueStyles.sendBtnDisabled,
               pressed && dialogueStyles.sendBtnPressed,
             ]}
             accessibilityLabel="送信"
@@ -831,6 +861,103 @@ const AgentCard: React.FC<{ text: string }> = ({ text }) => {
       </View>
       <Text style={dialogueStyles.agentText}>{text}</Text>
     </Animated.View>
+  );
+};
+
+// マイクボタン。 idle: 静かなアイコン、 listening: emerald 塗り + 呼吸 pulse。
+const MicButton: React.FC<{ listening: boolean; disabled?: boolean; onPress: () => void }> = ({
+  listening, disabled, onPress,
+}) => {
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!listening) {
+      pulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.18, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [listening, pulse]);
+
+  return (
+    <Pressable onPress={onPress} disabled={disabled} hitSlop={6} style={dialogueStyles.micWrap}>
+      {listening ? (
+        <Animated.View style={[dialogueStyles.micHalo, { transform: [{ scale: pulse }] }]} />
+      ) : null}
+      <View style={[dialogueStyles.micBtn, listening && dialogueStyles.micBtnActive, disabled && dialogueStyles.micBtnDisabled]}>
+        <Svg width={16} height={16} viewBox="0 0 16 16">
+          {/* 標準的なマイクアイコン (= capsule + base + 顎) */}
+          <Path
+            d="M8 2.4a2 2 0 0 0-2 2v3.6a2 2 0 1 0 4 0V4.4a2 2 0 0 0-2-2z"
+            fill={listening ? '#fff' : 'rgba(255,255,255,0.85)'}
+          />
+          <Path
+            d="M4.2 7.2v0.8a3.8 3.8 0 0 0 7.6 0v-0.8"
+            stroke={listening ? '#fff' : 'rgba(255,255,255,0.85)'}
+            strokeWidth={1.4}
+            strokeLinecap="round"
+            fill="none"
+          />
+          <Path
+            d="M8 11.8v2"
+            stroke={listening ? '#fff' : 'rgba(255,255,255,0.85)'}
+            strokeWidth={1.4}
+            strokeLinecap="round"
+          />
+        </Svg>
+      </View>
+    </Pressable>
+  );
+};
+
+// Waveform: 6 本のバーが個別タイミングで上下する。 実音量にバインドする予定。
+const Waveform: React.FC = () => {
+  const bars = useRef([0, 1, 2, 3, 4, 5].map(() => new Animated.Value(0.25))).current;
+  useEffect(() => {
+    const loops = bars.map((bar, i) => {
+      const animate = () => {
+        Animated.sequence([
+          Animated.timing(bar, {
+            toValue: 0.35 + Math.random() * 0.65,
+            duration: 220 + i * 35 + Math.random() * 120,
+            useNativeDriver: false,
+          }),
+          Animated.timing(bar, {
+            toValue: 0.18 + Math.random() * 0.18,
+            duration: 220 + i * 35 + Math.random() * 120,
+            useNativeDriver: false,
+          }),
+        ]).start(({ finished }) => {
+          if (finished) animate();
+        });
+      };
+      animate();
+      return bar;
+    });
+    return () => loops.forEach((b) => b.stopAnimation());
+  }, [bars]);
+  return (
+    <View style={dialogueStyles.waveformRow}>
+      {bars.map((bar, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            dialogueStyles.waveBar,
+            {
+              height: bar.interpolate({
+                inputRange: [0, 1],
+                outputRange: [4, 22],
+              }),
+            },
+          ]}
+        />
+      ))}
+    </View>
   );
 };
 
@@ -1001,17 +1128,80 @@ const dialogueStyles = StyleSheet.create({
   },
   inputWrap: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(14,31,68,0.82)',
     borderRadius: radii.full,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.15)',
+    paddingLeft: 5,
+    paddingRight: spacing.md,
+    minHeight: 48,
+  },
+  // listening 中は emerald 系の glow border に
+  inputWrapListening: {
+    borderColor: 'rgba(31,166,121,0.85)',
+    backgroundColor: 'rgba(14,31,68,0.9)',
+  },
+  inputCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   input: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 13,
+    paddingLeft: spacing.sm,
+    paddingRight: 0,
+    paddingVertical: 11,
     fontFamily: fonts.sansRegular,
     fontSize: 15,
     color: '#fff',
+  },
+
+  // ─── マイクボタン ────────────────────────────────────────────────────
+  micWrap: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  micHalo: {
+    position: 'absolute',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(31,166,121,0.24)',
+  },
+  micBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  micBtnActive: {
+    backgroundColor: colors.emerald,
+    borderColor: colors.emeraldDeep,
+  },
+  micBtnDisabled: {
+    opacity: 0.4,
+  },
+
+  // ─── Waveform (= listening 中の音量バー) ─────────────────────────────
+  waveformRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    height: 24,
+  },
+  waveBar: {
+    width: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.emerald,
   },
   sendBtn: {
     width: 44,
