@@ -24,6 +24,7 @@ import {
 import { RootNavigator } from './src/app/RootNavigator';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
 import { AuthGate } from './src/services/auth';
+import { initVoiceLanguage } from './src/services/voicePref';
 import { colors, fonts, typography } from './src/theme';
 
 // 統合フェーズ entry point。
@@ -47,6 +48,8 @@ export default function App() {
   // 撮影画面だけ task に応じて override し、 unmount で portrait に戻す。
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    // 音声エージェントの言語設定を AsyncStorage から復元 (= module 内 cache を埋める)
+    void initVoiceLanguage();
   }, []);
 
   const [fontsLoaded] = useFonts({

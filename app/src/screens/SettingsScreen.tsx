@@ -27,6 +27,7 @@ import * as FileSystem from 'expo-file-system';
 import { config } from '../config';
 import { COSIGN_AUTHORITY, SOLANA_RPC_URL } from '../env';
 import { useAuth } from '../services/auth';
+import { setVoiceLanguage, useVoiceLanguage, type VoiceLanguage } from '../services/voicePref';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 export const SettingsScreen: React.FC = () => {
@@ -36,6 +37,7 @@ export const SettingsScreen: React.FC = () => {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [showHandOverlay, setShowHandOverlay] = useState(true);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
+  const voiceLang = useVoiceLanguage();
 
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.1.0';
 
@@ -149,6 +151,16 @@ export const SettingsScreen: React.FC = () => {
 
         {/* ── 撮影 ── */}
         <Section title="撮影">
+          <SegmentRow
+            label="Hey Lens 言語"
+            sublabel="AI の応答 + TTS 読み上げに使う言語"
+            value={voiceLang}
+            options={[
+              { value: 'ja', label: '日本語' },
+              { value: 'en', label: 'English' },
+            ]}
+            onChange={(v) => { void setVoiceLanguage(v as VoiceLanguage); }}
+          />
           <SwitchRow
             label="ハンドトラッキング表示"
             sublabel="プレビュー上に手のスケルトンを描画"
@@ -307,6 +319,43 @@ const ActionRow: React.FC<{ label: string; onPress: () => void; kind?: 'warn' | 
   </Pressable>
 );
 
+/// セグメント切替 (= 言語選択など離散的な 2-4 値)。
+/// iOS の UISegmentedControl 相当を Editorial Fintech 色で再現。
+const SegmentRow: React.FC<{
+  label: string;
+  sublabel?: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (v: string) => void;
+}> = ({ label, sublabel, value, options, onChange }) => (
+  <View style={[styles.row, styles.segmentRow]}>
+    <View style={styles.segmentRowText}>
+      <Text style={styles.switchLabel}>{label}</Text>
+      {sublabel ? <Text style={styles.switchSublabel}>{sublabel}</Text> : null}
+    </View>
+    <View style={styles.segmentControl}>
+      {options.map((opt) => {
+        const active = opt.value === value;
+        return (
+          <Pressable
+            key={opt.value}
+            onPress={() => onChange(opt.value)}
+            style={({ pressed }) => [
+              styles.segmentBtn,
+              active && styles.segmentBtnActive,
+              pressed && !active && styles.segmentBtnPressed,
+            ]}
+          >
+            <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+              {opt.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  </View>
+);
+
 // ─── helpers ────────────────────────────────────────────────────────────
 
 function shortBase58(s: string | null | undefined): string {
@@ -378,6 +427,48 @@ const styles = StyleSheet.create({
   switchRowText: { flex: 1, gap: 2, paddingRight: spacing.md },
   switchLabel: { fontFamily: fonts.sansSemibold, fontSize: 14, color: colors.ink },
   switchSublabel: { ...typography.caption, color: colors.textMute },
+
+  segmentRow: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  segmentRowText: { gap: 2, marginBottom: 4 },
+  segmentControl: {
+    flexDirection: 'row',
+    backgroundColor: colors.paperDeep,
+    borderRadius: radii.md,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.sm,
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.card,
+    shadowColor: '#0E1F44',
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  segmentBtnPressed: { opacity: 0.6 },
+  segmentLabel: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.textMute,
+    letterSpacing: 0.2,
+  },
+  segmentLabelActive: {
+    color: colors.ink,
+    fontFamily: fonts.sansSemibold,
+  },
 
   actionRowLabel: {
     flex: 1,

@@ -22,6 +22,7 @@ import { Platform } from 'react-native';
 
 import { ANTHROPIC_API_KEY } from '../env';
 import { TASKS, type TaskDef } from '../domain/taskCatalog';
+import { getVoiceLanguage, type VoiceLanguage } from './voicePref';
 
 // ─── 型定義 ─────────────────────────────────────────────────────────────
 
@@ -107,13 +108,26 @@ export function buildDeviceContext(opts: {
 
 // ─── System prompt ─────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT_ROLE = `あなたは RootLens の撮影アシスタント「ヘイレンズ」 です。 ユーザは家事を撮影してデータセットとして売る撮影者。
+function buildRolePrompt(lang: VoiceLanguage): string {
+  if (lang === 'en') {
+    return `You are "Hey Lens", the RootLens recording assistant. The user is a creator who films household chores to sell as training data.
+Your role: help them pick a task, guide the recording flow, and surface device-state warnings.
+
+Response style:
+- Short, friendly. Max 3 sentences per reply.
+- The user hears you through a head-mounted phone, so avoid jargon and keep cadence natural.
+- ALWAYS return JSON (response_text + action). No prose, no markdown.
+- response_text must be in English.`;
+  }
+  return `あなたは RootLens の撮影アシスタント「ヘイレンズ」 です。 ユーザは家事を撮影してデータセットとして売る撮影者。
 役割: タスク選択、 撮影手順案内、 デバイス状況に基づく注意喚起。
 
 応答スタイル:
 - 短く、 フレンドリーに。 1 応答 3 文以内。
 - ヘッドマウント装着中に聞かれるので、 専門用語を避け、 句読点でリズムをつける。
-- 必ず JSON で返答 (response_text + action)。 prose や markdown は禁止。`;
+- 必ず JSON で返答 (response_text + action)。 prose や markdown は禁止。
+- response_text は日本語で。`;
+}
 
 function buildTaskListPrompt(): string {
   const lines = TASKS.map((t) => {
@@ -138,8 +152,8 @@ action type の選び方:
 必ずこの形式で返す:
 {"response_text": "短い返答", "action": {"type": "...", ...}}`;
 
-function buildSystemPrompt(): string {
-  return [SYSTEM_PROMPT_ROLE, '', buildTaskListPrompt(), '', DEVICE_CONTEXT_RULES].join('\n');
+function buildSystemPrompt(lang: VoiceLanguage): string {
+  return [buildRolePrompt(lang), '', buildTaskListPrompt(), '', DEVICE_CONTEXT_RULES].join('\n');
 }
 
 // ─── Claude Haiku 呼び出し ────────────────────────────────────────────
@@ -153,10 +167,13 @@ export async function callVoiceAgent(args: {
   userText: string;
   deviceContext: DeviceContext;
   history: AgentTurn[];
+  /// 応答言語。 省略時は voicePref から取る。
+  language?: VoiceLanguage;
 }): Promise<AgentResponse> {
   if (!ANTHROPIC_API_KEY) {
     throw new Error('EXPO_PUBLIC_ANTHROPIC_API_KEY is required for voice agent');
   }
+  const lang = args.language ?? getVoiceLanguage();
 
   // 履歴を最新 MAX_HISTORY_TURNS ペアに truncate (= context 肥大防止)。
   const trimmedHistory = args.history.slice(-MAX_HISTORY_TURNS * 2);
@@ -165,14 +182,14 @@ export async function callVoiceAgent(args: {
     `DeviceContext:`,
     JSON.stringify(args.deviceContext, null, 2),
     '',
-    `ユーザ発話:`,
+    lang === 'en' ? `User said:` : `ユーザ発話:`,
     args.userText,
   ].join('\n');
 
   const body = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
-    system: buildSystemPrompt(),
+    system: buildSystemPrompt(lang),
     messages: [
       ...trimmedHistory.map((t) => ({ role: t.role, content: t.text })),
       { role: 'user', content: userMessage },
