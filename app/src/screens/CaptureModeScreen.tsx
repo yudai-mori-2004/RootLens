@@ -167,7 +167,9 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
   // ので、 ユーザが端末を持ち替えたかどうかは UI 表示には関係ない (= 装着方向は
   // ヘッドマウントを物理回転させる動作で、 撮影画面が出た瞬間にもう向きが整っているべき)。
   useCaptureOrientationLock(task?.orientation ?? 'portrait');
-  const insets = useSafeAreaInsets();
+  // safe area は chrome 層を包む <SafeAreaView edges=all> が一括処理。 個別の inset 計算
+  // は不要 (= 旧版は close button / header pill / REC / error / bottomStack それぞれに
+  // insets.top + 12 等を sprinkle していたが、 orientation 変化のたびに同期ズレを起こす)。
   const { width: winW, height: winH } = useWindowDimensions();
   const layoutIsLandscape = winW > winH;
   const taskWantsLandscape = (task?.orientation ?? 'portrait') === 'landscape';
@@ -549,101 +551,93 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
         ) : null}
       </View>
 
-      {/* 左上: 閉じる / 緊急停止。 useSafeAreaInsets() で orientation 変化に追従しつつ、
-          Math.max でノッチ無し端末や OS の inset=0 値で画面端ベタ付きにならないよう min 値を確保。 */}
-      <View
-        style={[
-          styles.chromeTopLeft,
-          {
-            top: Math.max(insets.top, 14) + 8,
-            left: Math.max(insets.left, 14) + 8,
-          },
-        ]}
+      {/* chrome 層 — preview の上に被さる UI 全部をここにまとめる。
+          SafeAreaView が insets.top/bottom/left/right を padding 化するので、
+          中の要素は static な top/left/right/bottom 値だけで安全に配置できる。
+          (= 個別 element に insets を sprinkle する必要なし。) */}
+      <SafeAreaView
+        style={StyleSheet.absoluteFill}
+        edges={['top', 'bottom', 'left', 'right']}
+        pointerEvents="box-none"
       >
-        <Pressable
-          accessibilityLabel={isRecording ? '緊急停止' : '戻る'}
-          onPress={onEmergencyStop}
-          style={({ pressed }) => [
-            styles.closeBtn,
-            isRecording && styles.closeBtnRec,
-            pressed && styles.closeBtnPressed,
-          ]}
-          hitSlop={8}
-        >
-          <Svg width={18} height={18} viewBox="0 0 18 18">
-            <Line x1={4} y1={4} x2={14} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
-            <Line x1={14} y1={4} x2={4} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
-          </Svg>
-        </Pressable>
-      </View>
-
-      {/* 中央上: タスク名 + 状態。 一行に詰めた pill (= 撮影中のみ表示) */}
-      {task ? (
-        <View
-          style={[styles.chromeTopCenter, { top: insets.top + 12, left: insets.left + 60, right: insets.right + 60 }]}
-          pointerEvents="none"
-        >
-          <View style={styles.headerPill}>
-            <Text style={styles.headerTask} numberOfLines={1}>{task.name}</Text>
-            <View style={styles.headerSep} />
-            <Text style={styles.headerStatus} numberOfLines={1}>{describeState(state)}</Text>
-          </View>
+        {/* 左上: 閉じる / 緊急停止 */}
+        <View style={styles.chromeTopLeft}>
+          <Pressable
+            accessibilityLabel={isRecording ? '緊急停止' : '戻る'}
+            onPress={onEmergencyStop}
+            style={({ pressed }) => [
+              styles.closeBtn,
+              isRecording && styles.closeBtnRec,
+              pressed && styles.closeBtnPressed,
+            ]}
+            hitSlop={8}
+          >
+            <Svg width={18} height={18} viewBox="0 0 18 18">
+              <Line x1={4} y1={4} x2={14} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
+              <Line x1={14} y1={4} x2={4} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
+            </Svg>
+          </Pressable>
         </View>
-      ) : null}
+
+        {/* 中央上: タスク名 + 状態。 一行に詰めた pill (= 撮影中のみ表示) */}
+        {task ? (
+          <View style={styles.chromeTopCenter} pointerEvents="none">
+            <View style={styles.headerPill}>
+              <Text style={styles.headerTask} numberOfLines={1}>{task.name}</Text>
+              <View style={styles.headerSep} />
+              <Text style={styles.headerStatus} numberOfLines={1}>{describeState(state)}</Text>
+            </View>
+          </View>
+        ) : null}
 
       {/* 対話 overlay。 task 未選択時、 もしくは task 選択済でもまだ録画開始前なら
           表示し続ける (= ユーザが「やっぱりやめる」「別タスク」 を言える余地を残す)。
           録画中 (= recording / thumbs_up_holding / finalizing / reviewing) は
           UI_SPECS §5.1 通りチャットは閉じる。 */}
-      {(() => {
-        const preRecording =
-          state.kind === 'await_palm' ||
-          state.kind === 'palm_holding' ||
-          state.kind === 'vlm_start_checking' ||
-          state.kind === 'countdown';
-        const chatAvailable = !task || preRecording;
-        if (!chatAvailable) return null;
-        return (
-          <DialogueOverlay
-            onSelectTask={(id) => {
-              // 既存タスクから別タスクへ切替: state machine を await_palm に reset
-              if (taskId && id !== taskId) {
-                dispatch({ kind: 'retake' });
-                recordingStartedRef.current = false;
-                recordingFinalizedRef.current = false;
-              }
-              setTaskId(id);
-            }}
-            onExit={() => navigation.goBack()}
-            showQuickPick={!task}
-          />
-        );
-      })()}
+        {(() => {
+          const preRecording =
+            state.kind === 'await_palm' ||
+            state.kind === 'palm_holding' ||
+            state.kind === 'vlm_start_checking' ||
+            state.kind === 'countdown';
+          const chatAvailable = !task || preRecording;
+          if (!chatAvailable) return null;
+          return (
+            <DialogueOverlay
+              onSelectTask={(id) => {
+                // 既存タスクから別タスクへ切替: state machine を await_palm に reset
+                if (taskId && id !== taskId) {
+                  dispatch({ kind: 'retake' });
+                  recordingStartedRef.current = false;
+                  recordingFinalizedRef.current = false;
+                }
+                setTaskId(id);
+              }}
+              onExit={() => navigation.goBack()}
+              showQuickPick={!task}
+            />
+          );
+        })()}
 
-      {/* 右上: REC indicator (録画中のみ) */}
-      {isRecording ? (
-        <View
-          style={[styles.chromeTopRight, { top: insets.top + 12, right: insets.right + 12 }]}
-          pointerEvents="none"
-        >
-          <View style={styles.recPill}>
-            <View style={styles.recDot} />
-            <Text style={styles.recLabel}>REC</Text>
+        {/* 右上: REC indicator (録画中のみ) */}
+        {isRecording ? (
+          <View style={styles.chromeTopRight} pointerEvents="none">
+            <View style={styles.recPill}>
+              <View style={styles.recDot} />
+              <Text style={styles.recLabel}>REC</Text>
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
 
-      {/* エラーは画面下部に floating で */}
-      {error ? (
-        <View
-          style={[styles.chromeBottom, { bottom: insets.bottom + 16, left: insets.left + 16, right: insets.right + 16 }]}
-          pointerEvents="none"
-        >
-          <View style={styles.errCard}>
-            <Text style={styles.errBody} numberOfLines={3}>{error}</Text>
+        {/* エラーは画面下部に floating で */}
+        {error ? (
+          <View style={styles.chromeBottom} pointerEvents="none">
+            <View style={styles.errCard}>
+              <Text style={styles.errBody} numberOfLines={3}>{error}</Text>
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
+      </SafeAreaView>
     </View>
   );
 };
@@ -808,8 +802,9 @@ const DialogueOverlay: React.FC<{
       <View
         style={[
           dialogueStyles.bottomStack,
-          // keyboard 上昇分 + home indicator (= insets.bottom) + 16pt 余白
-          { bottom: keyboardHeight + insets.bottom + 16 },
+          // 親 SafeAreaView が insets.bottom 分の padding を持つので、 通常は 16pt 上に。
+          // キーボード上昇時のみ、 keyboard が safe area を超える分を offset として足す。
+          { bottom: Math.max(16, keyboardHeight - insets.bottom + 16) },
         ]}
         pointerEvents="box-none"
       >
@@ -1063,7 +1058,8 @@ const dialogueStyles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,38,0.18)' },
 
   // ─── 下部スタック (= AI card → echo → input → quick pick が縦に隣接) ───
-  // bottom はキーボード状態に応じて inline で指定 (= keyboardHeight + 24)
+  // 親の chrome SafeAreaView が insets.left/right を padding 化しているので、
+  // ここでは static な spacing.xl だけで OK。 bottom は keyboard 状態で inline 調整。
   bottomStack: {
     position: 'absolute',
     left: 0,
@@ -1380,11 +1376,32 @@ const styles = StyleSheet.create({
   body: { color: colors.ink, fontSize: 15, textAlign: 'center', lineHeight: 22 },
   preview: { flex: 1, backgroundColor: '#000' },
 
-  // Floating chrome (= 画面の上に被せる UI 要素、 full-width バーは持たない)
-  chromeTopLeft: { position: 'absolute' },
-  chromeTopCenter: { position: 'absolute', alignItems: 'center' },
-  chromeTopRight: { position: 'absolute' },
-  chromeBottom: { position: 'absolute' },
+  // Floating chrome — chrome 層を包む SafeAreaView (= edges all) が insets を
+  // padding 化するので、 ここでは safe area の縁から固定 pixel 数オフセットするだけで
+  // すべての orientation で動的島 / home indicator に被らなくなる。
+  chromeTopLeft: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+  },
+  chromeTopCenter: {
+    position: 'absolute',
+    top: 12,
+    left: 60,
+    right: 60,
+    alignItems: 'center',
+  },
+  chromeTopRight: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  chromeBottom: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+  },
 
   // 閉じる / 緊急停止: 40pt 円形ボタン
   closeBtn: {
