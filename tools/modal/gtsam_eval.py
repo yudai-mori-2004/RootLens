@@ -156,8 +156,12 @@ def gtsam_eval(content_id: str):
 
 
 def _zero_score() -> dict:
-    """全失敗パスの共通出力 (= 仕様: 例外でなく score=0 を返す)。"""
-    return {"score": 0, "residualNorm": float("inf"), "consistencyRatio": 0.0}
+    """全失敗パスの共通出力 (= 仕様: 例外でなく score=0 を返す)。
+    residualNorm は元々 float("inf") にしていたが、 FastAPI の strict JSON encoder で
+    "Out of range float values are not JSON compliant" → 500 になり workflow が
+    gtsam-eval で永遠に詰まる。 1e30 を sentinel として使い、 「実質無限大の残差」 を表す。
+    consistencyRatio = exp(-1e30) → 0.0 で意味も保たれる。"""
+    return {"score": 0, "residualNorm": 1e30, "consistencyRatio": 0.0}
 
 
 # ─── 評価本体 (= cv2 + gtsam) ──────────────────────────────────────────
