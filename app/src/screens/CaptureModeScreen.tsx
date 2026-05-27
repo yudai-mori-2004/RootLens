@@ -16,6 +16,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -53,6 +54,12 @@ import {
 import { evaluateTaskGate } from '../services/vlmGate';
 import { RealtimeFeedback } from '../services/realtimeFeedback';
 import { CaptureHandOverlay } from '../components/CaptureHandOverlay';
+import {
+  buildDeviceContext,
+  callVoiceAgent,
+  speak,
+  type AgentTurn,
+} from '../services/voiceAgent';
 import { colors, fonts, spacing, radii, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CaptureMode'>;
@@ -639,35 +646,111 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
 
 // ─── DialogueOverlay (UI_SPECS §4) ───────────────────────────────────
 //
-// 対話サブモードの画面。 voice agent (= task 13 で sherpa-onnx + Claude Haiku) が
-// 来るまでは手動タスク選択がメイン。 カメラプレビューは下に常時透けて見える。
+// 対話サブモードの画面。 Claude Haiku 4.5 ベースの AI エージェントと話す。
+// voice agent の wake word / STT (= sherpa-onnx) が来るまでは text 入力で代用、
+// AI 応答は TTS (= expo-speech) で読み上げる。 カメラプレビューは下に常時透ける。
 //
 // レイアウト:
-//   上部: 「Hey Lens」 placeholder + マイクアイコン (= voice 来てから本実装)
-//   下部: タスク選択タイル (2 列 grid、 横スクロール可)
+//   上部 トースト: AI の最新応答 (= 数秒で fade out しても良いが、 まずは保持)
+//   中部 トースト: ユーザの最新発話 (= STT 化された text 又は手動入力)
+//   下部:
+//     ① タスクタイル横スクロール (= UI_SPECS §4.5 ハンバーガーメニュー相当の fallback)
+//     ② テキスト入力 (= STT 代用、 「Hey Lens」 mock)
 
 const DialogueOverlay: React.FC<{
   onSelectTask: (taskId: string) => void;
   onExit: () => void;
   topInset: number;
-}> = ({ onSelectTask, topInset }) => {
+}> = ({ onSelectTask, onExit, topInset }) => {
+  const [userText, setUserText] = useState('');
+  const [draft, setDraft] = useState('');
+  const [agentText, setAgentText] = useState<string | null>(null);
+  const [thinking, setThinking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const historyRef = useRef<AgentTurn[]>([]);
+
+  const sendToAgent = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || thinking) return;
+    setError(null);
+    setUserText(trimmed);
+    setDraft('');
+    setThinking(true);
+    try {
+      const ctx = buildDeviceContext({
+        orientation: 'portrait',          // TODO: 実値を取る
+        tracking_state: 'normal',         // TODO: ARKit 経由で取得
+        hands_detected: { left: false, right: false },
+        selected_task: null,
+        clips_recorded_this_session: 0,
+        current_mode: 'dialogue',
+      });
+      const resp = await callVoiceAgent({
+        userText: trimmed,
+        deviceContext: ctx,
+        history: historyRef.current,
+      });
+      historyRef.current = [
+        ...historyRef.current,
+        { role: 'user', text: trimmed },
+        { role: 'assistant', text: resp.response_text },
+      ];
+      setAgentText(resp.response_text);
+      speak(resp.response_text);
+
+      // action 解釈
+      if (resp.action.type === 'task_matched' && resp.action.task_id) {
+        // 「基準確認しますか?」 のような確認ターン → ユーザの 「始めて」 待ち
+        if (!resp.action.await_user_confirmation) {
+          onSelectTask(resp.action.task_id);
+        }
+      } else if (resp.action.type === 'start_recording' && resp.action.task_id) {
+        onSelectTask(resp.action.task_id);
+      } else if (resp.action.type === 'end_session') {
+        onExit();
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+    } finally {
+      setThinking(false);
+    }
+  }, [onSelectTask, onExit, thinking]);
+
   return (
     <View style={dialogueStyles.root} pointerEvents="box-none">
       {/* 全体に薄い scrim をかけてカメラプレビューを和らげる */}
       <View style={dialogueStyles.scrim} pointerEvents="none" />
 
-      <View style={[dialogueStyles.voiceLedge, { paddingTop: topInset + 12 }]} pointerEvents="none">
-        <Text style={dialogueStyles.voiceEyebrow}>VOICE · COMING SOON</Text>
-        <Text style={dialogueStyles.voiceCue}>
-          <Text style={dialogueStyles.voiceCueAccent}>“Hey Lens.”</Text>
-        </Text>
-        <Text style={dialogueStyles.voiceBody}>
-          下のタスクをタップすると撮影を開始します。
-        </Text>
+      {/* 上部: AI 応答 toast (= 常時表示、 来たら更新) */}
+      <View style={[dialogueStyles.topArea, { paddingTop: topInset + 12 }]} pointerEvents="none">
+        {agentText ? (
+          <View style={dialogueStyles.agentToast}>
+            <Text style={dialogueStyles.agentToastEyebrow}>HEY LENS</Text>
+            <Text style={dialogueStyles.agentToastText}>{agentText}</Text>
+          </View>
+        ) : (
+          <View style={dialogueStyles.idlePrompt}>
+            <Text style={dialogueStyles.idleEyebrow}>STT · TEXT FALLBACK</Text>
+            <Text style={dialogueStyles.idleCue}>
+              <Text style={dialogueStyles.idleCueAccent}>“Hey Lens.”</Text>
+            </Text>
+            <Text style={dialogueStyles.idleBody}>
+              話しかけるか、 下のボックスに入力してください。
+            </Text>
+          </View>
+        )}
+        {userText ? (
+          <View style={dialogueStyles.userToast}>
+            <Text style={dialogueStyles.userToastIcon}>🎙</Text>
+            <Text style={dialogueStyles.userToastText} numberOfLines={2}>{userText}</Text>
+          </View>
+        ) : null}
       </View>
 
-      <View style={dialogueStyles.pickerWrap}>
-        <Text style={dialogueStyles.pickerEyebrow}>SELECT TASK · MANUAL</Text>
+      {/* 下部: タスクタイル + テキスト入力 */}
+      <View style={dialogueStyles.bottomArea}>
+        <Text style={dialogueStyles.pickerEyebrow}>QUICK PICK</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -677,6 +760,41 @@ const DialogueOverlay: React.FC<{
             <TaskTile key={task.id} task={task} onPress={() => onSelectTask(task.id)} />
           ))}
         </ScrollView>
+
+        <View style={dialogueStyles.inputRow}>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder={thinking ? '考え中…' : '話しかける (例: 洗い物しよう)'}
+            placeholderTextColor="rgba(255,255,255,0.45)"
+            style={dialogueStyles.input}
+            editable={!thinking}
+            onSubmitEditing={() => sendToAgent(draft)}
+            returnKeyType="send"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <Pressable
+            onPress={() => sendToAgent(draft)}
+            disabled={thinking || !draft.trim()}
+            style={({ pressed }) => [
+              dialogueStyles.sendBtn,
+              (thinking || !draft.trim()) && dialogueStyles.sendBtnDisabled,
+              pressed && dialogueStyles.sendBtnPressed,
+            ]}
+          >
+            {thinking ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Svg width={16} height={16} viewBox="0 0 16 16">
+                <Path d="M3 8h10m-3 -3 3 3 -3 3" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
+            )}
+          </Pressable>
+        </View>
+        {error ? (
+          <Text style={dialogueStyles.errorText} numberOfLines={2}>AI: {error}</Text>
+        ) : null}
       </View>
     </View>
   );
@@ -704,44 +822,99 @@ const dialogueStyles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,38,0.42)' },
 
-  voiceLedge: {
+  topArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-    gap: 6,
+    gap: spacing.sm,
+  },
+
+  // AI 応答 toast (UI_SPECS §4.2 上部トースト)
+  agentToast: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  agentToastEyebrow: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 9.5,
+    letterSpacing: 1.6,
+    color: colors.emeraldDeep,
+  },
+  agentToastText: {
+    fontFamily: fonts.serifMedium,
+    fontSize: 16,
+    lineHeight: 22,
+    letterSpacing: -0.1,
+    color: colors.ink,
+  },
+
+  // idle prompt (= AI 応答がまだ無いときの placeholder)
+  idlePrompt: {
+    gap: 4,
     alignItems: 'flex-start',
   },
-  voiceEyebrow: {
+  idleEyebrow: {
     fontFamily: fonts.sansSemibold,
     fontSize: 10,
     letterSpacing: 1.6,
-    color: 'rgba(255,255,255,0.65)',
+    color: 'rgba(255,255,255,0.7)',
   },
-  voiceCue: {
+  idleCue: {
     fontFamily: fonts.serifLight,
-    fontSize: 42,
-    lineHeight: 48,
-    letterSpacing: -0.6,
+    fontSize: 38,
+    lineHeight: 44,
+    letterSpacing: -0.5,
     color: '#fff',
     marginTop: 2,
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  voiceCueAccent: { fontFamily: fonts.serifMedium },
-  voiceBody: {
+  idleCueAccent: { fontFamily: fonts.serifMedium },
+  idleBody: {
     fontFamily: fonts.sansRegular,
     fontSize: 13,
     color: 'rgba(255,255,255,0.82)',
-    marginTop: 4,
+    marginTop: 2,
   },
 
-  pickerWrap: {
+  // ユーザ発話 toast (UI_SPECS §4.2 下部トースト、 ただし機能上は上に配置)
+  userToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(14,31,68,0.78)',
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    maxWidth: '85%',
+  },
+  userToastIcon: { fontSize: 14 },
+  userToastText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: '#fff',
+    flexShrink: 1,
+  },
+
+  bottomArea: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 32,
+    bottom: 24,
     gap: spacing.sm,
   },
+
   pickerEyebrow: {
     fontFamily: fonts.sansSemibold,
     fontSize: 10,
@@ -752,6 +925,44 @@ const dialogueStyles = StyleSheet.create({
   pickerScroll: {
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
+  },
+
+  // 入力行 (= STT 代用 text input)
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: 'rgba(14,31,68,0.78)',
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    fontFamily: fonts.sansRegular,
+    fontSize: 15,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.emerald,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: { opacity: 0.4 },
+  sendBtnPressed: { opacity: 0.7 },
+  errorText: {
+    paddingHorizontal: spacing.xl,
+    fontFamily: fonts.sansMedium,
+    fontSize: 11,
+    color: '#FCC',
+    marginTop: 4,
   },
   tile: {
     width: 138,
