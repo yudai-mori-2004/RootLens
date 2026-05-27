@@ -28,18 +28,47 @@ export type ProcessingStep =
   | 'vlm-score'        // Layer 3: VLM Claude Haiku 4.5 セマンティック採点
   | 'gtsam-eval';      // Layer 4: GTSAM Video-IMU 整合性検証
 
+// v0.1.3 4-layer scoring。 サーバ shared/api-types.ts と同じ shape。
+
+export interface Layer1Score {
+  score: number;                       // 0..20
+  handLandmarkPresenceBoth: number;    // 0..1
+  rgbSensorSyncRatio: number;          // 0..1
+  frameContinuity: number;             // 0..1
+  trackingQuality: number;             // 0..1
+  handMovement: number;                // 0..1
+  imuGravityCompliance: number;        // 0..1
+}
+
+export interface Layer2Score {
+  score: number;                       // 0..15
+  brightnessInRangeRatio: number;      // 0..1
+  sharpnessPassRatio: number;          // 0..1
+  opticalFlowPassRatio: number;        // 0..1
+  frameDiversity: number;              // 0..1
+}
+
+export interface Layer3Score {
+  score: number;                       // 0..55
+  taskActivityAvg: number;             // 0..5
+  objectInteractionAvg: number;        // 0..5
+  sceneMatchAvg: number;               // 0..5
+  authenticityAvg: number;             // 0..5
+  idleRatio: number;                   // 0..1 (= score には算入しない補助指標)
+}
+
+export interface GtsamScore {
+  score: number;                       // 0..10
+  residualNorm: number;
+  consistencyRatio: number;            // 0..1
+}
+
 export interface QualityBreakdown {
-  /// いずれかの手が出ているフレーム比率 (0..1)。 Pipeline 2 では未計算で null、
-  /// Pipeline 3 (= WiLoR) 通過後に backfill。
-  anyHandRatio: number | null;
-  /// 両手が出ているフレーム比率 (0..1)。 同上、 Pipeline 3 で backfill。
-  twoHandRatio: number | null;
-  /// 深度データが有効なフレーム比率 (0..1)。 LiDAR 非搭載機は null。
-  depthValidRatio: number | null;
-  /// RGB / 深度 / IMU の同期率 (0..1)
-  syncRatio: number;
-  /// フレーム欠落数
-  frameGapCount: number;
+  total: number;                       // 0..100 (= 4 層合計)
+  layer1: Layer1Score | null;
+  layer2: Layer2Score | null;
+  layer3: Layer3Score | null;
+  gtsam: GtsamScore | null;
 }
 
 export interface ClipReward {

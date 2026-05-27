@@ -13,6 +13,7 @@ import Svg, { Circle, Path, Polyline } from 'react-native-svg';
 import { useAuth } from '../services/auth';
 import { ClipCard } from '../components/ClipCard';
 import { StakeSheet } from '../components/StakeSheet';
+import { ClipDetailSheet } from '../components/ClipDetailSheet';
 import { priceFromLicenseUrl } from '../domain/licenseCatalog';
 import { clipStore, useClips, type Clip } from '../services/clipPipeline';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
@@ -62,6 +63,8 @@ export const CollectionScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const [stakeTarget, setStakeTarget] = useState<Clip | null>(null);
+  // タップしたクリップの詳細シート (UI_SPECS §3.3 / §3.4)。 ready / staked / error 共通。
+  const [detailTarget, setDetailTarget] = useState<Clip | null>(null);
 
   const fetchOnChain = useCallback(async () => {
     if (!ownerPubkey) {
@@ -190,10 +193,14 @@ export const CollectionScreen: React.FC = () => {
     return pts;
   }, [mergedClips]);
 
+  // ready / staked / error カードをタップしたら詳細シートを開く (UI_SPECS §3.3 / §3.4)。
+  // 詳細シート内の「Stake」 ボタンで stake シートを open する 2 段構造。
+  const onOpenDetail = useCallback((clip: Clip) => setDetailTarget(clip), []);
   const onOpenStake = useCallback((clip: Clip) => setStakeTarget(clip), []);
   const onRemove = useCallback((clip: Clip) => clipStore.remove(clip.id), []);
   const onRetry = useCallback((clip: Clip) => clipStore.retry(clip.id), []);
   const onCloseStake = useCallback(() => setStakeTarget(null), []);
+  const onCloseDetail = useCallback(() => setDetailTarget(null), []);
 
   const loading = onChain === null;
 
@@ -221,11 +228,20 @@ export const CollectionScreen: React.FC = () => {
           <ClipCard
             clip={item}
             onOpenStake={onOpenStake}
+            onOpenDetail={onOpenDetail}
             onRemove={onRemove}
             onRetry={onRetry}
           />
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+      />
+
+      <ClipDetailSheet
+        visible={detailTarget !== null}
+        clip={detailTarget}
+        onClose={onCloseDetail}
+        onOpenStake={onOpenStake}
+        onRemove={onRemove}
       />
 
       <StakeSheet
@@ -380,7 +396,7 @@ const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: 
       </Svg>
       <Text style={styles.emptyEyebrow}>NO CLIPS YET</Text>
       <Text style={styles.emptyText}>
-        Job タブから撮影を始めると、 撮影完了後ここに表示されます。
+        中央のカメラボタンから撮影を始めると、 撮影完了後ここに表示されます。
       </Text>
     </View>
   );

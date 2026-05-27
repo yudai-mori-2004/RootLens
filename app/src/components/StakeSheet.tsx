@@ -272,20 +272,30 @@ const BlurPreviewPlayer: React.FC<{
 };
 
 const QualityBreakdownDisplay: React.FC<{ breakdown: QualityBreakdown }> = ({ breakdown }) => {
+  // v0.1.3 は 4 層スコア合計。 ここでは合計と layer 別 score のみ簡潔に。
+  // 詳細な指標は ClipDetailSheet 側で全部見せる。
   const rows: Array<{ label: string; ratio: number | null; raw?: string }> = [
+    { label: '合計スコア', ratio: null, raw: `${breakdown.total} / 100` },
     {
-      label: 'いずれかの手の出現率',
-      ratio: breakdown.anyHandRatio,
-      raw: breakdown.anyHandRatio === null ? '販売準備時に算出' : undefined,
+      label: 'Layer 1 メタデータ',
+      ratio: null,
+      raw: breakdown.layer1 ? `${breakdown.layer1.score} / 20` : '—',
     },
     {
-      label: '両手の出現率',
-      ratio: breakdown.twoHandRatio,
-      raw: breakdown.twoHandRatio === null ? '販売準備時に算出' : undefined,
+      label: 'Layer 2 フレーム解析',
+      ratio: null,
+      raw: breakdown.layer2 ? `${breakdown.layer2.score} / 15` : '—',
     },
-    { label: '深度データ有効率', ratio: breakdown.depthValidRatio, raw: breakdown.depthValidRatio === null ? '対応端末なし' : undefined },
-    { label: 'RGB / 深度 / IMU の同期率', ratio: breakdown.syncRatio },
-    { label: 'フレーム欠落数', ratio: null, raw: `${breakdown.frameGapCount} 個` },
+    {
+      label: 'Layer 3 VLM 採点',
+      ratio: null,
+      raw: breakdown.layer3 ? `${breakdown.layer3.score} / 55` : '—',
+    },
+    {
+      label: 'Layer 4 GTSAM 整合性',
+      ratio: null,
+      raw: breakdown.gtsam ? `${breakdown.gtsam.score} / 10` : '—',
+    },
   ];
   return (
     <View style={styles.breakdownList}>

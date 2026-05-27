@@ -35,11 +35,13 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 interface Props {
   clip: Clip;
   onOpenStake?: (clip: Clip) => void;
+  /// ready / staked / error 行のタップで詳細シート (UI_SPECS §3.3 / §3.4) を開く。
+  onOpenDetail?: (clip: Clip) => void;
   onRemove?: (clip: Clip) => void;
   onRetry?: (clip: Clip) => void;
 }
 
-export const ClipCard: React.FC<Props> = ({ clip, onOpenStake, onRemove, onRetry }) => {
+export const ClipCard: React.FC<Props> = ({ clip, onOpenStake, onOpenDetail, onRemove, onRetry }) => {
   const task = useMemo(() => findTask(clip.taskId), [clip.taskId]);
 
   switch (clip.state) {
@@ -48,11 +50,11 @@ export const ClipCard: React.FC<Props> = ({ clip, onOpenStake, onRemove, onRetry
     case 'processing':
       return <ProcessingCard clip={clip} task={task} />;
     case 'ready':
-      return <ReadyCard clip={clip} task={task} onOpenStake={onOpenStake} />;
+      return <ReadyCard clip={clip} task={task} onOpenDetail={onOpenDetail} />;
     case 'staked':
-      return <StakedCard clip={clip} task={task} />;
+      return <StakedCard clip={clip} task={task} onOpenDetail={onOpenDetail} />;
     case 'error':
-      return <ErrorCard clip={clip} task={task} onRemove={onRemove} onRetry={onRetry} />;
+      return <ErrorCard clip={clip} task={task} onOpenDetail={onOpenDetail} onRemove={onRemove} onRetry={onRetry} />;
   }
 };
 
@@ -185,14 +187,14 @@ const ProcessingCard: React.FC<{ clip: Clip; task: TaskDef | undefined }> = ({ c
 
 // ─── 準備完了 (= action 要請、 視覚最強) ──────────────────────────────
 
-const ReadyCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenStake?: (c: Clip) => void }> = ({
-  clip, task, onOpenStake,
+const ReadyCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenDetail?: (c: Clip) => void }> = ({
+  clip, task, onOpenDetail,
 }) => {
   return (
     <Pressable
-      onPress={() => onOpenStake?.(clip)}
+      onPress={() => onOpenDetail?.(clip)}
       style={({ pressed }) => [styles.card, styles.cardReady, pressed && styles.cardReadyPressed]}
-      accessibilityLabel={`${task?.name ?? 'クリップ'} をステーキングする`}
+      accessibilityLabel={`${task?.name ?? 'クリップ'} の詳細を見る`}
     >
       <TaskThumb task={task} />
       <View style={styles.cardMid}>
@@ -216,18 +218,16 @@ const ReadyCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenStake?:
 
 // ─── ステーキング済み ──────────────────────────────────────────────────
 
-const StakedCard: React.FC<{ clip: Clip; task: TaskDef | undefined }> = ({ clip, task }) => {
-  const onSolscan = () => {
-    if (clip.rootAssetId) {
-      Linking.openURL(`https://solscan.io/token/${clip.rootAssetId}?cluster=devnet`).catch(() => {});
-    }
-  };
+const StakedCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenDetail?: (c: Clip) => void }> = ({
+  clip, task, onOpenDetail,
+}) => {
   const licenseCount = clip.licenseCount ?? 0;
   const revenue = clip.revenueUsdc ?? 0;
   return (
     <Pressable
-      onPress={onSolscan}
+      onPress={() => onOpenDetail?.(clip)}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      accessibilityLabel={`${task?.name ?? 'クリップ'} の詳細を見る`}
     >
       <TaskThumb task={task} />
       <View style={styles.cardMid}>
@@ -260,23 +260,28 @@ const StakedCard: React.FC<{ clip: Clip; task: TaskDef | undefined }> = ({ clip,
 
 const ErrorCard: React.FC<{
   clip: Clip; task: TaskDef | undefined;
+  onOpenDetail?: (c: Clip) => void;
   onRemove?: (c: Clip) => void; onRetry?: (c: Clip) => void;
-}> = ({ clip, task, onRemove, onRetry }) => {
+}> = ({ clip, task, onOpenDetail, onRemove, onRetry }) => {
   return (
-    <View style={[styles.card, styles.cardMuted]}>
+    <Pressable
+      onPress={() => onOpenDetail?.(clip)}
+      style={({ pressed }) => [styles.card, styles.cardMuted, pressed && styles.cardPressed]}
+      accessibilityLabel={`${task?.name ?? 'クリップ'} のエラー詳細を見る`}
+    >
       <TaskThumb task={task} muted />
       <View style={styles.cardMid}>
         <TaskName clip={clip} task={task} />
         <Text style={styles.eyebrowDanger}>処理エラー</Text>
         <Text style={styles.cardSub} numberOfLines={2}>
-          サーバ処理の再試行上限を超えました。 もう一度試すか、 サポートに連絡してください。
+          {clip.errorMessage ?? 'サーバ処理が失敗しました。 タップで詳細を確認。'}
         </Text>
         <View style={styles.actionRow}>
           <SmallActionBtn label="削除" onPress={() => onRemove?.(clip)} />
           <SmallActionBtn label="もう一度試す" onPress={() => onRetry?.(clip)} accent />
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 };
 
