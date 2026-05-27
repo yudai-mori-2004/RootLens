@@ -229,14 +229,24 @@ function parseAgentResponse(rawText: string): AgentResponse {
 // ─── TTS ────────────────────────────────────────────────────────────────
 
 /// 応答 text を読み上げる。 既に再生中なら中断して新しいものを差し替え。
-export function speak(text: string): void {
+/// 言語自動判定: ASCII + 通常記号だけなら en-US、 それ以外 (= 日本語混入) は ja-JP。
+/// 明示的に上書きしたい時は language を指定する。
+export function speak(text: string, language?: 'ja-JP' | 'en-US' | string): void {
   if (!text) return;
   Speech.stop();
+  const lang = language ?? (looksEnglish(text) ? 'en-US' : 'ja-JP');
   Speech.speak(text, {
-    language: 'ja-JP',
-    rate: 1.05,
+    language: lang,
+    // en は少し速め、 ja は標準。 AVSpeechSynthesizer の rate は OS で正規化される。
+    rate: lang.startsWith('en') ? 1.0 : 1.05,
     pitch: 1.0,
   });
+}
+
+/// ASCII + 一般句読点だけで構成されているか (= 日本語が混じってないか) のラフ判定。
+function looksEnglish(text: string): boolean {
+  // 半角英数 + 標準句読点 + 空白 + アポストロフィ + ハイフン等のみで構成されているなら english
+  return /^[\x20-\x7E]+$/.test(text);
 }
 
 export function stopSpeaking(): void {
