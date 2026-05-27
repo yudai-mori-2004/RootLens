@@ -40,7 +40,6 @@ import {
   type HandTrackEvent,
 } from '../native/arkitCapture';
 import { useCaptureOrientationLock } from '../hooks/useScreenOrientation';
-import { PhoneOrientationIcon } from '../components/PhoneOrientationIcon';
 import { findTask, TASKS, type TaskDef } from '../domain/taskCatalog';
 import { clipStore } from '../services/clipPipeline';
 import * as FileSystem from 'expo-file-system';
@@ -158,21 +157,17 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
   const [error, setError] = useState<string | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
 
-  // Orientation: task spec に従って lock + 実値の追跡。
+  // Orientation: task 確定で即 OS の orientation を lock する (= UI が即その向きに揃う)。
   //   - task が 'landscape' なら LANDSCAPE (LEFT / RIGHT 両許可、 OS が物理位置で選択)
   //   - task が 'portrait' なら PORTRAIT_UP
-  // 一致判定は useWindowDimensions の幅 / 高さ比で行う (= layout が一番信頼できる、
-  // ScreenOrientation API は UNKNOWN を返す瞬間があり判定がフラつく)。
-  // 物理 LEFT / RIGHT は ScreenOrientation listener から取って native に push する。
+  // 「センサーで端末を回してください」 という mismatch ゲートは廃止: タスクが向きを決める
+  // ので、 ユーザが端末を持ち替えたかどうかは UI 表示には関係ない (= 装着方向は
+  // ヘッドマウントを物理回転させる動作で、 撮影画面が出た瞬間にもう向きが整っているべき)。
   useCaptureOrientationLock(task?.orientation ?? 'portrait');
   const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const layoutIsLandscape = winW > winH;
   const taskWantsLandscape = (task?.orientation ?? 'portrait') === 'landscape';
-  const orientationMismatch = task ? layoutIsLandscape !== taskWantsLandscape : false;
-  // hand event subscribe コールバックは初回 render に bind されるので、 mismatch 値の参照は ref 経由
-  const orientationMismatchRef = useRef(false);
-  useEffect(() => { orientationMismatchRef.current = orientationMismatch; }, [orientationMismatch]);
 
   // 録画状態とそれに紐づくリソースの ref
   const recordingStartedRef = useRef(false);
@@ -257,14 +252,11 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
     };
   }, [task, taskWantsLandscape, layoutIsLandscape]);
 
-  // HandTrack イベント購読 + reducer に転送 + フィードバック発火
-  // orientationMismatch 中は reducer に流さない (= mount が整うまで gesture / state を
-  // 進めない、 = mismatch 中の hand 検出は意味のある landmark じゃない可能性が高い)
+  // HandTrack イベント購読 + reducer に転送 + フィードバック発火。
   useEffect(() => {
     const sub = subscribeHandTrack((e) => {
       setHandEvent(e);
       lastHandlEventRef.current = e;
-      if (orientationMismatchRef.current) return;
       dispatch({
         kind: 'frame',
         ts: Date.now(),
@@ -542,29 +534,6 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.countdownText}>{countdownRemaining}</Text>
           </View>
         ) : null}
-        {task && orientationMismatch ? (
-          <View style={styles.orientationGate} pointerEvents="none">
-            <View style={styles.orientationGateIcon}>
-              <PhoneOrientationIcon
-                orientation={task.orientation}
-                size={108}
-                stroke="#FFFFFF"
-                accent={colors.emerald}
-                withRotationHint
-              />
-            </View>
-            <Text style={styles.orientationGateEyebrow}>ROTATE MOUNT</Text>
-            <Text style={styles.orientationGateTitle}>
-              {task.orientation === 'landscape' ? 'Landscape orientation' : 'Portrait orientation'}
-            </Text>
-            <Text style={styles.orientationGateBody}>
-              {task.orientation === 'landscape'
-                ? 'mount を横向きに合わせると撮影を開始できます'
-                : 'mount を縦向きに合わせると撮影を開始できます'}
-            </Text>
-          </View>
-        ) : null}
-
         {state.kind === 'reviewing' ? (
           <ReviewOverlay
             confidence={state.achievementConfidence}
@@ -1211,27 +1180,6 @@ const styles = StyleSheet.create({
   reviewBtnLabelSecondary: { color: '#fff' },
   reviewBtnLabelPrimary: { color: colors.ink },
 
-  orientationGate: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(8,18,38,0.86)',
-    paddingHorizontal: spacing.xl,
-  },
-  orientationGateIcon: { marginBottom: spacing.lg },
-  orientationGateEyebrow: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 10, letterSpacing: 1.8, fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-  orientationGateTitle: {
-    color: '#fff', fontSize: 22, fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  orientationGateBody: {
-    color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 22,
-    textAlign: 'center',
-  },
   bottomBar: {
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
     backgroundColor: 'rgba(0,0,0,0.85)', alignItems: 'center',
