@@ -23,7 +23,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { Camera } from 'expo-camera';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -148,7 +148,19 @@ function computeDriftDirection(
   return 'bottom';
 }
 
-export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
+/// fullScreenModal (= react-native-screens で別 UIViewController に乗る) では、
+/// 親階層の <SafeAreaProvider> の UIView が modal VC の外に住むため、 orientation
+/// 変化時に safeAreaInsetsDidChange が発火しなくなる (= 取得 insets が portrait 値で
+/// stuck する既知挙動: safe-area-context #556 / #677、 react-navigation #11664)。
+/// modal の中で SafeAreaProvider を再 mount すれば、 その UIView が modal VC 配下に
+/// なるので insets が正しく更新される (= Expo 公式ドキュメントの推奨パターン)。
+export const CaptureModeScreen: React.FC<Props> = (props) => (
+  <SafeAreaProvider>
+    <CaptureModeScreenBody {...props} />
+  </SafeAreaProvider>
+);
+
+const CaptureModeScreenBody: React.FC<Props> = ({ navigation }) => {
   // 撮影中タスク (= null なら対話サブモード)。 撮影完了で null に戻して次タスク待ち。
   const [taskId, setTaskId] = useState<string | null>(null);
   const task = taskId ? findTask(taskId) : null;
@@ -664,6 +676,7 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       ) : null}
+
     </View>
   );
 };
