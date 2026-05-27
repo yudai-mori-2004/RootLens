@@ -353,6 +353,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let t = frame.camera.transform        // simd_float4x4 (= column-major)
     let k = frame.camera.intrinsics       // simd_float3x3
     let trackingPair = describeTrackingState(frame.camera.trackingState)
+    // 正規スキーマ (= tools/gen-dummy-sensors.py + tools/modal/gtsam_eval.py が期待):
+    //   timestamp_ns: int (= ts 秒 × 1e9)
+    //   tracking_state: int (= ARKit enum 値、 normal=2)
+    let tsNs: Int64 = Int64(ts * 1_000_000_000.0)
+    let trackingStateInt = arkitTrackingStateInt(frame.camera.trackingState)
 
     // row-major 4×4 → [[Float; 4]; 4]
     let row0 = [t.columns.0[0], t.columns.1[0], t.columns.2[0], t.columns.3[0]]
@@ -368,31 +373,32 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       k.columns.0[2], k.columns.1[2], k.columns.2[2],
     ]
 
-    // IMU snapshot (= 直近 CMDeviceMotion)
+    // IMU snapshot (= 直近 CMDeviceMotion)。 schema は imu_high_rate.jsonl と揃える:
+    //   accel = userAccel + gravity, gyro = rotationRate, mag は zero placeholder
     let mot = motionManager.deviceMotion
     let imuDict: [String: Any]
     if let m = mot {
       imuDict = [
-        "orientation": [m.attitude.quaternion.x, m.attitude.quaternion.y, m.attitude.quaternion.z, m.attitude.quaternion.w],
-        "angular_velocity": [m.rotationRate.x, m.rotationRate.y, m.rotationRate.z],
-        "linear_acceleration": [
-          m.userAcceleration.x + m.gravity.x,
-          m.userAcceleration.y + m.gravity.y,
-          m.userAcceleration.z + m.gravity.z,
+        "accel": [
+          "x": m.userAcceleration.x + m.gravity.x,
+          "y": m.userAcceleration.y + m.gravity.y,
+          "z": m.userAcceleration.z + m.gravity.z,
         ],
+        "gyro": ["x": m.rotationRate.x, "y": m.rotationRate.y, "z": m.rotationRate.z],
       ]
     } else {
       imuDict = [:]
     }
 
     let line: [String: Any] = [
-      "ts": ts,
       "frame_index": frameIndex,
-      "tracking_state": trackingPair.state,
+      "timestamp_ns": tsNs,
+      "tracking_state": trackingStateInt,
       "tracking_reason": trackingPair.reason,
       "camera_transform": transformRows,
       "camera_intrinsics": intr,
       "imu": imuDict,
+      "hand_landmarks": ["left": [], "right": []],  // task 12 で hand-pose 統合時に埋める
     ]
 
     sensorFileQueue.async {
@@ -474,14 +480,35 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   private func appendImuLine(motion: CMDeviceMotion) {
     guard let handle = imuFileHandle else { return }
+    // 正規スキーマ (= gen-dummy-sensors.py + gtsam_eval.py が期待):
+    //   timestamp_ns: int
+    //   accel: {x, y, z}    (= userAccel + gravity、 重力込みの absolute 加速度)
+    //   gyro:  {x, y, z}    (= rotationRate)
+    //   mag (optional): {x, y, z}
+    //   device_motion (optional): {attitude, user_accel, gravity, rotation_rate}
+    let tsNs: Int64 = Int64(motion.timestamp * 1_000_000_000.0)
     let line: [String: Any] = [
-      "ts": motion.timestamp,
-      "orientation": [motion.attitude.quaternion.x, motion.attitude.quaternion.y, motion.attitude.quaternion.z, motion.attitude.quaternion.w],
-      "angular_velocity": [motion.rotationRate.x, motion.rotationRate.y, motion.rotationRate.z],
-      "linear_acceleration": [
-        motion.userAcceleration.x + motion.gravity.x,
-        motion.userAcceleration.y + motion.gravity.y,
-        motion.userAcceleration.z + motion.gravity.z,
+      "timestamp_ns": tsNs,
+      "accel": [
+        "x": motion.userAcceleration.x + motion.gravity.x,
+        "y": motion.userAcceleration.y + motion.gravity.y,
+        "z": motion.userAcceleration.z + motion.gravity.z,
+      ],
+      "gyro": [
+        "x": motion.rotationRate.x,
+        "y": motion.rotationRate.y,
+        "z": motion.rotationRate.z,
+      ],
+      "device_motion": [
+        "attitude": [
+          "qx": motion.attitude.quaternion.x,
+          "qy": motion.attitude.quaternion.y,
+          "qz": motion.attitude.quaternion.z,
+          "qw": motion.attitude.quaternion.w,
+        ],
+        "user_accel": ["x": motion.userAcceleration.x, "y": motion.userAcceleration.y, "z": motion.userAcceleration.z],
+        "gravity": ["x": motion.gravity.x, "y": motion.gravity.y, "z": motion.gravity.z],
+        "rotation_rate": ["x": motion.rotationRate.x, "y": motion.rotationRate.y, "z": motion.rotationRate.z],
       ],
     ]
     sensorFileQueue.async {
@@ -544,6 +571,17 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       try data.write(to: url, options: .atomic)
     } catch {
       NSLog("[ArkitCaptureController] camera_intrinsics.json write failed: %@", "\(error)")
+    }
+  }
+
+  /// ARCamera.TrackingState を Pipeline 2 メタデータ採点が期待する整数値に写像。
+  /// gen-dummy-sensors.py が `tracking_state: 2` (normal) を使うのに揃える。
+  ///   0 = notAvailable, 1 = limited, 2 = normal
+  private func arkitTrackingStateInt(_ s: ARCamera.TrackingState) -> Int {
+    switch s {
+    case .notAvailable: return 0
+    case .limited:      return 1
+    case .normal:       return 2
     }
   }
 
