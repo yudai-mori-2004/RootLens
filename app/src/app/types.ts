@@ -10,6 +10,7 @@
 // 撮影完了で対話サブモードに戻り、 ループ可能。 「終わり」 または戻るボタンで Home に戻る。
 
 export type RootStackParamList = {
+  Onboarding: undefined;     // 初回起動の welcome + ToS 同意 (UI_SPECS §9)
   Login: undefined;
   Main: undefined;           // MainTabs を埋め込むコンテナ画面
   CaptureMode: undefined;    // 対話 + カメラサブモード統合 (UI_SPECS §4 + §5)

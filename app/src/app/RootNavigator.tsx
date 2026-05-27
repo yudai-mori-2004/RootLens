@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
@@ -8,22 +8,35 @@ import { useAuth } from '../services/auth';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
 import { CaptureModeScreen } from '../screens/CaptureModeScreen';
+import { OnboardingScreen, isOnboardingCompleted } from '../screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// CaptureMode は MainTabs の上に push する root-stack の fullscreen modal。
-// 対話サブモード + カメラサブモードを 1 画面に統合 (UI_SPECS §4 + §5)。
-// 撮影完了で対話サブモードに戻り、 「終わり」 で MainTabs に pop する。
+// 起動時の判定:
+//   onboarding 未完了        → Onboarding screen (ウェルカム + ToS)
+//   onboarding 済 + 未認証   → Login screen
+//   onboarding 済 + 認証済   → MainTabs
 //
-// 起動時は AuthGate が auth state を確定させる:
-//   loading           → 全画面 spinner
-//   unauthenticated   → Login screen (initialRoute=Login)
-//   authenticated     → Main tabs (initialRoute=Main)
+// CaptureMode は MainTabs の上に push する fullscreen modal (UI_SPECS §4 + §5)。
 
 export const RootNavigator: React.FC = () => {
   const { state } = useAuth();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingDone, setOnboardingDone] = useState(false);
 
-  if (state.status === 'loading') {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const done = await isOnboardingCompleted();
+      if (!cancelled) {
+        setOnboardingDone(done);
+        setOnboardingChecked(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (state.status === 'loading' || !onboardingChecked) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.ink} />
@@ -32,10 +45,21 @@ export const RootNavigator: React.FC = () => {
   }
 
   const initialRoute: keyof RootStackParamList =
+    !onboardingDone ? 'Onboarding' :
     state.status === 'authenticated' ? 'Main' : 'Login';
 
   return (
     <Stack.Navigator initialRouteName={initialRoute} screenOptions={navigationHeaderOptions}>
+      <Stack.Screen name="Onboarding" options={{ headerShown: false }}>
+        {({ navigation }) => (
+          <OnboardingScreen
+            onCompleted={() => {
+              setOnboardingDone(true);
+              navigation.replace(state.status === 'authenticated' ? 'Main' : 'Login');
+            }}
+          />
+        )}
+      </Stack.Screen>
       <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen
