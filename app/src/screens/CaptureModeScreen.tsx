@@ -13,14 +13,13 @@ import {
   Image,
   LayoutChangeEvent,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { Camera } from 'expo-camera';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -512,9 +511,9 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   const isRecording = state.kind === 'recording' || state.kind === 'thumbs_up_holding' || state.kind === 'finalizing';
-  // 録画中もオーバーレイ (= ボックス + ランドマーク) を描く。 ストラップ時は見えないが、
-  // 手元に持って確認する時 / 他人が補助する時に framing がわかる。 GPU 負荷は SVG 数十要素なので軽い。
-  const showOverlay = true;
+  // 手のスケルトン overlay は撮影中 (= task 確定後) のみ表示。 dialogue 中は出さない方が
+  // 視覚的にクリーン。 task 13 で voice agent ON 後は dialogue 中も出す予定 (UI_SPECS §4.2)。
+  const showOverlay = task !== null;
 
   return (
     <View style={styles.root}>
@@ -568,8 +567,8 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
         ) : null}
       </View>
 
-      {/* 左上: 閉じる / 緊急停止。 circular で 40pt 角、 landscape でも邪魔にならない */}
-      <View style={[styles.chromeTopLeft, { top: insets.top + 12, left: insets.left + 12 }]}>
+      {/* 左上: 閉じる / 緊急停止。 SafeAreaView で orientation 変化時のレイアウト崩れを防ぐ。 */}
+      <SafeAreaView style={styles.chromeTopLeftSafe} edges={['top', 'left']}>
         <Pressable
           accessibilityLabel={isRecording ? '緊急停止' : '戻る'}
           onPress={onEmergencyStop}
@@ -585,7 +584,7 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
             <Line x1={14} y1={4} x2={4} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
           </Svg>
         </Pressable>
-      </View>
+      </SafeAreaView>
 
       {/* 中央上: タスク名 + 状態。 一行に詰めた pill (= 撮影中のみ表示) */}
       {task ? (
@@ -852,6 +851,12 @@ const styles = StyleSheet.create({
 
   // Floating chrome (= 画面の上に被せる UI 要素、 full-width バーは持たない)
   chromeTopLeft: { position: 'absolute' },
+  // SafeAreaView 版: 自身が absolute で top-left に固定、 内側に safe-area padding が乗る。
+  // orientation 変化時に inset 計算が一拍遅れる現象を回避する。
+  chromeTopLeftSafe: {
+    position: 'absolute', top: 0, left: 0,
+    padding: 12,
+  },
   chromeTopCenter: { position: 'absolute', alignItems: 'center' },
   chromeTopRight: { position: 'absolute' },
   chromeBottom: { position: 'absolute' },

@@ -57,31 +57,14 @@ function imageRectInView(
   }
 }
 
-export const CaptureHandOverlay: React.FC<Props> = ({ width, height, hands, wellFramed, imageWidth, imageHeight }) => {
+export const CaptureHandOverlay: React.FC<Props> = ({ width, height, hands, imageWidth, imageHeight }) => {
   const rect = imageRectInView(width, height, imageWidth, imageHeight);
-
-  // 中央 60% safe zone は VIEW 全体ではなく IMAGE rect の内側 8% 余白で描く
-  // (= HandTracker.frameSafeMargin と一致、 ランドマークと同じ座標系)
-  const pad = 0.08;
-  const boxX = rect.x + pad * rect.w;
-  const boxY = rect.y + pad * rect.h;
-  const boxW = (1 - 2 * pad) * rect.w;
-  const boxH = (1 - 2 * pad) * rect.h;
-  const boxColor = wellFramed ? '#1FA679' : 'rgba(255,255,255,0.5)';
+  // 中央 60% safe zone box はデバッグ的に派手なので削除 (= プレビューがクリーンに)。
+  // フレーミング状態は BGM 音量変化と 「ドリフト方向」 音声で伝えるので視覚枠は不要。
 
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { width, height }]}>
       <Svg width={width} height={height}>
-        <Rect
-          x={boxX}
-          y={boxY}
-          width={boxW}
-          height={boxH}
-          stroke={boxColor}
-          strokeWidth={2}
-          fill="none"
-        />
-
         {hands.map((hand, hi) => (
           <React.Fragment key={hi}>
             {FINGER_CONNECTIONS.map(([a, b], ci) => {
