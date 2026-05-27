@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   LayoutChangeEvent,
   Pressable,
@@ -635,29 +636,72 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
 //     ① タスクタイル横スクロール (= UI_SPECS §4.5 ハンバーガーメニュー相当の fallback)
 //     ② テキスト入力 (= STT 代用、 「Hey Lens」 mock)
 
+// "Ephemeral Correspondence" — 2 メッセージは束の間のカード。 履歴感ゼロ、 スクロール禁忌。
+// AI の応答だけが「ステージ」 (= 大型 cream card)、 ユーザの発話は記録の側注 (= 小さい mono pill)。
+
+const AGENT_FADE_AFTER_MS = 8_000;
+const USER_FADE_AFTER_MS = 4_000;
+
 const DialogueOverlay: React.FC<{
   onSelectTask: (taskId: string) => void;
   onExit: () => void;
   topInset: number;
 }> = ({ onSelectTask, onExit, topInset }) => {
-  const [userText, setUserText] = useState('');
   const [draft, setDraft] = useState('');
-  const [agentText, setAgentText] = useState<string | null>(null);
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [agentMsg, setAgentMsg] = useState<{ text: string; id: number } | null>(null);
+  const [userMsg, setUserMsg] = useState<{ text: string; id: number } | null>(null);
   const historyRef = useRef<AgentTurn[]>([]);
+
+  // 自動 fade out (= 履歴感を出さないため必須)
+  useEffect(() => {
+    if (!agentMsg) return;
+    const t = setTimeout(() => {
+      setAgentMsg((cur) => (cur && cur.id === agentMsg.id ? null : cur));
+    }, AGENT_FADE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [agentMsg]);
+  useEffect(() => {
+    if (!userMsg) return;
+    const t = setTimeout(() => {
+      setUserMsg((cur) => (cur && cur.id === userMsg.id ? null : cur));
+    }, USER_FADE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [userMsg]);
+
+  // 入力欄 border の thinking pulse (= spinner より上品)
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!thinking) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: false }),
+        Animated.timing(pulse, { toValue: 0, duration: 800, useNativeDriver: false }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [thinking, pulse]);
+  const pulseBorderColor = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255,255,255,0.15)', 'rgba(31,166,121,0.85)'],
+  });
 
   const sendToAgent = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || thinking) return;
     setError(null);
-    setUserText(trimmed);
+    setUserMsg({ text: trimmed, id: Date.now() });
     setDraft('');
     setThinking(true);
     try {
       const ctx = buildDeviceContext({
-        orientation: 'portrait',          // TODO: 実値を取る
-        tracking_state: 'normal',         // TODO: ARKit 経由で取得
+        orientation: 'portrait',
+        tracking_state: 'normal',
         hands_detected: { left: false, right: false },
         selected_task: null,
         clips_recorded_this_session: 0,
@@ -673,23 +717,18 @@ const DialogueOverlay: React.FC<{
         { role: 'user', text: trimmed },
         { role: 'assistant', text: resp.response_text },
       ];
-      setAgentText(resp.response_text);
+      setAgentMsg({ text: resp.response_text, id: Date.now() });
       speak(resp.response_text);
 
-      // action 解釈
       if (resp.action.type === 'task_matched' && resp.action.task_id) {
-        // 「基準確認しますか?」 のような確認ターン → ユーザの 「始めて」 待ち
-        if (!resp.action.await_user_confirmation) {
-          onSelectTask(resp.action.task_id);
-        }
+        if (!resp.action.await_user_confirmation) onSelectTask(resp.action.task_id);
       } else if (resp.action.type === 'start_recording' && resp.action.task_id) {
         onSelectTask(resp.action.task_id);
       } else if (resp.action.type === 'end_session') {
         onExit();
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setThinking(false);
     }
@@ -697,37 +736,17 @@ const DialogueOverlay: React.FC<{
 
   return (
     <View style={dialogueStyles.root} pointerEvents="box-none">
-      {/* 全体に薄い scrim をかけてカメラプレビューを和らげる */}
       <View style={dialogueStyles.scrim} pointerEvents="none" />
 
-      {/* 上部: AI 応答 toast (= 常時表示、 来たら更新) */}
-      <View style={[dialogueStyles.topArea, { paddingTop: topInset + 12 }]} pointerEvents="none">
-        {agentText ? (
-          <View style={dialogueStyles.agentToast}>
-            <Text style={dialogueStyles.agentToastEyebrow}>HEY LENS</Text>
-            <Text style={dialogueStyles.agentToastText}>{agentText}</Text>
-          </View>
-        ) : (
-          <View style={dialogueStyles.idlePrompt}>
-            <Text style={dialogueStyles.idleEyebrow}>STT · TEXT FALLBACK</Text>
-            <Text style={dialogueStyles.idleCue}>
-              <Text style={dialogueStyles.idleCueAccent}>“Hey Lens.”</Text>
-            </Text>
-            <Text style={dialogueStyles.idleBody}>
-              話しかけるか、 下のボックスに入力してください。
-            </Text>
-          </View>
-        )}
-        {userText ? (
-          <View style={dialogueStyles.userToast}>
-            <Text style={dialogueStyles.userToastIcon}>🎙</Text>
-            <Text style={dialogueStyles.userToastText} numberOfLines={2}>{userText}</Text>
-          </View>
-        ) : null}
+      {/* AI card — close ボタンの下、 出現時のみ。 履歴は重ねない。 */}
+      <View
+        style={[dialogueStyles.agentSlot, { top: topInset + 64 }]}
+        pointerEvents="none"
+      >
+        {agentMsg ? <AgentCard key={agentMsg.id} text={agentMsg.text} /> : null}
       </View>
 
-      {/* 下部: タスクタイル + テキスト入力 */}
-      <View style={dialogueStyles.bottomArea}>
+      <View style={dialogueStyles.bottomArea} pointerEvents="box-none">
         <Text style={dialogueStyles.pickerEyebrow}>QUICK PICK</Text>
         <ScrollView
           horizontal
@@ -739,19 +758,32 @@ const DialogueOverlay: React.FC<{
           ))}
         </ScrollView>
 
+        {/* User echo (= 4 秒で消える小さい pill) または idle hint (= 何も無い時のみ) */}
+        <View style={dialogueStyles.echoSlot} pointerEvents="none">
+          {userMsg ? (
+            <UserEcho key={userMsg.id} text={userMsg.text} />
+          ) : !agentMsg && !thinking ? (
+            <Text style={dialogueStyles.idleHint}>
+              <Text style={dialogueStyles.idleHintAccent}>“Hey Lens”</Text> と話しかけるか、 下に入力
+            </Text>
+          ) : null}
+        </View>
+
         <View style={dialogueStyles.inputRow}>
-          <TextInput
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={thinking ? '考え中…' : '話しかける (例: 洗い物しよう)'}
-            placeholderTextColor="rgba(255,255,255,0.45)"
-            style={dialogueStyles.input}
-            editable={!thinking}
-            onSubmitEditing={() => sendToAgent(draft)}
-            returnKeyType="send"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
+          <Animated.View style={[dialogueStyles.inputWrap, thinking && { borderColor: pulseBorderColor as unknown as string }]}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={thinking ? '考え中…' : '例: 洗い物しよう'}
+              placeholderTextColor="rgba(255,255,255,0.45)"
+              style={dialogueStyles.input}
+              editable={!thinking}
+              onSubmitEditing={() => sendToAgent(draft)}
+              returnKeyType="send"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+          </Animated.View>
           <Pressable
             onPress={() => sendToAgent(draft)}
             disabled={thinking || !draft.trim()}
@@ -760,14 +792,11 @@ const DialogueOverlay: React.FC<{
               (thinking || !draft.trim()) && dialogueStyles.sendBtnDisabled,
               pressed && dialogueStyles.sendBtnPressed,
             ]}
+            accessibilityLabel="送信"
           >
-            {thinking ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Svg width={16} height={16} viewBox="0 0 16 16">
-                <Path d="M3 8h10m-3 -3 3 3 -3 3" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </Svg>
-            )}
+            <Svg width={16} height={16} viewBox="0 0 16 16">
+              <Path d="M3 8h10m-3 -3 3 3 -3 3" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </Svg>
           </Pressable>
         </View>
         {error ? (
@@ -775,6 +804,50 @@ const DialogueOverlay: React.FC<{
         ) : null}
       </View>
     </View>
+  );
+};
+
+// ─── 子コンポーネント (= AI card と User echo) ─────────────────────────
+
+const AgentCard: React.FC<{ text: string }> = ({ text }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 280, useNativeDriver: true }),
+    ]).start();
+    // 7 秒後から fade out 始める (= AGENT_FADE_AFTER_MS と合わせて 8 秒)
+    const t = setTimeout(() => {
+      Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }).start();
+    }, AGENT_FADE_AFTER_MS - 400);
+    return () => clearTimeout(t);
+  }, [opacity, translateY]);
+  return (
+    <Animated.View style={[dialogueStyles.agentCard, { opacity, transform: [{ translateY }] }]}>
+      <View style={dialogueStyles.agentEyebrowRow}>
+        <View style={dialogueStyles.agentDot} />
+        <Text style={dialogueStyles.agentEyebrow}>HEY LENS</Text>
+      </View>
+      <Text style={dialogueStyles.agentText}>{text}</Text>
+    </Animated.View>
+  );
+};
+
+const UserEcho: React.FC<{ text: string }> = ({ text }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+    const t = setTimeout(() => {
+      Animated.timing(opacity, { toValue: 0, duration: 400, useNativeDriver: true }).start();
+    }, USER_FADE_AFTER_MS - 400);
+    return () => clearTimeout(t);
+  }, [opacity]);
+  return (
+    <Animated.View style={[dialogueStyles.userEcho, { opacity }]}>
+      <Text style={dialogueStyles.userEchoIcon}>›</Text>
+      <Text style={dialogueStyles.userEchoText} numberOfLines={1}>{text}</Text>
+    </Animated.View>
   );
 };
 
@@ -798,93 +871,60 @@ const TaskTile: React.FC<{ task: TaskDef; onPress: () => void }> = ({ task, onPr
 
 const dialogueStyles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,38,0.42)' },
+  // 全体 scrim は控えめ (= AI card 自身が背景を持つので二重に暗くしない)
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,38,0.18)' },
 
-  topArea: {
+  // ─── AI card slot (= close ボタンの真下、 出現時のみ描画) ────────────
+  agentSlot: {
     position: 'absolute',
-    top: 0,
     left: 0,
     right: 0,
+    alignItems: 'center',
     paddingHorizontal: spacing.xl,
-    gap: spacing.sm,
   },
-
-  // AI 応答 toast (UI_SPECS §4.2 上部トースト)
-  agentToast: {
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderRadius: radii.lg,
+  agentCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: colors.paper,          // warm cream paper
+    borderRadius: radii.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(14,31,68,0.18)',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    paddingVertical: spacing.md + 2,
+    gap: spacing.xs,
+    // 浮遊感: 二重シャドウ (= 紙が机に乗ってる感じ)
+    shadowColor: '#0E1F44',
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 12,
   },
-  agentToastEyebrow: {
+  agentEyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  agentDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: colors.emerald,
+  },
+  agentEyebrow: {
     fontFamily: fonts.sansSemibold,
     fontSize: 9.5,
-    letterSpacing: 1.6,
+    letterSpacing: 1.8,
     color: colors.emeraldDeep,
   },
-  agentToastText: {
+  agentText: {
     fontFamily: fonts.serifMedium,
-    fontSize: 16,
-    lineHeight: 22,
-    letterSpacing: -0.1,
+    fontSize: 18,
+    lineHeight: 26,
+    letterSpacing: -0.15,
     color: colors.ink,
   },
 
-  // idle prompt (= AI 応答がまだ無いときの placeholder)
-  idlePrompt: {
-    gap: 4,
-    alignItems: 'flex-start',
-  },
-  idleEyebrow: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 10,
-    letterSpacing: 1.6,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  idleCue: {
-    fontFamily: fonts.serifLight,
-    fontSize: 38,
-    lineHeight: 44,
-    letterSpacing: -0.5,
-    color: '#fff',
-    marginTop: 2,
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  idleCueAccent: { fontFamily: fonts.serifMedium },
-  idleBody: {
-    fontFamily: fonts.sansRegular,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.82)',
-    marginTop: 2,
-  },
-
-  // ユーザ発話 toast (UI_SPECS §4.2 下部トースト、 ただし機能上は上に配置)
-  userToast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(14,31,68,0.78)',
-    borderRadius: radii.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    maxWidth: '85%',
-  },
-  userToastIcon: { fontSize: 14 },
-  userToastText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: '#fff',
-    flexShrink: 1,
-  },
-
+  // ─── bottom area (= tile + echo + input) ─────────────────────────────
   bottomArea: {
     position: 'absolute',
     left: 0,
@@ -897,33 +937,81 @@ const dialogueStyles = StyleSheet.create({
     fontFamily: fonts.sansSemibold,
     fontSize: 10,
     letterSpacing: 1.6,
-    color: 'rgba(255,255,255,0.55)',
+    color: 'rgba(255,255,255,0.6)',
     paddingHorizontal: spacing.xl,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   pickerScroll: {
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
 
-  // 入力行 (= STT 代用 text input)
+  // user echo / idle hint は同じ slot (= 入力欄の真上、 高さ固定)
+  echoSlot: {
+    minHeight: 26,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.xs,
+  },
+  userEcho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  userEchoIcon: {
+    fontFamily: fonts.mono,
+    fontSize: 14,
+    color: colors.emerald,
+    fontWeight: '700',
+  },
+  userEchoText: {
+    fontFamily: fonts.mono,
+    fontSize: 12.5,
+    letterSpacing: 0.2,
+    color: 'rgba(255,255,255,0.92)',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+    flexShrink: 1,
+  },
+  idleHint: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  idleHintAccent: {
+    fontFamily: fonts.serifMedium,
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 12.5,
+  },
+
+  // 入力行 (= STT 代用)
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    marginTop: 4,
+  },
+  inputWrap: {
+    flex: 1,
+    backgroundColor: 'rgba(14,31,68,0.82)',
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   input: {
-    flex: 1,
-    backgroundColor: 'rgba(14,31,68,0.78)',
-    borderRadius: radii.full,
     paddingHorizontal: spacing.lg,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontFamily: fonts.sansRegular,
     fontSize: 15,
     color: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
   },
   sendBtn: {
     width: 44,
@@ -932,8 +1020,12 @@ const dialogueStyles = StyleSheet.create({
     backgroundColor: colors.emerald,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.emeraldDeep,
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
-  sendBtnDisabled: { opacity: 0.4 },
+  sendBtnDisabled: { opacity: 0.35 },
   sendBtnPressed: { opacity: 0.7 },
   errorText: {
     paddingHorizontal: spacing.xl,
