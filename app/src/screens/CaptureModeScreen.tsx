@@ -738,27 +738,13 @@ const DialogueOverlay: React.FC<{
     <View style={dialogueStyles.root} pointerEvents="box-none">
       <View style={dialogueStyles.scrim} pointerEvents="none" />
 
-      {/* AI card — close ボタンの下、 出現時のみ。 履歴は重ねない。 */}
-      <View
-        style={[dialogueStyles.agentSlot, { top: topInset + 64 }]}
-        pointerEvents="none"
-      >
-        {agentMsg ? <AgentCard key={agentMsg.id} text={agentMsg.text} /> : null}
-      </View>
+      {/* 全要素を画面下に縦スタック。 視線移動最小化のため AI 応答 → 入力 → タスクは
+          すべて隣接させる。 AI card は出現/消滅で stack が上下に伸縮する (= push)。 */}
+      <View style={dialogueStyles.bottomStack} pointerEvents="box-none">
+        <View style={dialogueStyles.agentSlot} pointerEvents="none">
+          {agentMsg ? <AgentCard key={agentMsg.id} text={agentMsg.text} /> : null}
+        </View>
 
-      <View style={dialogueStyles.bottomArea} pointerEvents="box-none">
-        <Text style={dialogueStyles.pickerEyebrow}>QUICK PICK</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={dialogueStyles.pickerScroll}
-        >
-          {TASKS.map((task) => (
-            <TaskTile key={task.id} task={task} onPress={() => onSelectTask(task.id)} />
-          ))}
-        </ScrollView>
-
-        {/* User echo (= 4 秒で消える小さい pill) または idle hint (= 何も無い時のみ) */}
         <View style={dialogueStyles.echoSlot} pointerEvents="none">
           {userMsg ? (
             <UserEcho key={userMsg.id} text={userMsg.text} />
@@ -802,6 +788,20 @@ const DialogueOverlay: React.FC<{
         {error ? (
           <Text style={dialogueStyles.errorText} numberOfLines={2}>AI: {error}</Text>
         ) : null}
+
+        {/* タスクタイル (= fallback、 入力 / 音声で済む人は触らない) */}
+        <View style={dialogueStyles.quickPickWrap}>
+          <Text style={dialogueStyles.pickerEyebrow}>QUICK PICK</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={dialogueStyles.pickerScroll}
+          >
+            {TASKS.map((task) => (
+              <TaskTile key={task.id} task={task} onPress={() => onSelectTask(task.id)} />
+            ))}
+          </ScrollView>
+        </View>
       </View>
     </View>
   );
@@ -874,13 +874,19 @@ const dialogueStyles = StyleSheet.create({
   // 全体 scrim は控えめ (= AI card 自身が背景を持つので二重に暗くしない)
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,38,0.18)' },
 
-  // ─── AI card slot (= close ボタンの真下、 出現時のみ描画) ────────────
-  agentSlot: {
+  // ─── 下部スタック (= AI card → echo → input → quick pick が縦に隣接) ───
+  bottomStack: {
     position: 'absolute',
     left: 0,
     right: 0,
-    alignItems: 'center',
+    bottom: 24,
     paddingHorizontal: spacing.xl,
+    gap: spacing.sm,
+    alignItems: 'stretch',
+  },
+  agentSlot: {
+    alignItems: 'center',
+    // 出現時のみ高さを持つ。 何も無い時は collapse して下にスタックが詰まる。
   },
   agentCard: {
     width: '100%',
@@ -924,15 +930,13 @@ const dialogueStyles = StyleSheet.create({
     color: colors.ink,
   },
 
-  // ─── bottom area (= tile + echo + input) ─────────────────────────────
-  bottomArea: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 24,
-    gap: spacing.sm,
+  // ─── quick pick (= bottom stack 内、 入力欄の真下) ────────────────────
+  quickPickWrap: {
+    gap: 6,
+    marginTop: spacing.sm,
+    // bottomStack の paddingHorizontal を相殺してタイル横スクロールは画面端まで伸ばす
+    marginHorizontal: -spacing.xl,
   },
-
   pickerEyebrow: {
     fontFamily: fonts.sansSemibold,
     fontSize: 10,
@@ -948,12 +952,10 @@ const dialogueStyles = StyleSheet.create({
     gap: spacing.md,
   },
 
-  // user echo / idle hint は同じ slot (= 入力欄の真上、 高さ固定)
+  // user echo / idle hint は同じ slot (= AI カードと入力欄の間の高さ固定行)
   echoSlot: {
-    minHeight: 26,
+    minHeight: 22,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    marginTop: spacing.xs,
   },
   userEcho: {
     flexDirection: 'row',
@@ -991,13 +993,11 @@ const dialogueStyles = StyleSheet.create({
     fontSize: 12.5,
   },
 
-  // 入力行 (= STT 代用)
+  // 入力行 (= STT 代用、 cluster の最下段)
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    marginTop: 4,
   },
   inputWrap: {
     flex: 1,
@@ -1028,7 +1028,6 @@ const dialogueStyles = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.35 },
   sendBtnPressed: { opacity: 0.7 },
   errorText: {
-    paddingHorizontal: spacing.xl,
     fontFamily: fonts.sansMedium,
     fontSize: 11,
     color: '#FCC',
