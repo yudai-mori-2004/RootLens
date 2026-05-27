@@ -519,7 +519,10 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.root}>
-      {/* Camera preview は画面全体を占有 (= 黒い chrome 領域なし) */}
+      {/* Camera preview は full bleed (= iOS Camera と同じく端から端まで描画)。
+          動的島 / home indicator は preview の上に被さる形になるが、 landscape では
+          縦方向の貴重なスペースを safe area 帯で削らずに済む。 UI 要素 (close button、
+          header pill、 REC、 bottomStack) は個別に safe area 考慮の位置に置く。 */}
       <View style={styles.preview} onLayout={onPreviewLayout}>
         <ArkitCapturePreviewView style={StyleSheet.absoluteFill} />
         {showOverlay && previewSize.width > 0 && handEvent ? (
@@ -612,7 +615,6 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
               setTaskId(id);
             }}
             onExit={() => navigation.goBack()}
-            topInset={insets.top}
             showQuickPick={!task}
           />
         );
@@ -672,10 +674,10 @@ const DEMO_LISTEN_MS = 4_000;
 const DialogueOverlay: React.FC<{
   onSelectTask: (taskId: string) => void;
   onExit: () => void;
-  topInset: number;
   /// タスク選択タイルを表示するか。 タスク選択済の中盤では入力だけ残せばよい。 default true。
   showQuickPick?: boolean;
-}> = ({ onSelectTask, onExit, topInset, showQuickPick = true }) => {
+}> = ({ onSelectTask, onExit, showQuickPick = true }) => {
+  const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState('');
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -803,7 +805,14 @@ const DialogueOverlay: React.FC<{
       {/* 全要素を画面下に縦スタック。 視線移動最小化のため AI 応答 → 入力 → タスクは
           すべて隣接させる。 AI card は出現/消滅で stack が上下に伸縮する (= push)。
           キーボード分は bottom offset に加算してそのまま上に持ち上げる。 */}
-      <View style={[dialogueStyles.bottomStack, { bottom: keyboardHeight + 24 }]} pointerEvents="box-none">
+      <View
+        style={[
+          dialogueStyles.bottomStack,
+          // keyboard 上昇分 + home indicator (= insets.bottom) + 16pt 余白
+          { bottom: keyboardHeight + insets.bottom + 16 },
+        ]}
+        pointerEvents="box-none"
+      >
         <View style={dialogueStyles.agentSlot} pointerEvents="none">
           {agentMsg ? <AgentCard key={agentMsg.id} text={agentMsg.text} /> : null}
         </View>
