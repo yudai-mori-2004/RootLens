@@ -588,14 +588,34 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : null}
 
-      {/* 対話サブモード overlay (= taskId が無いとき) */}
-      {!task ? (
-        <DialogueOverlay
-          onSelectTask={(id) => setTaskId(id)}
-          onExit={() => navigation.goBack()}
-          topInset={insets.top}
-        />
-      ) : null}
+      {/* 対話 overlay。 task 未選択時、 もしくは task 選択済でもまだ録画開始前なら
+          表示し続ける (= ユーザが「やっぱりやめる」「別タスク」 を言える余地を残す)。
+          録画中 (= recording / thumbs_up_holding / finalizing / reviewing) は
+          UI_SPECS §5.1 通りチャットは閉じる。 */}
+      {(() => {
+        const preRecording =
+          state.kind === 'await_palm' ||
+          state.kind === 'palm_holding' ||
+          state.kind === 'vlm_start_checking' ||
+          state.kind === 'countdown';
+        const chatAvailable = !task || preRecording;
+        if (!chatAvailable) return null;
+        return (
+          <DialogueOverlay
+            onSelectTask={(id) => {
+              // 既存タスクから別タスクへ切替: state machine を await_palm に reset
+              if (taskId && id !== taskId) {
+                dispatch({ kind: 'retake' });
+                recordingStartedRef.current = false;
+                recordingFinalizedRef.current = false;
+              }
+              setTaskId(id);
+            }}
+            onExit={() => navigation.goBack()}
+            topInset={insets.top}
+          />
+        );
+      })()}
 
       {/* 右上: REC indicator (録画中のみ) */}
       {isRecording ? (
