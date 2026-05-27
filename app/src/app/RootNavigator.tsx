@@ -7,13 +7,13 @@ import { useAuth } from '../services/auth';
 
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
-import { TaskBriefingScreen } from '../screens/TaskBriefingScreen';
-import { CaptureScreen } from '../screens/CaptureScreen';
+import { CaptureModeScreen } from '../screens/CaptureModeScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// 撮影フロー (TaskBriefing → Capture) は MainTabs の上に push する root-stack screen。
-// Capture 完了時 (= 「送る」 押下) は popToTop で MainTabs の Home タブに戻る。
+// CaptureMode は MainTabs の上に push する root-stack の fullscreen modal。
+// 対話サブモード + カメラサブモードを 1 画面に統合 (UI_SPECS §4 + §5)。
+// 撮影完了で対話サブモードに戻り、 「終わり」 で MainTabs に pop する。
 //
 // 起動時は AuthGate が auth state を確定させる:
 //   loading           → 全画面 spinner
@@ -39,14 +39,9 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen
-        name="TaskBriefing"
-        component={TaskBriefingScreen}
-        options={{ title: '', presentation: 'card' }}
-      />
-      <Stack.Screen
-        name="Capture"
-        component={CaptureScreen}
-        options={{ title: 'Record', headerShown: false, presentation: 'fullScreenModal' }}
+        name="CaptureMode"
+        component={CaptureModeScreen}
+        options={{ headerShown: false, presentation: 'fullScreenModal' }}
       />
     </Stack.Navigator>
   );

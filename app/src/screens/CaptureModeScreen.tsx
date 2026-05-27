@@ -1,16 +1,27 @@
+// 撮影モード (UI_SPECS_JA §4 + §5)。
+//
+// 1 画面内で「対話サブモード」 と 「カメラサブモード」 を切替える:
+//   taskId == null  → 対話サブモード (= タスク選択 placeholder、 voice agent は task 13 で本実装)
+//   taskId != null  → カメラサブモード (= captureFlow state machine 駆動)
+//
+// 視覚的断絶を作らないため、 ARKit session と hand tracking subscription は phase 切替で
+// 持続する。 撮影完了で taskId=null に戻して次タスク待ちに復帰、 ループ可能 (UI_SPECS §2.2)。
+
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   LayoutChangeEvent,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Line } from 'react-native-svg';
+import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { Camera } from 'expo-camera';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,7 +41,7 @@ import {
 } from '../native/arkitCapture';
 import { useCaptureOrientationLock } from '../hooks/useScreenOrientation';
 import { PhoneOrientationIcon } from '../components/PhoneOrientationIcon';
-import { findTask } from '../domain/taskCatalog';
+import { findTask, TASKS, type TaskDef } from '../domain/taskCatalog';
 import { clipStore } from '../services/clipPipeline';
 import * as FileSystem from 'expo-file-system';
 import {
@@ -43,9 +54,9 @@ import {
 import { evaluateTaskGate } from '../services/vlmGate';
 import { RealtimeFeedback } from '../services/realtimeFeedback';
 import { CaptureHandOverlay } from '../components/CaptureHandOverlay';
-import { colors, spacing, radii } from '../theme';
+import { colors, fonts, spacing, radii, typography } from '../theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Capture'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'CaptureMode'>;
 
 /// expo-screen-orientation の Orientation 値を native module の DisplayOrientation に写像。
 /// FACE_UP / FACE_DOWN / UNKNOWN は portrait と同じ扱い (= 直立復帰時の fallback)。
@@ -129,8 +140,10 @@ function computeDriftDirection(
   return 'bottom';
 }
 
-export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
-  const task = findTask(route.params.taskId);
+export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
+  // 撮影中タスク (= null なら対話サブモード)。 撮影完了で null に戻して次タスク待ち。
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const task = taskId ? findTask(taskId) : null;
   const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [available, setAvailable] = useState<boolean | null>(null);
   const [state, dispatch] = useReducer(captureReducer, initialCaptureState);
@@ -322,7 +335,7 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, [state.kind, route.params.taskId, task]);
+  }, [state.kind, taskId, task]);
 
   // カウントダウンの残り秒表示
   useEffect(() => {
@@ -388,7 +401,7 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
         }
       })();
     }
-  }, [state, navigation, route.params.taskId, task]);
+  }, [state, navigation, taskId, task]);
 
   // クリーンアップ
   useEffect(() => {
@@ -405,22 +418,22 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
     setPreviewSize({ width, height });
   }, []);
 
-  // reviewing → 「送る」: clipPipeline に enqueue して Main の Collection タブへ遷移
+  // reviewing → 「送る」: clipPipeline に enqueue して、 対話サブモードに戻る (UI_SPECS §2.2)。
+  // ホームには戻らない (= ヘッドマウントを外さずに次タスクへループ可能)。
   const onReviewSend = useCallback(() => {
-    if (state.kind !== 'reviewing') return;
+    if (state.kind !== 'reviewing' || !taskId) return;
     clipStore.enqueue({
-      taskId: route.params.taskId,
+      taskId,
       sessionDirUri: state.sessionDirUri,
       achievementConfidence: state.achievementConfidence,
       snapshotUri: state.snapshotUri ?? undefined,
     });
-    // popToTop() だけだと Main の先頭タブに戻る (= 元 Job タブ → 現 Home)。
-    // Home タブを明示的に指定 (= UI_SPECS §2.1)、 user が新クリップを即見られるようにする。
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Main', state: { routes: [{ name: 'Home' }], index: 0 } as any }],
-    });
-  }, [state, navigation, route.params.taskId]);
+    // state machine と内部 ref を全部 reset して dialogue mode に戻る
+    recordingFinalizedRef.current = false;
+    recordingStartedRef.current = false;
+    dispatch({ kind: 'retake' });
+    setTaskId(null);
+  }, [state, taskId]);
 
   // reviewing → 「撮り直す」: セッションディレクトリ丸ごと破棄して await_palm に戻る
   const onReviewRetake = useCallback(() => {
@@ -438,9 +451,10 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
     dispatch({ kind: 'retake' });
   }, [state]);
 
-  // 緊急停止ボタン (= ハンドサインが効かないときの脱出口)。
-  // 録画中だった場合は MCAP を保存して reviewing 状態に遷移する (= 撮影者が「送る / 撮り直す」 を選ぶ)。
-  // 録画前だった場合は前画面に戻る。
+  // 緊急停止 / 戻るボタン。
+  //   録画中: MCAP を保存して reviewing 状態へ
+  //   カメラサブモード (= 待機中): dialogue に戻る (= タスク選択し直し)
+  //   対話サブモード: Home タブへ
   const onEmergencyStop = useCallback(() => {
     if (recordingStartedRef.current && !recordingFinalizedRef.current) {
       recordingFinalizedRef.current = true;
@@ -456,19 +470,15 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
           setError(`録画停止に失敗: ${e?.message ?? e}`);
         }
       })();
+    } else if (taskId !== null) {
+      // タスク選択済だがまだ未録画 → dialogue に戻ってタスク選び直し
+      dispatch({ kind: 'retake' });
+      setTaskId(null);
     } else {
       navigation.goBack();
     }
-  }, [navigation]);
+  }, [navigation, taskId]);
 
-  if (!task) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <Text style={styles.eyebrow}>NOT FOUND</Text>
-        <Text style={styles.body}>Task "{route.params.taskId}" not found.</Text>
-      </SafeAreaView>
-    );
-  }
   if (permission === 'pending' || available === null) {
     return (
       <SafeAreaView style={styles.center}>
@@ -526,7 +536,7 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.countdownText}>{countdownRemaining}</Text>
           </View>
         ) : null}
-        {orientationMismatch ? (
+        {task && orientationMismatch ? (
           <View style={styles.orientationGate} pointerEvents="none">
             <View style={styles.orientationGateIcon}>
               <PhoneOrientationIcon
@@ -577,17 +587,28 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
         </Pressable>
       </View>
 
-      {/* 中央上: タスク名 + 状態。 一行に詰めた pill。 タップ無し、 視認のみ */}
-      <View
-        style={[styles.chromeTopCenter, { top: insets.top + 12, left: insets.left + 60, right: insets.right + 60 }]}
-        pointerEvents="none"
-      >
-        <View style={styles.headerPill}>
-          <Text style={styles.headerTask} numberOfLines={1}>{task.name}</Text>
-          <View style={styles.headerSep} />
-          <Text style={styles.headerStatus} numberOfLines={1}>{describeState(state)}</Text>
+      {/* 中央上: タスク名 + 状態。 一行に詰めた pill (= 撮影中のみ表示) */}
+      {task ? (
+        <View
+          style={[styles.chromeTopCenter, { top: insets.top + 12, left: insets.left + 60, right: insets.right + 60 }]}
+          pointerEvents="none"
+        >
+          <View style={styles.headerPill}>
+            <Text style={styles.headerTask} numberOfLines={1}>{task.name}</Text>
+            <View style={styles.headerSep} />
+            <Text style={styles.headerStatus} numberOfLines={1}>{describeState(state)}</Text>
+          </View>
         </View>
-      </View>
+      ) : null}
+
+      {/* 対話サブモード overlay (= taskId が無いとき) */}
+      {!task ? (
+        <DialogueOverlay
+          onSelectTask={(id) => setTaskId(id)}
+          onExit={() => navigation.goBack()}
+          topInset={insets.top}
+        />
+      ) : null}
 
       {/* 右上: REC indicator (録画中のみ) */}
       {isRecording ? (
@@ -616,6 +637,159 @@ export const CaptureScreen: React.FC<Props> = ({ route, navigation }) => {
     </View>
   );
 };
+
+// ─── DialogueOverlay (UI_SPECS §4) ───────────────────────────────────
+//
+// 対話サブモードの画面。 voice agent (= task 13 で sherpa-onnx + Claude Haiku) が
+// 来るまでは手動タスク選択がメイン。 カメラプレビューは下に常時透けて見える。
+//
+// レイアウト:
+//   上部: 「Hey Lens」 placeholder + マイクアイコン (= voice 来てから本実装)
+//   下部: タスク選択タイル (2 列 grid、 横スクロール可)
+
+const DialogueOverlay: React.FC<{
+  onSelectTask: (taskId: string) => void;
+  onExit: () => void;
+  topInset: number;
+}> = ({ onSelectTask, topInset }) => {
+  return (
+    <View style={dialogueStyles.root} pointerEvents="box-none">
+      {/* 全体に薄い scrim をかけてカメラプレビューを和らげる */}
+      <View style={dialogueStyles.scrim} pointerEvents="none" />
+
+      <View style={[dialogueStyles.voiceLedge, { paddingTop: topInset + 12 }]} pointerEvents="none">
+        <Text style={dialogueStyles.voiceEyebrow}>VOICE · COMING SOON</Text>
+        <Text style={dialogueStyles.voiceCue}>
+          <Text style={dialogueStyles.voiceCueAccent}>“Hey Lens.”</Text>
+        </Text>
+        <Text style={dialogueStyles.voiceBody}>
+          下のタスクをタップすると撮影を開始します。
+        </Text>
+      </View>
+
+      <View style={dialogueStyles.pickerWrap}>
+        <Text style={dialogueStyles.pickerEyebrow}>SELECT TASK · MANUAL</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={dialogueStyles.pickerScroll}
+        >
+          {TASKS.map((task) => (
+            <TaskTile key={task.id} task={task} onPress={() => onSelectTask(task.id)} />
+          ))}
+        </ScrollView>
+      </View>
+    </View>
+  );
+};
+
+const TaskTile: React.FC<{ task: TaskDef; onPress: () => void }> = ({ task, onPress }) => {
+  const [lo, hi] = task.durationMin;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [dialogueStyles.tile, pressed && dialogueStyles.tilePressed]}
+    >
+      <View style={dialogueStyles.tileIlloFrame}>
+        <Image source={task.illustration} style={dialogueStyles.tileIllo} resizeMode="contain" />
+      </View>
+      <View style={dialogueStyles.tileBody}>
+        <Text style={dialogueStyles.tileName} numberOfLines={1}>{task.name}</Text>
+        <Text style={dialogueStyles.tileMeta}>{lo}–{hi}m · {task.intensity}</Text>
+      </View>
+    </Pressable>
+  );
+};
+
+const dialogueStyles = StyleSheet.create({
+  root: { ...StyleSheet.absoluteFillObject },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,38,0.42)' },
+
+  voiceLedge: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: 6,
+    alignItems: 'flex-start',
+  },
+  voiceEyebrow: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 10,
+    letterSpacing: 1.6,
+    color: 'rgba(255,255,255,0.65)',
+  },
+  voiceCue: {
+    fontFamily: fonts.serifLight,
+    fontSize: 42,
+    lineHeight: 48,
+    letterSpacing: -0.6,
+    color: '#fff',
+    marginTop: 2,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  voiceCueAccent: { fontFamily: fonts.serifMedium },
+  voiceBody: {
+    fontFamily: fonts.sansRegular,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.82)',
+    marginTop: 4,
+  },
+
+  pickerWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 32,
+    gap: spacing.sm,
+  },
+  pickerEyebrow: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 10,
+    letterSpacing: 1.6,
+    color: 'rgba(255,255,255,0.55)',
+    paddingHorizontal: spacing.xl,
+  },
+  pickerScroll: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+  },
+  tile: {
+    width: 138,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+  },
+  tilePressed: { opacity: 0.86, transform: [{ scale: 0.98 }] },
+  tileIlloFrame: {
+    aspectRatio: 1,
+    backgroundColor: 'rgba(248,244,237,0.96)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.sm,
+  },
+  tileIllo: { width: '92%', height: '92%' },
+  tileBody: {
+    paddingHorizontal: spacing.sm,
+    paddingTop: 6,
+    paddingBottom: spacing.sm,
+    gap: 2,
+  },
+  tileName: {
+    fontFamily: fonts.serifMedium,
+    fontSize: 14,
+    color: colors.ink,
+    letterSpacing: -0.1,
+  },
+  tileMeta: {
+    fontFamily: fonts.mono,
+    fontSize: 10,
+    color: colors.textMute,
+    letterSpacing: 0.3,
+  },
+});
 
 // ─── ReviewOverlay ───────────────────────────────────────────────────
 //

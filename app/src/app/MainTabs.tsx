@@ -7,8 +7,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainTabParamList, RootStackParamList } from './types';
 import { CollectionScreen as HomeScreen } from '../screens/CollectionScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
-import { CameraEntryScreen } from '../screens/CameraEntryScreen';
 import { HomeIcon, CameraIcon, SettingsIcon } from '../components/TabIcons';
+
+// Camera タブの screen 本体は何も描画しない (= push trigger 専用)。
+// MainTabs は createBottomTabNavigator が screen に component を要求するので、
+// 中身が空の placeholder を渡す。
+const CameraTabPlaceholder: React.FC = () => null;
 import { colors, fonts, spacing } from '../theme';
 
 // UI_SPECS_JA §2.1 — 3 タブ構造。
@@ -40,9 +44,9 @@ const renderLabel = (focused: boolean, label: string) => (
 const CameraTabButton: React.FC<{ children?: React.ReactNode }> = () => {
   const rootNav = useNavigation<RootNav>();
   const open = () => {
-    // 暫定: タスク選択 modal (= JobScreen 相当) は CameraEntryScreen で。
-    // Voice agent (task 13) が実装されたら、 直接 dialogue submode を開く。
-    rootNav.navigate('Camera' as never);
+    // RootStack の CaptureMode を fullscreen modal で push (UI_SPECS §2.2)。
+    // タブの Camera screen 自体は dummy で、 描画されない。
+    rootNav.navigate('CaptureMode');
   };
   return (
     <Pressable
@@ -81,7 +85,7 @@ export const MainTabs: React.FC = () => (
     />
     <Tab.Screen
       name="Camera"
-      component={CameraEntryScreen}
+      component={CameraTabPlaceholder}
       options={{
         tabBarButton: (props) => <CameraTabButton {...props} />,
         tabBarLabel: () => null,
