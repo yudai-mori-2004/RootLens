@@ -12,7 +12,9 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Keyboard,
   LayoutChangeEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -667,6 +669,22 @@ const DialogueOverlay: React.FC<{
     return () => clearTimeout(t);
   }, [isListening]);
 
+  // キーボード追従。 入力欄は bottom 固定なので keyboardHeight を bottom offset に足す。
+  // iOS は keyboardWillShow がスムーズ、 Android は did しか発火しないので両対応。
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const sub1 = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+    });
+    const sub2 = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      sub1.remove();
+      sub2.remove();
+    };
+  }, []);
+
   // 自動 fade out (= 履歴感を出さないため必須)
   useEffect(() => {
     if (!agentMsg) return;
@@ -751,9 +769,18 @@ const DialogueOverlay: React.FC<{
     <View style={dialogueStyles.root} pointerEvents="box-none">
       <View style={dialogueStyles.scrim} pointerEvents="none" />
 
+      {/* キーボードが上がっている時、 上半分のタップで dismiss する透明レイヤー。 */}
+      {keyboardHeight > 0 ? (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={Keyboard.dismiss}
+        />
+      ) : null}
+
       {/* 全要素を画面下に縦スタック。 視線移動最小化のため AI 応答 → 入力 → タスクは
-          すべて隣接させる。 AI card は出現/消滅で stack が上下に伸縮する (= push)。 */}
-      <View style={dialogueStyles.bottomStack} pointerEvents="box-none">
+          すべて隣接させる。 AI card は出現/消滅で stack が上下に伸縮する (= push)。
+          キーボード分は bottom offset に加算してそのまま上に持ち上げる。 */}
+      <View style={[dialogueStyles.bottomStack, { bottom: keyboardHeight + 24 }]} pointerEvents="box-none">
         <View style={dialogueStyles.agentSlot} pointerEvents="none">
           {agentMsg ? <AgentCard key={agentMsg.id} text={agentMsg.text} /> : null}
         </View>
@@ -1002,11 +1029,11 @@ const dialogueStyles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,18,38,0.18)' },
 
   // ─── 下部スタック (= AI card → echo → input → quick pick が縦に隣接) ───
+  // bottom はキーボード状態に応じて inline で指定 (= keyboardHeight + 24)
   bottomStack: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 24,
     paddingHorizontal: spacing.xl,
     gap: spacing.sm,
     alignItems: 'stretch',
