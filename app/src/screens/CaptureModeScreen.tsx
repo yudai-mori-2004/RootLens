@@ -613,6 +613,7 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
             }}
             onExit={() => navigation.goBack()}
             topInset={insets.top}
+            showQuickPick={!task}
           />
         );
       })()}
@@ -672,7 +673,9 @@ const DialogueOverlay: React.FC<{
   onSelectTask: (taskId: string) => void;
   onExit: () => void;
   topInset: number;
-}> = ({ onSelectTask, onExit, topInset }) => {
+  /// タスク選択タイルを表示するか。 タスク選択済の中盤では入力だけ残せばよい。 default true。
+  showQuickPick?: boolean;
+}> = ({ onSelectTask, onExit, topInset, showQuickPick = true }) => {
   const [draft, setDraft] = useState('');
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -866,19 +869,21 @@ const DialogueOverlay: React.FC<{
           <Text style={dialogueStyles.errorText} numberOfLines={2}>AI: {error}</Text>
         ) : null}
 
-        {/* タスクタイル (= fallback、 入力 / 音声で済む人は触らない) */}
-        <View style={dialogueStyles.quickPickWrap}>
-          <Text style={dialogueStyles.pickerEyebrow}>QUICK PICK</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={dialogueStyles.pickerScroll}
-          >
-            {TASKS.map((task) => (
-              <TaskTile key={task.id} task={task} onPress={() => onSelectTask(task.id)} />
-            ))}
-          </ScrollView>
-        </View>
+        {/* タスクタイル (= 未選択時の fallback)。 タスク選択後は入力だけ残して非表示。 */}
+        {showQuickPick ? (
+          <View style={dialogueStyles.quickPickWrap}>
+            <Text style={dialogueStyles.pickerEyebrow}>QUICK PICK</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={dialogueStyles.pickerScroll}
+            >
+              {TASKS.map((task) => (
+                <TaskTile key={task.id} task={task} onPress={() => onSelectTask(task.id)} />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
       </View>
     </View>
   );
