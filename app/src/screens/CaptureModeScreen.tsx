@@ -574,8 +574,17 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
         ) : null}
       </View>
 
-      {/* 左上: 閉じる / 緊急停止。 SafeAreaView で orientation 変化時のレイアウト崩れを防ぐ。 */}
-      <SafeAreaView style={styles.chromeTopLeftSafe} edges={['top', 'left']}>
+      {/* 左上: 閉じる / 緊急停止。 useSafeAreaInsets() で orientation 変化に追従しつつ、
+          Math.max でノッチ無し端末や OS の inset=0 値で画面端ベタ付きにならないよう min 値を確保。 */}
+      <View
+        style={[
+          styles.chromeTopLeft,
+          {
+            top: Math.max(insets.top, 14) + 8,
+            left: Math.max(insets.left, 14) + 8,
+          },
+        ]}
+      >
         <Pressable
           accessibilityLabel={isRecording ? '緊急停止' : '戻る'}
           onPress={onEmergencyStop}
@@ -591,7 +600,7 @@ export const CaptureModeScreen: React.FC<Props> = ({ navigation }) => {
             <Line x1={14} y1={4} x2={4} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
           </Svg>
         </Pressable>
-      </SafeAreaView>
+      </View>
 
       {/* 中央上: タスク名 + 状態。 一行に詰めた pill (= 撮影中のみ表示) */}
       {task ? (
@@ -1062,12 +1071,6 @@ const styles = StyleSheet.create({
 
   // Floating chrome (= 画面の上に被せる UI 要素、 full-width バーは持たない)
   chromeTopLeft: { position: 'absolute' },
-  // SafeAreaView 版: 自身が absolute で top-left に固定、 内側に safe-area padding が乗る。
-  // orientation 変化時に inset 計算が一拍遅れる現象を回避する。
-  chromeTopLeftSafe: {
-    position: 'absolute', top: 0, left: 0,
-    padding: 12,
-  },
   chromeTopCenter: { position: 'absolute', alignItems: 'center' },
   chromeTopRight: { position: 'absolute' },
   chromeBottom: { position: 'absolute' },
