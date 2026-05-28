@@ -13,6 +13,9 @@ export type ProcessingStep =
   | "frame-sampling"      // Layer 2: フレームサンプリング画像解析
   | "vlm-score";          // Layer 3: VLM (Claude Haiku 4.5) でセマンティック採点 + 自動分類
 
+// ─── Solana ネットワーク (= cNFT 発行先クラスタ) ──────────────────
+export type SolanaNetwork = "devnet" | "mainnet";
+
 // ─── VLM 自動分類カテゴリ (= DATA_SPECS §3.2.3) ──────────────────
 export type AutoCategory =
   | "cleaning"
@@ -104,6 +107,11 @@ export interface ClipDto {
   autoCategoryConfidence: number | null;
   /// Title Protocol が発行した Root NFT の cNFT asset ID (= base58、 ready 以降で入る)
   rootAssetId: string | null;
+  /// TP /process が返した signed_json への R2 URI (= signed-json/<signature_hash>.json)。
+  /// 端末の mint 前冪等チェックで再利用するため公開する。
+  signedJsonUri: string | null;
+  /// cNFT を発行した Solana ネットワーク (= "devnet" | "mainnet")。
+  network: SolanaNetwork;
   /// Bubblegum delegate (= staked 状態時のみ非 null)
   delegate: string | null;
   /// ライセンス販売累計 (= staked 後に更新)
@@ -135,6 +143,8 @@ export interface CreateClipRequest {
   rootAssetId: string;
   /// TP `/process` 応答を保存した R2 オブジェクト URL (= signed-json/<signature_hash>.json)。 必須。
   signedJsonUri: string;
+  /// cNFT を発行した Solana ネットワーク (= 重複排除キーの一部)。 省略時は server が devnet 扱い (legacy)。
+  network?: SolanaNetwork;
   /// legacy: 旧 client が送ってきた場合のみ受信、 新 client は省略
   taskId?: string;
   achievementConfidence?: number;
@@ -147,7 +157,8 @@ export type RawSessionFilename =
   | "rgb.mp4"
   | "realtime_handpose.jsonl"
   | "metadata.json"
-  | "imu.jsonl";
+  | "imu.jsonl"
+  | "depth.tar";
 
 export interface RawSessionUploadResponse {
   files: Record<RawSessionFilename, { url: string; key: string; contentType: string }>;

@@ -1,5 +1,5 @@
 import type { Clip } from "@/db/schema";
-import type { AutoCategory, ClipDto, ClipState, ProcessingStep } from "@/shared/api-types";
+import type { AutoCategory, ClipDto, ClipState, ProcessingStep, SolanaNetwork } from "@/shared/api-types";
 import { presignRawGet } from "@/lib/r2";
 
 // DB row → API DTO 変換。 client が見るのはこれだけ。
@@ -35,6 +35,8 @@ export async function clipToDto(row: Clip): Promise<ClipDto> {
     qualityScore: row.qualityScore,
     qualityBreakdown: row.qualityBreakdown,
     rootAssetId: row.rootAssetId,
+    signedJsonUri: row.signedJsonUri,
+    network: (row.network as SolanaNetwork) ?? "devnet",
     delegate: row.delegate,
     licenseCount: row.licenseCount,
     revenueUsdc: Number(row.revenueUsdc),

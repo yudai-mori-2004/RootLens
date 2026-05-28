@@ -25,7 +25,8 @@ export type RawSessionFilename =
   | "rgb.mp4"
   | "realtime_handpose.jsonl"
   | "metadata.json"
-  | "imu.jsonl";          // ARKit 構成のみ実際にアップロードされる (= 超広角構成では生成されない)
+  | "imu.jsonl"           // ARKit 構成のみ実際にアップロードされる (= 超広角構成では生成されない)
+  | "depth.tar";          // ARKit + LiDAR (Pro) のみ。 16-bit PNG (mm) / フレームを 1 本の tar にまとめたもの
 
 export function rawSessionFileKey(signatureHash: string, filename: RawSessionFilename): string {
   return `${rawSessionPrefix(signatureHash)}${filename}`;

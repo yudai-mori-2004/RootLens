@@ -63,12 +63,14 @@ export async function presignRawSessionUploads(opts: {
     "realtime_handpose.jsonl",
     "metadata.json",
     "imu.jsonl",
+    "depth.tar",
   ];
   const contentTypes: Record<RawSessionFilename, string> = {
     "rgb.mp4": "video/mp4",
     "realtime_handpose.jsonl": "application/x-ndjson",
     "metadata.json": "application/json",
     "imu.jsonl": "application/x-ndjson",
+    "depth.tar": "application/x-tar",
   };
   const files: RawSessionUploadResponse["files"] = {} as RawSessionUploadResponse["files"];
   for (const filename of filenames) {

@@ -16,6 +16,8 @@ import type {
 
 // GET /api/clips
 // 撮影者の所有クリップ一覧を新しい順に返す。
+// optional query: signatureHash + network を渡すと、 その条件で絞り込む
+// (= 端末の mint 前冪等チェックが「同 wallet × 同 hash × 同 network の既存 clip」を引くのに使う)。
 export async function GET(req: Request) {
   let walletPubkey: string;
   try {
@@ -24,10 +26,18 @@ export async function GET(req: Request) {
     return r as Response;
   }
 
+  const url = new URL(req.url);
+  const signatureHash = url.searchParams.get("signatureHash");
+  const network = url.searchParams.get("network");
+
+  const conditions = [eq(clips.walletPubkey, walletPubkey)];
+  if (signatureHash) conditions.push(eq(clips.signatureHash, signatureHash));
+  if (network) conditions.push(eq(clips.network, network));
+
   const rows = await db
     .select()
     .from(clips)
-    .where(eq(clips.walletPubkey, walletPubkey))
+    .where(and(...conditions))
     .orderBy(desc(clips.createdAt))
     .limit(200);
 
@@ -48,6 +58,8 @@ const createSchema = z.object({
   rootAssetId: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Solana cNFT asset id (base58)"),
   // R2 signed-json/<signature_hash>.json への URL (= TP /process 応答保存先)
   signedJsonUri: z.string().url(),
+  // cNFT 発行先ネットワーク (= 重複排除キーの一部)。 省略時は devnet 扱い (legacy)。
+  network: z.enum(["devnet", "mainnet"]).optional(),
   // legacy 互換 (= 段階削除中、 旧 client からも来うる)
   taskId: z.string().min(1).optional(),
   achievementConfidence: z.number().int().min(0).max(100).optional(),
@@ -76,12 +88,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // 重複アップロード排除 (= 同 wallet × 同 signature_hash は既存行を返す)
+  const network = parsed.data.network ?? "devnet";
+
+  // 重複アップロード排除 (= 同 wallet × 同 signature_hash × 同 network は既存行を返す)。
+  // network を含めるのは、 devnet 発行済みの動画を mainnet で発行し直す経路を塞がないため。
   const existing = await db
     .select()
     .from(clips)
     .where(
-      and(eq(clips.walletPubkey, walletPubkey), eq(clips.signatureHash, parsed.data.signatureHash)),
+      and(
+        eq(clips.walletPubkey, walletPubkey),
+        eq(clips.signatureHash, parsed.data.signatureHash),
+        eq(clips.network, network),
+      ),
     )
     .limit(1);
   if (existing.length > 0) {
@@ -107,6 +126,7 @@ export async function POST(req: Request) {
       state: "uploading",
       achievementConfidence: parsed.data.achievementConfidence ?? null,
       signatureHash: parsed.data.signatureHash,
+      network,
       signedMp4Key: signedMp4Key(parsed.data.signatureHash),
       rootAssetId: parsed.data.rootAssetId,
       signedJsonUri: parsed.data.signedJsonUri,

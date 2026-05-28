@@ -6,7 +6,9 @@ import type { QualityBreakdown } from "../shared/api-types";
 // DATA_SPECS §6 のクリップ状態機械 + §3 のサーバパイプラインを永続化するスキーマ。
 //
 // 1 クリップ = 1 行。 同じ wallet が同じ signature_hash (= D2 active manifest signature SHA-256) を
-// 2 度 upload した場合は idempotent に既存行を返す (= 重複排除)。
+// 同じ network で 2 度登録しようとした場合は idempotent に既存行を返す (= 重複排除)。
+// 重複排除キーは (wallet_pubkey, signature_hash, network)。 network を含めるのは、 devnet で
+// 発行済みの動画を後で mainnet で発行し直せるようにするため (= network が違えば別 clip 扱い)。
 
 export const clips = pgTable(
   "clips",
@@ -35,6 +37,11 @@ export const clips = pgTable(
     /// C2PA D2 アクティブマニフェスト署名の SHA-256 hex (= DATA_SPECS §1.1)。
     /// 端末で確定し、 以降全パイプラインを通じて不変の識別子。
     signatureHash: text("signature_hash"),
+
+    /// cNFT を発行した Solana ネットワーク (= "devnet" | "mainnet")。
+    /// 重複排除キーの一部 (= 同 wallet × 同 signature_hash でも network が違えば別 clip)。
+    /// devnet で撮った動画を後で mainnet で発行し直せるようにするため必須。
+    network: text("network").notNull().default("devnet"),
 
     /// R2 オブジェクトキー / プレフィックス。
     /// signedMp4Key = raw/<signature_hash>/rgb.mp4 (= 端末が C2PA D2 署名 + 顔ぼかしを終えてアップロードした MP4)
@@ -81,6 +88,8 @@ export const clips = pgTable(
     index("clips_wallet_idx").on(t.walletPubkey),
     index("clips_state_idx").on(t.state),
     index("clips_signature_hash_idx").on(t.signatureHash),
+    // 重複排除 lookup (= POST /api/clips dedup + 端末の mint 前チェック) 用の複合 index。
+    index("clips_wallet_sig_network_idx").on(t.walletPubkey, t.signatureHash, t.network),
   ],
 );
 
