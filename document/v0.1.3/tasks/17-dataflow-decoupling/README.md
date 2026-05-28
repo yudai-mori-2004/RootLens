@@ -61,6 +61,22 @@ app/ で UI ロジックとデータフローが密結合し、データフロ�
 - VLM 10s + dense prompt: **完了** (deploy + push 済)。実証は数分尺の活動クリップを実機録画して semantic.jsonl を解析するのが残課題。
 - C2PA 修正: **ソース完了 + TP で検証済** (commit `dcf8f82`, push は実機テスト後)。c2pa-bridge の iOS .a (device/sim) 再ビルド → アプリ再ビルド → 実機録画で最終確認、が残り。
 
+## 追加スコープ (2026-05-28 合意、未着手 — 長尺実測の後に実装)
+
+### A. blur 領域メタデータを C2PA に埋め込む (新ファイル無し)
+- 目的: 「何を・どのフレームのどこを除去したか」を来歴に残す (= 買い手の透明性 / blur 領域 mask / 監査)。
+- 形式: 別ファイルは作らず、D2 マニフェストにカスタム assertion (`io.rootlens.privacy.blur.v1` 等) として per-frame の顔 bbox を載せる → 署名されて tamper-evident。
+- サイズ: 典型 (顔は断続的) で数十〜数百 KB、顔が映り続ける長尺で最大 ~1-2MB。C2PA 埋め込みで問題ないレンジ。
+- 実装: `PrivacyBlurProcessor.swift` は既にフレーム単位で `boundingBox` を検出済み。これを per-frame で集約して返す → JS → `signD2(..., regions)` で `c2pa-bridge` が assertion 化。D2 action の `regions_blurred` カウントと併存。
+
+### B. 長尺 blur の堅牢化 (まず実測 → 必要分だけ)
+- 現状の `PrivacyBlurProcessor` は **AVAssetReader/Writer のストリーミング + フレームごと autoreleasepool** なので、長尺でも OOM しない設計。メモリ起因クラッシュは手当て済み。
+- 残る実リスクと対策:
+  - **iOS による kill**: blur 中にアプリを離れるとサスペンド/終了で処理が消える → `beginBackgroundTask` / BGProcessingTask で完走保証 (最優先)。
+  - **時間**: iPhone 12 で 30 分クリップの blur が 15〜25 分かかり得る → DevSandbox に進捗表示 (`onProgress` は実装済み) + キャンセル。
+  - **発熱**: iOS が自動スロットリング (= 遅くなるだけ)。任意で `ProcessInfo.thermalState == .critical` 時にペース調整。
+- 方針: **先に実機長尺で blur 所要時間 / thermalState を実測**し、数字を見てから background task + 必要なら throttle を足す (= 過剰設計回避)。
+
 ## 関連メモ
 
 - 検証スクリプト: `web/scripts/r2_inspect.mjs` (R2 一覧/取得)、`web/scripts/apply_one_migration.mjs` (増分 migration)、mock-device `--verify-only` / `--selftest` (C2PA ローカル検証)。
