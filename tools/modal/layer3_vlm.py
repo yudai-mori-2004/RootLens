@@ -487,6 +487,31 @@ def _write_and_upload_semantic(
     return key
 
 
+def _write_quality_scores(
+    s3, bucket_processed: str, signature_hash: str,
+    prior_scores_json: str, layer3_result: dict,
+) -> str:
+    """processed/<signature_hash>/quality_scores.json を書き出す (DATA_SPECS §3.3)。
+    DB の quality_breakdown と同じ「総合スコア + 全サブ指標」のバックアップ。
+    prior_scores_json は workflow が渡す {"layer1": Layer1Score, "layer2": Layer2Score} (= JSON 文字列)。
+    layer3 は frameLabels を除いた score + サブ指標のみ載せる (= フレームラベルは semantic.jsonl にある)。"""
+    prior = json.loads(prior_scores_json)
+    l1 = prior["layer1"]
+    l2 = prior["layer2"]
+    layer3 = {k: v for k, v in layer3_result.items() if k != "frameLabels"}
+    total = int(round(
+        float(l1.get("score", 0)) + float(l2.get("score", 0)) + float(layer3_result.get("score", 0))
+    ))
+    doc = {"total": total, "layer1": l1, "layer2": l2, "layer3": layer3}
+    key = f"processed/{signature_hash}/quality_scores.json"
+    s3.put_object(
+        Bucket=bucket_processed, Key=key,
+        Body=json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8"),
+        ContentType="application/json",
+    )
+    return key
+
+
 # ─── Modal function (HTTP endpoint) ────────────────────────────────────
 
 @app.function(
@@ -502,6 +527,7 @@ def _write_and_upload_semantic(
 def score_layer3(
     signature_hash: str,
     vlm_interval_sec: float = 30.0,
+    prior_scores: str = "",
 ):
     """
     Pipeline 2 第 3 層 (= VLM セマンティック解析 + 自動分類) のエントリポイント。
@@ -606,6 +632,18 @@ def score_layer3(
             f"[layer3_vlm] WARNING: semantic.jsonl write failed: {type(e).__name__}: {e}",
             flush=True,
         )
+
+    # 6. quality_scores.json を processed/ に書き出す (= DATA_SPECS §3.3、 DB のバックアップ)。
+    #    workflow が layer1 + layer2 のスコアを prior_scores で渡してきた場合のみ。
+    if prior_scores:
+        try:
+            q_key = _write_quality_scores(s3, bucket_processed, signature_hash, prior_scores, result)
+            print(f"[layer3_vlm] wrote {q_key}", flush=True)
+        except Exception as e:
+            print(
+                f"[layer3_vlm] WARNING: quality_scores.json write failed: {type(e).__name__}: {e}",
+                flush=True,
+            )
 
     # 後片付け (= MP4 を消す。 同 container 再利用で /tmp が太るのを避ける)
     try:

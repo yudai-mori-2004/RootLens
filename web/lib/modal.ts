@@ -69,12 +69,18 @@ export interface VlmScoreResult extends Layer3Score {
 export async function callVlmScore(opts: {
   signatureHash: string;
   vlmIntervalSec?: number;
+  /// layer1 + layer2 のスコアを渡すと、 layer3 が processed/<hash>/quality_scores.json を書き出す。
+  layer1?: Layer1Score;
+  layer2?: Layer2Score;
 }): Promise<VlmScoreResult> {
   const params: Record<string, string> = {
     signature_hash: opts.signatureHash,
   };
   if (opts.vlmIntervalSec !== undefined) {
     params.vlm_interval_sec = String(opts.vlmIntervalSec);
+  }
+  if (opts.layer1 && opts.layer2) {
+    params.prior_scores = JSON.stringify({ layer1: opts.layer1, layer2: opts.layer2 });
   }
   return await callModal<VlmScoreResult>("MODAL_VLM_ENDPOINT", params);
 }

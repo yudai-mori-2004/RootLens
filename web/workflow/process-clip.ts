@@ -67,10 +67,13 @@ export async function processClip(input: ProcessClipInput) {
   });
 
   // ステップ 3: 第 3 層 (= VLM セマンティック解析 + 自動分類、 65 点)
+  // layer1 + layer2 を渡すと layer3 が processed/<hash>/quality_scores.json も書き出す。
   await setStep(input.clipId, "vlm-score");
   const layer3 = await runLayer3({
     clipId: input.clipId,
     signatureHash: clip.signatureHash,
+    layer1,
+    layer2,
   });
 
   // ステップ 4: ready 遷移
@@ -112,9 +115,15 @@ async function runLayer2(args: { clipId: string; signatureHash: string }): Promi
 async function runLayer3(args: {
   clipId: string;
   signatureHash: string;
+  layer1: Layer1Score;
+  layer2: Layer2Score;
 }): Promise<VlmScoreResult> {
   "use step";
-  return await callVlmScore({ signatureHash: args.signatureHash });
+  return await callVlmScore({
+    signatureHash: args.signatureHash,
+    layer1: args.layer1,
+    layer2: args.layer2,
+  });
 }
 
 async function markReady(args: {
