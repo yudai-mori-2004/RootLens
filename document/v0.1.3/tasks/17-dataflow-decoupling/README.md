@@ -69,7 +69,19 @@ app/ で UI ロジックとデータフローが密結合し、データフロ�
 - サイズ: 典型 (顔は断続的) で数十〜数百 KB、顔が映り続ける長尺で最大 ~1-2MB。C2PA 埋め込みで問題ないレンジ。
 - 実装: `PrivacyBlurProcessor.swift` は既にフレーム単位で `boundingBox` を検出済み。これを per-frame で集約して返す → JS → `signD2(..., regions)` で `c2pa-bridge` が assertion 化。D2 action の `regions_blurred` カウントと併存。
 
-### B. 長尺 blur の堅牢化 (まず実測 → 必要分だけ)
+### C. Pipeline 1 の background 化 + resumable キュー (本番撮影フロー、大きめ — 独立タスク化も可)
+- 現状: 撮影後の端末処理 (blur / D1+D2 sign / signature_hash / R2 upload / TP /process / cNFT mint / POST /api/clips) は **全て foreground** で走る。upload も `expo-file-system uploadAsync` = foreground (DATA_SPECS §2.5 の Background URLSession は未実装)。アプリが background に入ると JS が suspend し、処理が止まる/消える。
+- iOS 制約 (期待値): background で任意の処理を即時実行はできない。`beginBackgroundTask` は数分、`BGProcessingTask` は OS が時間を決める (遅延あり)、`Background URLSession` だけがアップロードを suspend/kill 跨ぎで継続する。→ 達成目標は「**永続 + resumable で データ喪失ゼロ、 アップロードは background 継続、 重い計算は active 時 or OS 許諾時に再開して最終的に完走**」(「放置で全部即完了」ではない)。
+- アーキ:
+  1. 永続 resumable キュー (クリップごとの step state: recorded→blurred→signed→uploaded→tp→minted→registered)。
+  2. Background URLSession で R2 upload (= native module 追加 or react-native-background-upload 系) + `UIBackgroundModes` 宣言。
+  3. `BGProcessingTask` で blur/sign + upload 後のネットワーク工程をドレイン。
+  4. `beginBackgroundTask` で短時間離脱中の blur 即 kill を回避。
+  5. 各 step 冪等 (signature_hash 重複排除 + POST /api/clips 冪等は既存)。
+- B (blur 堅牢化) はこの C に吸収される。対象は本番撮影画面で、DevSandbox は対象外。
+- 順序: 長尺実測 → Background URLSession + 永続キュー → blur/sign を BG task に載せる。
+
+### B. 長尺 blur の堅牢化 (まず実測 → 必要分だけ。 C に吸収)
 - 現状の `PrivacyBlurProcessor` は **AVAssetReader/Writer のストリーミング + フレームごと autoreleasepool** なので、長尺でも OOM しない設計。メモリ起因クラッシュは手当て済み。
 - 残る実リスクと対策:
   - **iOS による kill**: blur 中にアプリを離れるとサスペンド/終了で処理が消える → `beginBackgroundTask` / BGProcessingTask で完走保証 (最優先)。
