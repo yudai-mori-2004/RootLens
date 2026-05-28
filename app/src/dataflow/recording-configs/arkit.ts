@@ -1,24 +1,29 @@
 // ARKit 構成 (DATA_SPECS §2.2「ARKit 構成」)。iOS 限定。
 //
 // ARKit world tracking + 背面 wide camera (1x)。6DoF カメラポーズ・IMU・LiDAR 深度 (Pro 端末のみ) を
-// 同期取得する。超広角構成より画角が狭く発熱が大きい。
-//
-// native module は未実装 (= 2026-05-27 に旧 arkit-capture を撤去済み)。この構成は
-// 撮影構成の抽象がプラットフォームごとに複数パスを持てることを表現するための実体であり、
-// native が用意されるまで isAvailable() は false を返し、 lifecycle 呼び出しは fail-loud にする。
+// 同期取得する。超広角構成より画角が狭く発熱が大きい。native は arkit-capture module。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+//    native module wrapper (../../native/arkitCapture) は内部で react-native を使うが、
+//    ここが import するのは関数 export のみ (= React component は触らない)。
 
+import {
+  isArkitCaptureAvailable,
+  startArkitSession,
+  stopArkitSession,
+  startArkitRecording,
+  stopArkitRecording,
+} from '../../native/arkitCapture';
 import type { EventSink } from '../events';
 import type { OutputFileSpec, RecordingConfig, RecordingSession } from './types';
 
 // ARKit 構成の出力ファイル (DATA_SPECS §2.2):
 //   rgb.mp4                    wide (1x) RGB 映像 (30 fps)
-//   realtime_handpose.jsonl    手ランドマーク + カメラポーズ (4x4) + tracking_state
-//                              (= 超広角構成と同じファイル名。 行スキーマに構成固有フィールドが増えるだけ)
-//   imu.jsonl                  加速度 / ジャイロ / デバイスモーション (100 Hz)
-//   metadata.json              機種名 / OS / アプリ版 / 画角 / 構成 ID / キャリブレーション baseline 等の静的情報
-//   depth/<frame>.png          LiDAR 深度 (Pro 端末のみ、 可変枚数)。 単一ファイルではないので outputFiles には含めず別扱い。
+//   realtime_handpose.jsonl    手ランドマーク (= ultra_wide と同形の hands) + カメラポーズ (4×4) + tracking_state + IMU snapshot
+//   imu.jsonl                  加速度 / ジャイロ / デバイスモーション (~100 Hz)
+//   metadata.json              機種 / OS / アプリ版 / カメラ画角・解像度・intrinsics / 構成 ID 等の静的情報
+//   depth/<frame>.png          LiDAR 深度 (Pro 端末のみ、 可変枚数)。 単一ファイルではないので outputFiles には含めず、
+//                              現状アップロード対象外 (= 仕様 §3.2「存在すれば使い、 なければスキップ」)。
 const OUTPUT_FILES: OutputFileSpec[] = [
   { name: 'rgb.mp4', contentType: 'video/mp4', required: true, isPrimaryVideo: true },
   { name: 'realtime_handpose.jsonl', contentType: 'application/x-ndjson', required: true },
@@ -26,8 +31,9 @@ const OUTPUT_FILES: OutputFileSpec[] = [
   { name: 'metadata.json', contentType: 'application/json', required: true },
 ];
 
-const NOT_IMPLEMENTED =
-  'ARKit 構成の native module は未実装です (= 別フェーズで再導入)。現状この構成は選択できません。';
+function ensureTrailingSlash(uri: string): string {
+  return uri.endsWith('/') ? uri : `${uri}/`;
+}
 
 export const arkitConfig: RecordingConfig = {
   id: 'arkit',
@@ -36,27 +42,45 @@ export const arkitConfig: RecordingConfig = {
   outputFiles: OUTPUT_FILES,
 
   async isAvailable() {
-    // native 未実装のため常に false。 native 導入時にここを ARKit module の可用性判定に差し替える。
-    return false;
+    return isArkitCaptureAvailable();
   },
 
-  async startSession(_sink: EventSink) {
-    throw new Error(NOT_IMPLEMENTED);
+  async startSession(sink: EventSink) {
+    sink({ step: 'record', level: 'info', message: 'ARKit session を開始' });
+    await startArkitSession();
+    sink({ step: 'record', level: 'success', message: 'session 開始完了 (プレビュー稼働)' });
   },
-  async stopSession(_sink: EventSink) {
-    throw new Error(NOT_IMPLEMENTED);
+
+  async stopSession(sink: EventSink) {
+    sink({ step: 'record', level: 'info', message: 'ARKit session を停止' });
+    await stopArkitSession();
+    sink({ step: 'record', level: 'success', message: 'session 停止完了' });
   },
-  async startRecording(_sink: EventSink): Promise<RecordingSession> {
-    throw new Error(NOT_IMPLEMENTED);
+
+  async startRecording(sink: EventSink): Promise<RecordingSession> {
+    sink({ step: 'record', level: 'info', message: '録画開始 (ARKit)' });
+    const dir = await startArkitRecording();
+    const sessionDir = ensureTrailingSlash(dir);
+    sink({ step: 'record', level: 'success', message: '録画開始完了', detail: { sessionDir } });
+    return { sessionDir };
   },
-  async stopRecording(_sink: EventSink): Promise<RecordingSession> {
-    throw new Error(NOT_IMPLEMENTED);
+
+  async stopRecording(sink: EventSink): Promise<RecordingSession> {
+    sink({ step: 'record', level: 'info', message: '録画停止 (ARKit)' });
+    const dir = await stopArkitRecording();
+    const sessionDir = ensureTrailingSlash(dir);
+    sink({
+      step: 'record',
+      level: 'success',
+      message: '録画停止完了',
+      detail: { sessionDir, files: OUTPUT_FILES.map((f) => f.name) },
+    });
+    return { sessionDir };
   },
 
   primaryVideoUri(session: RecordingSession): string {
     const primary = OUTPUT_FILES.find((f) => f.isPrimaryVideo);
     if (!primary) throw new Error('arkit config has no primary video file');
-    const dir = session.sessionDir.endsWith('/') ? session.sessionDir : `${session.sessionDir}/`;
-    return `${dir}${primary.name}`;
+    return `${ensureTrailingSlash(session.sessionDir)}${primary.name}`;
   },
 };

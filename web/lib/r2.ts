@@ -49,8 +49,10 @@ export { signedMp4Key, processedPrefix };
 
 // ─── presigned URLs ────────────────────────────────────────────────────
 
-/// クリップ 1 件の超広角構成ファイル分の PUT presigned URL を一括発行 (DATA_SPECS §2.2)。
-/// 端末はこれを受けて raw/<signature_hash>/{rgb.mp4 + realtime_handpose.jsonl + metadata.json} に並列 PUT する。
+/// クリップ 1 件の撮影構成ファイル分の PUT presigned URL を一括発行 (DATA_SPECS §2.2)。
+/// 全構成のファイルを presign し、 端末はその構成で実際に生成したものだけ PUT する
+/// (= 超広角: rgb + realtime_handpose + metadata、 ARKit: + imu.jsonl)。
+/// depth/ (ARKit + Pro) は可変枚数なので別扱い (現状アップロード対象外)。
 export async function presignRawSessionUploads(opts: {
   signatureHash: string;
   expiresInSec?: number;
@@ -60,11 +62,13 @@ export async function presignRawSessionUploads(opts: {
     "rgb.mp4",
     "realtime_handpose.jsonl",
     "metadata.json",
+    "imu.jsonl",
   ];
   const contentTypes: Record<RawSessionFilename, string> = {
     "rgb.mp4": "video/mp4",
     "realtime_handpose.jsonl": "application/x-ndjson",
     "metadata.json": "application/json",
+    "imu.jsonl": "application/x-ndjson",
   };
   const files: RawSessionUploadResponse["files"] = {} as RawSessionUploadResponse["files"];
   for (const filename of filenames) {

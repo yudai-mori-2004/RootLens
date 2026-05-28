@@ -20,11 +20,12 @@ export function rawSessionPrefix(signatureHash: string): string {
   return `raw/${signatureHash}/`;
 }
 
-/// 超広角構成が出力するファイル名 (DATA_SPECS §2.2)。 構成が増えたら固有ファイルを足す。
+/// 撮影構成が出力するファイル名 (DATA_SPECS §2.2)。 構成が増えたら固有ファイルを足す。
 export type RawSessionFilename =
   | "rgb.mp4"
   | "realtime_handpose.jsonl"
-  | "metadata.json";
+  | "metadata.json"
+  | "imu.jsonl";          // ARKit 構成のみ実際にアップロードされる (= 超広角構成では生成されない)
 
 export function rawSessionFileKey(signatureHash: string, filename: RawSessionFilename): string {
   return `${rawSessionPrefix(signatureHash)}${filename}`;

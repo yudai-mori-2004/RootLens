@@ -21,6 +21,8 @@ import { useStore } from 'zustand';
 
 import {
   DEFAULT_RECORDING_CONFIG,
+  RECORDING_CONFIGS,
+  getRecordingConfig,
   dataflowStore,
   storeEventSink,
   teeToConsole,
@@ -32,6 +34,7 @@ import {
   type EventLevel,
 } from '../dataflow';
 import { WideCapturePreviewView } from '../native/wideCapture';
+import { ArkitCapturePreviewView } from '../native/arkitCapture';
 import { getCurrentSession } from '../services/auth/instance';
 import { MERKLE_TREE, MERKLE_COLLECTION } from '../env';
 
@@ -65,7 +68,10 @@ const LEVEL_COLOR: Record<EventLevel, string> = {
 
 export const DevSandboxScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const config = DEFAULT_RECORDING_CONFIG;
+
+  // 撮影構成は切替可能 (= ultra_wide ⇄ arkit)。録画待機中のみ切替できる。
+  const [selectedConfigId, setSelectedConfigId] = useState<string>(DEFAULT_RECORDING_CONFIG.id);
+  const config = getRecordingConfig(selectedConfigId) ?? DEFAULT_RECORDING_CONFIG;
 
   const events = useStore(dataflowStore, (s) => s.events);
   const recording = useStore(dataflowStore, (s) => s.recording);
@@ -74,7 +80,23 @@ export const DevSandboxScreen: React.FC = () => {
   const busy = useStore(dataflowStore, (s) => s.busy);
 
   const [available, setAvailable] = useState<boolean | null>(null);
+  // 全撮影構成の利用可否 (= スイッチャの活性判定)。
+  const [availByConfig, setAvailByConfig] = useState<Record<string, boolean>>({});
   const logRef = useRef<ScrollView>(null);
+
+  // 起動時に 1 度だけ、 全撮影構成の利用可否を判定する (= スイッチャ表示用)。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        RECORDING_CONFIGS.map(
+          async (c) => [c.id, await c.isAvailable().catch(() => false)] as const,
+        ),
+      );
+      if (!cancelled) setAvailByConfig(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // 起動時: 撮影構成の可用性を確認し、 使えるなら session (プレビュー) を開始する。
   useEffect(() => {
@@ -122,6 +144,14 @@ export const DevSandboxScreen: React.FC = () => {
   }, []);
 
   // ─── ハンドラ ─────────────────────────────────────────────────────
+
+  // 撮影構成の切替 (= 録画待機中のみ)。 config が変わると session useEffect が
+  // 旧 session を stop → 新 config で start し直す。
+  const onSelectConfig = useCallback((id: string) => {
+    const st = dataflowStore.getState();
+    if (st.busy || (st.recording !== 'idle' && st.recording !== 'session-active')) return;
+    setSelectedConfigId(id);
+  }, []);
 
   const onStartRecording = useCallback(() => {
     runAction('録画開始', async () => {
@@ -218,6 +248,9 @@ export const DevSandboxScreen: React.FC = () => {
   const canStop = recording === 'recording';
   const canSendP2 = recording === 'recorded' && !!dataflowStore.getState().session;
   const hasClip = !!clip?.id;
+  const canSwitchConfig = !busy && (recording === 'idle' || recording === 'session-active');
+  // プレビューは構成ごとに native view が違う。 native 未登録 (= 未ビルド) なら null。
+  const PreviewView = config.id === 'arkit' ? ArkitCapturePreviewView : WideCapturePreviewView;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -227,16 +260,44 @@ export const DevSandboxScreen: React.FC = () => {
           {config.label} · {recording}
           {available === false ? ' · 端末非対応' : ''}
         </Text>
+        {/* 撮影構成スイッチャ (= 録画待機中のみ切替可) */}
+        <View style={styles.switcher}>
+          {RECORDING_CONFIGS.map((c) => {
+            const selected = c.id === config.id;
+            const avail = availByConfig[c.id];
+            const disabled = avail === false || !canSwitchConfig || selected;
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => onSelectConfig(c.id)}
+                disabled={disabled}
+                style={[
+                  styles.configChip,
+                  selected && styles.configChipSel,
+                  avail === false && styles.configChipUnavail,
+                ]}
+              >
+                <Text style={[styles.configChipText, selected && styles.configChipTextSel]}>
+                  {c.id}{avail === false ? ' ✕' : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {/* プレビュー */}
       <View style={styles.preview}>
-        {available ? (
-          <WideCapturePreviewView style={StyleSheet.absoluteFill} />
+        {available && PreviewView ? (
+          <PreviewView style={StyleSheet.absoluteFill} />
         ) : (
           <View style={styles.previewPlaceholder}>
             <Text style={styles.placeholderText}>
-              {available === null ? '撮影構成を確認中…' : 'プレビュー利用不可 (実機で起動してください)'}
+              {available === null
+                ? '撮影構成を確認中…'
+                : !PreviewView
+                  ? `${config.id} preview は未ビルド (実機再ビルドが必要)`
+                  : 'プレビュー利用不可 (実機で起動してください)'}
             </Text>
           </View>
         )}
@@ -351,6 +412,15 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingVertical: 8 },
   title: { color: '#e6edf3', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
   sub: { color: '#8aa0b6', fontSize: 12, marginTop: 2 },
+  switcher: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  configChip: {
+    paddingVertical: 5, paddingHorizontal: 12, borderRadius: 14,
+    backgroundColor: '#161b22', borderWidth: 1, borderColor: '#30363d',
+  },
+  configChipSel: { backgroundColor: '#1f3a5f', borderColor: '#3b6ea5' },
+  configChipUnavail: { opacity: 0.4 },
+  configChipText: { color: '#8aa0b6', fontSize: 12, fontWeight: '600' },
+  configChipTextSel: { color: '#cfe3ff' },
 
   preview: { height: 180, backgroundColor: '#000', margin: 12, borderRadius: 10, overflow: 'hidden' },
   previewPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },

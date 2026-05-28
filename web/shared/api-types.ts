@@ -140,12 +140,14 @@ export interface CreateClipRequest {
   achievementConfidence?: number;
 }
 
-/// 超広角構成が並走出力するファイル分の presigned PUT URL (DATA_SPECS §2.2「超広角構成」)。
-/// ARKit 構成など他構成が増えたら、 その構成固有ファイル (= imu.jsonl 等) をここに足す。
+/// 撮影構成が並走出力するファイル分の presigned PUT URL (DATA_SPECS §2.2)。
+/// 超広角構成は rgb/realtime_handpose/metadata の 3 つ、 ARKit 構成はそれに imu.jsonl を加える。
+/// (server は全ファイル分を presign し、 端末はその構成で実際に生成したものだけ PUT する)
 export type RawSessionFilename =
   | "rgb.mp4"
   | "realtime_handpose.jsonl"
-  | "metadata.json";
+  | "metadata.json"
+  | "imu.jsonl";
 
 export interface RawSessionUploadResponse {
   files: Record<RawSessionFilename, { url: string; key: string; contentType: string }>;
