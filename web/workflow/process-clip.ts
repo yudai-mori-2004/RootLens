@@ -119,8 +119,10 @@ async function runLayer3(args: {
   layer2: Layer2Score;
 }): Promise<VlmScoreResult> {
   "use step";
+  // 10 秒間隔 = Ego4D の dense narration (~10s) と同等密度 (DATA_SPECS §3.2.3、 約 $1.2/時)。
   return await callVlmScore({
     signatureHash: args.signatureHash,
+    vlmIntervalSec: 10,
     layer1: args.layer1,
     layer2: args.layer2,
   });
