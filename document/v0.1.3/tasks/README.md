@@ -43,9 +43,14 @@ Phase F (iOS アプリ)
   14. calibration-and-capture    新  キャリブレーション + ジェスチャー撮影の 2 layer (= 旧 14 camera-mode を再設計)
   15. home-tab                   🔄  自動分類カテゴリ + 3 層スコア表示に追従
   16. onboarding-settings        🔄  キャリブレーション再実行 + マイク権限除去
+
+Phase G (リアーキ + 仕様準拠 + 検証)
+  17. dataflow-decoupling        🔄  dataflow/UI 3 層分離 + DevSandbox。 signature_hash/processed
+                                     フルスタック移行。 VLM 10s dense。 C2PA 検証成立 (action + O= cert)。
+                                     実機 Pipeline 1→2 完走 + TP c2pa-verify ok。 実機 .a 再ビルドが残り。
 ```
 
-凡例: ✅ = 完了、 🔄 = 方針転換で再設計が必要、 新 = 新規追加。
+凡例: ✅ = 完了、 🔄 = 方針転換で再設計が必要 / 進行中、 新 = 新規追加。
 
 ## 依存関係
 
