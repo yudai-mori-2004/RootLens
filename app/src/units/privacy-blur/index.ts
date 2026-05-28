@@ -51,6 +51,15 @@ export interface PrivacyBlurResult {
   outputWidth: number;
   /** 出力動画の表示高 (px) */
   outputHeight: number;
+  /** 実際にぼかした領域の per-frame 記録 (= C2PA blur assertion の元データ)。
+   *  顔が検出されたフレームのみ。座標は upright フレームの top-left 原点・正規化 [0,1]。 */
+  blurRegions: BlurFrameRegions[];
+}
+
+/** 1 フレーム分の blur 領域 (= 顔 bbox 群)。native PrivacyBlur の dict キーと一致させる。 */
+export interface BlurFrameRegions {
+  frame_index: number;
+  regions: Array<{ x: number; y: number; w: number; h: number }>;
 }
 
 export interface PrivacyBlurProgress {

@@ -64,9 +64,24 @@ export async function signClip(
   });
 
   // ─── Step 3: D2 sign (parentOf D1) ───────────────────────────────
-  sink({ step: 'sign-d2', level: 'info', message: 'C2PA D2 署名 (ぼかし済、 D1 を ingredient 参照)' });
+  // blur 領域メタを C2PA assertion (io.rootlens.privacy.blur.v1) として D2 に埋め込む
+  // (= 「どのフレームのどこを除去したか」を署名付きで残す。 新ファイルは作らない)。
+  const blurAssertion = {
+    operation: 'face_blur',
+    detector: 'Apple Vision VNDetectFaceRectanglesRequest revision 3',
+    method: 'gaussian',
+    coordinate_space: 'normalized_top_left', // x,y,w,h は upright フレームの top-left 原点・正規化 [0,1]
+    total_faces_blurred: blurResult.facesBlurred,
+    frames: blurResult.blurRegions ?? [], // 顔が映ったフレームのみ
+  };
+  const blurAssertionJson = JSON.stringify(blurAssertion);
+  sink({
+    step: 'sign-d2',
+    level: 'info',
+    message: `C2PA D2 署名 (ぼかし済、 D1 を ingredient 参照、 blur 領域 ${blurAssertion.frames.length} フレーム分を assertion 化)`,
+  });
   const d2Path = `${tmpDir}d2.mp4`;
-  await signD2(blurResult.outputUri, d1Path, d2Path, blurResult.facesBlurred);
+  await signD2(blurResult.outputUri, d1Path, d2Path, blurResult.facesBlurred, blurAssertionJson);
   sink({ step: 'sign-d2', level: 'success', message: 'D2 署名完了' });
 
   // ─── Step 4: signature_hash 抽出 ──────────────────────────────────────

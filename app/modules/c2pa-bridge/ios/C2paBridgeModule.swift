@@ -461,16 +461,19 @@ public class C2paBridgeModule: Module {
       }
     }
 
-    /// D2 署名 (= c2pa.actions.v2 [c2pa.placed] + D1 ingredient parentOf)。
+    /// D2 署名 (= c2pa.actions.v2 [c2pa.edited] + D1 ingredient parentOf)。
+    /// blurAssertionJson: io.rootlens.privacy.blur.v1 の data (per-frame 顔 bbox)。 空文字なら付けない。
     /// 戻り値は output_mp4 のパス。
     AsyncFunction("signD2") {
-      (blurredMp4: String, parentD1Mp4: String, outputMp4: String, facesBlurred: Int, promise: Promise) in
+      (blurredMp4: String, parentD1Mp4: String, outputMp4: String, facesBlurred: Int, blurAssertionJson: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         let blurredPath = Self.stripFileScheme(blurredMp4)
         let parentPath = Self.stripFileScheme(parentD1Mp4)
         let outputPath = Self.stripFileScheme(outputMp4)
-        NSLog("[C2paBridge] signD2: \(blurredPath) (parent=\(parentPath)) → \(outputPath), faces=\(facesBlurred)")
-        let rc = pipeline1_sign_d2(blurredPath, parentPath, outputPath, UInt32(facesBlurred))
+        NSLog("[C2paBridge] signD2: \(blurredPath) (parent=\(parentPath)) → \(outputPath), faces=\(facesBlurred), blurMeta=\(blurAssertionJson.isEmpty ? "none" : "\(blurAssertionJson.count)B")")
+        let rc = blurAssertionJson.withCString { jsonPtr in
+          pipeline1_sign_d2(blurredPath, parentPath, outputPath, UInt32(facesBlurred), jsonPtr)
+        }
         if rc == 0 {
           promise.resolve(outputPath)
         } else {

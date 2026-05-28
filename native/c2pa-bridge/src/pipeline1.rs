@@ -53,8 +53,14 @@ fn build_d1_manifest(title: &str) -> serde_json::Value {
 // Builder の intent=Edit が自動挿入する。 C2PA 2.x の「最初の action は created/opened」
 // 「opened/placed/removed は ingredients param 必須」を満たすため、 ここでは ingredient 不要な
 // `c2pa.edited` のみ宣言する (= 顔ぼかしは編集アクション)。
-fn build_d2_manifest(title: &str, faces_blurred: u32) -> serde_json::Value {
-    serde_json::json!({
+// blur_assertion: privacy-blur が検出した per-frame 顔 bbox を載せた custom assertion data
+// (= `io.rootlens.privacy.blur.v1`)。 None なら付けない。 署名に含まれるので tamper-evident。
+fn build_d2_manifest(
+    title: &str,
+    faces_blurred: u32,
+    blur_assertion: Option<serde_json::Value>,
+) -> serde_json::Value {
+    let mut manifest = serde_json::json!({
         "title": title,
         "format": MIME_MP4,
         "claim_generator_info": [{
@@ -74,7 +80,19 @@ fn build_d2_manifest(title: &str, faces_blurred: u32) -> serde_json::Value {
                 }]
             }
         }]
-    })
+    });
+    if let Some(data) = blur_assertion {
+        if let Some(arr) = manifest
+            .get_mut("assertions")
+            .and_then(|a| a.as_array_mut())
+        {
+            arr.push(serde_json::json!({
+                "label": "io.rootlens.privacy.blur.v1",
+                "data": data
+            }));
+        }
+    }
+    manifest
 }
 
 fn make_signer() -> Result<Box<dyn c2pa::Signer + Send + Sync>, String> {
@@ -116,13 +134,14 @@ fn sign_d2_impl(
     parent_d1_mp4: &Path,
     output_mp4: &Path,
     faces_blurred: u32,
+    blur_assertion: Option<serde_json::Value>,
 ) -> Result<(), String> {
     let title = output_mp4
         .file_name()
         .and_then(|s| s.to_str())
         .unwrap_or("d2.mp4");
 
-    let manifest_json = build_d2_manifest(title, faces_blurred).to_string();
+    let manifest_json = build_d2_manifest(title, faces_blurred, blur_assertion).to_string();
     let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
         .with_definition(&manifest_json)
         .map_err(|e| format!("Builder::with_definition (D2) failed: {e}"))?;
@@ -230,6 +249,7 @@ pub unsafe extern "C" fn pipeline1_sign_d2(
     parent_d1_mp4: *const c_char,
     output_mp4: *const c_char,
     faces_blurred: u32,
+    blur_assertion_json: *const c_char,
 ) -> i32 {
     let blurred = match cstr_to_path(blurred_mp4) {
         Ok(p) => p,
@@ -252,7 +272,23 @@ pub unsafe extern "C" fn pipeline1_sign_d2(
             return -1;
         }
     };
-    match sign_d2_impl(blurred, parent, output, faces_blurred) {
+    // blur assertion data (= io.rootlens.privacy.blur.v1)。 NULL / 空 / parse 失敗時は付けない
+    // (= blur メタは best-effort、 ここで署名全体を失敗させない)。
+    let blur_assertion: Option<serde_json::Value> = if blur_assertion_json.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(blur_assertion_json).to_str() {
+            Ok(s) if !s.is_empty() => match serde_json::from_str::<serde_json::Value>(s) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    eprintln!("[pipeline1_sign_d2] blur_assertion parse failed: {e}");
+                    None
+                }
+            },
+            _ => None,
+        }
+    };
+    match sign_d2_impl(blurred, parent, output, faces_blurred, blur_assertion) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("[pipeline1_sign_d2] {e}");

@@ -47,6 +47,10 @@ public struct PrivacyBlurResult {
   public let outputBytes: Int64
   public let outputWidth: Int
   public let outputHeight: Int
+  /// 実際にぼかした領域の per-frame 記録 (= C2PA blur assertion の元データ)。
+  /// 顔が検出されたフレームのみ。 各要素: { "frame_index": Int, "regions": [{x,y,w,h}] }。
+  /// 座標は upright フレームの top-left 原点・正規化 [0,1]。
+  public let blurRegions: [[String: Any]]
 
   public func toDictionary() -> [String: Any] {
     return [
@@ -58,6 +62,7 @@ public struct PrivacyBlurResult {
       "outputBytes": outputBytes,
       "outputWidth": outputWidth,
       "outputHeight": outputHeight,
+      "blurRegions": blurRegions,
     ]
   }
 }
@@ -94,6 +99,9 @@ public final class PrivacyBlurProcessor {
   // Detection state (single-instance fields, pipeline is single-thread per processor)
   private var totalFacesBlurred = 0
   private let faceTracker = FaceTracker()
+  /// 実際にぼかした領域の per-frame 記録 (= C2PA blur assertion 用)。
+  /// processFrame と同じ単一スレッド (requestMediaDataWhenReady の serial queue) で蓄積する。
+  private var blurRegionsPerFrame: [[String: Any]] = []
 
   public static func process(
     _ opts: PrivacyBlurOptions,
@@ -309,7 +317,8 @@ public final class PrivacyBlurProcessor {
       inputBytes: (inAttrs?[.size] as? NSNumber)?.int64Value ?? 0,
       outputBytes: (outAttrs?[.size] as? NSNumber)?.int64Value ?? 0,
       outputWidth: outW,
-      outputHeight: outH
+      outputHeight: outH,
+      blurRegions: blurRegionsPerFrame
     )
   }
 
@@ -379,6 +388,21 @@ public final class PrivacyBlurProcessor {
         normalizedRegions.append(r)
         totalFacesBlurred += 1
       }
+    }
+
+    // blur メタデータ: このフレームで実際にぼかした領域を記録 (= C2PA blur assertion の元データ)。
+    // Vision/CIImage は bottom-left 原点。 メタデータは top-left 正規化 (= ML 標準) に変換し 4 桁丸め。
+    if !normalizedRegions.isEmpty {
+      let round4: (CGFloat) -> Double = { Double(($0 * 10000).rounded()) / 10000.0 }
+      let regionDicts: [[String: Double]] = normalizedRegions.map { r in
+        [
+          "x": round4(r.minX),
+          "y": round4(1.0 - (r.minY + r.height)),
+          "w": round4(r.width),
+          "h": round4(r.height),
+        ]
+      }
+      blurRegionsPerFrame.append(["frame_index": frameIndex, "regions": regionDicts])
     }
 
     // 5) OCR は本ユニットでは未対応 (顔のみ)。詳細はファイル冒頭コメント参照。

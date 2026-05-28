@@ -69,15 +69,18 @@ void c2pa_free_string(char *s);
 int32_t pipeline1_sign_d1(const char *input_mp4, const char *output_mp4);
 
 /**
- * D2 署名: ぼかし済 MP4 + 親 D1 MP4 → c2pa.actions.v2 = [c2pa.placed]
+ * D2 署名: ぼかし済 MP4 + 親 D1 MP4 → c2pa.actions.v2 = [c2pa.edited]
  *           + D1 を ingredient parentOf 参照した C2PA manifest 付き MP4。
+ * blur_assertion_json: per-frame 顔 bbox を載せた io.rootlens.privacy.blur.v1 の data
+ *           (JSON 文字列)。 NULL / 空 / parse 失敗時は assertion を付けない (best-effort)。
  * 戻り値: 0 = 成功, それ以外 = 失敗。
  */
 int32_t pipeline1_sign_d2(
     const char *blurred_mp4,
     const char *parent_d1_mp4,
     const char *output_mp4,
-    uint32_t faces_blurred
+    uint32_t faces_blurred,
+    const char *blur_assertion_json
 );
 
 /**

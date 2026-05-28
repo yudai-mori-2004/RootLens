@@ -80,7 +80,7 @@ interface C2paBridgeInterface {
   clearStoredCertificates(): Promise<void>;
   // v0.1.3 Pipeline 1 (= mock-device 互換 D1/D2/signature_hash)
   signD1(inputMp4: string, outputMp4: string): Promise<string>;
-  signD2(blurredMp4: string, parentD1Mp4: string, outputMp4: string, facesBlurred: number): Promise<string>;
+  signD2(blurredMp4: string, parentD1Mp4: string, outputMp4: string, facesBlurred: number, blurAssertionJson: string): Promise<string>;
   computeContentId(inputMp4: string): Promise<string>;
 }
 
@@ -261,9 +261,11 @@ export async function signD2(
   parentD1Mp4: string,
   outputMp4: string,
   facesBlurred: number,
+  /// io.rootlens.privacy.blur.v1 の data (per-frame 顔 bbox) の JSON 文字列。 空なら assertion を付けない。
+  blurAssertionJson = '',
 ): Promise<string> {
   if (!C2paBridge) throw new Error('C2paBridge native module not available');
-  return C2paBridge.signD2(blurredMp4, parentD1Mp4, outputMp4, facesBlurred);
+  return C2paBridge.signD2(blurredMp4, parentD1Mp4, outputMp4, facesBlurred, blurAssertionJson);
 }
 
 /// signature_hash = SHA-256(active manifest signature)。 "sha256:<64 hex>" を返す。
