@@ -80,11 +80,15 @@ ARKit world tracking + 背面 wide camera（1x）を使用する。6DoF カメ�
 
 Apple Vision の `VNDetectFaceRectanglesRequest`（revision 3）/ Android の同等 API でフレームごとに顔を検出し、ガウスぼかしを適用する。テキストのぼかしは行わない。
 
+**ぼかし領域メタデータ**: 実際にぼかした顔領域を per-frame で D2 の C2PA マニフェストに custom assertion `io.rootlens.privacy.blur.v1` として記録する（別ファイルは作らない）。フレームごとに `{frame_index, regions:[{x,y,w,h}]}`（upright フレームの top-left 原点・正規化 [0,1]、顔が映ったフレームのみ）。署名対象なので tamper-evident で、買い手は「どのフレームのどこを除去したか」を検証・mask できる。サイズは数十 KB〜（顔が映り続ける長尺で最大 ~1-2MB）。
+
 ### 2.4 C2PA 署名
 
 **署名 D1（生 MP4）**: 撮影直後、ぼかし前に Secure Enclave の P-256 鍵で ES256 署名。App Attest + RFC 3161 タイムスタンプ。3 段 PKI。c2pa 0.81 系ストリーミング署名。
 
-**署名 D2（ぼかし済み MP4）**: ぼかし後に再署名。D1 を ingredient として参照、action にぼかし処理を記載。D2 のアクティブマニフェスト署名の SHA-256 が `signature_hash` となる。
+**署名 D2（ぼかし済み MP4）**: ぼかし後に再署名。D1 を ingredient として `parentOf` 参照する。actions assertion は先頭が `c2pa.opened`（Builder が intent=Edit で親 ingredient を ingredients param に入れて自動挿入）+ ぼかしを記録する `c2pa.edited`（`operation: face_blur` / `regions_blurred`）。ぼかし領域の詳細は §2.3 の `io.rootlens.privacy.blur.v1` assertion に載る。D2 のアクティブマニフェスト署名の SHA-256 が `signature_hash` となる。
+
+> 署名証明書（EE）の Subject DN には Organization（`O=`）を必ず入れる。c2pa-rs が `O=` を必須抽出し、無いと `MissingSigningCertificateChain` を `claimSignature.mismatch` として返す（§17 タスクの調査記録参照）。
 
 ### 2.5 アップロード
 

@@ -63,11 +63,17 @@ app/ で UI ロジックとデータフローが密結合し、データフロ�
 
 ## 追加スコープ (2026-05-28 合意、未着手 — 長尺実測の後に実装)
 
-### A. blur 領域メタデータを C2PA に埋め込む (新ファイル無し)
+### A. blur 領域メタデータを C2PA に埋め込む (新ファイル無し) ✅ 実装済み (2026-05-28)
 - 目的: 「何を・どのフレームのどこを除去したか」を来歴に残す (= 買い手の透明性 / blur 領域 mask / 監査)。
-- 形式: 別ファイルは作らず、D2 マニフェストにカスタム assertion (`io.rootlens.privacy.blur.v1` 等) として per-frame の顔 bbox を載せる → 署名されて tamper-evident。
+- 形式: 別ファイルは作らず、D2 マニフェストにカスタム assertion `io.rootlens.privacy.blur.v1` として per-frame の顔 bbox を載せる → 署名されて tamper-evident。data: `{operation, detector, method, coordinate_space:"normalized_top_left", total_faces_blurred, frames:[{frame_index, regions:[{x,y,w,h}]}]}`。座標は upright フレームの top-left 原点・正規化 [0,1]、顔が映ったフレームのみ。
 - サイズ: 典型 (顔は断続的) で数十〜数百 KB、顔が映り続ける長尺で最大 ~1-2MB。C2PA 埋め込みで問題ないレンジ。
-- 実装: `PrivacyBlurProcessor.swift` は既にフレーム単位で `boundingBox` を検出済み。これを per-frame で集約して返す → JS → `signD2(..., regions)` で `c2pa-bridge` が assertion 化。D2 action の `regions_blurred` カウントと併存。
+- 実装した連鎖:
+  - `PrivacyBlurProcessor.swift`: ぼかした smoothed+inflated 領域を per-frame 収集 → `PrivacyBlurResult.blurRegions` で返す (top-left 正規化, 4 桁丸め)。
+  - `app/src/units/privacy-blur/index.ts`: `blurRegions: BlurFrameRegions[]` を追加。
+  - `app/src/dataflow/steps/sign.ts`: assertion data を組立 → `signD2(..., blurAssertionJson)`。
+  - `native/c2pa-bridge/src/pipeline1.rs`: `pipeline1_sign_d2` に `blur_assertion_json` 引数追加、`build_d2_manifest` が assertion を append (best-effort、parse 失敗で署名は止めない)。
+  - `c2pa_bridge.h` / `C2paBridgeModule.swift` / `c2paBridge.ts`: FFI/ブリッジ/wrapper に引数追加。
+  - 検証: cargo check (host) OK / app tsc 移行起因エラー 0。**実機反映には c2pa-bridge .a 再ビルド + privacy-blur/c2pa-bridge pod 再ビルド (= アプリ再ビルド) が必要**。DATA_SPECS §2.3 に記載。
 
 ### C. Pipeline 1 の background 化 + resumable キュー (本番撮影フロー、大きめ — 独立タスク化も可)
 - 現状: 撮影後の端末処理 (blur / D1+D2 sign / signature_hash / R2 upload / TP /process / cNFT mint / POST /api/clips) は **全て foreground** で走る。upload も `expo-file-system uploadAsync` = foreground (DATA_SPECS §2.5 の Background URLSession は未実装)。アプリが background に入ると JS が suspend し、処理が止まる/消える。
