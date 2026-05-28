@@ -2,7 +2,7 @@
 rootlens-server サーバパイプライン Pipeline 2 第 2 層 (= フレームサンプリング画像解析、 15 点)
 を Modal の CPU 関数として実装。
 
-入力: R2 上の生 MP4 (= raw/<content_id>/rgb.mp4) + sample_interval_sec
+入力: R2 上の生 MP4 (= raw/<signature_hash>/rgb.mp4) + sample_interval_sec
 処理:
   1. R2 から MP4 を /tmp に download
   2. cv2.VideoCapture で開き、 int(fps * sample_interval_sec) 間隔で 1 フレームずつ抽出
@@ -275,17 +275,17 @@ def _compute_score(metrics: dict) -> int:
     secrets=[modal.Secret.from_name("r2-creds")],
 )
 @modal.fastapi_endpoint(method="POST")
-def analyze(content_id: str, sample_interval_sec: float = 3.0):
+def analyze(signature_hash: str, sample_interval_sec: float = 3.0):
     """
-    rootlens-server が叩く endpoint。 R2 から raw/<content_id>/rgb.mp4 を fetch し、
+    rootlens-server が叩く endpoint。 R2 から raw/<signature_hash>/rgb.mp4 を fetch し、
     サンプリングフレームから 4 指標 + 0..15 score を算出して返す。
 
     Args (query string):
-        content_id:           生 MP4 を特定する content_id (= R2 key prefix 用)
+        signature_hash:           生 MP4 を特定する signature_hash (= R2 key prefix 用)
         sample_interval_sec:  サンプリング間隔の秒数 (= default 3)
 
     冪等性:
-        同じ content_id + sample_interval_sec で同じ入力 MP4 を読み、 同じ計算ロジックを
+        同じ signature_hash + sample_interval_sec で同じ入力 MP4 を読み、 同じ計算ロジックを
         通すので結果は決定的。 cache layer は server 側 (= Pipeline 2 の DB) が持つ。
     """
     import boto3
@@ -303,7 +303,7 @@ def analyze(content_id: str, sample_interval_sec: float = 3.0):
         region_name="auto",
     )
 
-    input_key = f"raw/{content_id}/rgb.mp4"
+    input_key = f"raw/{signature_hash}/rgb.mp4"
     in_path = "/tmp/in.mp4"
     s3.download_file(bucket_raw, input_key, in_path)
 

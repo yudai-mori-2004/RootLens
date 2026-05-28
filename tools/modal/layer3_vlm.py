@@ -1,23 +1,38 @@
 """
-RootLens v0.1.3 Pipeline 2 第 3 層 (= VLM セマンティック解析、 55 点) を Modal の
-CPU 関数として実装。
+RootLens v0.1.3 Pipeline 2 第 3 層 (= VLM セマンティック解析 + 自動分類、 65 点) を
+Modal の CPU 関数として実装。
 
-入力: content_id + task_id + vlm_interval_sec (= 既定 30s)
+2026-05-27 大方針転換に対応:
+  - 配点を 55 → 65 点に再分配 (= GTSAM 撤去分を吸収)。 task_activity 22 / object_interaction 18 /
+    authenticity 15 / scene_match 10
+  - 撮影前タスク選択を撤去 (= task_id 不要)。 system prompt は事前にタスクを絞らない
+    「家事 / 学習 / 工作等 egocentric 活動を判定 + 分類」 の汎用評価に切替
+  - VLM が事後分類するカテゴリ (= cleaning / laundry / cooking / studying / crafting /
+    organizing / meal_prep / other) を per-frame で生成、 クリップ全体で多数決して
+    主カテゴリ + 信頼度を返す
+  - per-frame の短い行動説明文も生成 (= 後段 Pipeline 3 のエピソードラベル集約で再利用)
+
+入力: signature_hash + vlm_interval_sec (= 既定 30s)
 処理:
-  1. R2 から raw/<content_id>/rgb.mp4 を download
+  1. R2 から raw/<signature_hash>/rgb.mp4 を download
   2. cv2 で int(fps * vlm_interval_sec) フレーム間隔でサンプリング、 1024px 幅に
      リサイズ + JPEG quality 70 で base64 エンコード
-  3. Claude Haiku 4.5 (= claude-haiku-4-5) の messages API に N=16 枚バッチで送信、
-     N を超えたら複数リクエストに分割
-  4. 各フレームの 4 基準 (task_activity / object_interaction / authenticity /
-     scene_match) を 0-5 で採点 → 全フレーム平均 → 配点で按分 (= 20 / 15 / 10 / 10)
-  5. task_activity == 0 のフレーム割合を idle_ratio として算出
-出力 JSON (= camelCase):
-  {score: 0..55 整数, taskActivityAvg, objectInteractionAvg, authenticityAvg,
-   sceneMatchAvg, idleRatio}
+  3. Claude Haiku 4.5 の messages API に N=16 枚バッチで送信 (= 超過は分割)
+  4. 各フレームの 4 基準 (= 0-5) + カテゴリ (= 8 値) + 行動説明文を取得
+  5. 4 基準を平均 → 配点で按分 (= 22 / 18 / 15 / 10)、 カテゴリは多数決
+出力 JSON (= camelCase、 server shared/api-types Layer3Score と整合):
+  {
+    score: 0..65 整数,
+    taskActivityAvg, objectInteractionAvg, authenticityAvg, sceneMatchAvg,
+    idleRatio,
+    autoCategory: "cleaning" | ... | "other",
+    autoCategoryConfidence: 0..1,
+    frameLabels: [{frameIdx, tsSec, category, description}]
+  }
 
-冪等性: VLM 呼び出しは非決定的 (= temperature > 0)。 スコアは再採点時に微小変動
-しうる。 同一 content_id での再呼び出し抑止は Pipeline 2 orchestrator 側で扱う。
+冪等性: VLM 呼び出しは非決定的 (= temperature > 0 でも内部揺らぎあり)。
+スコアとカテゴリは再採点時に微小変動しうる。 同一 signature_hash での再呼び出し抑止は
+Pipeline 2 orchestrator 側で扱う。
 
 詳細: document/v0.1.3/tasks/06-pipeline-2-layer-3-vlm/README.md 参照。
 """
@@ -28,6 +43,7 @@ import json
 import os
 import sys
 import time
+from collections import Counter
 
 import modal
 
@@ -60,95 +76,80 @@ TEMPERATURE = 0.0  # 再現性目的 (= とはいえ Claude 側に揺らぎは�
 RESIZE_WIDTH = 1024  # JPEG エンコード時の最大幅
 JPEG_QUALITY = 70
 
-# 配点 (= DATA_SPECS_JA.md §3.2.4 第 3 層内訳)
-WEIGHT_TASK_ACTIVITY = 20
-WEIGHT_OBJECT_INTERACTION = 15
-WEIGHT_AUTHENTICITY = 10
+# 配点 (= DATA_SPECS_JA.md §3.2.4 第 3 層内訳、 2026-05-27 GTSAM 撤去後)
+WEIGHT_TASK_ACTIVITY = 22
+WEIGHT_OBJECT_INTERACTION = 18
+WEIGHT_AUTHENTICITY = 15
 WEIGHT_SCENE_MATCH = 10
 LAYER3_MAX_SCORE = (
     WEIGHT_TASK_ACTIVITY
     + WEIGHT_OBJECT_INTERACTION
     + WEIGHT_AUTHENTICITY
     + WEIGHT_SCENE_MATCH
-)  # = 55
+)  # = 65
 
-# フォールバック中央値 (= 各 metric を 2.5、 idle_ratio を 0.5 にして fail-soft で進む)
-FALLBACK_METRIC = 2.5
-FALLBACK_IDLE_RATIO = 0.5
-
-
-# ─── タスク定義 (= hard-coded、 本フェーズでは 1-2 タスクで十分) ─────────
-
-# 後続フェーズでタスクカタログとして DB に展開する。 現段階では README の例 (= dishes)
-# + generic を定義する。 未知 task_id は generic にフォールバック。
-TASK_CATALOG: dict[str, dict[str, str]] = {
-    "dishes": {
-        "name": "シンクで食器を洗う",
-        "start_condition": "シンクの前に立ち、 洗う対象の食器が視界に入っている。",
-        "end_condition": "全ての食器が洗い終わり、 水切りカゴまたは乾燥棚に置かれている。",
-        "scene_description": (
-            "家庭のキッチンのシンク周辺。 蛇口、 水、 スポンジ、 洗剤、 皿 / コップ / "
-            "カトラリー等の食器、 水切りカゴが映ることが多い。"
-        ),
-    },
-    "generic": {
-        "name": "家庭内の日常タスク",
-        "start_condition": "撮影者が何らかの家庭内タスクを開始している。",
-        "end_condition": "そのタスクが完了している。",
-        "scene_description": "家庭内 (= キッチン / リビング / 浴室 / 寝室 等) の典型的な環境。",
-    },
+# 自動分類カテゴリ (= shared/api-types.ts AutoCategory と完全一致)
+VALID_CATEGORIES = {
+    "cleaning", "laundry", "cooking", "studying",
+    "crafting", "organizing", "meal_prep", "other",
 }
 
-
-def get_task_definition(task_id: str) -> dict[str, str]:
-    """task_id に対応するタスク定義を返す。 未知なら generic にフォールバック。"""
-    return TASK_CATALOG.get(task_id, TASK_CATALOG["generic"])
+# フォールバック (= 各 metric を 2.5、 idle_ratio を 0.5、 category は "other" 信頼度 0)
+FALLBACK_METRIC = 2.5
+FALLBACK_IDLE_RATIO = 0.5
+FALLBACK_CATEGORY = "other"
 
 
 # ─── システムプロンプト ─────────────────────────────────────────────
 
-def build_system_prompt(task_id: str) -> str:
-    """タスク定義を埋め込んだ system prompt を生成。"""
-    td = get_task_definition(task_id)
-    return (
-        "あなたは一人称視点 (= エゴセントリック) のタスク遂行映像を評価する評価者です。\n"
-        "\n"
-        f"評価対象タスク: 「{td['name']}」 (task_id={task_id})\n"
-        f"- 開始条件: {td['start_condition']}\n"
-        f"- 終了条件: {td['end_condition']}\n"
-        f"- 典型的な環境: {td['scene_description']}\n"
-        "\n"
-        "ユーザーは複数の JPEG フレームを送ります。 各フレームは時系列順にサンプリング\n"
-        "されています。 各フレームに対して以下 4 基準を 0-5 (= 整数) で採点し、 短い\n"
-        "根拠テキスト (= 1 文程度) を添えて JSON で返してください。\n"
-        "\n"
-        "4 基準:\n"
-        "- task_activity (0-5): タスクに関連する動作を行っているか。\n"
-        "    0 = 完全に無関係、 3 = 部分的に関連、 5 = タスクを明確に遂行中。\n"
-        "- object_interaction (0-5): 手が物体を操作しているか。\n"
-        "    0 = 何にも触れていない、 3 = 軽く触れている、 5 = 道具 / 対象物を能動的に操作。\n"
-        "- authenticity (0-5): 本物の人間の手による実際の動作に見えるか。\n"
-        "    0 = 明らかに偽造 / 画面の再撮影 / マネキン、 5 = 自然な人間の手と動作。\n"
-        "- scene_match (0-5): 環境がタスクに適合しているか。\n"
-        "    0 = 完全に不一致 (= 例: 「洗い物」 タスクで草原)、 5 = 典型的な環境。\n"
-        "\n"
-        "出力 JSON 形式 (= JSON 以外の prose / markdown は禁止):\n"
-        "{\n"
-        '  "frames": [\n'
-        "    {\n"
-        '      "frame_idx": 0,\n'
-        '      "task_activity": 4,\n'
-        '      "object_interaction": 4,\n'
-        '      "authenticity": 5,\n'
-        '      "scene_match": 5,\n'
-        '      "rationale": "右手がスポンジを持ち皿をこすっている"\n'
-        "    },\n"
-        "    ...\n"
-        "  ]\n"
-        "}\n"
-        "\n"
-        "frame_idx はユーザーが各画像と共に提示する番号をそのまま使ってください。"
-    )
+SYSTEM_PROMPT = (
+    "あなたは一人称視点 (= エゴセントリック) の家庭内活動映像を評価する評価者です。\n"
+    "撮影者は事前にタスクを申告していません。 映像内容から自律的に活動を判定して\n"
+    "ください。\n"
+    "\n"
+    "対象とする活動カテゴリ (= 8 値、 必ずいずれか 1 つに分類):\n"
+    "- cleaning   (= 掃除: 床 / 棚 / 浴室 / トイレ等の清掃)\n"
+    "- laundry    (= 洗濯: 洗濯物の畳み / 干し / 取り込み)\n"
+    "- cooking    (= 料理: 調理 / 食材処理 / 加熱 / 盛り付け)\n"
+    "- studying   (= 勉強: 読書 / ノート / 計算 / 学習作業)\n"
+    "- crafting   (= 工作: DIY / 手芸 / 修理 / 組み立て)\n"
+    "- organizing (= 整理整頓: 物の片付け / 収納 / 分類)\n"
+    "- meal_prep  (= 食事の支度: 配膳 / 食器並べ / 食卓準備)\n"
+    "- other      (= 上記いずれにも該当しない or 活動が不明瞭)\n"
+    "\n"
+    "ユーザーは複数の JPEG フレームを送ります。 各フレームは時系列順にサンプリング\n"
+    "されています。 各フレームに対して以下 4 基準を 0-5 (= 整数) で採点 + カテゴリを\n"
+    "1 つ選択 + 短い行動説明文 (= 1 文程度、 30 字以内) を生成し、 JSON で返してください。\n"
+    "\n"
+    "4 基準:\n"
+    "- task_activity (0-5): 何らかの目的的活動を遂行しているか。\n"
+    "    0 = ぼーっとしている / 何もしていない、 3 = 部分的に活動、 5 = 明確に手作業中。\n"
+    "- object_interaction (0-5): 手が物体を操作しているか。\n"
+    "    0 = 何にも触れていない、 3 = 軽く触れている、 5 = 道具 / 対象物を能動的に操作。\n"
+    "- authenticity (0-5): 本物の人間の手による実際の動作に見えるか。\n"
+    "    0 = 明らかに偽造 / 画面の再撮影 / マネキン、 5 = 自然な人間の手と動作。\n"
+    "- scene_match (0-5): 環境が活動と合致しているか。\n"
+    "    0 = 不自然な状況、 5 = 典型的な家事 / 作業環境。\n"
+    "\n"
+    "出力 JSON 形式 (= JSON 以外の prose / markdown は禁止):\n"
+    "{\n"
+    '  "frames": [\n'
+    "    {\n"
+    '      "frame_idx": 0,\n'
+    '      "task_activity": 4,\n'
+    '      "object_interaction": 4,\n'
+    '      "authenticity": 5,\n'
+    '      "scene_match": 5,\n'
+    '      "category": "cleaning",\n'
+    '      "description": "床にモップをかけている"\n'
+    "    },\n"
+    "    ...\n"
+    "  ]\n"
+    "}\n"
+    "\n"
+    "frame_idx はユーザーが各画像と共に提示する番号をそのまま使ってください。\n"
+    "category は必ず上記 8 値のいずれかを使用してください (= 未知値は禁止、 不明なら other)。"
+)
 
 
 # ─── フレームサンプリング + エンコード ─────────────────────────────────
@@ -179,7 +180,7 @@ def sample_and_encode_frames(
 
         sampled: list[dict] = []
         sample_idx = 0
-        # 5 秒サンプル MP4 (= step が total_frames を超える) でも先頭 1 枚を必ず取る
+        # 短いサンプル MP4 (= step が total_frames を超える) でも先頭 1 枚を必ず取る
         for src_idx in range(0, total_frames, step):
             cap.set(cv2.CAP_PROP_POS_FRAMES, src_idx)
             ok, frame_bgr = cap.read()
@@ -221,11 +222,9 @@ def sample_and_encode_frames(
 
 # ─── Claude Haiku 呼び出し ──────────────────────────────────────────
 
-def call_claude_for_batch(
-    client, system_prompt: str, batch: list[dict]
-) -> list[dict]:
+def call_claude_for_batch(client, batch: list[dict]) -> list[dict]:
     """1 バッチ (= 最大 MAX_FRAMES_PER_REQUEST 枚) を Claude Haiku に投げて
-    per-frame スコアの list を返す。
+    per-frame スコア + カテゴリ + 説明文の list を返す。
 
     JSON parse 失敗時は空 list を返す (= caller でフォールバック扱い)。 stdout に
     warning を吐く。
@@ -252,8 +251,9 @@ def call_claude_for_batch(
         {
             "type": "text",
             "text": (
-                f"上記 {len(batch)} 枚のフレームを 4 基準で採点し、 指定 JSON 形式で\n"
-                "返してください。 JSON 以外の prose / markdown は出力しないでください。"
+                f"上記 {len(batch)} 枚のフレームを 4 基準で採点 + カテゴリ判定 + 行動説明文\n"
+                "を生成して、 指定 JSON 形式で返してください。 JSON 以外の prose / markdown は\n"
+                "出力しないでください。"
             ),
         }
     )
@@ -262,7 +262,7 @@ def call_claude_for_batch(
         model=CLAUDE_MODEL,
         max_tokens=MAX_OUTPUT_TOKENS,
         temperature=TEMPERATURE,
-        system=system_prompt,
+        system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": content}],
     )
     raw_text = "".join(
@@ -304,15 +304,19 @@ def call_claude_for_batch(
         if not isinstance(entry, dict):
             continue
         try:
+            cat = str(entry.get("category", "")).strip().lower()
+            if cat not in VALID_CATEGORIES:
+                cat = FALLBACK_CATEGORY
+            desc = str(entry.get("description", "")).strip()
             cleaned.append(
                 {
                     "frame_idx": int(entry.get("frame_idx", -1)),
                     "task_activity": _clamp_0_5(entry.get("task_activity")),
-                    "object_interaction": _clamp_0_5(
-                        entry.get("object_interaction")
-                    ),
+                    "object_interaction": _clamp_0_5(entry.get("object_interaction")),
                     "authenticity": _clamp_0_5(entry.get("authenticity")),
                     "scene_match": _clamp_0_5(entry.get("scene_match")),
+                    "category": cat,
+                    "description": desc,
                 }
             )
         except (TypeError, ValueError):
@@ -333,16 +337,19 @@ def _clamp_0_5(v) -> float:
     return f
 
 
-# ─── スコア集計 ─────────────────────────────────────────────────────
+# ─── スコア集計 + カテゴリ多数決 ──────────────────────────────────────
 
-def aggregate_scores(per_frame: list[dict], total_sampled: int) -> dict:
-    """per-frame の 4 基準スコア list を平均 + 配点按分 + idle_ratio に集約。
+def aggregate_scores(
+    per_frame: list[dict], frame_ts_map: dict[int, float]
+) -> dict:
+    """per-frame の 4 基準スコア + カテゴリ + 説明文を集約。
 
-    per_frame: [{frame_idx, task_activity, object_interaction, authenticity, scene_match}, ...]
-    total_sampled: cv2 でサンプリングしたフレーム総数 (= VLM が一部 frame を落として
-                   返した場合の分母として使う)。
+    per_frame: [{frame_idx, task_activity, object_interaction, authenticity,
+                 scene_match, category, description}, ...]
+    frame_ts_map: frame_idx → ts_sec の対応表 (= frameLabels に含める用)
 
-    フォールバック条件: per_frame が空 → 全 metric 2.5、 idle_ratio 0.5。
+    フォールバック条件: per_frame が空 → 全 metric 2.5、 idle_ratio 0.5、
+                       category "other" 信頼度 0.0、 frameLabels 空。
     """
     if not per_frame:
         print(
@@ -351,25 +358,30 @@ def aggregate_scores(per_frame: list[dict], total_sampled: int) -> dict:
             file=sys.stdout,
             flush=True,
         )
-        task_activity_avg = FALLBACK_METRIC
-        object_interaction_avg = FALLBACK_METRIC
-        authenticity_avg = FALLBACK_METRIC
-        scene_match_avg = FALLBACK_METRIC
-        idle_ratio = FALLBACK_IDLE_RATIO
-    else:
-        n = len(per_frame)
-        task_activity_avg = sum(f["task_activity"] for f in per_frame) / n
-        object_interaction_avg = (
-            sum(f["object_interaction"] for f in per_frame) / n
-        )
-        authenticity_avg = sum(f["authenticity"] for f in per_frame) / n
-        scene_match_avg = sum(f["scene_match"] for f in per_frame) / n
-        # idle_ratio は cv2 サンプリング側の分母を使う (= VLM が落としたフレームは
-        # 「不明」 なので idle 扱いせず分子からも分母からも除外、 という選択肢も
-        # あるが、 ここでは VLM の返した frame 集合のみで計算する。 total_sampled
-        # との乖離はメトリクス検査で別途見る。)
-        idle_frames = sum(1 for f in per_frame if f["task_activity"] == 0)
-        idle_ratio = idle_frames / n if n > 0 else FALLBACK_IDLE_RATIO
+        return {
+            "score": int(round(
+                (FALLBACK_METRIC / 5.0) * (
+                    WEIGHT_TASK_ACTIVITY + WEIGHT_OBJECT_INTERACTION
+                    + WEIGHT_AUTHENTICITY + WEIGHT_SCENE_MATCH
+                )
+            )),
+            "taskActivityAvg": FALLBACK_METRIC,
+            "objectInteractionAvg": FALLBACK_METRIC,
+            "authenticityAvg": FALLBACK_METRIC,
+            "sceneMatchAvg": FALLBACK_METRIC,
+            "idleRatio": FALLBACK_IDLE_RATIO,
+            "autoCategory": FALLBACK_CATEGORY,
+            "autoCategoryConfidence": 0.0,
+            "frameLabels": [],
+        }
+
+    n = len(per_frame)
+    task_activity_avg = sum(f["task_activity"] for f in per_frame) / n
+    object_interaction_avg = sum(f["object_interaction"] for f in per_frame) / n
+    authenticity_avg = sum(f["authenticity"] for f in per_frame) / n
+    scene_match_avg = sum(f["scene_match"] for f in per_frame) / n
+    idle_frames = sum(1 for f in per_frame if f["task_activity"] == 0)
+    idle_ratio = idle_frames / n
 
     # 配点按分 (= 各基準の平均 / 5 × 配点)
     score_float = (
@@ -378,14 +390,29 @@ def aggregate_scores(per_frame: list[dict], total_sampled: int) -> dict:
         + (authenticity_avg / 5.0) * WEIGHT_AUTHENTICITY
         + (scene_match_avg / 5.0) * WEIGHT_SCENE_MATCH
     )
-    # 四捨五入で整数化、 0..55 範囲に clamp
+    # 四捨五入で整数化、 0..65 範囲に clamp
     score = int(round(score_float))
     if score < 0:
         score = 0
     if score > LAYER3_MAX_SCORE:
         score = LAYER3_MAX_SCORE
 
-    # 平均値は 0..5 範囲に clamp (= 念のため)
+    # カテゴリ多数決 + 信頼度 (= 主カテゴリ占有率)
+    cat_counter = Counter(f["category"] for f in per_frame)
+    most_common_cat, most_common_count = cat_counter.most_common(1)[0]
+    auto_category_confidence = most_common_count / n
+
+    # frameLabels: Pipeline 3 のエピソードラベル集約で再利用
+    frame_labels = [
+        {
+            "frameIdx": f["frame_idx"],
+            "tsSec": round(frame_ts_map.get(f["frame_idx"], 0.0), 3),
+            "category": f["category"],
+            "description": f["description"],
+        }
+        for f in per_frame
+    ]
+
     def _clamp(v: float) -> float:
         if v < 0.0:
             return 0.0
@@ -407,7 +434,57 @@ def aggregate_scores(per_frame: list[dict], total_sampled: int) -> dict:
         "authenticityAvg": round(_clamp(authenticity_avg), 4),
         "sceneMatchAvg": round(_clamp(scene_match_avg), 4),
         "idleRatio": round(_clamp01(idle_ratio), 4),
+        "autoCategory": most_common_cat,
+        "autoCategoryConfidence": round(_clamp01(auto_category_confidence), 4),
+        "frameLabels": frame_labels,
     }
+
+
+# ─── semantic.jsonl 書き出し (DATA_SPECS §3.3) ──────────────────────────
+
+def _build_semantic_rows(frame_labels: list[dict], total_frames: int, fps: float) -> list[dict]:
+    """sparse な frameLabels (= VLM サンプル点) を全フレームに展開する。
+    各フレームは直近のサンプル点のラベルを継承する (= n〜n+step は同一ラベル)。"""
+    if total_frames <= 0:
+        return []
+    pts = sorted(frame_labels, key=lambda x: x.get("frameIdx", 0))
+    rows: list[dict] = []
+    cur: dict | None = None
+    pi = 0
+    for i in range(total_frames):
+        while pi < len(pts) and pts[pi].get("frameIdx", 0) <= i:
+            cur = pts[pi]
+            pi += 1
+        rows.append({
+            "frame_index": i,
+            "ts_sec": round(i / fps, 4) if fps > 0 else 0.0,
+            "category": (cur or {}).get("category", "other"),
+            "description": (cur or {}).get("description", ""),
+        })
+    return rows
+
+
+def _write_and_upload_semantic(
+    s3, bucket_processed: str, signature_hash: str,
+    frame_labels: list[dict], total_frames: int, fps: float, work_dir: str,
+) -> str:
+    """semantic.jsonl を組み立てて processed/<signature_hash>/semantic.jsonl に upload。
+    1 行目はヘッダー (= モデル名 / fps / total_frames)、 2 行目以降が全フレーム分のラベル。"""
+    rows = _build_semantic_rows(frame_labels, total_frames, fps)
+    path = f"{work_dir}/semantic.jsonl"
+    with open(path, "w") as f:
+        f.write(json.dumps({
+            "model": CLAUDE_MODEL,
+            "signature_hash": signature_hash,
+            "fps": fps,
+            "total_frames": total_frames,
+            "fields": ["frame_index", "ts_sec", "category", "description"],
+        }) + "\n")
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+    key = f"processed/{signature_hash}/semantic.jsonl"
+    s3.upload_file(path, bucket_processed, key, ExtraArgs={"ContentType": "application/x-ndjson"})
+    return key
 
 
 # ─── Modal function (HTTP endpoint) ────────────────────────────────────
@@ -423,21 +500,23 @@ def aggregate_scores(per_frame: list[dict], total_sampled: int) -> dict:
 )
 @modal.fastapi_endpoint(method="POST")
 def score_layer3(
-    content_id: str,
-    task_id: str,
+    signature_hash: str,
     vlm_interval_sec: float = 30.0,
 ):
     """
-    Pipeline 2 第 3 層 (= VLM セマンティック解析) のエントリポイント。
+    Pipeline 2 第 3 層 (= VLM セマンティック解析 + 自動分類) のエントリポイント。
 
     Args (query string):
-        content_id:       生データ R2 prefix 末尾 (= raw/<content_id>/rgb.mp4)
-        task_id:          評価対象タスクの ID (= 例: "dishes"、 未知なら generic)
+        signature_hash:       生データ R2 prefix 末尾 (= raw/<signature_hash>/rgb.mp4)
         vlm_interval_sec: フレームサンプリング間隔 (= 既定 30 秒、 30 分動画で
-                          ~60 フレーム → 1 クリップ ~$0.18)
+                          ~60 フレーム → 1 クリップ ~$0.20)
+
     Returns:
-        camelCase JSON: {score, taskActivityAvg, objectInteractionAvg,
-                         authenticityAvg, sceneMatchAvg, idleRatio}
+        camelCase JSON: {
+          score, taskActivityAvg, objectInteractionAvg, authenticityAvg,
+          sceneMatchAvg, idleRatio, autoCategory, autoCategoryConfidence,
+          frameLabels
+        }
     """
     import boto3  # type: ignore
     from anthropic import Anthropic  # type: ignore
@@ -454,6 +533,7 @@ def score_layer3(
 
     account_id = os.environ["R2_ACCOUNT_ID"]
     bucket_raw = os.environ.get("R2_BUCKET_RAW", "rootlens-raw")
+    bucket_processed = os.environ.get("R2_BUCKET_PROCESSED", "rootlens-processed")
 
     s3 = boto3.client(
         "s3",
@@ -466,28 +546,28 @@ def score_layer3(
     # 1. R2 から rgb.mp4 を download
     work_dir = "/tmp/layer3_work"
     os.makedirs(work_dir, exist_ok=True)
-    rgb_path = f"{work_dir}/{content_id}_rgb.mp4"
-    key = f"raw/{content_id}/rgb.mp4"
+    rgb_path = f"{work_dir}/{signature_hash}_rgb.mp4"
+    key = f"raw/{signature_hash}/rgb.mp4"
     s3.download_file(bucket_raw, key, rgb_path)
 
     # 2. フレームサンプリング + JPEG エンコード
     sampled = sample_and_encode_frames(rgb_path, vlm_interval_sec)
     total_sampled = len(sampled)
+    frame_ts_map = {fr["frame_idx"]: fr["ts_sec"] for fr in sampled}
     print(
         f"[layer3_vlm] sampled {total_sampled} frames "
-        f"(interval={vlm_interval_sec}s) for content_id={content_id}",
+        f"(interval={vlm_interval_sec}s) for signature_hash={signature_hash}",
         flush=True,
     )
 
-    # 3. Claude Haiku で N=16 バッチで採点
+    # 3. Claude Haiku で N=16 バッチで採点 + 分類
     client = Anthropic(api_key=anthropic_key)
-    system_prompt = build_system_prompt(task_id)
     per_frame_all: list[dict] = []
     for i in range(0, total_sampled, MAX_FRAMES_PER_REQUEST):
         batch = sampled[i : i + MAX_FRAMES_PER_REQUEST]
         t_batch = time.time()
         try:
-            per_frame = call_claude_for_batch(client, system_prompt, batch)
+            per_frame = call_claude_for_batch(client, batch)
         except Exception as e:
             # 1 バッチが転んでも他バッチで継続する (= 部分的成功)。 全バッチが転んだら
             # per_frame_all が空のまま aggregate_scores 側でフォールバックに落ちる。
@@ -506,7 +586,26 @@ def score_layer3(
         per_frame_all.extend(per_frame)
 
     # 4. 集計
-    result = aggregate_scores(per_frame_all, total_sampled)
+    result = aggregate_scores(per_frame_all, frame_ts_map)
+
+    # 5. semantic.jsonl を processed/<signature_hash>/ に書き出す (= DATA_SPECS §3.3)。
+    #    scoring は成功しているので、 書き出し失敗で全体を落とさず warning に留める。
+    try:
+        import cv2  # type: ignore
+        _cap = cv2.VideoCapture(rgb_path)
+        _total = int(_cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        _fps = float(_cap.get(cv2.CAP_PROP_FPS) or 0.0)
+        _cap.release()
+        sem_key = _write_and_upload_semantic(
+            s3, bucket_processed, signature_hash,
+            result.get("frameLabels", []), _total, _fps, work_dir,
+        )
+        print(f"[layer3_vlm] wrote {sem_key} ({_total} frames)", flush=True)
+    except Exception as e:
+        print(
+            f"[layer3_vlm] WARNING: semantic.jsonl write failed: {type(e).__name__}: {e}",
+            flush=True,
+        )
 
     # 後片付け (= MP4 を消す。 同 container 再利用で /tmp が太るのを避ける)
     try:
@@ -515,8 +614,9 @@ def score_layer3(
         pass
 
     print(
-        f"[layer3_vlm] done content_id={content_id} task_id={task_id} "
+        f"[layer3_vlm] done signature_hash={signature_hash} "
         f"score={result['score']}/{LAYER3_MAX_SCORE} "
+        f"category={result['autoCategory']} ({result['autoCategoryConfidence']:.2f}) "
         f"elapsed={time.time() - t_start:.1f}s",
         flush=True,
     )

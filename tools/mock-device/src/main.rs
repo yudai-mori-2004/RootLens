@@ -4,7 +4,7 @@
 //   1. C2PA D1 署名 (= c2pa.actions.v2 = [c2pa.created]、 dev ed25519 chain)
 //   2. MacOsBlur Swift CLI で Apple Vision 顔ぼかし + H.264 再 encode
 //   3. C2PA D2 署名 (= D1 を ingredient parentOf 参照、 c2pa.placed action)
-//   4. content_id = SHA-256(D2 active manifest signature) を抽出
+//   4. signature_hash = SHA-256(D2 active manifest signature) を抽出
 //   5. R2 raw バケットに 4 ファイル並列 PUT (prod profile)
 //      / ローカル out dir にコピー (dev profile)
 //
@@ -16,7 +16,7 @@ mod blur;
 mod c2pa_sign;
 mod clips_register;
 mod cnft_mint;
-mod content_id;
+mod signature_hash;
 mod jumbf;
 mod r2_upload;
 mod tp_register;
@@ -47,7 +47,7 @@ struct Args {
     #[arg(long)]
     imu: Option<PathBuf>,
 
-    /// camera_intrinsics.json (= fx, fy, cx, cy)。 未指定なら省略する。
+    /// metadata.json (= fx, fy, cx, cy)。 未指定なら省略する。
     #[arg(long)]
     intrinsics: Option<PathBuf>,
 
@@ -56,7 +56,7 @@ struct Args {
     profile: Profile,
 
     /// 中間 / 最終ファイルを置くディレクトリ。 dev profile では --output-dir 配下に
-    /// `<content_id>/rgb.mp4` 等が出る。 prod profile でも R2 PUT 前に一時保存する。
+    /// `<signature_hash>/rgb.mp4` 等が出る。 prod profile でも R2 PUT 前に一時保存する。
     #[arg(long, default_value = "./mock_device_out")]
     output_dir: PathBuf,
 
@@ -110,16 +110,16 @@ enum Profile {
 
 #[derive(Serialize)]
 struct Output {
-    content_id: String,
-    /// "sha256:" prefix を除いた 64 文字 hex (= DB の contentId カラム / R2 prefix に使う)
-    content_id_hex: String,
+    signature_hash: String,
+    /// "sha256:" prefix を除いた 64 文字 hex (= DB の signatureHash カラム / R2 prefix に使う)
+    signature_hash_hex: String,
     faces_blurred: u32,
     frames_processed: u32,
     blur_duration_ms: f64,
     output_width: u32,
     output_height: u32,
     /// dev profile では `output_paths` (= ローカル絶対パス)、
-    /// prod profile では `r2_keys` (= raw/<content_id>/<filename>)
+    /// prod profile では `r2_keys` (= raw/<signature_hash>/<filename>)
     #[serde(skip_serializing_if = "Option::is_none")]
     output_paths: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -128,11 +128,11 @@ struct Output {
     r2_bucket: Option<String>,
 
     // ─── Title Protocol register 結果 (prod profile のみ) ─────────────────
-    /// TP Gateway が返した signature_hash (= "sha256:<hex>")。 mock-device 側の content_id と
+    /// TP Gateway が返した signature_hash (= "sha256:<hex>")。 mock-device 側の signature_hash と
     /// 一致するはず (= 両方 D2 active manifest signature の SHA-256)。
     #[serde(skip_serializing_if = "Option::is_none")]
     tp_signature_hash: Option<String>,
-    /// ProcessResponse JSON を保存した R2 key (= signed-json/<content_id>.json)。
+    /// ProcessResponse JSON を保存した R2 key (= signed-json/<signature_hash>.json)。
     #[serde(skip_serializing_if = "Option::is_none")]
     tp_offchain_key: Option<String>,
     /// TP register 自体が成功したか (= 失敗してもアップロード自体は完了)
@@ -143,7 +143,7 @@ struct Output {
     /// Solana cNFT asset id (= /api/clips の rootAssetId に渡す、 base58)。
     #[serde(skip_serializing_if = "Option::is_none")]
     root_asset_id: Option<String>,
-    /// R2 signed-json/<content_id>.json への 7 日有効 presigned GET URL (= /api/clips の signedJsonUri)。
+    /// R2 signed-json/<signature_hash>.json への 7 日有効 presigned GET URL (= /api/clips の signedJsonUri)。
     #[serde(skip_serializing_if = "Option::is_none")]
     signed_json_uri: Option<String>,
     /// /api/clips POST で得たクリップ ID (= サーバ DB 内 primary key)。
@@ -206,13 +206,13 @@ async fn main() -> Result<()> {
     ));
     c2pa_sign::sign_d2_with_parent(&tmp_blur, &tmp_d1, &tmp_d2, blur_result.faces_blurred)?;
 
-    log("step 4/4: extract content_id (= SHA-256 of D2 active manifest signature)");
-    let content_id_full = content_id::compute_content_id(&tmp_d2, "video/mp4")?;
-    let content_id_hex = content_id::to_hex_only(&content_id_full)?.to_string();
-    log(&format!("  content_id = {content_id_full}"));
+    log("step 4/4: extract signature_hash (= SHA-256 of D2 active manifest signature)");
+    let signature_hash_full = signature_hash::compute_signature_hash(&tmp_d2, "video/mp4")?;
+    let signature_hash_hex = signature_hash::to_hex_only(&signature_hash_full)?.to_string();
+    log(&format!("  signature_hash = {signature_hash_full}"));
 
-    // 最終 rgb.mp4 を `<content_id>/rgb.mp4` の位置に置く (= dev / prod 共通)
-    let clip_dir = args.output_dir.join(&content_id_hex);
+    // 最終 rgb.mp4 を `<signature_hash>/rgb.mp4` の位置に置く (= dev / prod 共通)
+    let clip_dir = args.output_dir.join(&signature_hash_hex);
     std::fs::create_dir_all(&clip_dir)?;
     let final_rgb = clip_dir.join("rgb.mp4");
     std::fs::rename(&tmp_d2, &final_rgb)
@@ -222,27 +222,27 @@ async fn main() -> Result<()> {
     let _ = std::fs::remove_file(&tmp_d1);
     let _ = std::fs::remove_file(&tmp_blur);
 
-    // ローカル sensors / imu / intrinsics を clip_dir にコピー
+    // ローカル realtime_handpose / imu / metadata を clip_dir にコピー
     let mut local_paths: Vec<PathBuf> = vec![final_rgb.clone()];
     if let Some(p) = &args.sensors {
-        let dst = clip_dir.join("sensors.jsonl");
+        let dst = clip_dir.join("realtime_handpose.jsonl");
         std::fs::copy(p, &dst).with_context(|| format!("cp {} -> {}", p.display(), dst.display()))?;
         local_paths.push(dst);
     }
     if let Some(p) = &args.imu {
-        let dst = clip_dir.join("imu_high_rate.jsonl");
+        let dst = clip_dir.join("imu.jsonl");
         std::fs::copy(p, &dst).with_context(|| format!("cp {} -> {}", p.display(), dst.display()))?;
         local_paths.push(dst);
     }
     if let Some(p) = &args.intrinsics {
-        let dst = clip_dir.join("camera_intrinsics.json");
+        let dst = clip_dir.join("metadata.json");
         std::fs::copy(p, &dst).with_context(|| format!("cp {} -> {}", p.display(), dst.display()))?;
         local_paths.push(dst);
     }
 
     let mut output = Output {
-        content_id: content_id_full,
-        content_id_hex: content_id_hex.clone(),
+        signature_hash: signature_hash_full,
+        signature_hash_hex: signature_hash_hex.clone(),
         faces_blurred: blur_result.faces_blurred,
         frames_processed: blur_result.frames_processed,
         blur_duration_ms: blur_result.duration_ms,
@@ -284,12 +284,12 @@ async fn main() -> Result<()> {
                     anyhow!("R2 bucket required: pass --bucket or set R2_BUCKET_RAW env")
                 })?;
 
-            log(&format!("prod profile: uploading to s3://{bucket}/raw/{content_id_hex}/"));
+            log(&format!("prod profile: uploading to s3://{bucket}/raw/{signature_hash_hex}/"));
             let client = r2_upload::make_r2_client(&account, &access_key, &secret).await?;
             let upload_result = r2_upload::upload_clip_files(
                 &client,
                 &bucket,
-                &content_id_hex,
+                &signature_hash_hex,
                 &final_rgb,
                 args.sensors.as_deref(),
                 args.imu.as_deref(),
@@ -306,7 +306,7 @@ async fn main() -> Result<()> {
 
             // ─── step 5: Title Protocol register (= /process) ───────────────
             log("step 5/7: Title Protocol register (= POST /process via Gateway)");
-            let signed_key = format!("raw/{content_id_hex}/rgb.mp4");
+            let signed_key = format!("raw/{signature_hash_hex}/rgb.mp4");
             let env_gateway = std::env::var("TP_GATEWAY_URL").ok();
             let tp_gateway_url: String = args
                 .tp_gateway
@@ -318,7 +318,7 @@ async fn main() -> Result<()> {
                 &client,
                 &bucket,
                 &signed_key,
-                &content_id_hex,
+                &signature_hash_hex,
                 Some(&tp_gateway_url),
             )
             .await
@@ -419,7 +419,7 @@ async fn main() -> Result<()> {
                     &wallet_pubkey,
                     &args.task_id,
                     args.achievement,
-                    &content_id_hex,
+                    &signature_hash_hex,
                     content_size,
                     &root_asset_id,
                     &signed_json_uri,
@@ -462,13 +462,13 @@ async fn register_tp(
     client: &aws_sdk_s3::Client,
     bucket: &str,
     signed_key: &str,
-    content_id_hex: &str,
+    signature_hash_hex: &str,
     gateway: Option<&str>,
 ) -> Result<(String, String, String)> {
     let content_url = r2_upload::presign_get_url(client, bucket, signed_key, 600).await?;
     let resp = tp_register::register_with_tp(&content_url, gateway).await?;
 
-    let offchain_key = format!("signed-json/{content_id_hex}.json");
+    let offchain_key = format!("signed-json/{signature_hash_hex}.json");
     let body = serde_json::to_vec_pretty(&resp).context("serialize ProcessResponse")?;
 
     // raw バケットに保存 (サーバ内部参照用)

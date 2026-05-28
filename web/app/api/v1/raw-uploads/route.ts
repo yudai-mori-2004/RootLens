@@ -3,10 +3,9 @@
 // v0.1.3 device-side Pipeline 1 用 presigned PUT URL endpoint。
 //
 // 流れ:
-//   1. device が C2PA D1+D2 を済ませて content_id を確定
-//   2. このエンドポイントに contentId を投げ、 4 ファイル分の presigned PUT を得る
-//   3. R2 (raw/<content_id>/{rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl
-//      + camera_intrinsics.json}) に並列 PUT
+//   1. device が C2PA D1+D2 を済ませて signature_hash を確定
+//   2. このエンドポイントに signatureHash を投げ、 超広角構成ファイル分の presigned PUT を得る
+//   3. R2 (raw/<signature_hash>/{rgb.mp4 + realtime_handpose.jsonl + metadata.json}) に並列 PUT
 //   4. その後 device は TP /process + cNFT mint を経て rootAssetId を確定
 //   5. POST /api/clips で clip 行を作成 (= rootAssetId 必須)
 //
@@ -26,7 +25,7 @@ import { presignRawSessionUploads } from "@/lib/r2";
 const CONTENT_ID_RE = /^[0-9a-f]{64}$/;
 
 const RequestSchema = z.object({
-  contentId: z.string().regex(CONTENT_ID_RE, "contentId must be 64-char lowercase hex (SHA-256)"),
+  signatureHash: z.string().regex(CONTENT_ID_RE, "signatureHash must be 64-char lowercase hex (SHA-256)"),
 });
 
 export async function POST(req: NextRequest) {
@@ -46,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const presigned = await presignRawSessionUploads({ contentId: parsed.data.contentId });
+    const presigned = await presignRawSessionUploads({ signatureHash: parsed.data.signatureHash });
     return NextResponse.json(presigned);
   } catch (e: unknown) {
     console.error("[raw-uploads] presign failed:", e);

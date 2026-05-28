@@ -1,0 +1,14 @@
+{
+  "_note": "Mixkit Sound Effects Free License (= 商用 OK、 アプリ内同梱 OK、 再配布禁止、 クレジット不要)。 https://mixkit.co/license/#sfxFree",
+  "_source": "mixkit.co",
+  "files": {
+    "detect_palm.mp3":       { "mixkitId": 947,  "page": "https://mixkit.co/free-sound-effects/correct/" },
+    "detect_thumbs_up.mp3":  { "mixkitId": 952,  "page": "https://mixkit.co/free-sound-effects/correct/" },
+    "countdown_tick.mp3":    { "mixkitId": 1076, "page": "https://mixkit.co/free-sound-effects/beep/" },
+    "countdown_end.mp3":     { "mixkitId": 1955, "page": "https://mixkit.co/free-sound-effects/countdown/" },
+    "rec_start.mp3":         { "mixkitId": 2354, "page": "https://mixkit.co/free-sound-effects/notification/" },
+    "rec_stop.mp3":          { "mixkitId": 2357, "page": "https://mixkit.co/free-sound-effects/notification/" },
+    "warn_hand_lost.mp3":    { "mixkitId": 2310, "page": "https://mixkit.co/free-sound-effects/notification/" },
+    "enter_capture.mp3":     { "mixkitId": 2358, "page": "https://mixkit.co/free-sound-effects/notification/" }
+  }
+}

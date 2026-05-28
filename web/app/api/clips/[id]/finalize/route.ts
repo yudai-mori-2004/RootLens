@@ -14,9 +14,9 @@ interface Ctx {
 }
 
 // POST /api/clips/:id/finalize
-// 端末が R2 への PUT を完了したら呼ぶ。 サーバは contentId 照合 + state 遷移 + workflow 起動。
+// 端末が R2 への PUT を完了したら呼ぶ。 サーバは signatureHash 照合 + state 遷移 + workflow 起動。
 const schema = z.object({
-  contentId: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
+  signatureHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
 }) satisfies z.ZodType<FinalizeUploadRequest>;
 
 export async function POST(req: Request, ctx: Ctx) {
@@ -53,9 +53,9 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const clip = rows[0];
 
-  if (clip.contentId !== parsed.data.contentId) {
+  if (clip.signatureHash !== parsed.data.signatureHash) {
     return NextResponse.json(
-      { error: `Content id mismatch (expected ${clip.contentId})` },
+      { error: `Content id mismatch (expected ${clip.signatureHash})` },
       { status: 409 },
     );
   }

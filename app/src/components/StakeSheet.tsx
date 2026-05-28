@@ -272,7 +272,7 @@ const BlurPreviewPlayer: React.FC<{
 };
 
 const QualityBreakdownDisplay: React.FC<{ breakdown: QualityBreakdown }> = ({ breakdown }) => {
-  // v0.1.3 は 4 層スコア合計。 ここでは合計と layer 別 score のみ簡潔に。
+  // 2026-05-27: 4 → 3 層 (= GTSAM 撤去) + Layer3 配点 55 → 65。
   // 詳細な指標は ClipDetailSheet 側で全部見せる。
   const rows: Array<{ label: string; ratio: number | null; raw?: string }> = [
     { label: '合計スコア', ratio: null, raw: `${breakdown.total} / 100` },
@@ -289,12 +289,7 @@ const QualityBreakdownDisplay: React.FC<{ breakdown: QualityBreakdown }> = ({ br
     {
       label: 'Layer 3 VLM 採点',
       ratio: null,
-      raw: breakdown.layer3 ? `${breakdown.layer3.score} / 55` : '—',
-    },
-    {
-      label: 'Layer 4 GTSAM 整合性',
-      ratio: null,
-      raw: breakdown.gtsam ? `${breakdown.gtsam.score} / 10` : '—',
+      raw: breakdown.layer3 ? `${breakdown.layer3.score} / 65` : '—',
     },
   ];
   return (

@@ -128,6 +128,8 @@ export const TASKS: TaskDef[] = [
   },
 ];
 
-export function findTask(id: string): TaskDef | undefined {
+/// 2026-05-27: clip.taskId は legacy 互換で optional になったので undefined を受ける。
+export function findTask(id: string | undefined): TaskDef | undefined {
+  if (!id) return undefined;
   return TASKS.find((t) => t.id === id);
 }

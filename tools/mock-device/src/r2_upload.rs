@@ -2,7 +2,7 @@
 //
 // aws-sdk-s3 で endpoint URL を R2 の "https://<account_id>.r2.cloudflarestorage.com" に差し替え。
 // region は "auto"、 認証は AWS_ACCESS_KEY_ID 形式 + secret。
-// content_id を prefix にして raw/<content_id>/<filename> 配下に PUT。
+// signature_hash を prefix にして raw/<signature_hash>/<filename> 配下に PUT。
 
 use anyhow::{anyhow, Context, Result};
 use aws_config::BehaviorVersion;
@@ -17,11 +17,11 @@ use std::time::Duration;
 /// R2 PUT 1 ファイルあたりの最大同時実行 (= aws-sdk-s3 内部 connection pool で十分)。
 const MAX_CONCURRENT_UPLOADS: usize = 4;
 
-/// content_id 配下にアップロードする 4 ファイル + depth/ の組。
+/// signature_hash 配下にアップロードする 4 ファイル + depth/ の組。
 pub struct UploadFile {
     /// ローカル絶対パス
     pub local_path: PathBuf,
-    /// R2 内の object key (= raw/<content_id>/<filename> 形式)
+    /// R2 内の object key (= raw/<signature_hash>/<filename> 形式)
     pub key: String,
     /// HTTP Content-Type ヘッダ
     pub content_type: &'static str,
@@ -105,41 +105,42 @@ pub async fn upload_files(
     Ok(UploadResult { keys, total_bytes })
 }
 
-/// raw/<content_id>/ 配下に 4 ファイルをまとめてアップロードする。
+/// raw/<signature_hash>/ 配下にクリップのファイルをまとめてアップロードする (DATA_SPECS §2.2 / §5)。
+/// 超広角構成: rgb.mp4 + realtime_handpose.jsonl + metadata.json。 imu.jsonl は ARKit 構成のみ。
 pub async fn upload_clip_files(
     client: &Client,
     bucket: &str,
-    content_id_hex: &str,
+    signature_hash_hex: &str,
     rgb_mp4: &Path,
-    sensors_jsonl: Option<&Path>,
-    imu_high_rate_jsonl: Option<&Path>,
-    camera_intrinsics_json: Option<&Path>,
+    realtime_handpose_jsonl: Option<&Path>,
+    imu_jsonl: Option<&Path>,
+    metadata_json: Option<&Path>,
 ) -> Result<UploadResult> {
-    let prefix = format!("raw/{content_id_hex}");
+    let prefix = format!("raw/{signature_hash_hex}");
     let mut files = vec![UploadFile {
         local_path: rgb_mp4.to_path_buf(),
         key: format!("{prefix}/rgb.mp4"),
         content_type: "video/mp4",
     }];
 
-    if let Some(p) = sensors_jsonl {
+    if let Some(p) = realtime_handpose_jsonl {
         files.push(UploadFile {
             local_path: p.to_path_buf(),
-            key: format!("{prefix}/sensors.jsonl"),
+            key: format!("{prefix}/realtime_handpose.jsonl"),
             content_type: "application/x-ndjson",
         });
     }
-    if let Some(p) = imu_high_rate_jsonl {
+    if let Some(p) = imu_jsonl {
         files.push(UploadFile {
             local_path: p.to_path_buf(),
-            key: format!("{prefix}/imu_high_rate.jsonl"),
+            key: format!("{prefix}/imu.jsonl"),
             content_type: "application/x-ndjson",
         });
     }
-    if let Some(p) = camera_intrinsics_json {
+    if let Some(p) = metadata_json {
         files.push(UploadFile {
             local_path: p.to_path_buf(),
-            key: format!("{prefix}/camera_intrinsics.json"),
+            key: format!("{prefix}/metadata.json"),
             content_type: "application/json",
         });
     }
@@ -167,7 +168,7 @@ pub async fn presign_get_url(
     Ok(req.uri().to_string())
 }
 
-/// 任意 bytes を R2 に PUT する。 ProcessResponse を JSON 化して signed-json/<content_id>.json に
+/// 任意 bytes を R2 に PUT する。 ProcessResponse を JSON 化して signed-json/<signature_hash>.json に
 /// 保存する用。
 pub async fn put_bytes(
     client: &Client,

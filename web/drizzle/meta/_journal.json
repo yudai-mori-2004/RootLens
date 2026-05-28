@@ -15,6 +15,13 @@
       "when": 1779824868384,
       "tag": "0001_flimsy_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779911111111,
+      "tag": "0002_signature_hash_processed",
+      "breakpoints": true
     }
   ]
 }

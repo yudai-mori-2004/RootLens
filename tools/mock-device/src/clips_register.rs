@@ -1,13 +1,13 @@
 // POST https://<api_base>/api/clips を叩いて clips 行を作成する。 v0.1.3 では
-// content_id + rootAssetId + signedJsonUri が必須 (= Pipeline 2 起動の前提条件)。
+// signature_hash + rootAssetId + signedJsonUri が必須 (= Pipeline 2 起動の前提条件)。
 //
 // zod schema (= web/app/api/clips/route.ts) 参照:
 //   taskId               : string, min 1
 //   achievementConfidence: int 0-100
-//   contentId            : sha256 hex 64 chars (= "sha256:" prefix なし)
+//   signatureHash            : sha256 hex 64 chars (= "sha256:" prefix なし)
 //   contentSize          : positive int (= rgb.mp4 のバイト数)
 //   rootAssetId          : base58 32-44 chars (= cNFT asset id)
-//   signedJsonUri        : URL (= R2 signed-json/<content_id>.json の公開 URL)
+//   signedJsonUri        : URL (= R2 signed-json/<signature_hash>.json の公開 URL)
 //
 // wallet pubkey は `X-Wallet-Pubkey` header で渡す (= web/lib/auth.ts requireWalletPubkey)。
 
@@ -20,8 +20,8 @@ struct CreateClipBody<'a> {
     task_id: &'a str,
     #[serde(rename = "achievementConfidence")]
     achievement_confidence: u32,
-    #[serde(rename = "contentId")]
-    content_id: &'a str,
+    #[serde(rename = "signatureHash")]
+    signature_hash: &'a str,
     #[serde(rename = "contentSize")]
     content_size: u64,
     #[serde(rename = "rootAssetId")]
@@ -46,7 +46,7 @@ pub async fn register_clip(
     wallet_pubkey: &str,
     task_id: &str,
     achievement_confidence: u32,
-    content_id_hex: &str,
+    signature_hash_hex: &str,
     content_size: u64,
     root_asset_id: &str,
     signed_json_uri: &str,
@@ -55,7 +55,7 @@ pub async fn register_clip(
     let body = CreateClipBody {
         task_id,
         achievement_confidence,
-        content_id: content_id_hex,
+        signature_hash: signature_hash_hex,
         content_size,
         root_asset_id,
         signed_json_uri,

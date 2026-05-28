@@ -1,13 +1,12 @@
 // Modal クラウド関数を Node.js から HTTP 経由で呼ぶラッパ。
 //
-// Pipeline 2 (= 自動): 4 層スコアリング + GTSAM
-//   - MODAL_METADATA_ENDPOINT      第 1 層 (= sensors.jsonl + imu_high_rate.jsonl)
+// Pipeline 2 (= 自動): 3 層スコアリング + 自動分類
+//   - MODAL_METADATA_ENDPOINT      第 1 層 (= realtime_handpose.jsonl から手検出率等を算出)
 //   - MODAL_FRAME_SAMPLING_ENDPOINT 第 2 層 (= フレームサンプル画像解析)
-//   - MODAL_VLM_ENDPOINT           第 3 層 (= Claude Haiku 4.5)
-//   - MODAL_GTSAM_ENDPOINT         GTSAM (= Video-IMU 整合性検証)
+//   - MODAL_VLM_ENDPOINT           第 3 層 (= Claude Haiku 4.5、 65 点 + 自動分類カテゴリ)
 //
-// Pipeline 3 (= 手動):
-//   - MODAL_BUNDLE_ENDPOINT        WiLoR + LeRobot v3
+// Pipeline 3 (= 手動): GPU 重処理
+//   - MODAL_WILOR_ENDPOINT         WiLoR 手ポーズ推定 → processed/<signature_hash>/wilor.jsonl
 //
 // 全 endpoint は @modal.fastapi_endpoint(method="POST") で公開され、 引数は FastAPI の
 // query string で受ける。 大きいバイナリは HTTP body で運ばず、 Modal 側が R2 から
@@ -16,7 +15,7 @@
 // この module は workflow worker context (= ESM only sandbox) に取り込まれる可能性が
 // あるので、 top-level で AWS SDK 等は import しない (= fetch のみ)。
 
-import type { Layer1Score, Layer2Score, Layer3Score, GtsamScore } from "@/shared/api-types";
+import type { AutoCategory, Layer1Score, Layer2Score, Layer3Score } from "@/shared/api-types";
 
 // ─── 共通 helper ──────────────────────────────────────────────────────
 
@@ -37,75 +36,72 @@ async function callModal<T>(endpointEnv: string, params: Record<string, string>)
 
 // ─── Pipeline 2 各層 ──────────────────────────────────────────────────
 
-export async function callMetadataScore(opts: { contentId: string }): Promise<Layer1Score> {
+export async function callMetadataScore(opts: { signatureHash: string }): Promise<Layer1Score> {
   return await callModal<Layer1Score>("MODAL_METADATA_ENDPOINT", {
-    content_id: opts.contentId,
+    signature_hash: opts.signatureHash,
   });
 }
 
 export async function callFrameSampling(opts: {
-  contentId: string;
+  signatureHash: string;
   sampleIntervalSec?: number;
 }): Promise<Layer2Score> {
-  const params: Record<string, string> = { content_id: opts.contentId };
+  const params: Record<string, string> = { signature_hash: opts.signatureHash };
   if (opts.sampleIntervalSec !== undefined) {
     params.sample_interval_sec = String(opts.sampleIntervalSec);
   }
   return await callModal<Layer2Score>("MODAL_FRAME_SAMPLING_ENDPOINT", params);
 }
 
+/// 2026-05-27: tasks 事前選択撤去で task_id 引数を撤去。 VLM が映像から自律的に分類。
+/// 返値に autoCategory / autoCategoryConfidence / frameLabels が追加 (= Layer3Score を拡張)。
+export interface VlmScoreResult extends Layer3Score {
+  autoCategory: AutoCategory;
+  autoCategoryConfidence: number;
+  frameLabels: Array<{
+    frameIdx: number;
+    tsSec: number;
+    category: AutoCategory;
+    description: string;
+  }>;
+}
+
 export async function callVlmScore(opts: {
-  contentId: string;
-  taskId: string;
+  signatureHash: string;
   vlmIntervalSec?: number;
-}): Promise<Layer3Score> {
+}): Promise<VlmScoreResult> {
   const params: Record<string, string> = {
-    content_id: opts.contentId,
-    task_id: opts.taskId,
+    signature_hash: opts.signatureHash,
   };
   if (opts.vlmIntervalSec !== undefined) {
     params.vlm_interval_sec = String(opts.vlmIntervalSec);
   }
-  return await callModal<Layer3Score>("MODAL_VLM_ENDPOINT", params);
+  return await callModal<VlmScoreResult>("MODAL_VLM_ENDPOINT", params);
 }
 
-export async function callGtsam(opts: { contentId: string }): Promise<GtsamScore> {
-  return await callModal<GtsamScore>("MODAL_GTSAM_ENDPOINT", {
-    content_id: opts.contentId,
-  });
+// ─── Pipeline 3: WiLoR 手ポーズ推定 (= GPU 重処理、 手動トリガー) ──────────
+// DATA_SPECS §4。 ぼかし済 MP4 の各フレームを WiLoR-mini に通し、 フレームごとの推定結果を
+// processed/<signature_hash>/wilor.jsonl に書き出すだけ。 データセット組み立て (= 複数クリップを
+// LeRobot v3 等にまとめる) はパイプライン外であり、 ここでは行わない。
+
+export interface WilorRequest {
+  /// 入力 signature_hash。 Modal は raw/<signature_hash>/rgb.mp4 を読み、
+  /// processed/<signature_hash>/wilor.jsonl に書き出す。
+  signatureHash: string;
 }
 
-// ─── Pipeline 3: WiLoR + LeRobot v3 ───────────────────────────────────
-
-export interface BundleRequest {
-  /// 生データ prefix (= raw/<content_id>/)
-  rawPrefix: string;
-  /// 端末から R2 にあがった C2PA D2 署名済 + ぼかし済 MP4 のキー (= raw/<content_id>/rgb.mp4)
-  signedMp4Key: string;
-  /// 出力 LeRobot dataset の R2 prefix (= datasets/<root_asset_id>/)
-  outputPrefix: string;
-  /// TP Root NFT asset id
-  rootAssetId: string;
-  /// 冪等性キー (= 同じ key で 2 回目は cached 経路で短絡)
-  idempotencyKey: string;
-}
-
-export interface BundleResult {
+export interface WilorResult {
   totalFrames: number;
   fps: number;
-  /// hands detected per frame の平均 (= cached 経路では null)
-  handsDetectedAvg: number | null;
-  durationMs: number | null;
-  uploadedFiles: number | null;
-  cached: boolean;
+  /// hands detected per frame の平均
+  handsDetectedAvg: number;
+  durationMs: number;
+  /// 出力した wilor.jsonl の R2 キー
+  outputKey: string;
 }
 
-export async function callBundle(req: BundleRequest): Promise<BundleResult> {
-  return await callModal<BundleResult>("MODAL_BUNDLE_ENDPOINT", {
-    raw_prefix: req.rawPrefix,
-    signed_mp4_key: req.signedMp4Key,
-    output_prefix: req.outputPrefix,
-    root_asset_id: req.rootAssetId,
-    idempotency_key: req.idempotencyKey,
+export async function callWilor(req: WilorRequest): Promise<WilorResult> {
+  return await callModal<WilorResult>("MODAL_WILOR_ENDPOINT", {
+    signature_hash: req.signatureHash,
   });
 }

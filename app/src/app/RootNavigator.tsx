@@ -7,7 +7,10 @@ import { useAuth } from '../services/auth';
 
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
-import { CaptureModeScreen } from '../screens/CaptureModeScreen';
+// 2026-05-27 大方針転換: 旧 CaptureModeScreen (= dialogue + VLM gate + ARKit) を
+// CalibrationCaptureScreen (= キャリブレーション + ジェスチャー + wide-capture) に差替。
+// 旧 file は段階削除 task で rm 予定、 今は import を切替えるだけ。
+import { CalibrationCaptureScreen } from '../screens/CalibrationCaptureScreen';
 import { OnboardingScreen, isOnboardingCompleted } from '../screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -64,7 +67,7 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen
         name="CaptureMode"
-        component={CaptureModeScreen}
+        component={CalibrationCaptureScreen}
         options={{ headerShown: false, presentation: 'fullScreenModal' }}
       />
     </Stack.Navigator>

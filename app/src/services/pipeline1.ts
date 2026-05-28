@@ -5,9 +5,9 @@
 //   1. C2PA D1 署名 (= c2pa.actions.v2 [c2pa.created])
 //   2. Apple Vision 顔ぼかし (= privacy-blur module)
 //   3. C2PA D2 署名 (= D1 を ingredient parentOf 参照、 c2pa.placed action)
-//   4. content_id = SHA-256(D2 active manifest 署名 bytes)
-//   5. R2 へ 4 ファイル並列 PUT (rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl
-//      + camera_intrinsics.json)。 presigned URL は /api/v1/raw-uploads から
+//   4. signature_hash = SHA-256(D2 active manifest 署名 bytes)
+//   5. R2 へ 2 ファイル並列 PUT (rgb.mp4 + realtime_handpose.jsonl)。
+//      presigned URL は /api/v1/raw-uploads から
 //   6. TP /process via /api/v1/tp-process (= server proxy)
 //      → signedJsonUri (公開 URL) を取得
 //      → cNFT mint:
@@ -17,7 +17,7 @@
 //         d. TreeConfig PDA を読んで num_minted - 1 を nonce として asset_id を導出
 //   7. POST /api/clips に rootAssetId + signedJsonUri 付きで送信
 //
-// 帰り値は { clipId, contentId, rootAssetId, signedJsonUri, txSignature }。
+// 帰り値は { clipId, signatureHash, rootAssetId, signedJsonUri, txSignature }。
 
 import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
@@ -27,7 +27,7 @@ import {
   VersionedTransaction,
 } from '@solana/web3.js';
 
-import { signD1, signD2, computeContentId } from '../native/c2paBridge';
+import { signD1, signD2, computeSignatureHash } from '../native/c2paBridge';
 import { processPrivacyBlur } from '../units/privacy-blur';
 import { getAuthProvider, requireCurrentSession } from './auth';
 import { SERVER_URL, SOLANA_RPC_URL } from '../env';
@@ -39,38 +39,34 @@ const BUBBLEGUM_PROGRAM_ID = new PublicKey('BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK7
 // TreeConfig PDA layout: discriminator(8) + tree_creator(32) + tree_delegate(32) + total_mint_capacity(8) + num_minted(8) ...
 const TREE_CONFIG_NUM_MINTED_OFFSET = 8 + 32 + 32 + 8;
 
+// 旧 capture flow (= 本番 UI 用に残置)。 超広角構成の rgb.mp4 + realtime_handpose.jsonl を上げる。
+// metadata.json は新 dataflow 層 (app/src/dataflow) 経由でのみ対応 (= この旧経路は Phase C で置換予定)。
 const RAW_FILENAMES = [
   'rgb.mp4',
-  'sensors.jsonl',
-  'imu_high_rate.jsonl',
-  'camera_intrinsics.json',
+  'realtime_handpose.jsonl',
 ] as const;
 type RawFilename = (typeof RAW_FILENAMES)[number];
 
 // ─── 公開型 ────────────────────────────────────────────────────────────
 
 export interface Pipeline1Input {
-  /** タスクカタログ ID (= /api/clips の taskId) */
-  taskId: string;
-  /** 撮影後の raw mp4 (= arkit-capture の出力) */
+  /** 撮影後の raw mp4 (= capture native の出力) */
   rawMp4Uri: string;
-  /** 同時取得した sensors.jsonl */
+  /** 同時取得した realtime_handpose.jsonl (= timestamp_ns + frame_index + hand_landmarks) */
   sensorsUri: string;
-  /** 同時取得した imu_high_rate.jsonl */
-  imuUri: string;
-  /** 同時取得した camera_intrinsics.json */
-  intrinsicsUri: string;
-  /** 端末側 VLM 達成確度 (= 0..100) */
-  achievementConfidence: number;
   /** cNFT 発行先 Bubblegum tree pubkey */
   merkleTree: string;
   /** MPL Core collection (= public tree なら省略可) */
   collection?: string;
+  /** legacy: 撮影前タスク選択 (= 2026-05-27 撤去、 新撮影では渡さない) */
+  taskId?: string;
+  /** legacy: 端末側 VLM 達成確度 (= 2026-05-27 VLM gate 撤去で渡さない) */
+  achievementConfidence?: number;
 }
 
 export interface Pipeline1Result {
   clipId: string;
-  contentId: string;         // 64-char hex (= "sha256:" prefix なし)
+  signatureHash: string;         // 64-char hex (= "sha256:" prefix なし)
   rootAssetId: string;       // Solana cNFT asset id (base58)
   signedJsonUri: string;     // rootlens-public の TP signed-json URL
   txSignature: string;       // Solana cNFT mint tx signature
@@ -83,7 +79,7 @@ export type Pipeline1Step =
   | 'sign-d1'
   | 'blur'
   | 'sign-d2'
-  | 'content-id'
+  | 'signature-hash'
   | 'r2-upload'
   | 'tp-process'
   | 'cnft-mint'
@@ -138,14 +134,14 @@ export async function runPipeline1(
     const d2Path = `${tmpDir}d2.mp4`;
     await signD2(blurResult.outputUri, d1Path, d2Path, blurResult.facesBlurred);
 
-    // ─── Step 4: content_id 抽出 ─────────────────────────────────────
-    progress('content-id');
-    const contentIdFull = await computeContentId(d2Path);
-    if (!contentIdFull.startsWith('sha256:')) {
-      throw new Error(`unexpected content_id format: ${contentIdFull}`);
+    // ─── Step 4: signature_hash 抽出 ─────────────────────────────────────
+    progress('signature-hash');
+    const signatureHashFull = await computeSignatureHash(d2Path);
+    if (!signatureHashFull.startsWith('sha256:')) {
+      throw new Error(`unexpected signature_hash format: ${signatureHashFull}`);
     }
-    const contentId = contentIdFull.slice('sha256:'.length);
-    progress('content-id', contentId);
+    const signatureHash = signatureHashFull.slice('sha256:'.length);
+    progress('signature-hash', signatureHash);
 
     // D2 mp4 を最終アップロード用に rgb.mp4 として配置
     const finalMp4Path = `${tmpDir}rgb.mp4`;
@@ -154,21 +150,19 @@ export async function runPipeline1(
     if (!mp4Info.exists) throw new Error('D2 mp4 missing after copy');
     const contentSize = (mp4Info as { size?: number }).size ?? 0;
 
-    // ─── Step 5: R2 upload (4 並列 PUT) ──────────────────────────────
+    // ─── Step 5: R2 upload (rgb.mp4 + realtime_handpose.jsonl の並列 PUT) ──
     progress('r2-upload', 'requesting presigned URLs');
-    const presigned = await requestPresignedUrls(contentId);
-    progress('r2-upload', 'uploading 4 files');
+    const presigned = await requestPresignedUrls(signatureHash);
+    progress('r2-upload', 'uploading files');
     await uploadFiles(presigned, {
       'rgb.mp4': finalMp4Path,
-      'sensors.jsonl': input.sensorsUri,
-      'imu_high_rate.jsonl': input.imuUri,
-      'camera_intrinsics.json': input.intrinsicsUri,
+      'realtime_handpose.jsonl': input.sensorsUri,
     });
 
     // ─── Step 6: TP /process (via server proxy) ─────────────────────
     progress('tp-process');
-    const { signedJsonUri, signatureHash } = await callTpProcess(contentId);
-    progress('tp-process', signatureHash);
+    const { signedJsonUri, signatureHash: tpSignatureHash } = await callTpProcess(signatureHash);
+    progress('tp-process', tpSignatureHash);
 
     // ─── Step 7: cNFT mint ───────────────────────────────────────────
     progress('cnft-mint', 'requesting partial_tx');
@@ -190,7 +184,7 @@ export async function runPipeline1(
     const clipId = await postClip({
       taskId: input.taskId,
       achievementConfidence: input.achievementConfidence,
-      contentId,
+      signatureHash,
       contentSize,
       rootAssetId,
       signedJsonUri,
@@ -199,7 +193,7 @@ export async function runPipeline1(
 
     return {
       clipId,
-      contentId,
+      signatureHash,
       rootAssetId,
       signedJsonUri,
       txSignature,
@@ -221,11 +215,11 @@ interface PresignedFile {
 }
 type PresignedUploads = Record<RawFilename, PresignedFile>;
 
-async function requestPresignedUrls(contentId: string): Promise<PresignedUploads> {
+async function requestPresignedUrls(signatureHash: string): Promise<PresignedUploads> {
   const res = await fetch(`${SERVER_URL}/api/v1/raw-uploads`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contentId }),
+    body: JSON.stringify({ signatureHash }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -260,12 +254,12 @@ async function uploadFiles(
 }
 
 async function callTpProcess(
-  contentId: string,
+  signatureHash: string,
 ): Promise<{ signedJsonUri: string; signatureHash: string }> {
   const res = await fetch(`${SERVER_URL}/api/v1/tp-process`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contentId }),
+    body: JSON.stringify({ signatureHash }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -361,28 +355,31 @@ function readU64LE(data: Uint8Array, offset: number): bigint {
 }
 
 async function postClip(args: {
-  taskId: string;
-  achievementConfidence: number;
-  contentId: string;
+  signatureHash: string;
   contentSize: number;
   rootAssetId: string;
   signedJsonUri: string;
   walletPubkey: string;
+  /** legacy: server 互換のため optional で送り続ける (= server 側 zod は optional) */
+  taskId?: string;
+  achievementConfidence?: number;
 }): Promise<string> {
+  const body: Record<string, unknown> = {
+    signatureHash: args.signatureHash,
+    contentSize: args.contentSize,
+    rootAssetId: args.rootAssetId,
+    signedJsonUri: args.signedJsonUri,
+  };
+  if (args.taskId !== undefined) body.taskId = args.taskId;
+  if (args.achievementConfidence !== undefined) body.achievementConfidence = args.achievementConfidence;
+
   const res = await fetch(`${SERVER_URL}/api/clips`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'X-Wallet-Pubkey': args.walletPubkey,
     },
-    body: JSON.stringify({
-      taskId: args.taskId,
-      achievementConfidence: args.achievementConfidence,
-      contentId: args.contentId,
-      contentSize: args.contentSize,
-      rootAssetId: args.rootAssetId,
-      signedJsonUri: args.signedJsonUri,
-    }),
+    body: JSON.stringify(body),
   });
   if (!(res.status === 200 || res.status === 201)) {
     const text = await res.text().catch(() => '');

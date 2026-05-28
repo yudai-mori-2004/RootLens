@@ -1,7 +1,10 @@
 // クリップ詳細シート (UI_SPECS §3.3 / §3.4)。
 //
 // Home タブのカードをタップすると開く。 ready / staked / error の状態別に内容を切替え、
-// 品質スコアの 4 層内訳 + タスク情報 + アクション (= Stake / Unstake / Delete) を提示する。
+// 品質スコアの 3 層内訳 + 自動分類カテゴリ + オンチェーン情報 + アクションを提示する。
+//
+// 2026-05-27 方針転換: 4 → 3 層 (= GTSAM 撤去)、 タスク事前選択撤去で TASK ブロックは
+// autoCategory 表示に置換。
 //
 // デザイン方針:
 //   ・ Bottom Sheet 風の modal (= 上部に handle bar、 背景は scrim)
@@ -22,8 +25,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Line } from 'react-native-svg';
 
 import type {
+  AutoCategory,
   Clip,
-  GtsamScore,
   Layer1Score,
   Layer2Score,
   Layer3Score,
@@ -49,7 +52,8 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
     );
   }
 
-  const task = findTask(clip.taskId);
+  // 旧 taskId 持ち clip (= legacy persistence) の互換表示。 新撮影では undefined。
+  const legacyTask = clip.taskId ? findTask(clip.taskId) : null;
   const breakdown = clip.qualityBreakdown ?? null;
   const total = breakdown?.total ?? clip.qualityScore ?? null;
 
@@ -66,9 +70,11 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
         <View style={styles.handle} />
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* タスク名 + 撮影日 */}
+          {/* ヘッダ: VLM 自動分類 (= 新仕様) or legacy task name + 撮影日 */}
           <View style={styles.header}>
-            <Text style={styles.taskName}>{task?.name ?? clip.taskId}</Text>
+            <Text style={styles.taskName}>
+              {clip.autoCategory ? describeAutoCategory(clip.autoCategory) : legacyTask?.name ?? clip.taskId ?? '未分類'}
+            </Text>
             <Text style={styles.timestamp}>{formatDateTime(clip.createdAt)}</Text>
           </View>
 
@@ -83,14 +89,13 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
             </View>
           </View>
 
-          {/* 4 層内訳 */}
+          {/* 3 層内訳 (= GTSAM 撤去後) */}
           {breakdown ? (
             <View style={styles.layersBlock}>
               <Text style={styles.sectionEyebrow}>BREAKDOWN</Text>
               <Layer1Card data={breakdown.layer1} />
               <Layer2Card data={breakdown.layer2} />
               <Layer3Card data={breakdown.layer3} />
-              <GtsamCard data={breakdown.gtsam} />
             </View>
           ) : (
             <View style={styles.noScoreCard}>
@@ -117,15 +122,22 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
             </View>
           ) : null}
 
-          {/* タスク情報 */}
-          {task ? (
+          {/* 自動分類 (= 新仕様、 Pipeline 2 の VLM ラベル付け結果) */}
+          {clip.autoCategory ? (
             <View style={styles.taskBlock}>
-              <Text style={styles.sectionEyebrow}>TASK</Text>
-              <Row label="ID" value={task.id} mono />
-              <Row label="INTENSITY" value={task.intensity} />
-              <Row label="ORIENTATION" value={task.orientation} />
-              <Row label="START" value={task.startCondition} multiline />
-              <Row label="END" value={task.endCondition} multiline />
+              <Text style={styles.sectionEyebrow}>AUTO LABEL</Text>
+              <Row label="CATEGORY" value={describeAutoCategory(clip.autoCategory)} />
+              {clip.autoCategoryConfidence !== undefined ? (
+                <Row label="CONFIDENCE" value={`${Math.round(clip.autoCategoryConfidence * 100)}%`} />
+              ) : null}
+            </View>
+          ) : legacyTask ? (
+            // legacy: 旧 capture flow で taskId 持ちのクリップを互換表示
+            <View style={styles.taskBlock}>
+              <Text style={styles.sectionEyebrow}>LEGACY TASK</Text>
+              <Row label="ID" value={legacyTask.id} mono />
+              <Row label="INTENSITY" value={legacyTask.intensity} />
+              <Row label="ORIENTATION" value={legacyTask.orientation} />
             </View>
           ) : null}
 
@@ -170,14 +182,14 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
 // ─── レイヤカード ──────────────────────────────────────────────────
 
 const Layer1Card: React.FC<{ data: Layer1Score | null }> = ({ data }) => (
+  // 2026-05-27: ARKit 撤去で trackingQuality 行削除
+  // 2026-05-28: IMU 撤去で imuGravityCompliance 行削除、 配点は handLandmarkPresenceBoth に振替
   <LayerCard title="Layer 1 · Metadata" max={20} data={data} renderRows={(d) => (
     <>
       <MetricRow label="Hand presence (both)" value={pctOrNa(d.handLandmarkPresenceBoth)} />
       <MetricRow label="RGB/Sensor sync" value={pctOrNa(d.rgbSensorSyncRatio)} />
       <MetricRow label="Frame continuity" value={pctOrNa(d.frameContinuity)} />
-      <MetricRow label="ARKit tracking" value={pctOrNa(d.trackingQuality)} />
       <MetricRow label="Hand movement" value={pctOrNa(d.handMovement)} />
-      <MetricRow label="IMU gravity" value={pctOrNa(d.imuGravityCompliance)} />
     </>
   )} />
 );
@@ -194,22 +206,14 @@ const Layer2Card: React.FC<{ data: Layer2Score | null }> = ({ data }) => (
 );
 
 const Layer3Card: React.FC<{ data: Layer3Score | null }> = ({ data }) => (
-  <LayerCard title="Layer 3 · VLM semantic" max={55} data={data} renderRows={(d) => (
+  // 2026-05-27: GTSAM 撤去で 55 → 65 点 + 配点を再分配
+  <LayerCard title="Layer 3 · VLM semantic" max={65} data={data} renderRows={(d) => (
     <>
       <MetricRow label="Task activity (avg, 0-5)" value={d.taskActivityAvg.toFixed(2)} />
       <MetricRow label="Object interaction" value={d.objectInteractionAvg.toFixed(2)} />
       <MetricRow label="Scene match" value={d.sceneMatchAvg.toFixed(2)} />
       <MetricRow label="Authenticity" value={d.authenticityAvg.toFixed(2)} />
       <MetricRow label="Idle ratio" value={pctOrNa(d.idleRatio)} />
-    </>
-  )} />
-);
-
-const GtsamCard: React.FC<{ data: GtsamScore | null }> = ({ data }) => (
-  <LayerCard title="Layer 4 · GTSAM (Video-IMU)" max={10} data={data} renderRows={(d) => (
-    <>
-      <MetricRow label="Consistency ratio" value={pctOrNa(d.consistencyRatio)} />
-      <MetricRow label="Residual norm" value={Number.isFinite(d.residualNorm) ? d.residualNorm.toExponential(2) : '∞'} />
     </>
   )} />
 );
@@ -313,6 +317,19 @@ const ActionButton: React.FC<{
 );
 
 // ─── helpers ──────────────────────────────────────────────────────
+
+function describeAutoCategory(c: AutoCategory): string {
+  switch (c) {
+    case 'cleaning':   return '掃除';
+    case 'laundry':    return '洗濯';
+    case 'cooking':    return '料理';
+    case 'studying':   return '勉強';
+    case 'crafting':   return '工作';
+    case 'organizing': return '整理整頓';
+    case 'meal_prep':  return '食事の支度';
+    case 'other':      return 'その他';
+  }
+}
 
 function pctOrNa(v: number | null | undefined): string {
   if (v === null || v === undefined) return '—';

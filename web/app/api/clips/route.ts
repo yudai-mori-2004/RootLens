@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { clips } from "@/db/schema";
 import { requireWalletPubkey } from "@/lib/auth";
 import { presignRawSessionUploads } from "@/lib/r2";
-import { signedMp4Key } from "@/lib/r2-keys";
+import { signedMp4Key, processedPrefix } from "@/lib/r2-keys";
 import { clipToDto, clipsToDtos } from "@/lib/mapper";
 import { makeClipId } from "@/lib/clipId";
 import type {
@@ -36,18 +36,21 @@ export async function GET(req: Request) {
 }
 
 // POST /api/clips
-// mock-device が R2 upload + TP /process + cNFT 発行を終え、 rootAssetId 確定後に呼ぶ。
+// 端末が R2 upload + TP /process + cNFT 発行を終え、 rootAssetId 確定後に呼ぶ。
 // rootAssetId + signedJsonUri は v0.1.3 で必須 (= Pipeline 2 起動の前提条件)。
+// 2026-05-27 方針転換: taskId / achievementConfidence は新仕様では送られない。
+// 旧 client 互換のため zod は optional で受信 (= 受け取っても新 schema では無視 or fallback)。
 const createSchema = z.object({
-  taskId: z.string().min(1),
-  achievementConfidence: z.number().int().min(0).max(100),
-  // content_id は SHA-256 hex 64 文字 (= "sha256:" prefix なしの hex 部分のみ受ける)
-  contentId: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
+  // signature_hash は SHA-256 hex 64 文字 (= "sha256:" prefix なしの hex 部分のみ受ける)
+  signatureHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
   contentSize: z.number().int().positive(),
   // Solana cNFT asset id (= base58 32-44 文字、 Pipeline 1 末尾で確定済)
   rootAssetId: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Solana cNFT asset id (base58)"),
-  // R2 signed-json/<content_id>.json への URL (= TP /process 応答保存先)
+  // R2 signed-json/<signature_hash>.json への URL (= TP /process 応答保存先)
   signedJsonUri: z.string().url(),
+  // legacy 互換 (= 段階削除中、 旧 client からも来うる)
+  taskId: z.string().min(1).optional(),
+  achievementConfidence: z.number().int().min(0).max(100).optional(),
 }) satisfies z.ZodType<CreateClipRequest>;
 
 export async function POST(req: Request) {
@@ -73,16 +76,16 @@ export async function POST(req: Request) {
     );
   }
 
-  // 重複アップロード排除 (= 同 wallet × 同 content_id は既存行を返す)
+  // 重複アップロード排除 (= 同 wallet × 同 signature_hash は既存行を返す)
   const existing = await db
     .select()
     .from(clips)
     .where(
-      and(eq(clips.walletPubkey, walletPubkey), eq(clips.contentId, parsed.data.contentId)),
+      and(eq(clips.walletPubkey, walletPubkey), eq(clips.signatureHash, parsed.data.signatureHash)),
     )
     .limit(1);
   if (existing.length > 0) {
-    const presigned = await presignRawSessionUploads({ contentId: parsed.data.contentId });
+    const presigned = await presignRawSessionUploads({ signatureHash: parsed.data.signatureHash });
     const body: CreateClipResponse = {
       clip: await clipToDto(existing[0]),
       upload: presigned,
@@ -91,22 +94,23 @@ export async function POST(req: Request) {
   }
 
   // 新規作成
-  const id = makeClipId(parsed.data.contentId);
-  const presigned = await presignRawSessionUploads({ contentId: parsed.data.contentId });
+  const id = makeClipId(parsed.data.signatureHash);
+  const presigned = await presignRawSessionUploads({ signatureHash: parsed.data.signatureHash });
 
   const [inserted] = await db
     .insert(clips)
     .values({
       id,
       walletPubkey,
-      taskId: parsed.data.taskId,
+      // 2026-05-27: taskId は DB schema が notNull なので fallback で埋める (= 別 task で nullable migration 予定)
+      taskId: parsed.data.taskId ?? "legacy",
       state: "uploading",
-      achievementConfidence: parsed.data.achievementConfidence,
-      contentId: parsed.data.contentId,
-      signedMp4Key: signedMp4Key(parsed.data.contentId),
+      achievementConfidence: parsed.data.achievementConfidence ?? null,
+      signatureHash: parsed.data.signatureHash,
+      signedMp4Key: signedMp4Key(parsed.data.signatureHash),
       rootAssetId: parsed.data.rootAssetId,
       signedJsonUri: parsed.data.signedJsonUri,
-      datasetPrefix: `datasets/${parsed.data.rootAssetId}/`,
+      processedPrefix: processedPrefix(parsed.data.signatureHash),
     })
     .returning();
 

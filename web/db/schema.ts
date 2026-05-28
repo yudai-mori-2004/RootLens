@@ -5,7 +5,7 @@ import type { QualityBreakdown } from "../shared/api-types";
 
 // DATA_SPECS §6 のクリップ状態機械 + §3 のサーバパイプラインを永続化するスキーマ。
 //
-// 1 クリップ = 1 行。 同じ wallet が同じ content_id (= D2 active manifest signature SHA-256) を
+// 1 クリップ = 1 行。 同じ wallet が同じ signature_hash (= D2 active manifest signature SHA-256) を
 // 2 度 upload した場合は idempotent に既存行を返す (= 重複排除)。
 
 export const clips = pgTable(
@@ -34,19 +34,19 @@ export const clips = pgTable(
 
     /// C2PA D2 アクティブマニフェスト署名の SHA-256 hex (= DATA_SPECS §1.1)。
     /// 端末で確定し、 以降全パイプラインを通じて不変の識別子。
-    contentId: text("content_id"),
+    signatureHash: text("signature_hash"),
 
     /// R2 オブジェクトキー / プレフィックス。
-    /// signedMp4Key = raw/<content_id>/rgb.mp4 (= 端末が C2PA D2 署名 + 顔ぼかしを終えてアップロードした MP4)
-    /// datasetPrefix = datasets/<root_asset_id>/ (= Pipeline 3 出力。 未実行なら NULL)
+    /// signedMp4Key = raw/<signature_hash>/rgb.mp4 (= 端末が C2PA D2 署名 + 顔ぼかしを終えてアップロードした MP4)
+    /// processedPrefix = processed/<signature_hash>/ (= Pipeline 2 / 3 の計算結果出力先)
     signedMp4Key: text("signed_mp4_key"),
-    datasetPrefix: text("dataset_prefix"),
+    processedPrefix: text("processed_prefix"),
 
     /// processing 中の現在ステップ (= Pipeline 2 の進行表示用)。
-    /// 'metadata-scan' | 'frame-sampling' | 'vlm-score' | 'gtsam-eval' | 'tp-submit'
+    /// 'metadata-scan' | 'frame-sampling' | 'vlm-score'
     processingStep: text("processing_step"),
 
-    /// 品質評価結果 (= DATA_SPECS §3)。 4 層 + GTSAM の構造化 JSON。
+    /// 品質評価結果 (= DATA_SPECS §3)。 3 層スコアリングの構造化 JSON。
     /// 各層の score + 全 sub-metric 値を保持。 撮影者へのフィードバックと
     /// 買い手向けカタログフィルタの両方に使う。
     qualityScore: integer("quality_score"),
@@ -61,7 +61,7 @@ export const clips = pgTable(
     rootAssetId: text("root_asset_id").notNull(),
 
     /// TP が返した signed_json_uri (= TEE 署名済メタデータ JSON への URI)。
-    /// v0.1.3 で R2 上の signed-json/<content_id>.json を指す。 cNFT 発行と同時に確定。
+    /// v0.1.3 で R2 上の signed-json/<signature_hash>.json を指す。 cNFT 発行と同時に確定。
     signedJsonUri: text("signed_json_uri").notNull(),
 
     /// Bubblegum delegate (= owner と等しければ unstaked、 異なれば staked)。
@@ -80,7 +80,7 @@ export const clips = pgTable(
   (t) => [
     index("clips_wallet_idx").on(t.walletPubkey),
     index("clips_state_idx").on(t.state),
-    index("clips_content_id_idx").on(t.contentId),
+    index("clips_signature_hash_idx").on(t.signatureHash),
   ],
 );
 

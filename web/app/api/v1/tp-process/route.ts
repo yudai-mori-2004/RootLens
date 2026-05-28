@@ -2,7 +2,7 @@
 //
 // v0.1.3 Pipeline 1 step 5 をサーバ側でやるための統合エンドポイント。
 //
-//   1. content_id から rootlens-raw/raw/<id>/rgb.mp4 への presigned GET URL を発行
+//   1. signature_hash から rootlens-raw/raw/<id>/rgb.mp4 への presigned GET URL を発行
 //   2. TP Gateway /process に POST (= TEE が R2 から MP4 fetch + C2PA 検証 +
 //      signature_hash 計算 + signed_json 作成)
 //   3. TP の ProcessResponse JSON を rootlens-raw + rootlens-public に保存
@@ -11,7 +11,7 @@
 // クライアント側に R2 credential を持たせず、 ATS で塞がる plain HTTP TP gateway も
 // HTTPS proxy で迂回するため、 デバイスから 1 リクエストで全部済むようにまとめる。
 //
-// 本エンドポイントは認証 header 不要 (= content_id 自体が SHA-256 hex なので簡単に
+// 本エンドポイントは認証 header 不要 (= signature_hash 自体が SHA-256 hex なので簡単に
 // 推測されない、 かつ signed_json 自体の保存先は public bucket で読み取り無認証)。
 
 import { NextRequest, NextResponse } from "next/server";
@@ -24,7 +24,7 @@ const CONTENT_ID_RE = /^[0-9a-f]{64}$/;
 const TP_GATEWAY = process.env.TP_GATEWAY_URL ?? "http://13.113.217.17:3000";
 
 const RequestSchema = z.object({
-  contentId: z.string().regex(CONTENT_ID_RE, "contentId must be 64-char lowercase hex"),
+  signatureHash: z.string().regex(CONTENT_ID_RE, "signatureHash must be 64-char lowercase hex"),
 });
 
 export const runtime = "nodejs";
@@ -43,13 +43,13 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { contentId } = parsed.data;
-  const offchainKey = `signed-json/${contentId}.json`;
+  const { signatureHash } = parsed.data;
+  const offchainKey = `signed-json/${signatureHash}.json`;
 
   // 1. presigned GET URL for the raw mp4 (TP gateway は TEE 内で fetch する)
   let contentUrl: string;
   try {
-    const presigned = await presignSignedMp4Get({ contentId, expiresInSec: 600 });
+    const presigned = await presignSignedMp4Get({ signatureHash, expiresInSec: 600 });
     contentUrl = presigned.url;
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -82,24 +82,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `TP /process fetch failed: ${msg}` }, { status: 502 });
   }
 
-  // signature_hash があるかチェック (= TP gateway が必ず返すフィールド、 mock-device の検証参照)
-  const signatureHash = (processJson as { signature_hash?: unknown }).signature_hash;
-  if (typeof signatureHash !== "string") {
+  // TP gateway が返す signature_hash を取り出す (= 必ず返すフィールド、 mock-device の検証参照)
+  const tpSignatureHash = (processJson as { signature_hash?: unknown }).signature_hash;
+  if (typeof tpSignatureHash !== "string") {
     return NextResponse.json(
       { error: "TP /process response missing signature_hash" },
       { status: 502 },
     );
   }
 
-  // signature_hash と client が計算した content_id の整合性チェック (= sha256:<hex> 形式)
-  const expected = `sha256:${contentId}`;
-  if (signatureHash !== expected) {
+  // TP 返却値と client が計算した signature_hash の整合性チェック (= TP は sha256:<hex> 形式で返す)
+  const expected = `sha256:${signatureHash}`;
+  if (tpSignatureHash !== expected) {
     return NextResponse.json(
       {
         error: "signature_hash mismatch",
-        contentId,
+        signatureHash,
         expected,
-        actual: signatureHash,
+        actual: tpSignatureHash,
       },
       { status: 422 },
     );
@@ -133,6 +133,5 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     signedJsonUri,
     signatureHash,
-    contentId,
   });
 }

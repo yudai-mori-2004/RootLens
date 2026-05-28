@@ -39,9 +39,9 @@ export async function POST(req: Request, ctx: Ctx) {
       { status: 409 },
     );
   }
-  if (!clip.contentId || !clip.signedMp4Key) {
+  if (!clip.signatureHash || !clip.signedMp4Key) {
     return NextResponse.json(
-      { error: "Missing contentId / signedMp4Key (= raw 削除済の可能性)" },
+      { error: "Missing signatureHash / signedMp4Key (= raw 削除済の可能性)" },
       { status: 409 },
     );
   }

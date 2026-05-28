@@ -1,448 +1,291 @@
-# RootLens データパイプライン仕様書 v2
-
-## 0. この文書について
-
-本仕様書は、RootLens のデータパイプラインの設計と動作を定義する。撮影者がスマートフォンで家事動画を撮影してから、AI 企業が購入可能なデータセットとして整形されるまでの、データの流れ・処理・保存の全体を扱う。
-
-アプリの UI/UX、オンチェーンのライセンス発行・収益分配の法的構造、Title Protocol の内部仕様については本仕様の範囲外であり、それぞれの専用仕様書を参照すること。
-
----
+# RootLens データパイプライン仕様書
 
 ## 1. 全体構成
 
-データパイプラインは 3 つの独立したパイプラインで構成される。各パイプラインはデータへのリンクを入力に取り、データへのリンクを出力する純粋関数として設計される。
-
 ```
-Pipeline 1 (iOS デバイス)
+Pipeline 1 (デバイス)
   撮影 → C2PA 署名 → 顔ぼかし → C2PA 再署名 → R2 アップロード
-        → TP /process → cNFT 発行 (= rootAssetId 確定)
-        → POST /api/clips (rootAssetId + contentId 込み)
+        → TP /process → cNFT 発行 → POST /api/clips
                               ↓
-Pipeline 2 (サーバー, CPU)
-  品質スコアリング (= 4 層) → Video-IMU 整合性検証
+Pipeline 2 (サーバー, CPU)                     ← 自動
+  品質スコアリング + VLM 自動ラベリング → processed/ に書き出し
                               ↓
-Pipeline 3 (サーバー, GPU)        ← 手動トリガー
-  手ポーズ推定 → データセット組み立て
+Pipeline 3 (サーバー, GPU)                     ← 手動
+  WiLoR 手ポーズ推定 → processed/ に書き出し
 ```
 
-Pipeline 1 はデバイス上で完結する。Title Protocol への登録 (= `/process` 呼び出しと cNFT 発行) も Pipeline 1 の末尾に含まれ、`rootAssetId` が確定してから `POST /api/clips` でサーバーに登録される。Pipeline 2 は、サーバーへの登録 (= `rootAssetId` 付きのクリップレコードが作成された状態) を契機に自動実行される。Pipeline 3 は RootLens チームが手動でトリガーする。Pipeline 2 と Pipeline 3 は独立しており、両者とも Pipeline 1 で確定した `rootAssetId` をキーとしてデータを参照する。
+Pipeline 1 はデバイス上で完結する。TP 登録と cNFT 発行も含まれ、`root_asset_id` 確定後にサーバーへ登録する。Pipeline 2 は登録を契機に自動実行。Pipeline 3 は手動トリガー。
 
-### 1.1 コンテンツ識別子
+Pipeline 2・3 の出力はいずれも `processed/<signature_hash>/` に個別クリップの処理結果として書き出される。複数クリップをデータセットとしてまとめる作業はパイプラインの範囲外であり、事後的に行う。
 
-各クリップの一意な識別子は、ぼかし済み MP4 の C2PA アクティブマニフェスト署名の SHA-256 ハッシュである。この値を `content_id` と呼ぶ。`content_id` は Pipeline 1 のぼかし処理・再署名完了時点でデバイス上で確定し、以降すべてのパイプラインを通じて不変のキーとなる。
+### 1.1 識別子
 
-Title Protocol 登録の完了後、`content_id` に対応する Solana cNFT の asset id (= `root_asset_id`) が確定する。`root_asset_id` は Pipeline 2 の起動条件であり、Pipeline 3 のデータセット出力 prefix のキーでもある。
+`signature_hash`: ぼかし済み MP4 の C2PA アクティブマニフェスト署名の SHA-256。デバイス上でぼかし・再署名完了時に確定し、全パイプラインを通じて不変のキー。`raw/` と `processed/` の両方でこの値をディレクトリキーとして使用する。
 
-### 1.2 対象プラットフォーム
-
-現時点では iOS のみをサポートする。Android 対応は将来の拡張として扱う。
+`root_asset_id`: TP 登録完了後に確定する Solana cNFT の asset id（base58）。Pipeline 2 の起動条件。`raw/<signature_hash>/signed-json.json` から参照可能。
 
 ---
 
-## 2. Pipeline 1: 撮影 + プライバシー処理 (iOS デバイス)
+## 2. Pipeline 1: 撮影 + プライバシー処理（デバイス）
 
 ### 2.1 撮影フロー
 
-1. ユーザーがアプリ上でタスクリストからタスクを選択する（「洗い物をする」「洗濯物を畳む」等）。
-2. ユーザーが両手をカメラに向けてオープンパームを 1 秒間保持する。アプリは Apple Vision で 21 × 2 = 42 の手ランドマークすべてがフレーム内に検出されていることを確認する。
-3. VLM（Claude）にスナップショットを送信し、選択されたタスクの開始条件への合致を確認する。開始条件はタスクごとに定義される。
-4. 3 秒間のカウントダウンの後、ARKit 録画が開始される。
-5. 録画中、手の検出状態はBGM の音量フェードによりフィードバックされる。手が適切にフレーム内に収まっていれば BGM が流れ、フレームアウトすると音量が下がる。
-6. ユーザーが両手でサムズアップを 1 秒間保持すると、VLM が終了条件を確認し、録画が停止する。
-7. 撮影された映像に対し、プライバシー処理（§2.3）と C2PA 署名（§2.4）がデバイス上で実行される。
-8. ユーザーに VLM 達成確度と送信確認が提示される。「送る」を選択するとアップロード（§2.5）が開始され、撮影フローは完了する。撮影フローの操作詳細は UX 仕様書を参照。
+1. ユーザーが撮影モードに入り、ジェスチャーで撮影を開始する。
+2. 何の活動を撮るかをアプリに事前申告しない。分類は Pipeline 2 が事後で行う。
+3. 録画中はカメラで RGB 映像を、デバイス側ハンドトラッキングでリアルタイム手ポーズを記録する。撮影構成（§2.2）に応じて追加センサーも記録する。
+4. ジェスチャーで撮影を終了する。
+5. プライバシー処理（§2.3）と C2PA 署名（§2.4）をデバイス上で実行する。
+6. アップロード（§2.5）をバックグラウンドで自動開始する。確認ダイアログは出さない。
+7. 録画時間が n 秒未満（初期値: 1 秒）のクリップは自動破棄する。上限は 60 分で自動停止。
 
-### 2.2 撮影されるデータ
+### 2.2 撮影構成
 
-ARKit セッション中に以下の 7 種のセンサーデータを記録する。時刻同期の基準は `ARFrame.timestamp`（`mach_absolute_time()` のナノ秒変換）であり、すべてのセンサーストリームがこの共通時間軸を使用する。
+撮影構成はプラットフォームごとに複数定義できる抽象レイヤーとして設計する。各プラットフォームは利用可能な撮影構成のリストを持ち、新しい構成をいつでも追加できる。
 
-| ファイル | 内容 | フォーマット | レート |
-|----------|------|------------|--------|
-| `rgb.mp4` | エゴセントリック RGB 映像 | H.264 MP4, 1920×1080 | 30 fps |
-| `sensors.jsonl` | カメラ外部パラメータ（4×4 変換行列）+ トラッキング状態 | JSON Lines | 30 fps |
-| `imu_high_rate.jsonl` | IMU 生データ（加速度 / ジャイロ / 地磁気 / デバイスモーション / 気圧） | JSON Lines | 100 Hz |
-| `camera_intrinsics.json` | カメラ内部パラメータ（fx, fy, cx, cy）+ RGB / 深度解像度 | JSON | セッション毎 1 回 |
-| `depth/{frame_id}.png` | LiDAR 深度マップ（Pro 端末のみ） | 16-bit PNG, mm 単位 | 30 fps |
-| *(サイドカー)* | 手ランドマーク（21 関節, Apple Vision） | sensors.jsonl 内 | フレーム毎 |
-| *(サイドカー)* | デバイス情報（機種 / OS / アプリバージョン） | JSON | セッション毎 1 回 |
+現時点で定義されている撮影構成は以下の通り。
 
-**LiDAR 非搭載端末の場合**: `depth/` ディレクトリは生成されない。端末のデバイス情報にモデル名が記録されるため、LiDAR の有無は購入時にフィルタ可能となる。LiDAR がないこと自体はパイプラインの進行を妨げない。
+#### 超広角構成（iOS / Android 共通）
 
-**IMU データの記録方式**: 録画開始から終了まで、IMU サンプルを受信するたびにファイルへ逐次書き出す（append）。100 Hz × 30 分 = 180,000 行、約 36 MB。メモリ上のリングバッファに蓄積してから書き出す方式は採用しない（30 分の録画に対してバッファが溢れ、データの大半が失われるため）。
+背面 ultra-wide camera（0.5x）を使用する。広い画角で両手の作業領域を捉える。iOS では AVCaptureSession、Android では Camera2 API。
+
+出力ファイル:
+
+| ファイル | 内容 | レート |
+|----------|------|--------|
+| `rgb.mp4` | RGB 映像（ultra-wide） | 30 fps |
+| `realtime_handpose.jsonl` | フレームごとの timestamp + デバイス側手ランドマーク（21×2 関節） | 30 fps |
+| `metadata.json` | 機種名、OS、アプリバージョン、カメラスペック（画角・焦点距離・解像度）、撮影構成識別子、キャリブレーション baseline | セッション毎 1 回 |
+
+デバイス側手ランドマークは iOS では Apple Vision、Android では MediaPipe Hand Landmarker で取得する。このデータは Pipeline 2 のスコアリング用であり、学習用の手ポーズ推定は Pipeline 3 の WiLoR が担う。
+
+#### ARKit 構成（iOS 限定）
+
+ARKit world tracking + 背面 wide camera（1x）を使用する。6DoF カメラポーズ、IMU、LiDAR 深度（Pro 端末のみ）を同期取得できる。画角は超広角より狭く、発熱が大きい。
+
+出力ファイル:
+
+| ファイル | 内容 | レート |
+|----------|------|--------|
+| `rgb.mp4` | RGB 映像（wide 1x） | 30 fps |
+| `realtime_handpose.jsonl` | フレームごとの timestamp + 手ランドマーク + カメラポーズ（4×4 変換行列）+ tracking_state | 30 fps |
+| `imu.jsonl` | 加速度 / ジャイロ / デバイスモーション | 100 Hz |
+| `metadata.json` | 超広角構成と同一フォーマット | セッション毎 1 回 |
+| `depth/{frame_id}.png` | LiDAR 深度（Pro 端末のみ） | 30 fps |
+
+時刻同期の基準は `ARFrame.timestamp`。IMU は録画開始から終了まで逐次書き出し。
 
 ### 2.3 プライバシー処理
 
-プライバシー処理はデバイス上で、撮影完了直後に実行する。サーバーには処理済みのデータのみがアップロードされ、生データがデバイスを離れることはない。
+デバイス上で撮影完了直後に実行する。サーバーには処理済みデータのみがアップロードされる。
 
-処理内容は顔のぼかしである。Apple Vision の `VNDetectFaceRectanglesRequest`（revision 3）でフレームごとに顔を検出し、ガウスぼかしを適用する。
-
-テキスト（看板 / 書類 / 画面の文字）のぼかしは行わない。エゴセントリック環境における全シーンテキストの検出は技術的に未解決であり（EasyOCR / DBNet / PP-OCRv5 のいずれも recall 50〜70%、false positive 多発）、ぼかし漏れが生じるリスクのほうが高い。個人情報を含む書類や画面の写り込みは、タスク定義の撮影指示と撮影者の同意フローで担保する。
+Apple Vision の `VNDetectFaceRectanglesRequest`（revision 3）/ Android の同等 API でフレームごとに顔を検出し、ガウスぼかしを適用する。テキストのぼかしは行わない。
 
 ### 2.4 C2PA 署名
 
-C2PA 署名はデバイス上で 2 段階に分けて付与される。
+**署名 D1（生 MP4）**: 撮影直後、ぼかし前に Secure Enclave の P-256 鍵で ES256 署名。App Attest + RFC 3161 タイムスタンプ。3 段 PKI。c2pa 0.81 系ストリーミング署名。
 
-**署名 D1（生 MP4 への署名）**: 撮影直後、ぼかし処理の前に、生 MP4 に対して Secure Enclave の P-256 鍵で ES256 署名を付与する。App Attest による鍵の正当性証明と RFC 3161 タイムスタンプを含む。3 段 PKI（デバイス証明書 → 中間 CA → ルート CA）。c2pa 0.81 系のストリーミング署名（single MP4 に対するストリーミング方式）を使用する。
-
-**署名 D2（ぼかし済み MP4 への再署名）**: ぼかし処理完了後、ぼかし済み MP4 に対して再度 C2PA 署名を付与する。このとき、署名 D1 を ingredient として参照し、action にぼかし処理の実行を記載する。アクティブマニフェストは署名 D2 のものとなる。
-
-署名 D2 のアクティブマニフェスト署名の SHA-256 ハッシュが、このクリップの `content_id` となる（§1.1）。
+**署名 D2（ぼかし済み MP4）**: ぼかし後に再署名。D1 を ingredient として参照、action にぼかし処理を記載。D2 のアクティブマニフェスト署名の SHA-256 が `signature_hash` となる。
 
 ### 2.5 アップロード
 
 ぼかし済みデータのみを R2 にアップロードする。生データはアップロードしない。
 
-アップロード対象は以下の 5 ファイルである（LiDAR 非搭載端末の場合は 4 ファイル）。
-
-| ファイル | 保存先キー |
-|----------|-----------|
-| ぼかし済み `rgb.mp4`（署名 D2 付き） | `raw/<content_id>/rgb.mp4` |
-| `sensors.jsonl` | `raw/<content_id>/sensors.jsonl` |
-| `imu_high_rate.jsonl` | `raw/<content_id>/imu_high_rate.jsonl` |
-| `camera_intrinsics.json` | `raw/<content_id>/camera_intrinsics.json` |
-| `depth/` ディレクトリ（Pro 端末のみ） | `raw/<content_id>/depth/{frame_id}.png` |
-
-アップロードは R2 の事前署名 PUT URL を使用した並列転送で行う。iOS の `URLSessionConfiguration.background` による Background URLSession を使用し、アプリがフォアグラウンドでなくても OS がアップロード完了を担保する。
-
-アップロード完了をサーバーが確認した時点で、デバイス上の生データ（ぼかし前の MP4）を削除する。ぼかし済みデータはユーザーの意思でデバイスに残すことができるが、サーバー上のデータが正本となる。
-
-### 2.6 Title Protocol への登録 (= `/process` 呼び出し)
-
-R2 アップロード完了後、デバイスは Title Protocol Gateway の `POST /process` を直接呼び出す。リクエストには R2 上のぼかし済み MP4 への presigned GET URL を含める。
-
-Title Protocol は C2PA 署名を TEE 内で検証し、`signature_hash` (= `content_id` と同じ値、デバイス側で算出済みの値と一致することを確認) と attestation を返す。デバイスはこの応答を `signed-json/<content_id>.json` として R2 raw バケットに保存する。
-
-この時点ではまだ cNFT は発行されていない。`/process` は検証と attestation 生成のみを行う。
-
-### 2.7 cNFT 発行 (= `rootAssetId` 確定)
-
-デバイスは続いて Title Protocol Gateway の `POST /extension/solana` を呼び出し、cNFT 発行用の partial transaction を取得する。デバイスは Solana wallet 秘密鍵で署名し、Solana RPC に broadcast する。
-
-トランザクション確定後、`rootAssetId` (= cNFT の asset id、base58 文字列) が確定する。`rootAssetId` は以降の全パイプラインを通じてクリップを参照する主キーである。
-
-### 2.8 サーバーへの登録 (= `POST /api/clips`)
-
-`rootAssetId` 確定後、デバイスは `POST /api/clips` でサーバーにクリップを登録する。リクエストには `content_id`、`root_asset_id`、`signed_json_uri` を必須フィールドとして含める。`root_asset_id` 未確定のままサーバーへ登録することは仕様上認められない。
-
-サーバーは登録を契機に Pipeline 2 を起動する (= §3.1)。
-
-### 2.9 Pipeline 1 の出力
-
-Pipeline 1 の出力は、R2 上の以下のファイル群へのリンクと、確定した `root_asset_id` および `signed_json_uri` である。
-
 ```
-raw/<content_id>/
-  rgb.mp4              # ぼかし済み, C2PA 署名 D2 付き
-  sensors.jsonl        # カメラ外部パラメータ + トラッキング状態 + 手ランドマーク
-  imu_high_rate.jsonl  # 100 Hz IMU 生データ
-  camera_intrinsics.json
-  depth/               # Pro 端末のみ
+raw/<signature_hash>/
+  rgb.mp4
+  realtime_handpose.jsonl
+  metadata.json
+  imu.jsonl                  # ARKit 構成のみ
+  depth/                     # ARKit 構成 + Pro 端末のみ
     000000.png
-    000001.png
     ...
-signed-json/<content_id>.json    # TP /process の応答 (= signature_hash + attestation)
 ```
 
-加えて、DB に以下のメタデータが記録される: `content_id`、`root_asset_id` (= notNull)、`signed_json_uri`、デバイス情報 (機種 / OS / アプリバージョン)、タスク ID、撮影開始・終了の VLM 達成確度、撮影日時。
+R2 の事前署名 PUT URL による並列転送。iOS Background URLSession / Android WorkManager でバックグラウンド継続。アップロード完了後、デバイス上の生データ（ぼかし前 MP4）を削除する。
+
+### 2.6 Title Protocol 登録
+
+R2 アップロード完了後、デバイスが TP Gateway `POST /process` を呼び出す。TP は C2PA 署名を TEE 内で検証し、attestation を返す。デバイスはこの応答を `raw/<signature_hash>/signed-json.json` として R2 に保存する。
+
+続いて `POST /extension/solana` で cNFT 発行用 partial transaction を取得、デバイスが署名・broadcast し、`root_asset_id` が確定する。
+
+### 2.7 サーバーへの登録
+
+`root_asset_id` 確定後、`POST /api/clips` でサーバーにクリップを登録する。`signature_hash`、`root_asset_id`、`recording_config` を含める。`root_asset_id` 未確定のまま登録することは認めない。
+
+登録と `POST /api/clips/:id/finalize` を経て Pipeline 2 を起動する。
 
 ---
 
-## 3. Pipeline 2: 品質スコアリング + 登録 (サーバー, CPU)
+## 3. Pipeline 2: 品質スコアリング + 自動ラベリング（サーバー, CPU）
 
-### 3.1 トリガーと実行環境
+### 3.1 トリガー
 
-Pipeline 2 は、Pipeline 1 完了後の `POST /api/clips` (= §2.8) によるクリップ登録、およびそれに続く `POST /api/clips/:id/finalize` を契機に自動実行される。実行環境は CPU インスタンス (Modal) を想定する。
+`POST /api/clips/:id/finalize` で自動実行。`root_asset_id` が DB に確定済みであることを前提条件とする。
 
-起動の前提条件として、対象クリップの `root_asset_id` が DB に確定済みであること (= notNull) を要求する。`root_asset_id` 不在のまま finalize が呼ばれた場合、サーバーは 400 を返し Pipeline 2 を開始しない。Pipeline 2 自身が Title Protocol を呼ぶ経路は v0.1.3 では存在しない。
+Pipeline 2 は撮影構成を問わず同一のパイプラインで処理する。撮影構成固有のデータがある場合は、存在すれば使い、なければスキップする。
 
 ### 3.2 品質スコアリング
 
-品質スコアリングは 3 層構成で実行する。各層は独立した指標セットを持ち、後段の層ほどコストが高い。
+3 層構成。後段ほどコストが高い。
 
 #### 3.2.1 第 1 層: メタデータ解析
 
-R2 から `sensors.jsonl` と `imu_high_rate.jsonl` を読み込み、映像ファイルをデコードせずにセンサーデータのみで算出する。コストはほぼゼロ。
+`realtime_handpose.jsonl` を読み込み、映像をデコードせずに算出する。コストはほぼゼロ。
 
 | 指標 | 計算方法 |
 |------|---------|
-| RGB / センサー同期率 | `sensors.jsonl` 内で有効な timestamp + frame_index を持つ行の割合 |
-| フレームドロップ率 | 0..N-1 のフレーム番号列における欠番の割合 |
-| トラッキング品質 | ARKit `tracking_state == 2`（正常）の割合 |
-| 手ランドマーク存在率 | Apple Vision 手ランドマークがフレーム内に検出されたフレームの割合（片手 / 両手を区別） |
-| 手の移動量 | 手首ランドマーク位置のフレーム間変位の平均・分散。長時間静止しているクリップを検出する |
-| IMU 重力ベクトル偏差 | 加速度センサーの重力ベクトルが 9.81 m/s² から乖離している区間の割合 |
+| フレームドロップ率 | フレーム番号列の欠番割合 |
+| 手ランドマーク存在率 | 手が検出されたフレームの割合（片手 / 両手を区別） |
+| 手の移動量 | 手首位置のフレーム間変位の平均・分散 |
+
+ARKit 構成の場合、`imu.jsonl` と `realtime_handpose.jsonl` 内のカメラポーズ・tracking_state から追加メトリクスを算出する（トラッキング品質、RGB/センサー同期率、IMU 重力偏差、深度有効率）。追加メトリクスは総合スコアには含めず、カタログのフィルタ軸として公開する。
 
 #### 3.2.2 第 2 層: フレームサンプリング解析
 
-ぼかし済み MP4 から n_frame 秒おきに 1 フレームを抽出し、画像処理で算出する。30 分の動画で n_frame=3 の場合 600 フレーム、CPU で数十秒。コストは $0.01 未満。
+ぼかし済み MP4 から n_frame 秒おきに 1 フレームを抽出（初期値: 3）。CPU で数十秒、コスト $0.01 未満。
 
 | 指標 | 計算方法 |
 |------|---------|
-| 輝度 | フレームの平均輝度とヒストグラム分布。暗すぎ（平均輝度 < 40）・白飛び（平均輝度 > 240）を検出 |
-| シャープネス | ラプラシアン分散。全体的なボケやモーションブラーを検出 |
-| オプティカルフロー | 連続するサンプルフレーム間の Farneback 法によるフロー量の平均。画面内で何も動いていない区間を検出 |
-| フレーム間多様性 | サンプルフレーム間のヒストグラム差分。全フレームがほぼ同一であるループ映像を検出 |
+| 輝度 | 平均輝度のヒストグラム。暗すぎ / 白飛びを検出 |
+| シャープネス | ラプラシアン分散。ボケやブラーを検出 |
+| オプティカルフロー | Farneback 法によるフレーム間フロー量。静止区間を検出 |
+| フレーム間多様性 | ヒストグラム差分。ループ映像を検出 |
 
-#### 3.2.3 第 3 層: VLM セマンティック解析
+#### 3.2.3 第 3 層: VLM セマンティック解析 + 自動ラベリング
 
-第 2 層とは別のサンプリングレートで抽出したフレームを VLM（Claude Haiku 4.5）に送信し、意味レベルの評価を行う。チェック間隔 n_vlm はタスク定義ごとに設定可能（初期値: 30 秒）。30 分の動画で n_vlm=30 の場合 60 フレーム、1 クリップあたり約 $0.18。
+n_vlm 秒おきにフレームを VLM（Claude Haiku 4.5）に送信（初期値: 30）。30 分の動画で 60 フレーム、約 $0.20/クリップ。
 
-フレームごとに以下の基準を 0〜5 で採点させ、短い根拠テキストを添えさせる。
+**スコア基準（0〜5）**:
 
 | 基準 | 説明 |
 |------|------|
-| `task_activity` | タスクに関連する動作を行っているか（0=無関係, 5=明確に遂行中） |
-| `object_interaction` | 手が物体を操作しているか（0=何も触れていない, 5=道具/対象物を操作中） |
-| `scene_match` | 環境がタスクに適合しているか（0=完全に不一致, 5=典型的な環境） |
-| `authenticity` | 本物の人間の手による実際の動作に見えるか（0=明らかに偽造, 5=自然） |
+| `task_activity` | 目的的活動を遂行しているか |
+| `object_interaction` | 手が物体を操作しているか |
+| `scene_match` | 環境が活動と合致しているか |
+| `authenticity` | 本物の人間の手による実際の動作か |
 
-VLM への入力にはタスク定義（タスク名、開始条件、終了条件、典型的な環境の説明）を含める。出力は構造化 JSON で返させる。
+**カテゴリ分類**: フレームごとに `cleaning` / `laundry` / `cooking` / `studying` / `crafting` / `organizing` / `meal_prep` / `other` を推定 + 短い行動説明文。クリップ全体で多数決を取り主カテゴリと信頼度を決定。
 
-#### 3.2.4 総合スコアの算出
+#### 3.2.4 総合スコア
 
-3 層 + GTSAM の指標を統合して 0〜100 の総合品質スコアを算出する。以下は初版の重み配分である。この配分は運用データの蓄積に基づいて継続的に改善する。重みが変更された場合、過去に採点済みのクリップに対して再採点を実行する。
+| 層 | 配点 |
+|----|------|
+| 第 1 層: メタデータ | 15 |
+| 第 2 層: フレームサンプリング | 15 |
+| 第 3 層: VLM セマンティック | 70 |
 
-**層ごとの配点（合計 100 点）**:
+**第 1 層（15 点）**: 手ランドマーク存在率 8、フレームドロップ率 4、手の移動量 3。
 
-| 層 | 配点 | 根拠 |
-|----|------|------|
-| 第 1 層: メタデータ | 20 点 | 技術的にまともなデータかの最低限の足切り |
-| 第 2 層: フレームサンプリング | 15 点 | 映像として使える品質かの確認 |
-| 第 3 層: VLM セマンティック | 55 点 | データの中身（タスク遂行・手の操作）が価値の本体 |
-| GTSAM 整合性 | 10 点 | 不正データの排除 |
+**第 2 層（15 点）**: 輝度 4、シャープネス 4、オプティカルフロー 4、フレーム間多様性 3。
 
-**第 1 層の内訳（20 点満点）**:
+**第 3 層（70 点）**: task_activity 25、object_interaction 20、authenticity 15、scene_match 10。算出式: `(全フレーム平均 / 5) × 配点`。
 
-| 指標 | 配点 | 正規化方法 |
-|------|------|-----------|
-| 手ランドマーク存在率（両手） | 6 | 両手検出フレーム割合 × 6 |
-| RGB / センサー同期率 | 4 | 同期率 × 4 |
-| フレームドロップ率 | 4 | (1 − 欠番率) × 4 |
-| トラッキング品質 | 3 | tracking_state==2 の割合 × 3 |
-| 手の移動量 | 2 | 手首変位の分散を閾値で正規化。静止 = 0, 十分な動き = 2 |
-| IMU 重力ベクトル偏差 | 1 | 偏差 ≤ 0.5 m/s² の割合 × 1 |
+`task_activity == 0` のフレーム割合を `idle_ratio` として別途記録。棄却閾値は設けない。
 
-手ランドマーク存在率を第 1 層の最大配点としている。エゴセントリック手活動データとして、手が映っていることが最も基本的な価値要件であるため。
+### 3.3 processed への書き出し
 
-**第 2 層の内訳（15 点満点）**:
-
-| 指標 | 配点 | 正規化方法 |
-|------|------|-----------|
-| 輝度 | 4 | 平均輝度 40〜240 の範囲内フレーム割合 × 4 |
-| シャープネス | 4 | ラプラシアン分散が閾値以上のフレーム割合 × 4 |
-| オプティカルフロー | 4 | フロー量が閾値以上のフレーム割合 × 4。動きがないフレームが多いほど減点 |
-| フレーム間多様性 | 3 | ヒストグラム差分の平均を閾値で正規化。全フレーム同一 = 0, 十分な変化 = 3 |
-
-**第 3 層の内訳（55 点満点）**:
-
-VLM の 4 基準はそれぞれ 0〜5 で採点される。全サンプルフレームの平均値を算出し、以下の配点で按分する。
-
-| 基準 | 配点 | 根拠 |
-|------|------|------|
-| `task_activity` | 20 | データの価値を最も左右する。タスクと無関係な映像は用途がない |
-| `object_interaction` | 15 | 手が物体を操作しているかは模倣学習データの核心 |
-| `authenticity` | 10 | マネキン・画面再撮影等の不正は VLM でも検出する（GTSAM と相補的） |
-| `scene_match` | 10 | 環境の不一致は二次的だが、データセットの整合性に影響する |
-
-算出式: 各基準について `(全フレーム平均 / 5) × 配点` で 0〜配点 の値を得る。
-
-加えて、`task_activity` が 0 のフレームの割合を `idle_ratio` として別途記録する。たとえば 60 フレーム中 50 フレームが `task_activity=0` なら `idle_ratio=0.83` であり、ほぼ何もしていないクリップだとわかる。`idle_ratio` は総合スコアには直接組み込まないが、買い手向けカタログのフィルタ軸として公開する。
-
-**GTSAM（10 点満点）**:
-
-| 指標 | 配点 | 正規化方法 |
-|------|------|-----------|
-| `imu_visual_consistency` | 10 | 15 次元残差ノルムを閾値で正規化。物理的に整合 = 10, 完全に乖離 = 0 |
-
-**総合スコアの算出式**:
+Pipeline 2 の出力は `processed/<signature_hash>/` に書き出す。
 
 ```
-total_score = layer1_score + layer2_score + layer3_score + gtsam_score
+processed/<signature_hash>/
+  quality_scores.json        # 総合スコア + 全サブ指標
+  semantic.jsonl             # フレーム単位のラベル（VLM 未推定フレームは直近の推定値で補間）
 ```
 
-各層のスコアは上記の内訳の合計であり、total_score は 0〜100 の範囲に収まる。
+`semantic.jsonl` は全フレーム分の行を持つ。VLM が n_vlm 秒おきに推定したフレーム間は、直近の推定値で埋める。各行にモデル名・バージョンを記録する。
 
-総合スコアとすべてのサブ指標は、撮影者へのフィードバックとして公開される。撮影者はスコアと内訳を見て撮り方を改善できる。買い手にはカタログ上のフィルタ軸として提供される。
+DB にも品質スコア、主カテゴリ + 信頼度、ステータス `ready` を書き込む。撮影者に push 通知。
 
-**棄却閾値は設けない。** スコアが低くてもクリップは次のステップに進む。品質を理由に運営がクリップを棄却する構造を持たない。
+### 3.4 コスト
 
-### 3.3 Video-IMU 整合性検証（不正防止）
+30 分クリップあたり約 $0.20。大半は第 3 層 VLM。
 
-GTSAM ImuFactor（Forster et al., TRO 2017）を使用する。映像からの視覚的自己運動推定（KLT オプティカルフロー）と IMU 読み値をファクターグラフで交差検証し、15 次元残差（回転 + 速度 + 位置 + ジャイロバイアス + 加速度バイアス）を算出する。
+### 3.5 冪等性
 
-この検証の目的は、画面再撮影攻撃（ディスプレイに録画映像を表示して撮り直す）の検出である。C2PA 署名はコンテンツの改ざんを検出するが、「正当なデバイスでディスプレイを撮影した」場合は署名上は正規の撮影として成立する。IMU 信号と映像内の運動が物理的に整合しないことで、この攻撃パターンを検出する。
-
-検証結果は `imu_visual_consistency` スコアとして品質スコアの一部に組み込む。異常値のしきい値設定は運用データの蓄積に基づいて調整する。
-
-### 3.4 ステータス更新と通知
-
-Pipeline 2 の全ステップが完了すると、DB 上のクリップ状態を `ready` に遷移し、以下の情報を保存する: 品質スコア (総合 + 全サブ指標)、`blurred_mp4_key`。`root_asset_id` と `signed_json_uri` は Pipeline 1 完了時点で既に DB に書き込まれているため、Pipeline 2 では更新しない。
-
-撮影者には push 通知で完了を通知する (`expo-notifications` 経由、APNs)。通知設定がオフの場合のフォールバックとして、アプリがフォアグラウンドに戻ったタイミングで全クリップの最新状態を取得する。
-
-### 3.5 Pipeline 2 の入出力まとめ
-
-**入力**:
-- `raw/<content_id>/` 配下の全ファイル (= Pipeline 1 の出力)
-- DB レコード: `content_id`、`root_asset_id` (= notNull、Pipeline 1 で確定済み)、`signed_json_uri`
-
-**出力**:
-- DB レコード更新: 品質スコア群、ステータス `ready`
-
-**コスト目安 (1 クリップ 30 分あたり)**:
-- 第 1 層 + 第 2 層: < $0.01
-- 第 3 層 VLM (n=30 秒): 約 $0.18
-- GTSAM: 約 $0.05〜0.10
-- 合計: 約 $0.20〜0.30
-
-### 3.6 冪等性
-
-Pipeline 2 のうち、メタデータ解析・フレームサンプリング・GTSAM は決定論的であり同じ入力に対して同じ出力を返す。VLM スコアリングは非決定的 (temperature > 0) なため、再実行時にスコアが微小に変動しうる。スコアリングロジック更新時の再採点は意図的な再実行であり、この変動は許容する。
+メタデータ解析・フレームサンプリングは決定論的。VLM は非決定的のため再実行時に微小変動あり。
 
 ---
 
-## 4. Pipeline 3: データセット構築 (サーバー, GPU)
+## 4. Pipeline 3: WiLoR 手ポーズ推定（サーバー, GPU）
 
 ### 4.1 位置づけ
 
-Pipeline 3 は、買い手に納品するデータセットを構築するパイプラインである。Pipeline 1・2 が全クリップに対して 1 本道で実行されるのに対し、Pipeline 3 は買い手の要求に応じて異なるフォーマット・処理を適用する。RootLens チームが手動でトリガーする。
+ぼかし済み MP4 に対して WiLoR-mini による手ポーズ推定を実行し、結果を `processed/` に書き出す。RootLens チームが手動でトリガーする。
 
-現時点では Type 1（LeRobot v3 + WiLoR 手ポーズ推定）のみを定義する。買い手の要望に応じて Type 2 以降を追加する。
+Pipeline 3 は撮影構成を問わず同一の処理を行う（RGB フレームのみを入力とするため）。
 
 ### 4.2 トリガー条件
 
-Pipeline 3 は、Pipeline 2 が完了しクリップが `ready` 状態にあるものに対してのみ実行可能である。`root_asset_id` は Pipeline 1 完了時点で既に確定しているため、Pipeline 3 では必ず存在することを前提とする。ステーキング (delegate 設定) の有無は Pipeline 3 の実行に影響しない。ステーキングは License NFT 発行の前提条件であり、データセット構築自体は事前に行える。
+Pipeline 2 完了かつ `ready` 状態のクリップに対してのみ実行可能。
 
-### 4.2.1 入力
+### 4.3 WiLoR 推定
 
-Pipeline 3 の入力は以下とする。`root_asset_id` は必須であり、不在の場合 Pipeline 3 は起動しない。
-
-- `content_id` (= R2 raw バケットのキー解決用)
-- `root_asset_id` (= データセット出力 prefix のキー)
-- `signed_json_uri` (= `meta/info.json` の `rootlens.*` 拡張への記録用)
-
-### 4.3 Type 1: WiLoR 手ポーズ推定 + LeRobot v3
-
-#### 4.3.1 実行環境
-
-Modal GPU（A10G）。1 クリップ 30 分あたりの処理時間は数分、コストは約 $0.10〜0.20。
-
-#### 4.3.2 Step 1: WiLoR 手ポーズ推定
+Modal GPU（A10G）。30 分クリップあたり数分、$0.10〜0.20。
 
 ぼかし済み MP4 の各フレームを WiLoR-mini（ViTDet 手検出 + ViT ベースの MANO パラメータ推定）に通す。
 
 フレームごとの出力:
 
-| データ | 形状 | 説明 |
-|--------|------|------|
-| `pred_keypoints_3d` | [2, 21, 3] | MANO 21 関節の 3D 座標（global_orient 回転適用済み） |
-| `pred_cam_t_full` | [2, 3] | カメラ空間での手首位置（弱透視投影、無次元） |
-| `global_orient` | [2, 3] | 手の大域回転（axis-angle） |
-| `hand_pose` | [2, 45] | 指関節の回転（15 関節 × 3、axis-angle） |
-| `hand_present` | [2] | 左右の手が検出されたか（bool） |
+| データ | 形状 |
+|--------|------|
+| `pred_keypoints_3d` | [2, 21, 3] |
+| `pred_cam_t_full` | [2, 3] |
+| `global_orient` | [2, 3] |
+| `hand_pose` | [2, 45] |
+| `hand_present` | [2] |
 
-手が未検出のフレームではゼロ埋め。クォータニオンは恒等 [0, 0, 0, 1]。MANO shape（betas）は WiLoR-mini が公開していないため 10 次元ゼロベクトルとする。
+手が未検出のフレームではゼロ埋め。クォータニオンは恒等 [0,0,0,1]。
 
-`action` ベクトル（14 次元）は両手手首の 6-DoF として構成する:
-
-```
-[左手_xyz(3), 左手_quaternion(4), 右手_xyz(3), 右手_quaternion(4)]
-```
-
-#### 4.3.3 Step 2: LeRobot v3.0 データセット組み立て
-
-WiLoR の出力と Pipeline 1 のセンサーデータを frame_index で結合し、LeRobot v3.0 フォーマットのデータセットを構築する。
-
-**ディレクトリ構成**:
-
-| ファイル | 内容 |
-|----------|------|
-| `meta/info.json` | スキーマ定義。`codebase_version: "v3.0"`, `robot_type: "rootlens-iphone-ego"` |
-| `meta/stats.json` | 全数値列の min / max / mean / std |
-| `meta/tasks.jsonl` + `tasks.parquet` | タスク名一覧（lerobot v0.5.1 互換に両形式が必要） |
-| `meta/episodes/chunk-000/file-000.parquet` | エピソード毎のメタ情報（フレーム範囲、タスク一覧） |
-| `data/chunk-000/file-000.parquet` | 全フレームの観測 + アクションデータ |
-| `videos/observation.images.ego_cam/chunk-000/episode_XXX.mp4` | ぼかし済み RGB 映像 |
-
-**data parquet のカラム定義**:
-
-| カラム | 型 | 形状 | 説明 |
-|--------|-----|------|------|
-| `timestamp` | float32 | スカラー | frame_index / fps |
-| `frame_index` | int64 | スカラー | エピソード内 0 始まり |
-| `episode_index` | int64 | スカラー | エピソード番号 |
-| `index` | int64 | スカラー | 全エピソード通しインデックス |
-| `task_index` | int64 | スカラー | tasks.jsonl へのインデックス |
-| `observation.hand_pose_mano` | float32 | [2, 48] | global_orient 3 + hand_pose 45 |
-| `observation.hand_shape_mano` | float32 | [2, 10] | 全ゼロ（WiLoR-mini 制約） |
-| `observation.hand_keypoints_3d` | float32 | [2, 21, 3] | MANO 21 関節 3D 座標 |
-| `observation.hand_present` | bool | [2] | 左右手の検出フラグ |
-| `action` | float32 | [14] | 両手手首 6-DoF |
-| `observation.state` | float32 | [7] | カメラ 6-DoF: xyz(3) + quaternion(4) |
-| `observation.imu_orientation` | float32 | [4] | デバイス姿勢クォータニオン |
-| `observation.imu_angular_velocity` | float32 | [3] | 角速度 |
-| `observation.imu_linear_acceleration` | float32 | [3] | 線形加速度 |
-| `observation.tracking_state` | int8 | [1] | ARKit トラッキング状態 |
-
-#### 4.3.4 Step 3: タスクラベル生成
-
-エピソード毎に 3 秒間隔でフレームを抽出し、VLM（Claude Haiku 4.5）に送信する。Ego4D ナレーション形式のフェーズ分割ラベルを生成する（1 エピソードあたり 3〜8 フェーズ）。
-
-例:
-- "Right hand holds a glass pitcher while left hand holds a white cup on the counter."
-- "Right hand scoops cooked rice from the rice cooker into the white bowl."
-
-生成されたラベルは `meta/tasks.jsonl` と `tasks.parquet` に格納される。
-
-#### 4.3.5 Type 1 の出力
+### 4.4 processed への書き出し
 
 ```
-datasets/<root_asset_id>/
-  meta/
-    info.json
-    stats.json
-    tasks.jsonl
-    tasks.parquet
-    episodes/chunk-000/file-000.parquet
-  data/
-    chunk-000/file-000.parquet
-  videos/
-    observation.images.ego_cam/chunk-000/episode_XXX.mp4
+processed/<signature_hash>/
+  wilor.jsonl                # フレームごとの WiLoR 推定結果（全カラム）
 ```
 
-`meta/info.json` には Pipeline 1 で確定した `root_asset_id`、`content_hash`、`signed_json_uri` を `rootlens.*` 拡張フィールドとして記録する。
+`wilor.jsonl` の各行は 1 フレームに対応し、上記の全出力フィールドを含む。ヘッダーにモデル名・バージョンを記録する。
 
-### 4.4 冪等性
+### 4.5 冪等性
 
-Pipeline 3 は同じ入力に対して同じ出力を返す。WiLoR の推論は決定論的であり、LeRobot データセットの構築も決定論的である。ネットワーク障害や処理中断からの再実行が安全に行える。
+WiLoR は決定論的。再実行が安全。
 
 ---
 
 ## 5. ストレージ配置
 
-### 5.1 R2 バケット構成
+```
+rootlens-raw/
+  raw/<signature_hash>/
+    rgb.mp4
+    realtime_handpose.jsonl
+    metadata.json
+    imu.jsonl                    # ARKit 構成のみ
+    depth/                       # ARKit + Pro のみ
+    signed-json.json             # TP 応答
 
-| バケット | キープレフィックス | 内容 | アクセス |
-|---------|-------------------|------|---------|
-| `rootlens-raw` | `raw/<content_id>/` | Pipeline 1 出力 (ぼかし済み MP4 + センサーデータ) | サーバーのみ |
-| `rootlens-raw` | `signed-json/<content_id>.json` | Pipeline 1 末尾、Title Protocol `/process` の応答 (= signature_hash + attestation) | サーバーのみ |
-| `rootlens-datasets` | `datasets/<root_asset_id>/` | Pipeline 3 出力 (LeRobot v3 データセット) | 購入者に対して RootLens 経由で提供 |
+rootlens-processed/
+  processed/<signature_hash>/
+    quality_scores.json          # Pipeline 2
+    semantic.jsonl               # Pipeline 2
+    wilor.jsonl                  # Pipeline 3
+```
 
-### 5.2 DB（Supabase）に保存される情報
+`raw/` と `processed/` は同じ `signature_hash` をキーにする。同一動画は同一ハッシュになるため、重複が自然に吸収される。`root_asset_id` が必要な場合は `raw/<signature_hash>/signed-json.json` を参照する。
+
+DB（Supabase）:
 
 | カテゴリ | 内容 |
 |---------|------|
-| クリップメタデータ | `content_id`, タスク ID, 撮影日時, デバイス情報, ステータス |
-| Pipeline 1 出力 | `root_asset_id` (= notNull), `signed_json_uri` |
-| Pipeline 2 出力 | 品質スコア (総合 + 全サブ指標), GTSAM 整合性スコア |
-| ユーザー情報 | ウォレットアドレス, KYC リファレンス |
-| タスク定義 | タスク名, 開始条件, 終了条件, VLM チェック間隔 (n_vlm 秒), VLM プロンプト, 推奨 orientation, min/max_duration_sec |
+| クリップ | `signature_hash`、`root_asset_id`（notNull）、`recording_config`、デバイス情報、撮影日時、撮影時間、ステータス |
+| Pipeline 2 | 品質スコア、VLM 分類カテゴリ + 信頼度 |
+| ユーザー | ウォレットアドレス、KYC リファレンス |
 
 ---
 
 ## 6. クリップの状態機械
 
-撮影者が「送る」を選択したクリップは、以下の状態を遷移する。
+全クリップは自動アップロードされる。
 
 ```
 アップロード中 → 処理中 → ready → staked
@@ -450,45 +293,25 @@ Pipeline 3 は同じ入力に対して同じ出力を返す。WiLoR の推論は
 アップロード失敗  処理エラー
 ```
 
-| 状態 | 遷移条件 | ユーザー操作 |
-|------|---------|-------------|
-| アップロード中 | Pipeline 1 のアップロード + TP `/process` + cNFT 発行を実行中 (= `root_asset_id` 確定前) | キャンセル可能 |
-| アップロード失敗 | ネットワーク障害、TP 呼び出し失敗、cNFT 発行失敗等で再試行上限超過 | リトライ、削除 |
-| 処理中 | Pipeline 2 実行中 (= `root_asset_id` 確定済みかつ finalize 完了) | 待機 (現在のステップが表示される) |
-| ready | Pipeline 2 正常完了 | ステーキング、または削除 |
-| staked | Bubblegum delegate を RootLens に設定済み | delegate 解除 (アンステーク)、売上引き出し |
-| 処理エラー | Pipeline 2 の技術的失敗で再試行上限超過 | サポートへの連絡、削除 |
-
-「アップロード中 → 処理中」 への遷移トリガは、`POST /api/clips/:id/finalize` の成功である。finalize は `root_asset_id` が DB に存在することを前提条件として要求し、不在の場合は 400 を返して状態遷移を行わない。
+| 状態 | 遷移条件 |
+|------|---------|
+| アップロード中 | Pipeline 1 実行中（`root_asset_id` 確定前） |
+| アップロード失敗 | 再試行上限超過 |
+| 処理中 | Pipeline 2 実行中 |
+| ready | Pipeline 2 正常完了 |
+| staked | delegate 設定済み |
+| 処理エラー | Pipeline 2 失敗で再試行上限超過 |
 
 ---
 
-## 7. 下流の概要（本仕様の範囲外）
+## 7. コスト構造
 
-データパイプラインの下流にあるライセンス発行・収益分配の仕組みを簡潔に記す。詳細は各専用仕様書を参照すること。
+全パイプラインの処理コスト合計は動画 1 時間あたり $1〜2 を上限とする。
 
-1. 撮影者が Root NFT をステーク（Bubblegum delegate を RootLens の co-sign アドレスに設定）する。これにより、RootLens がこのコンテンツの License NFT 発行に co-sign する権限を持つ。
-2. AI 企業がカタログからデータを選択し、`issue_license` トランザクションを構築・署名する。
-3. RootLens が co-sign し、トランザクションが Solana 上で実行される。1 トランザクションで License NFT 発行・USDC 支払い・収益分配がアトミックに完了する。
-4. 収益は `UserRevenue` PDA に蓄積され、撮影者は `claim_revenue` で自分のウォレットに引き出す。
-5. License NFT の URI に `?root_mint=<root_asset_id>` が含まれ、ライセンスと元データの紐付けがオンチェーンで検証可能となる。
+| パイプライン | 対象 | 30 分あたり |
+|-------------|------|-----------|
+| Pipeline 1 | 全クリップ | Solana 手数料のみ |
+| Pipeline 2 | 全クリップ | 約 $0.20 |
+| Pipeline 3 | 販売対象 | $0.10〜0.20 |
 
----
-
-## 8. コスト構造のまとめ
-
-| パイプライン | 実行タイミング | 対象 | 1 クリップあたりコスト目安 |
-|-------------|--------------|------|------------------------|
-| Pipeline 1 | 撮影直後 (デバイス) | 全クリップ | 約 $0.01 (VLM 開始・終了チェック 2 回) + cNFT 発行の Solana 手数料 |
-| Pipeline 2 | クリップ登録 + finalize 後 (自動) | 全クリップ | $0.20〜0.30 |
-| Pipeline 3 Type 1 | 手動トリガー | 販売対象クリップ | $0.10〜0.20 |
-
-Pipeline 2 + Pipeline 3 の合計は 1 クリップあたり $0.50 以下で、$1 の予算に対して十分な余裕がある。Pipeline 2 の VLM 呼び出し (第 3 層) が最大のコスト要因であり、VLM チェック間隔 n_vlm の調整で制御可能。
-
-### 8.1 補足: 録画時間
-
-録画時間の上限・下限はタスク定義ごとに設定する。タスク定義のフィールドとして `min_duration_sec` と `max_duration_sec` を持つ。
-
-### 8.2 補足: 深度データの位置づけ
-
-LiDAR 深度データ（`depth/`）は Pipeline 2 のスコアリングでは使用しないが、Pipeline 3 以降のデータセット構築で価値を持つ（3D 再構成、深度付き模倣学習等）。取得可能なセンサーデータは全て収集・保存する方針であり、現時点で下流パイプラインが消費していなくてもアップロード対象から外さない。
+合計 30 分あたり $0.40 以下（1 時間あたり $0.80 以下）。

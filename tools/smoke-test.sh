@@ -10,11 +10,11 @@
 #      ここで clip 行は既にできていて、 rootAssetId + signedJsonUri も入っている
 #   3. POST /api/clips/:id/finalize で Pipeline 2 workflow 起動
 #   4. GET /api/clips/:id を 2 秒ごとに polling、 state == "ready" まで待つ
-#   5. Pipeline 3 endpoint を手動トリガで叩いて LeRobot v3 dataset を生成
+#   5. Pipeline 3 endpoint を手動トリガで叩いて WiLoR 推定結果を processed/ に書き出す
 #
 # 前提:
 #   - Vercel deploy 済 (= rootlens.io/api 経由 もしくは preview URL)
-#   - web/.env.local に R2 credential + MODAL_BUNDLE_ENDPOINT (= mock-device prod 用)。
+#   - web/.env.local に R2 credential + MODAL_WILOR_ENDPOINT (= mock-device prod 用)。
 #     無ければ `cd web && vercel env pull .env.local --yes` で取得
 #   - mock-device の release build 済 (= cargo build --release in tools/mock-device)
 #   - MERKLE_TREE env (= cNFT mint 先 tree pubkey、 devnet)
@@ -65,8 +65,8 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 set -a; source "$ENV_FILE"; set +a
 
-if [ -z "${MODAL_BUNDLE_ENDPOINT:-}" ]; then
-  echo "MODAL_BUNDLE_ENDPOINT が .env.local に無い (= Pipeline 3 を叩けない)"
+if [ -z "${MODAL_WILOR_ENDPOINT:-}" ]; then
+  echo "MODAL_WILOR_ENDPOINT が .env.local に無い (= Pipeline 3 を叩けない)"
   exit 1
 fi
 
@@ -109,12 +109,12 @@ if [ "$MOCK_EXIT" -ne 0 ]; then
   exit 1
 fi
 
-CONTENT_ID=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['content_id_hex'])")
+SIGNATURE_HASH=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['signature_hash_hex'])")
 ROOT_ASSET=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['root_asset_id'])")
 CLIP_ID=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['clip_id'])")
 WALLET=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['wallet_pubkey'])")
 TX_SIG=$(python3 -c "import json; d=json.load(open('$MOCK_JSON_PATH')); print(d['solana_tx_signature'])")
-echo "  ok: content_id    = $CONTENT_ID"
+echo "  ok: signature_hash    = $SIGNATURE_HASH"
 echo "      root_asset_id = $ROOT_ASSET"
 echo "      clip_id       = $CLIP_ID"
 echo "      wallet_pubkey = $WALLET"
@@ -126,7 +126,7 @@ echo "=== Step 3/5: POST /api/clips/$CLIP_ID/finalize (= Pipeline 2 workflow キ
 curl -fsS -X POST "$API_BASE/api/clips/$CLIP_ID/finalize" \
   -H "Content-Type: application/json" \
   -H "X-Wallet-Pubkey: $WALLET" \
-  -d "{\"contentId\":\"$CONTENT_ID\"}" \
+  -d "{\"signatureHash\":\"$SIGNATURE_HASH\"}" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'  ok: state={d[\"clip\"][\"state\"]} processingStep={d[\"clip\"][\"processingStep\"]}')"
 
 # ─── Step 4: ready 待ち polling ──────────────────────────────────
@@ -164,19 +164,16 @@ done
 
 # ─── Step 5: Pipeline 3 を手動トリガ ────────────────────────────
 echo ""
-echo "=== Step 5/5: Pipeline 3 (= WiLoR + LeRobot v3 bundle) を手動トリガ ==="
-RAW_PREFIX="raw/$CONTENT_ID/"
-SIGNED_KEY="raw/$CONTENT_ID/rgb.mp4"
-OUTPUT_PREFIX="datasets/$ROOT_ASSET/"
-BUNDLE_URL="$MODAL_BUNDLE_ENDPOINT?raw_prefix=$RAW_PREFIX&signed_mp4_key=$SIGNED_KEY&output_prefix=$OUTPUT_PREFIX&root_asset_id=$ROOT_ASSET&idempotency_key=$CONTENT_ID"
-BUNDLE_RES=$(curl -fsS -X POST "$BUNDLE_URL")
-echo "$BUNDLE_RES" | python3 -m json.tool | sed 's/^/  /'
+echo "=== Step 5/5: Pipeline 3 (= WiLoR 手ポーズ推定) を手動トリガ ==="
+WILOR_URL="$MODAL_WILOR_ENDPOINT?signature_hash=$SIGNATURE_HASH"
+WILOR_RES=$(curl -fsS -X POST "$WILOR_URL")
+echo "$WILOR_RES" | python3 -m json.tool | sed 's/^/  /'
 
 echo ""
 echo "=== smoke test 完了 ==="
 echo "  clip_id:        $CLIP_ID"
-echo "  content_id:     $CONTENT_ID"
+echo "  signature_hash:     $SIGNATURE_HASH"
 echo "  root_asset_id:  $ROOT_ASSET"
 echo "  wallet_pubkey:  $WALLET"
-echo "  dataset prefix: $OUTPUT_PREFIX"
+echo "  processed:      processed/$SIGNATURE_HASH/"
 echo "  preview:        $API_BASE/api/clips/$CLIP_ID"

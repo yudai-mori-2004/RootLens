@@ -46,9 +46,9 @@ root-lens/
 
 | Pipeline | 場所 | 役割 |
 |---|---|---|
-| 1 (端末) | `tools/mock-device/` (= iOS 実機実装は別フェーズ) | 撮影 → C2PA D1 → 顔ぼかし → C2PA D2 → content_id 抽出 → R2 アップロード → TP `/process` (= signature_hash + attestation 取得 + R2 signed-json/ 保存) → cNFT 発行 (= `/extension/solana` + Solana wallet 署名 + broadcast) → rootAssetId 確定 → `POST /api/clips` でサーバ登録 |
-| 2 (サーバ、 自動) | `web/workflow/process-clip.ts` + `tools/modal/{layer1_metadata,layer2_frame_sampling,layer3_vlm,gtsam_eval}.py` | 4 層スコアリング (= metadata 20 + frame sampling 15 + VLM 55 + GTSAM 10) で 0..100 点。 起動条件は `clip.rootAssetId` not null |
-| 3 (サーバ、 手動) | `tools/modal/bundle.py` | WiLoR 手ポーズ推定 + LeRobot v3 dataset 構築。 出力 prefix は `datasets/<rootAssetId>/` |
+| 1 (端末) | `tools/mock-device/` (= iOS 実機実装は別フェーズ) | 撮影 → C2PA D1 → 顔ぼかし → C2PA D2 → signature_hash 抽出 → R2 アップロード → TP `/process` (= signature_hash + attestation 取得 + R2 signed-json/ 保存) → cNFT 発行 (= `/extension/solana` + Solana wallet 署名 + broadcast) → rootAssetId 確定 → `POST /api/clips` でサーバ登録 |
+| 2 (サーバ、 自動) | `web/workflow/process-clip.ts` + `tools/modal/{layer1_metadata,layer2_frame_sampling,layer3_vlm}.py` | 3 層スコアリング (= metadata 20 + frame sampling 15 + VLM 65) で 0..100 点。 起動条件は `clip.rootAssetId` not null。 出力 `processed/<signature_hash>/{quality_scores.json,semantic.jsonl}` |
+| 3 (サーバ、 手動) | `tools/modal/wilor.py` | WiLoR 手ポーズ推定のみ。 出力 `processed/<signature_hash>/wilor.jsonl`。 データセット化 (= 複数クリップを LeRobot v3 等にまとめる) はパイプライン外 |
 
 TP register + cNFT 発行は v0.1.3 で Pipeline 1 内に前倒し済 (= 新 Gateway は `POST /process` 直叩き、 SDK 廃止)。 サーバ workflow からは tp-submit step を完全削除済、 mock-device が R2 upload 後に TP `/process` + cNFT 発行を実行して rootAssetId を確定させてから `POST /api/clips` でサーバに登録する。
 
@@ -56,10 +56,11 @@ TP register + cNFT 発行は v0.1.3 で Pipeline 1 内に前倒し済 (= 新 Gat
 
 - web: `https://rootlens.io` (= Vercel auto deploy on main push)
 - API: `https://rootlens.io/api/clips` 系 + `/api/clips/:id/finalize` で WDK workflow キック
-- Modal: workspace `yudai-mori-2004`、 5 app 全 deploy 済
-  - rootlens-layer1-metadata、 rootlens-layer2-frame-sampling、 rootlens-layer3-vlm、 rootlens-gtsam-eval、 rootlens-bundle
+- Modal: workspace `yudai-mori-2004`
+  - rootlens-layer1-metadata、 rootlens-layer2-frame-sampling、 rootlens-layer3-vlm、 rootlens-wilor
+  - (旧 rootlens-gtsam-eval / rootlens-bundle は廃止。 deploy 済の旧 app は別途 tear down)
 - DB: Supabase (= web/drizzle/ + web/scripts/apply_migrations.mjs)。 drizzle-kit push は Supabase の auth/storage schema introspection で内部バグを踏むため使わない
-- R2 buckets: `rootlens-raw` (= raw/<content_id>/) + `rootlens-datasets` (= datasets/<...>/) の 2 つ
+- R2 buckets: `rootlens-raw` (= raw/<signature_hash>/) + `rootlens-processed` (= processed/<signature_hash>/) の 2 つ
 
 smoke test の実行:
 
@@ -97,11 +98,11 @@ API_BASE=https://rootlens.io bash tools/smoke-test.sh
 
 v0.1.3 で Title Protocol が SDK 廃止 + `POST /process` 直叩き経路に切替したのを契機に、 TP register + cNFT 発行を Pipeline 1 内に前倒した。 mock-device は R2 upload 後に `POST /process` (= signature_hash + attestation 取得 → R2 signed-json/ 保存) → `POST /extension/solana` (= partial_tx 取得 → Solana wallet 署名 → RPC broadcast) を実行して `rootAssetId` を確定させる。 確定後にのみ `POST /api/clips` でサーバに登録する。
 
-`rootAssetId` は Pipeline 2 起動の前提条件として扱う (= DB schema 上 notNull、 `POST /api/clips` の必須 field、 finalize で not null check)。 確定するまで `POST /api/clips` は叩かない。 サーバから TP を呼ぶ経路は v0.1.3 で完全廃止 (= サーバ workflow は scoring 4 step のみ)。
+`rootAssetId` は Pipeline 2 起動の前提条件として扱う (= DB schema 上 notNull、 `POST /api/clips` の必須 field、 finalize で not null check)。 確定するまで `POST /api/clips` は叩かない。 サーバから TP を呼ぶ経路は v0.1.3 で完全廃止 (= サーバ workflow は scoring 3 step のみ)。
 
-### Pipeline 3 出力 prefix
+### Pipeline 2 / 3 の出力先
 
-出力 prefix は必ず `datasets/<rootAssetId>/`。 `rootAssetId` は Pipeline 1 末尾で確定するため、 Pipeline 3 起動時には必ず存在する (= 不在で起動した場合 fail-loud)。
+Pipeline 2 / 3 の出力はいずれも `processed/<signature_hash>/` に書き出す (= raw と同じ signature_hash キーで対称、 DATA_SPECS §5)。 Pipeline 2 = `quality_scores.json` + `semantic.jsonl`、 Pipeline 3 = `wilor.jsonl`。 複数クリップをデータセット形式 (= LeRobot v3 等) にまとめる作業はパイプライン外で事後的に行う。
 
 ### オフチェーンストレージについて
 

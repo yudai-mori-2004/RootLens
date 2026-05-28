@@ -22,10 +22,16 @@ import {
 } from '@expo-google-fonts/inter';
 
 import { RootNavigator } from './src/app/RootNavigator';
+import { DevSandboxScreen } from './src/devsandbox/DevSandboxScreen';
 import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioning';
 import { AuthGate } from './src/services/auth';
-import { initVoiceLanguage } from './src/services/voicePref';
+// 2026-05-27 撤去: voicePref / voiceAgent / sherpa-onnx 系は段階削除済み
 import { colors, fonts, typography } from './src/theme';
+
+// 開発ビルドでは本番 UI (RootNavigator) ではなく dataflow sandbox を起動する。
+// UI フローから独立して、 単体クリップのデータフローを 1 ボタンずつ検証するため。
+// 本番ビルド (= __DEV__ === false) では従来どおり RootNavigator を出す。
+const USE_DEV_SANDBOX = __DEV__;
 
 // 統合フェーズ entry point。
 // CertGate (Unit A の TEE 証明書プロビジョニング) を起動時に解決してから
@@ -48,8 +54,6 @@ export default function App() {
   // 撮影画面だけ task に応じて override し、 unmount で portrait に戻す。
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
-    // 音声エージェントの言語設定を AsyncStorage から復元 (= module 内 cache を埋める)
-    void initVoiceLanguage();
   }, []);
 
   const [fontsLoaded] = useFonts({
@@ -75,10 +79,17 @@ export default function App() {
     <SafeAreaProvider>
       <AuthGate>
         <CertGate>
-          <NavigationContainer theme={navTheme}>
-            <RootNavigator />
-            <StatusBar style="dark" />
-          </NavigationContainer>
+          {USE_DEV_SANDBOX ? (
+            <>
+              <DevSandboxScreen />
+              <StatusBar style="light" />
+            </>
+          ) : (
+            <NavigationContainer theme={navTheme}>
+              <RootNavigator />
+              <StatusBar style="dark" />
+            </NavigationContainer>
+          )}
         </CertGate>
       </AuthGate>
     </SafeAreaProvider>

@@ -10,9 +10,23 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import type { Clip } from '../services/clipPipeline';
+import type { AutoCategory, Clip } from '../services/clipPipeline';
 import { describeProcessingStep, processingStepIndex, PROCESSING_TOTAL_STEPS } from '../services/clipPipeline';
 import { findTask, type TaskDef } from '../domain/taskCatalog';
+
+/// 2026-05-27 新仕様: autoCategory の短い日本語表示 (= カード用、 sheet 用と分けて短く)
+function describeAutoCategoryShort(c: AutoCategory): string {
+  switch (c) {
+    case 'cleaning':   return '掃除';
+    case 'laundry':    return '洗濯';
+    case 'cooking':    return '料理';
+    case 'studying':   return '勉強';
+    case 'crafting':   return '工作';
+    case 'organizing': return '整理整頓';
+    case 'meal_prep':  return '食事の支度';
+    case 'other':      return 'その他';
+  }
+}
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 // クリップカード。
@@ -76,16 +90,15 @@ const TaskThumb: React.FC<{ task: TaskDef | undefined; muted?: boolean }> = ({ t
 };
 
 const TaskName: React.FC<{ task: TaskDef | undefined; clip: Clip; mono?: boolean }> = ({ task, clip, mono }) => {
-  if (mono || !task) {
-    return (
-      <Text style={[styles.cardName, !task && styles.cardNameMono]} numberOfLines={1}>
-        {task?.name ?? `Clip ${clip.id.slice(-6)}`}
-      </Text>
-    );
-  }
+  // 2026-05-27 方針転換: 新仕様では撮影前タスク選択を撤去、 Pipeline 2 の VLM が事後分類する。
+  // 表示優先順位: autoCategory (= 新クリップ) > legacy task name > "Clip XXX" (= 未分類 fallback)
+  const displayName = clip.autoCategory
+    ? describeAutoCategoryShort(clip.autoCategory)
+    : (task?.name ?? `Clip ${clip.id.slice(-6)}`);
+  const isMono = mono || (!task && !clip.autoCategory);
   return (
-    <Text style={styles.cardName} numberOfLines={1}>
-      {task.name}
+    <Text style={[styles.cardName, isMono && styles.cardNameMono]} numberOfLines={1}>
+      {displayName}
     </Text>
   );
 };

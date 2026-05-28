@@ -23,11 +23,13 @@ import {
 } from 'react-native';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { config } from '../config';
 import { COSIGN_AUTHORITY, SOLANA_RPC_URL } from '../env';
 import { useAuth } from '../services/auth';
-import { setVoiceLanguage, useVoiceLanguage, type VoiceLanguage } from '../services/voicePref';
+// 2026-05-27 方針転換: 音声入力 (= voicePref / voiceAgent / sherpa-onnx) は撤去対象。
+// UI からは外す、 module の rm は段階削除 task #6 で。
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 export const SettingsScreen: React.FC = () => {
@@ -37,7 +39,6 @@ export const SettingsScreen: React.FC = () => {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [showHandOverlay, setShowHandOverlay] = useState(true);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
-  const voiceLang = useVoiceLanguage();
 
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.1.0';
 
@@ -151,16 +152,6 @@ export const SettingsScreen: React.FC = () => {
 
         {/* ── 撮影 ── */}
         <Section title="撮影">
-          <SegmentRow
-            label="Hey Lens 言語"
-            sublabel="AI の応答 + TTS 読み上げに使う言語"
-            value={voiceLang}
-            options={[
-              { value: 'ja', label: '日本語' },
-              { value: 'en', label: 'English' },
-            ]}
-            onChange={(v) => { void setVoiceLanguage(v as VoiceLanguage); }}
-          />
           <SwitchRow
             label="ハンドトラッキング表示"
             sublabel="プレビュー上に手のスケルトンを描画"
@@ -168,6 +159,14 @@ export const SettingsScreen: React.FC = () => {
             onValueChange={setShowHandOverlay}
             disabled={true}
             disabledNote="次の更新で有効化"
+          />
+          <ActionRow
+            label="キャリブレーション再校正"
+            onPress={async () => {
+              try {
+                await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
+              } catch {}
+            }}
           />
           <Row label="BGM トラック" value="ambient-01 (default)" tone="mute" />
         </Section>

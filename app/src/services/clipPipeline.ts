@@ -21,54 +21,53 @@ export type ClipState =
   | 'staked'
   | 'error';
 
-/// サーバ shared/api-types.ts の ProcessingStep と完全一致させる (v0.1.3 = 4-layer scoring)。
+/// サーバ shared/api-types.ts の ProcessingStep と完全一致させる (= v0.1.3 = 3-layer scoring)。
+/// 2026-05-27 方針転換: gtsam-eval は撤去。
 export type ProcessingStep =
   | 'metadata-scan'    // Layer 1: メタデータ解析
   | 'frame-sampling'   // Layer 2: フレームサンプリング画像解析
-  | 'vlm-score'        // Layer 3: VLM Claude Haiku 4.5 セマンティック採点
-  | 'gtsam-eval';      // Layer 4: GTSAM Video-IMU 整合性検証
+  | 'vlm-score';       // Layer 3: VLM Claude Haiku 4.5 セマンティック採点 + 自動分類
 
-// v0.1.3 4-layer scoring。 サーバ shared/api-types.ts と同じ shape。
+/// VLM が事後分類した活動カテゴリ。 DATA_SPECS §3.2.3 の 8 値。
+export type AutoCategory =
+  | 'cleaning' | 'laundry' | 'cooking' | 'studying'
+  | 'crafting' | 'organizing' | 'meal_prep' | 'other';
+
+// v0.1.3 3-layer scoring。 サーバ shared/api-types.ts と同じ shape。
+// 2026-05-27: ARKit 廃止に伴い Layer1 から trackingQuality 撤去。
+//             GTSAM 撤去に伴い Layer3 配点 55 → 65 + 4 層 → 3 層。
 
 export interface Layer1Score {
   score: number;                       // 0..20
-  handLandmarkPresenceBoth: number;    // 0..1
-  rgbSensorSyncRatio: number;          // 0..1
-  frameContinuity: number;             // 0..1
-  trackingQuality: number;             // 0..1
-  handMovement: number;                // 0..1
-  imuGravityCompliance: number;        // 0..1
+  handLandmarkPresenceBoth: number;    // 0..1、 配点 9 (= 2026-05-28 IMU 撤去で +1)
+  rgbSensorSyncRatio: number;          // 0..1、 配点 4
+  frameContinuity: number;             // 0..1、 配点 4
+  handMovement: number;                // 0..1、 配点 3
+  // 2026-05-28 撤去: imuGravityCompliance (= IMU 撤去)
 }
 
 export interface Layer2Score {
   score: number;                       // 0..15
-  brightnessInRangeRatio: number;      // 0..1
-  sharpnessPassRatio: number;          // 0..1
-  opticalFlowPassRatio: number;        // 0..1
-  frameDiversity: number;              // 0..1
+  brightnessInRangeRatio: number;      // 0..1、 配点 4
+  sharpnessPassRatio: number;          // 0..1、 配点 4
+  opticalFlowPassRatio: number;        // 0..1、 配点 4
+  frameDiversity: number;              // 0..1、 配点 3
 }
 
 export interface Layer3Score {
-  score: number;                       // 0..55
-  taskActivityAvg: number;             // 0..5
-  objectInteractionAvg: number;        // 0..5
-  sceneMatchAvg: number;               // 0..5
-  authenticityAvg: number;             // 0..5
+  score: number;                       // 0..65
+  taskActivityAvg: number;             // 0..5、 配点 22
+  objectInteractionAvg: number;        // 0..5、 配点 18
+  sceneMatchAvg: number;               // 0..5、 配点 10
+  authenticityAvg: number;             // 0..5、 配点 15
   idleRatio: number;                   // 0..1 (= score には算入しない補助指標)
 }
 
-export interface GtsamScore {
-  score: number;                       // 0..10
-  residualNorm: number;
-  consistencyRatio: number;            // 0..1
-}
-
 export interface QualityBreakdown {
-  total: number;                       // 0..100 (= 4 層合計)
+  total: number;                       // 0..100 (= 3 層合計)
   layer1: Layer1Score | null;
   layer2: Layer2Score | null;
   layer3: Layer3Score | null;
-  gtsam: GtsamScore | null;
 }
 
 export interface ClipReward {
@@ -80,11 +79,12 @@ export interface ClipReward {
 export interface Clip {
   /// 内部ローカル ID。 Root NFT 発行後は rootAssetId が埋まる。
   id: string;
-  /// タスクの ID (= taskCatalog 参照)
-  taskId: string;
+  /// 旧 taskCatalog 参照 ID (= legacy)。 2026-05-27 方針転換でタスク事前選択は撤去、
+  /// 新規撮影では undefined。 既存 persistence からの hydrate 互換のため optional で残置。
+  taskId?: string;
   /// 現在の状態
   state: ClipState;
-  /// 端末で「送る」 を押した時刻 (ms epoch)
+  /// 端末で撮影完了した時刻 (ms epoch)
   createdAt: number;
 
   /// アップロード進捗 (0..1)。 state === 'uploading' のみで意味を持つ。
@@ -92,8 +92,12 @@ export interface Clip {
   /// 処理中のステップ。 state === 'processing' のみで意味を持つ。
   processingStep?: ProcessingStep;
 
-  /// VLM 終了時の達成確度 (0..100)。 端末側で取得して送信した値。
+  /// 旧 VLM gate 達成確度 (0..100、 legacy)。 2026-05-27 VLM gate 撤去で新規撮影では undefined。
   achievementConfidence?: number;
+  /// VLM が事後分類した主カテゴリ (= ready 以降で値が入る)
+  autoCategory?: AutoCategory;
+  /// autoCategory の信頼度 (0..1、 multi-frame 多数決比率)
+  autoCategoryConfidence?: number;
   /// サーバ側 品質スコア (0..100)。 state >= 'ready' で意味を持つ。
   qualityScore?: number;
   /// 品質スコアの内訳。
@@ -121,13 +125,15 @@ export interface Clip {
 }
 
 interface EnqueueInput {
-  taskId: string;
-  /// 端末 startArkitRecording が返したセッションディレクトリの file:// URI。
-  /// 配下に rgb.mp4 + sensors.jsonl + imu_high_rate.jsonl + camera_intrinsics.json が並ぶ。
+  /// 端末側 capture が返したセッションディレクトリの file:// URI。
+  /// 配下に rgb.mp4 + realtime_handpose.jsonl が並ぶ (= 2026-05-28 4 → 2 ファイル集約)。
+  /// 2026-05-27: sensors.jsonl → realtime_handpose.jsonl に rename (= DATA_SPECS §2.2 統一)。
   sessionDirUri: string;
-  achievementConfidence: number;
   /// 端末で撮ったプレビュー用 snapshot URI (= サーバ完了時に server 側 ぼかし済 MP4 url で置き換わる)
   snapshotUri?: string;
+  /// 旧 capture flow からの呼び出し互換 (= legacy、 新撮影では渡さない)
+  taskId?: string;
+  achievementConfidence?: number;
 }
 
 /// rootlens-server の base URL。 src/env.ts から取得 (default は本番)。
@@ -197,11 +203,11 @@ class ClipStore {
     const id = makeClipId();
     const clip: Clip = {
       id,
-      taskId: input.taskId,
+      taskId: input.taskId,             // legacy 互換、 新撮影では undefined
       state: 'uploading',
       createdAt: Date.now(),
       uploadProgress: 0,
-      achievementConfidence: input.achievementConfidence,
+      achievementConfidence: input.achievementConfidence,  // legacy 互換
       previewUris: input.snapshotUri ? [input.snapshotUri] : undefined,
     };
     this.clips.set(id, clip);
@@ -256,15 +262,13 @@ class ClipStore {
       ? input.sessionDirUri
       : `${input.sessionDirUri}/`;
 
-    // Step 1-8 (= C2PA D1+D2 + blur + content_id + R2 upload + TP + cNFT + POST /api/clips)
+    // Step 1-8 (= C2PA D1+D2 + blur + signature_hash + R2 upload + TP + cNFT + POST /api/clips)
     const p1 = await runPipeline1(
       {
-        taskId: input.taskId,
+        taskId: input.taskId,                    // legacy 互換
         rawMp4Uri: `${sessionDir}rgb.mp4`,
-        sensorsUri: `${sessionDir}sensors.jsonl`,
-        imuUri: `${sessionDir}imu_high_rate.jsonl`,
-        intrinsicsUri: `${sessionDir}camera_intrinsics.json`,
-        achievementConfidence: input.achievementConfidence,
+        sensorsUri: `${sessionDir}realtime_handpose.jsonl`,
+        achievementConfidence: input.achievementConfidence,  // legacy 互換
         merkleTree: MERKLE_TREE,
         collection: MERKLE_COLLECTION,
       },
@@ -287,7 +291,7 @@ class ClipStore {
         'Content-Type': 'application/json',
         'X-Wallet-Pubkey': walletPubkey,
       },
-      body: JSON.stringify({ contentId: p1.contentId }),
+      body: JSON.stringify({ signatureHash: p1.signatureHash }),
     });
     if (!finRes.ok) {
       throw new Error(
@@ -398,15 +402,19 @@ class ClipStore {
   }
 
   /// サーバ DTO を ローカル Clip 型に正規化して update。
+  /// 2026-05-27: server 仕様から taskId / achievementConfidence は撤去、 autoCategory を新規受信。
+  /// 既存 persistence (= cur) から taskId / achievementConfidence は legacy として継承。
   private applyServerClip(serverClip: any): void {
     const id = serverClip.id;
     const cur = this.clips.get(id);
     const merged: Clip = {
       id,
-      taskId: serverClip.taskId,
+      taskId: cur?.taskId,                       // legacy persistence 継承
       state: serverClip.state,
       createdAt: cur?.createdAt ?? new Date(serverClip.createdAt).getTime(),
-      achievementConfidence: serverClip.achievementConfidence ?? undefined,
+      achievementConfidence: cur?.achievementConfidence,  // legacy persistence 継承
+      autoCategory: serverClip.autoCategory ?? undefined,
+      autoCategoryConfidence: serverClip.autoCategoryConfidence ?? undefined,
       processingStep: serverClip.processingStep ?? undefined,
       qualityScore: serverClip.qualityScore ?? undefined,
       qualityBreakdown: serverClip.qualityBreakdown ?? undefined,
@@ -477,7 +485,7 @@ function pipelineStepProgress(step: Pipeline1Step): number {
     case 'sign-d1': return 0.1;
     case 'blur': return 0.25;
     case 'sign-d2': return 0.4;
-    case 'content-id': return 0.45;
+    case 'signature-hash': return 0.45;
     case 'r2-upload': return 0.65;
     case 'tp-process': return 0.8;
     case 'cnft-mint': return 0.92;
@@ -530,8 +538,7 @@ export function describeProcessingStep(step: ProcessingStep | undefined): string
   switch (step) {
     case 'metadata-scan':   return 'メタデータ解析中';
     case 'frame-sampling':  return 'フレームサンプル解析中';
-    case 'vlm-score':       return 'VLM セマンティック採点中';
-    case 'gtsam-eval':      return 'Video-IMU 整合性検証中';
+    case 'vlm-score':       return 'VLM セマンティック採点 + 自動分類中';
     default:                return '';
   }
 }
@@ -541,9 +548,8 @@ export function processingStepIndex(step: ProcessingStep | undefined): number {
     case 'metadata-scan':   return 1;
     case 'frame-sampling':  return 2;
     case 'vlm-score':       return 3;
-    case 'gtsam-eval':      return 4;
     default:                return 0;
   }
 }
 
-export const PROCESSING_TOTAL_STEPS = 4;
+export const PROCESSING_TOTAL_STEPS = 3;
