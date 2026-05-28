@@ -42,7 +42,11 @@ fn build_d1_manifest(title: &str) -> serde_json::Value {
 }
 
 /// D2 manifest JSON を構築する。 D1 を ingredient parentOf 参照し、
-/// `c2pa.placed` action で Apple Vision 顔ぼかしを記録する。
+/// `c2pa.edited` action で Apple Vision 顔ぼかしを記録する。
+/// 先頭の `c2pa.opened` action は Builder の intent=Edit が自動挿入する
+/// (= parentOf ingredient を ingredients param に持つ `c2pa.opened`)。 C2PA 2.x の
+/// 「最初の action は created/opened」「opened/placed/removed は ingredients param 必須」を
+/// 満たすため、 ここでは ingredient 不要な `c2pa.edited` のみ宣言する。
 fn build_d2_manifest(title: &str, faces_blurred: u32) -> serde_json::Value {
     serde_json::json!({
         "title": title,
@@ -55,7 +59,7 @@ fn build_d2_manifest(title: &str, faces_blurred: u32) -> serde_json::Value {
             "label": "c2pa.actions.v2",
             "data": {
                 "actions": [{
-                    "action": "c2pa.placed",
+                    "action": "c2pa.edited",
                     "softwareAgent": "Apple Vision VNDetectFaceRectanglesRequest rev 3",
                     "parameters": {
                         "operation": "face_blur",
@@ -72,6 +76,45 @@ fn build_d2_manifest(title: &str, faces_blurred: u32) -> serde_json::Value {
 fn make_signer() -> Result<Box<dyn c2pa::Signer + Send + Sync>> {
     c2pa::create_signer::from_keys(CERTS_PEM, KEY_PEM, c2pa::SigningAlg::Ed25519, None)
         .map_err(|e| anyhow!("Failed to create ed25519 signer: {e}"))
+}
+
+/// デバッグ: created-only manifest で署名 → 同じ c2pa-rs (trust-off) で検証し結果文字列を返す。
+/// BMFF(mp4) と image(jpeg) の round-trip 差を切り分けるための最小再現。
+pub fn selftest_sign_verify<P: AsRef<Path>>(input: P, format: &str) -> Result<String> {
+    let manifest = serde_json::json!({
+        "title": "selftest",
+        "format": format,
+        "assertions": [{"label":"c2pa.actions.v2","data":{"actions":[{"action":"c2pa.created"}]}}]
+    })
+    .to_string();
+    let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
+        .with_definition(&manifest)
+        .map_err(|e| anyhow!("selftest with_definition: {e}"))?;
+    let signer = make_signer()?;
+    let out = std::env::temp_dir().join("c2pa_selftest_out.bin");
+    let mut src = File::open(input.as_ref())?;
+    let mut dest = OpenOptions::new()
+        .read(true).write(true).create(true).truncate(true)
+        .open(&out)?;
+    builder
+        .sign(signer.as_ref(), format, &mut src, &mut dest)
+        .map_err(|e| anyhow!("selftest sign: {e}"))?;
+    drop(dest);
+    let settings = c2pa::Settings::new()
+        .with_json(r#"{"verify":{"verify_trust":false}}"#)
+        .map_err(|e| anyhow!("selftest settings: {e}"))?;
+    let ctx = c2pa::Context::new()
+        .with_settings(settings)
+        .map_err(|e| anyhow!("selftest ctx: {e}"))?;
+    let vf = File::open(&out)?;
+    let reader = c2pa::Reader::from_context(ctx)
+        .with_stream(format, vf)
+        .map_err(|e| anyhow!("selftest reader: {e}"))?;
+    let codes: Vec<String> = reader
+        .validation_status()
+        .map(|ss| ss.iter().map(|s| s.code().to_string()).collect())
+        .unwrap_or_default();
+    Ok(format!("state={:?} codes={:?}", reader.validation_state(), codes))
 }
 
 /// D1 署名: 生 MP4 → D1 manifest 付き MP4。
@@ -128,6 +171,9 @@ pub fn sign_d2_with_parent<P: AsRef<Path>>(
     let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
         .with_definition(&manifest_json)
         .map_err(|e| anyhow!("Builder::with_definition (D2) failed: {e}"))?;
+    // intent=Edit + parentOf ingredient で、 Builder が先頭に `c2pa.opened`
+    // (ingredients param 付き) を自動挿入する (= C2PA 2.x の first-action / ingredient ルール充足)。
+    builder.set_intent(c2pa::BuilderIntent::Edit);
 
     // D1 を parentOf ingredient として登録。 ingredient JSON は `relationship: "parentOf"` を含める。
     // c2pa-rs は与えられた stream のハッシュと manifest 情報を取り、 D2 manifest に来歴記録として埋める。

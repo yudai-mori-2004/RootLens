@@ -49,6 +49,10 @@ fn build_d1_manifest(title: &str) -> serde_json::Value {
     })
 }
 
+// D2 manifest。 先頭の `c2pa.opened` (parentOf ingredient を ingredients param に持つ) は
+// Builder の intent=Edit が自動挿入する。 C2PA 2.x の「最初の action は created/opened」
+// 「opened/placed/removed は ingredients param 必須」を満たすため、 ここでは ingredient 不要な
+// `c2pa.edited` のみ宣言する (= 顔ぼかしは編集アクション)。
 fn build_d2_manifest(title: &str, faces_blurred: u32) -> serde_json::Value {
     serde_json::json!({
         "title": title,
@@ -61,7 +65,7 @@ fn build_d2_manifest(title: &str, faces_blurred: u32) -> serde_json::Value {
             "label": "c2pa.actions.v2",
             "data": {
                 "actions": [{
-                    "action": "c2pa.placed",
+                    "action": "c2pa.edited",
                     "softwareAgent": "Apple Vision VNDetectFaceRectanglesRequest rev 3",
                     "parameters": {
                         "operation": "face_blur",
@@ -122,6 +126,9 @@ fn sign_d2_impl(
     let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
         .with_definition(&manifest_json)
         .map_err(|e| format!("Builder::with_definition (D2) failed: {e}"))?;
+    // intent=Edit + parentOf ingredient で、 Builder が先頭に `c2pa.opened`
+    // (ingredients param 付き) を自動挿入する (= C2PA 2.x の first-action / ingredient ルール充足)。
+    builder.set_intent(c2pa::BuilderIntent::Edit);
 
     let ingredient_json = serde_json::json!({
         "title": parent_d1_mp4.file_name().and_then(|s| s.to_str()).unwrap_or("d1.mp4"),

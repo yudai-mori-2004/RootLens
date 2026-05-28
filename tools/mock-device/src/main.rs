@@ -100,6 +100,15 @@ struct Args {
     /// 進捗ログを抑制
     #[arg(long)]
     quiet: bool,
+
+    /// --input の C2PA を c2pa-rs (= 署名と同じ版) で検証して validation_state +
+    /// validation_status を出力するだけのモード (= 署名フローは実行しない、 デバッグ用)。
+    #[arg(long)]
+    verify_only: bool,
+
+    /// created-only manifest で署名→検証する最小 round-trip self-test (= デバッグ用)。
+    #[arg(long)]
+    selftest: bool,
 }
 
 #[derive(ValueEnum, Clone, Debug, PartialEq)]
@@ -170,6 +179,41 @@ async fn main() -> Result<()> {
 
     if !args.input.exists() {
         return Err(anyhow!("input not found: {}", args.input.display()));
+    }
+
+    // デバッグ: created-only の最小 round-trip self-test (= BMFF/image 切り分け)。
+    if args.selftest {
+        let format = match args.input.extension().and_then(|s| s.to_str()) {
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            _ => "video/mp4",
+        };
+        let r = c2pa_sign::selftest_sign_verify(&args.input, format)?;
+        eprintln!("[selftest {format}] {r}");
+        return Ok(());
+    }
+
+    // デバッグ: 署名と同じ c2pa-rs で --input を検証するだけ。
+    if args.verify_only {
+        let format = match args.input.extension().and_then(|s| s.to_str()) {
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            _ => "video/mp4",
+        };
+        let f = std::fs::File::open(&args.input)
+            .with_context(|| format!("open {}", args.input.display()))?;
+        // trust-off で検証 (= TP gateway が trust-off で動いている前提を再現)。
+        // これで untrusted を無視したとき claimSignature.mismatch が残るか = 真の署名バグか trust cascade かの切り分け。
+        let settings = c2pa::Settings::new()
+            .with_json(r#"{"verify":{"verify_trust":false}}"#)
+            .map_err(|e| anyhow!("settings: {e}"))?;
+        let ctx = c2pa::Context::new()
+            .with_settings(settings)
+            .map_err(|e| anyhow!("context: {e}"))?;
+        let reader = c2pa::Reader::from_context(ctx)
+            .with_stream(format, f)
+            .map_err(|e| anyhow!("Reader::with_stream: {e}"))?;
+        eprintln!("[verify] (verify_trust=false) validation_state = {:?}", reader.validation_state());
+        eprintln!("[verify] validation_status = {:#?}", reader.validation_status());
+        return Ok(());
     }
 
     let t0 = Instant::now();
