@@ -79,7 +79,21 @@ app/ で UI ロジックとデータフローが密結合し、データフロ�
   4. `beginBackgroundTask` で短時間離脱中の blur 即 kill を回避。
   5. 各 step 冪等 (signature_hash 重複排除 + POST /api/clips 冪等は既存)。
 - B (blur 堅牢化) はこの C に吸収される。対象は本番撮影画面で、DevSandbox は対象外。
-- 順序: 長尺実測 → Background URLSession + 永続キュー → blur/sign を BG task に載せる。
+
+#### 実機実測 (2026-05-28, iPhone 12 = iPhone13,2)
+- **blur は約 0.5x リアルタイム**: 1 時間動画で blur に **~30 分**。発熱は軽度 (撮影と重なるため切り分け未)。
+- **TP /process は完全サーバー側** (R2 起点で TEE が fetch): 2GB 動画でも **2〜3 分**。端末は HTTP を呼んで待つだけ、計算負荷ゼロ。
+
+#### 設計の確定点
+- 「端末が重い」のは **blur + sign + upload まで**。TP /process 以降 (TP・cNFT mint・POST /api/clips) はサーバー/ネットワークで、端末は待つだけ。→ background で守るべき device 計算は実質 **blur + sign**。
+- 30 分級の blur は **pure background では回せない** (BGProcessingTask は OS が時間を決める)。長尺を「放置で必ず完走」させるには **blur を resumable (フレーム checkpoint → 再開)** にし、foreground + BG window をまたいで進捗を積む。← C で最も重い実装。
+- ただし UI_SPECS §2.2 のヘッドマウント運用は **複数の短いクリップ連続撮影**が前提 (60 分は安全上限)。典型 5-10 分なら blur 2.5-5 分で foreground + beginBackgroundTask 猶予で捌ける。resumable キューは長尺/短尺どちらも吸収。
+
+#### 実装順序 (確定)
+1. **Background URLSession で R2 upload** + `UIBackgroundModes` (= 一番確実に background 継続する部分)。
+2. **永続 resumable キュー** (step state 保存、 アプリ再起動/BG window 跨ぎで再開)。
+3. **blur を resumable 化** (フレーム checkpoint) + beginBackgroundTask 猶予 + BGProcessingTask でドレイン。
+4. TP/mint/register は upload 完了後にキューが順次叩く (端末は待つだけなので軽い)。
 
 ### B. 長尺 blur の堅牢化 (まず実測 → 必要分だけ。 C に吸収)
 - 現状の `PrivacyBlurProcessor` は **AVAssetReader/Writer のストリーミング + フレームごと autoreleasepool** なので、長尺でも OOM しない設計。メモリ起因クラッシュは手当て済み。
