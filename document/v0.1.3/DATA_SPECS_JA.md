@@ -113,9 +113,13 @@ R2 アップロード完了後、デバイスが TP Gateway `POST /process` を�
 
 続いて `POST /extension/solana` で cNFT 発行用 partial transaction を取得、デバイスが署名・broadcast し、`root_asset_id` が確定する。
 
+**mint の冪等性**: cNFT 発行はオンチェーンで非冪等（= 再実行のたびに新資産を発行し SOL を浪費、孤児資産を生む）。デバイスは mint の前に、同一 `(wallet, signature_hash, network)` の clip が既に存在し、かつその `root_asset_id` が DAS `getAsset` で実在する（burn 済でない）ことを確認できた場合、TP `/process` + mint を丸ごとスキップして既存の `root_asset_id` / signed-json を再利用する。lookup は `GET /api/clips?signatureHash=&network=`（wallet スコープ）。lookup / DAS が失敗した場合は安全側（= 通常 mint）に倒す。判定が 2 段（DB lookup → DAS 実在確認）なのは、DB の `root_asset_id` が burn 等で無効化されていても気づけるようにするため。
+
 ### 2.7 サーバーへの登録
 
-`root_asset_id` 確定後、`POST /api/clips` でサーバーにクリップを登録する。`signature_hash`、`root_asset_id`、`recording_config` を含める。`root_asset_id` 未確定のまま登録することは認めない。
+`root_asset_id` 確定後、`POST /api/clips` でサーバーにクリップを登録する。`signature_hash`、`root_asset_id`、`signed_json_uri`、`network` を含める。`root_asset_id` 未確定のまま登録することは認めない。
+
+**重複排除**: 重複排除キーは `(wallet, signature_hash, network)`。同一キーの再登録は既存行を idempotent に返す（新規行を作らない）。`network`（`devnet` / `mainnet`）をキーに含めるのは、devnet で発行済みの動画を後で mainnet で発行し直す経路を塞がないため。
 
 登録と `POST /api/clips/:id/finalize` を経て Pipeline 2 を起動する。
 
@@ -171,6 +175,14 @@ n_vlm 秒おきにフレームを VLM（Claude Haiku 4.5）に送信（初期値
 
 **ラベリング**: 主ラベルはフレームごとの**具体的な行動記述文（dense narration）**。「どの手で・何を・どう操作しているか」を verb + noun を含む自然文で書く（Ego4D 流）。固定カテゴリ（`cleaning` / `laundry` / `cooking` / `studying` / `crafting` / `organizing` / `meal_prep` / `other`）は marketplace フィルタ用の**粗い派生ビュー**として併記するだけで主役ではない。taxonomy は固定せず、ジャンルは記述文の embedding から事後に導出・再分類できる設計とする（= 記述文を再生成せずカテゴリだけ付け替え可能）。クリップ全体の多数決で主カテゴリ + 信頼度を出す。
 
+**ラベリング手法はプラガブル**: ラベリングは採点（品質ゲート）から分離し、`Labeler` インターフェース（`tools/modal/labeling/`）の差し替えで手法を変更できる。抽象の境界は Modal 関数（= 実行/デプロイの器）ではなく **Python インターフェース + 出力スキーマ（semantic.jsonl）** に置く。粒度は**ベンダー単位**（`gemini-video-dense` / `claude-diffsw` / `claude-single-pass` …）= 各 Labeler が自前の SDK・認証 key・リクエスト構造を持つ。同一ランタイム（= CPU 上で動画/フレームを外部 LLM API に投げる）の手法は 1 つの Modal 関数内で registry 切替（`labeler` パラメータ）、GPU + ローカルモデル等ランタイムが異なる手法のみ別 Modal 関数にしつつ同じ出力スキーマを満たす、という二段構成とする。採点ロジックは固定（手法を差し替えても比較可能性を保つ）。
+
+既定手法は **`gemini-video-dense`（Gemini 動画ネイティブ取り込み）**。フレームを個別画像として独立に投げる手法（`claude-single-pass`）は VLM が「視界に写っている物」を「撮影者がしている操作」に捏造する（object/action hallucination、例: 画面が映る → "マウスを操作している" と捏造）。動画ネイティブ取り込みはフレーム間の時間運動を実際に見るため捏造が出にくく、課金もフレーム枚数ではなく秒数ベースで割安。手法は (1) 全体パスで要約・物体インベントリ・スコアを取り、(2) `videoMetadata` の start/end offset で動画を秒窓に分割し fps=2 / media LOW で各窓を密記述、(3) 相対秒→絶対秒に変換し尺に clamp、で構成する。窓は相互独立なので並列実行し Modal の同期 HTTP 上限内に収める。フレーム系の代替として **DiffSW（差分スライディングウィンドウ、ShareGPT4Video / NeurIPS 2024、= 直前フレーム + 現フレームを与え差分記述）= `claude-diffsw`** も同じインターフェース下に持つ。
+
+全手法 + 採点で共有する**接地原則（GROUNDING_RULES）**として Ego4D の `#C`（撮影者本人の行動のみ記述）を採用する: 視界に在ること ≠ 操作していること、手に握っていない道具名を出さない、見回し/歩行/画面を撮しているだけ/無活動はそのまま無活動として書き task_activity・object_interaction を低くする。
+
+自動ラベルは人手アノテーション（Ego4D / EPIC-KITCHENS / HomER はいずれも人手）ではないため、`semantic.jsonl` に `annotation: "auto_generated_unverified"` + labeler 名を記録して「自動生成・未検証」であることを明示する。将来、少数の人手正解セットとの一致率で「自動で安定して作れるラベル種別 / 人手確認が要る種別」を切り分ける検証ループを設ける。
+
 #### 3.2.4 総合スコア
 
 | 層 | 配点 |
@@ -197,7 +209,7 @@ processed/<signature_hash>/
   semantic.jsonl             # フレーム単位のラベル（VLM 未推定フレームは直近の推定値で補間）
 ```
 
-`semantic.jsonl` は全フレーム分の行を持つ。VLM が n_vlm 秒おきに推定したフレーム間は、直近の推定値で埋める。各行にモデル名・バージョンを記録する。
+`semantic.jsonl` は 1 行目がヘッダー（`model` / `labeler` / `annotation: "auto_generated_unverified"` / `fps` / `total_frames` / `fields`）、2 行目以降が全フレーム分の行（`frame_index` / `ts_sec` / `category` / `description`）。VLM が n_vlm 秒おきに推定したフレーム間は、直近の推定値（= 実フレーム番号基準の区間）で埋める。
 
 DB にも品質スコア、主カテゴリ + 信頼度、ステータス `ready` を書き込む。撮影者に push 通知。
 
@@ -207,7 +219,7 @@ DB にも品質スコア、主カテゴリ + 信頼度、ステータス `ready`
 
 ### 3.5 冪等性
 
-メタデータ解析・フレームサンプリングは決定論的。VLM は非決定的のため再実行時に微小変動あり。
+メタデータ解析・フレームサンプリングは決定論的。VLM は非決定的のため再実行時に内容は微小変動する。出力は `processed/<signature_hash>/` の固定キーへの上書きであり、DB 行も in-place 更新のため、同一クリップを再処理してもオブジェクト数・行数は増えない（= ストレージは増えない、内容のみ変動）。
 
 ---
 
