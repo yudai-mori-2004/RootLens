@@ -125,101 +125,64 @@ R2 アップロード完了後、デバイスが TP Gateway `POST /process` を�
 
 ---
 
-## 3. Pipeline 2: 品質スコアリング + 自動ラベリング（サーバー, CPU）
+## 3. Pipeline 2: 前処理 + 多軸品質スコアリング（サーバー）
+
+Pipeline 2 のゴールは**品質の定量化（採点）**。ラベリング等はその前準備。構造は**対称な2ステージ**で、リクエストで「どの前処理・どの採点を走らせるか」を選ぶ（= Pipeline 2 全体が純関数的）:
+
+1. **前処理 (preprocess)**: 採点に必要な中間データを `processed/<signature_hash>/` に書き出す。
+2. **採点 (scoring)**: R2（raw + processed）を **stateless に読み**、独立した品質軸を**各 0-100** で採点する。
+
+採点が R2 を読む設計なので、採点対象データがストレージに在ることが保証され、前処理と採点が疎結合になる（= 採点だけ後で再実行できる）。両ステージとも registry + 名前選択 + stateless R2 で対称・拡張可（軸 / 前処理の追加は実装 1 ファイル + registry 1 行）。実装は `tools/modal/{preprocess,scoring}/`、オーケストレータは `tools/modal/pipeline2.py`（Modal app `rootlens-pipeline2`）。
 
 ### 3.1 トリガー
 
-`POST /api/clips/:id/finalize` で自動実行。`root_asset_id` が DB に確定済みであることを前提条件とする。
+`POST /api/clips/:id/finalize` で自動実行。`root_asset_id` 確定済みが前提。撮影構成を問わず同一フロー（構成固有データは存在すれば使い、なければスキップ）。
 
-Pipeline 2 は撮影構成を問わず同一のパイプラインで処理する。撮影構成固有のデータがある場合は、存在すれば使い、なければスキップする。
+### 3.2 前処理ステージ（preprocess）
 
-### 3.2 品質スコアリング
+採点に必要な中間データを生成する。`Preprocessor` インターフェースで実装を差し替え・追加できる。
 
-3 層構成。後段ほどコストが高い。
+**labeling（既定の前処理）**: クリップ → dense narration（撮影者の手作業の時系列記述）→ `semantic.jsonl`。ラベリング自体もプラガブル（`Labeler`、既定 `gemini-video-dense`、他 `claude-diffsw` / `claude-single-pass`）。各 Labeler は「ベンダー + 手法」を 1 単位とし、自前の SDK・認証・リクエスト構造を持つ。
 
-#### 3.2.1 第 1 層: メタデータ解析
+- `gemini-video-dense`: 動画をネイティブ取り込み。(1) 全体パスでクリップ要約、(2) 秒窓分割で各窓を密記述（手の動作を捉える fps/解像度、窓は独立なので並列）、(3) 窓内相対秒→絶対秒。**採点はしない**（採点は §3.3）。
+- ラベル本体は**説明文のみ**（固定カテゴリは付けない）。主カテゴリが要る場合は要約から事後派生する（粗い marketplace フィルタの目安。taxonomy は固定せず記述文から再分類できる）。
+- **接地ルール**（全実装がプロンプトで共有）: 撮影者本人の手が実際に把持・操作している事だけ記述。物が視界に在ること ≠ 操作していること。握っていない道具名は出さない。手作業のない区間は記述しない（空 = idle）。
+- ラベルは**自動生成・未検証**。`semantic.jsonl` に `annotation: "auto_generated_unverified"` と labeler 名を記録。精度は別途、人手正解との比較で測定・公開する。
 
-`realtime_handpose.jsonl` を読み込み、映像をデコードせずに算出する。コストはほぼゼロ。
+### 3.3 採点ステージ（scoring）— 多軸・合計なし
 
-| 指標 | 計算方法 |
-|------|---------|
-| フレームドロップ率 | フレーム番号列の欠番割合 |
-| 手ランドマーク存在率 | 手が検出されたフレームの割合（片手 / 両手を区別） |
-| 手の移動量 | 手首位置のフレーム間変位の平均・分散 |
+品質は**独立した軸ごとに 0-100** で出し、**合算しない**。異種の品質軸を混ぜず、重み付けは**買い手が用途に応じて行う**（= 売り手は重みを焼き込まない。データ品質は consumer のタスクに対する "fitness for use" であり、合成は consumer の領分）。`Scorer` インターフェースで軸を追加できる。各軸は `score`（0-100）+ `method`（breakdown からの導出式）+ `breakdown`（独立サブ信号 + 生カウント + 閾値）を返し、**スコアを再計算・再重み付け可能**にする。
 
-ARKit 構成の場合、`imu.jsonl` と `realtime_handpose.jsonl` 内のカメラポーズ・tracking_state から追加メトリクスを算出する（トラッキング品質、RGB/センサー同期率、IMU 重力偏差、深度有効率）。追加メトリクスは総合スコアには含めず、カタログのフィルタ軸として公開する。
+| 軸 | 種別 | 入力 | 概要 |
+|----|------|------|------|
+| `video_technical` | 内在・タスク非依存 | raw `rgb.mp4` | 動画の技術品質（輝度 / シャープネス / 動き / 多様性） |
+| `motion_content`  | 内在・タスク非依存 | raw `realtime_handpose.jsonl` | 撮影者の手の動きの豊富さ（手首変位） |
+| `label_quality`   | 内在・タスク非依存 | processed `semantic.jsonl` | ラベルの具体性（LLM）+ 被覆 / 密度（決定的） |
 
-#### 3.2.2 第 2 層: フレームサンプリング解析
+- 軸**内**は同種なので集約してよい（例: video_technical は 4 サブ信号の平均）が、軸**間**は合算しない。
+- 採点は **stateless**: 入力が R2 に無ければ fail-loud（例: `label_quality` は `semantic.jsonl` 不在で失敗）。これにより前処理の実行漏れが黙って 0 点にならない。
+- **タスク適合度**（買い手のタスク定義に対する適合スコア）は将来の別軸として後段で足す設計（= 内在品質は取り込み時に確定、タスク適合は購入 / クエリ時にラベル + タスク定義から算出。これも 0-100・合算なし）。
+- 認証は各実装が自前の env から読む（Gemini / Anthropic 等）。GPU 等ランタイムが異なる軸のみ別 Modal 関数にし、同じ I/O 契約を満たす。
 
-ぼかし済み MP4 から n_frame 秒おきに 1 フレームを抽出（初期値: 3）。CPU で数十秒、コスト $0.01 未満。
-
-| 指標 | 計算方法 |
-|------|---------|
-| 輝度 | 平均輝度のヒストグラム。暗すぎ / 白飛びを検出 |
-| シャープネス | ラプラシアン分散。ボケやブラーを検出 |
-| オプティカルフロー | Farneback 法によるフレーム間フロー量。静止区間を検出 |
-| フレーム間多様性 | ヒストグラム差分。ループ映像を検出 |
-
-#### 3.2.3 第 3 層: VLM dense ラベリング + 採点
-
-クリップを VLM に渡し、撮影者の手作業の時系列記述（dense narration）と 4 基準スコアを得る。
-
-**ラベリングはプラガブル**: ラベリングは採点（品質ゲート）から分離し、`Labeler` インターフェース（`tools/modal/labeling/`）で実装を差し替えられる。抽象の境界は Python インターフェース + 出力スキーマであり、Modal 関数は実行環境にすぎない。各 Labeler は「ベンダー + 手法」を 1 単位とし（既定 `gemini-video-dense`、他に `claude-diffsw` / `claude-single-pass`）、自前の SDK・認証・リクエスト構造を持つ。**出力ファイル形式も実装が宣言する**（§3.3）。採点ロジックは実装間で固定し、手法を差し替えても比較可能性を保つ。GPU + ローカルモデル等ランタイムが異なる手法のみ別 Modal 関数にし、同じ出力スキーマを満たす。
-
-既定の `gemini-video-dense` は動画をネイティブに取り込み、(1) 全体パスでクリップ要約 + 4 基準スコア、(2) 動画を秒窓に分割し各窓を密記述、(3) 窓内相対秒を絶対秒に変換、の手順で時系列イベントを得る。手の動作を捉えるため窓は適切な fps / 解像度で渡す。窓分割は長尺を 1 回で密に出せない（出力トークン上限）ための機械的分割で、各窓は相互独立なので並列実行する。
-
-**スコア基準（0〜5、クリップ全体）**:
-
-| 基準 | 説明 |
-|------|------|
-| `task_activity` | 目的的な手作業を遂行しているか |
-| `object_interaction` | 手が物体を操作しているか |
-| `authenticity` | 本物の人間の手による実際の動作か |
-| `scene_match` | 環境が家事 / 作業と合致するか |
-
-**ラベル本体は説明文（dense narration）のみ**で、固定カテゴリは付けない。クリップ単位の主カテゴリは要約から事後に派生する（`cleaning` / `laundry` / `cooking` / `studying` / `crafting` / `organizing` / `meal_prep` / `other`。marketplace フィルタ用の粗い目安であり、ラベル本体ではない。taxonomy は固定せず記述文から再分類できる）。
-
-**接地ルール**（プロンプトで全実装が共有）: 記述は撮影者本人の手が実際に把持・操作している事だけに基づく。物が視界に在ること ≠ 操作していること。手に握っていない道具名は出さない。手作業のない区間は記述しない（空 = idle）。
-
-ラベルは**自動生成・未検証**であり、`semantic.jsonl` に `annotation: "auto_generated_unverified"` と labeler 名を記録する。ラベル精度は外部標準では担保されないため、別途、人手正解との比較で測定して公開する。
-
-#### 3.2.4 総合スコア
-
-| 層 | 配点 |
-|----|------|
-| 第 1 層: メタデータ | 15 |
-| 第 2 層: フレームサンプリング | 15 |
-| 第 3 層: VLM セマンティック | 70 |
-
-**第 1 層（15 点）**: 手ランドマーク存在率 8、フレームドロップ率 4、手の移動量 3。
-
-**第 2 層（15 点）**: 輝度 4、シャープネス 4、オプティカルフロー 4、フレーム間多様性 3。
-
-**第 3 層（70 点）**: task_activity 25、object_interaction 20、authenticity 15、scene_match 10。算出式: `(全フレーム平均 / 5) × 配点`。
-
-`task_activity == 0` のフレーム割合を `idle_ratio` として別途記録。棄却閾値は設けない。
-
-### 3.3 processed への書き出し
-
-Pipeline 2 の出力は `processed/<signature_hash>/` に書き出す。
+### 3.4 processed への書き出し
 
 ```
 processed/<signature_hash>/
-  quality_scores.json        # 総合スコア + 全サブ指標
-  semantic.jsonl             # dense video captioning 形式の時系列ラベル
+  quality_scores.json   # 品質ベクトル（軸名 → {axis, score, method, breakdown}）。合計は持たない
+  semantic.jsonl        # ActivityNet Captions 形式の時系列ラベル（= labeling 前処理の出力）
 ```
 
-`semantic.jsonl` は **ActivityNet Captions のイベントスキーマ**で出力する（既定 labeler が宣言する形式）。1 行目はヘッダー（`format` / `labeler` / `signature_hash` / `duration` / `annotation: "auto_generated_unverified"` / `fields`）、2 行目以降が時系列イベント `{timestamp: [start, end], sentence}`。イベントは時間順・非重複で、手作業のない時間はイベントを作らない（= idle）。
+`semantic.jsonl` は 1 行目ヘッダー（`format` / `labeler` / `signature_hash` / `duration` / `summary` / `annotation: "auto_generated_unverified"` / `fields`）+ 2 行目以降が時系列イベント `{timestamp: [start, end], sentence}`（時間順・非重複、idle 区間はイベントなし）。
 
-DB にも品質スコア、主カテゴリ + 信頼度、ステータス `ready` を書き込む。撮影者に push 通知。
+DB には品質ベクトルを `quality_breakdown` 列（列名は互換のため据え置き）+ ステータス `ready` を書く。**合成スコア（`quality_score`）は持たない**。
 
-### 3.4 コスト
+### 3.5 コスト
 
-大半は第 3 層 VLM。既定 `gemini-video-dense` は動画秒数ベース課金で、1 時間あたり $2 以内に収める。
+大半は labeling の VLM。既定 `gemini-video-dense` は動画秒数ベース課金で 1 時間あたり $2 以内に収める。採点軸は `label_quality` のみ LLM（テキスト、安い）、他は CPU のみ。
 
-### 3.5 冪等性
+### 3.6 冪等性
 
-メタデータ解析・フレームサンプリングは決定論的。VLM は非決定的のため再実行時に内容は微小変動する。出力は `processed/<signature_hash>/` の固定キーへの上書きであり、DB 行も in-place 更新のため、同一クリップを再処理してもオブジェクト数・行数は増えない（= ストレージは増えない、内容のみ変動）。
+採点（`video_technical` / `motion_content`）は決定論的。LLM 由来（labeling / `label_quality`）は再実行で内容が微小変動する。出力は `processed/<signature_hash>/` の固定キー上書き + DB 行 in-place 更新のため、同一クリップを再処理してもオブジェクト数・行数は増えない（= ストレージは増えない）。
 
 ---
 

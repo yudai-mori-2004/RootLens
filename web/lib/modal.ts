@@ -1,9 +1,7 @@
 // Modal クラウド関数を Node.js から HTTP 経由で呼ぶラッパ。
 //
-// Pipeline 2 (= 自動): 3 層スコアリング + 自動分類
-//   - MODAL_METADATA_ENDPOINT      第 1 層 (= realtime_handpose.jsonl から手検出率等を算出)
-//   - MODAL_FRAME_SAMPLING_ENDPOINT 第 2 層 (= フレームサンプル画像解析)
-//   - MODAL_VLM_ENDPOINT           第 3 層 (= Claude Haiku 4.5、 65 点 + 自動分類カテゴリ)
+// Pipeline 2 (= 自動): 前処理 (ラベリング) + 多軸採点を1関数で実行
+//   - MODAL_PIPELINE2_ENDPOINT     rootlens-pipeline2 (= preprocess + scoring、 軸ベクトルを返す)
 //
 // Pipeline 3 (= 手動): GPU 重処理
 //   - MODAL_WILOR_ENDPOINT         WiLoR 手ポーズ推定 → processed/<signature_hash>/wilor.jsonl
@@ -15,7 +13,7 @@
 // この module は workflow worker context (= ESM only sandbox) に取り込まれる可能性が
 // あるので、 top-level で AWS SDK 等は import しない (= fetch のみ)。
 
-import type { AutoCategory } from "@/shared/api-types";
+import type { QualityAxis } from "@/shared/api-types";
 
 // ─── 共通 helper ──────────────────────────────────────────────────────
 
@@ -34,36 +32,29 @@ async function callModal<T>(endpointEnv: string, params: Record<string, string>)
   return (await res.json()) as T;
 }
 
-// ─── Pipeline 2: ラベリング (= dense narration) ───────────────────────
-// 品質スコアリング (旧 layer1 metadata / layer2 frame-sampling / layer3 VLM 採点) は
-// この flow から分離した。 スコアリングはタスク定義依存の別レイヤーで後段に被せる (= 現状未実装)。
+// ─── Pipeline 2: 前処理 (ラベリング) + 多軸採点 ───────────────────────
+// rootlens-pipeline2 は対称な2ステージ (preprocess → scoring) を stateless に実行し、
+// 軸ごと 0-100 の品質ベクトル (= 合計なし) を返す。 詳細は DATA_SPECS §3。
 
-/// 2026-05-29: layer3 はラベリング専任に分離 (= 採点しない)。 返値はラベル結果のみ。
-/// 品質スコアリングはタスク定義依存の別フローで後段に行う (= ここでは扱わない)。
-export interface Layer3LabelResult {
-  /// 要約キーワードから派生した粗カテゴリ (= marketplace フィルタの目安)
-  autoCategory: AutoCategory;
-  autoCategoryConfidence: number;
-  /// セグメント被覆から算出した観測統計 (= 手作業していない時間割合。 採点ではない)
-  idleRatio: number;
-  /// クリップ全体の 1 文要約
-  summary: string;
-  /// dense narration セグメント (= semantic.jsonl の内容と対応)
-  frameLabels: Array<{
-    frameIdx: number;
-    tsSec: number;
-    description: string;
-  }>;
+export interface Pipeline2Result {
+  signatureHash: string;
+  preprocessed: Array<{ name: string; artifacts: string[]; meta: Record<string, unknown> }>;
+  /// 軸名 → {axis, score 0-100, method, breakdown}。 合成しない (= 重みは買い手)。
+  scores: Record<string, QualityAxis>;
 }
 
-/// Pipeline 2 ラベリング層 (= layer3 Modal, gemini-video-dense 既定)。 採点はしない。
-export async function callLayer3Labeling(opts: {
+/// Pipeline 2 を実行する。 preprocess / score を省略すると既定 (= labeling / 全採点軸) を走らせる。
+export async function callPipeline2(opts: {
   signatureHash: string;
-  labeler?: string;
-}): Promise<Layer3LabelResult> {
+  preprocess?: string;   // csv (既定 labeling)
+  score?: string;        // csv (既定 video_technical,motion_content,label_quality)
+  labeler?: string;      // labeling 前処理が使う Labeler (既定 gemini-video-dense)
+}): Promise<Pipeline2Result> {
   const params: Record<string, string> = { signature_hash: opts.signatureHash };
+  if (opts.preprocess) params.preprocess = opts.preprocess;
+  if (opts.score) params.score = opts.score;
   if (opts.labeler) params.labeler = opts.labeler;
-  return await callModal<Layer3LabelResult>("MODAL_VLM_ENDPOINT", params);
+  return await callModal<Pipeline2Result>("MODAL_PIPELINE2_ENDPOINT", params);
 }
 
 // ─── Pipeline 3: WiLoR 手ポーズ推定 (= GPU 重処理、 手動トリガー) ──────────

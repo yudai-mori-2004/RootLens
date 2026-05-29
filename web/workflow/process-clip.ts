@@ -2,18 +2,16 @@ import { eq } from "drizzle-orm";
 import { FatalError } from "workflow";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
-import { callLayer3Labeling, type Layer3LabelResult } from "@/lib/modal";
-import type { ProcessingStep } from "@/shared/api-types";
+import { callPipeline2, type Pipeline2Result } from "@/lib/modal";
+import type { ProcessingStep, QualityVector } from "@/shared/api-types";
 
-// Pipeline 2 (= dense narration ラベリング) を Vercel Workflow DevKit で実装する (DATA_SPECS §3)。
+// Pipeline 2 (= 前処理ラベリング + 多軸採点) を Vercel Workflow DevKit で実装する (DATA_SPECS §3)。
 //
-// ⚠ 品質スコアリングはこのフローから分離した。 スコアリングはタスク定義に依存する別概念であり、
-//    ラベル (semantic.jsonl) を入力にした別レイヤーで後段に被せる設計 (= 現状未実装)。
-//    したがって現状の Pipeline 2 はラベリング専任: クリップ → dense narration → ready。
+// Pipeline 2 のゴールは品質の定量化 (= 採点)。 ラベリング等はその前準備。 Modal の rootlens-pipeline2
+// が対称な2ステージ (preprocess → scoring) を stateless に実行し、 軸ごと 0-100 の品質ベクトル
+// (= 合計なし) を返す。 ここはその呼び出し + DB 更新に専念する (= R2 書き出しは Modal 側)。
 //
-// 入力: 端末が raw/<signature_hash>/ にアップロードしたファイル (= rgb.mp4 は D2 署名済 + 顔ぼかし済)。
-// 流れ: labeling (= Modal layer3, gemini-video-dense 既定) → ready 遷移。
-// processed/<signature_hash>/semantic.jsonl の書き出しは Modal 側が行う (= WDK worker は R2 を直接叩かない)。
+// ⚠ 合成スコア (= 重み付け合算) は持たない。 軸ベクトルをそのまま保存し、 重み付けは買い手が行う。
 //
 // 各 step は durable: 自動 retry、 冪等性、 サーバ再起動を跨いだ resume が WDK で担保される。
 
@@ -35,15 +33,9 @@ export async function processClip(input: ProcessClipInput) {
     throw new FatalError(`Clip ${input.clipId} missing rootAssetId (Pipeline 1 incomplete)`);
   }
 
-  // ラベリング (= dense narration、 採点はしない)
-  await setStep(input.clipId, "labeling");
-  const labeling = await runLabeling({
-    clipId: input.clipId,
-    signatureHash: clip.signatureHash,
-  });
-
-  // ready 遷移
-  await markReady({ clipId: input.clipId, labeling });
+  await setStep(input.clipId, "scoring");
+  const result = await runPipeline2({ clipId: input.clipId, signatureHash: clip.signatureHash });
+  await markReady({ clipId: input.clipId, result });
 }
 
 // ─── steps (= 永続化される処理単位、 自動 retry) ────────────────────
@@ -63,20 +55,20 @@ async function setStep(clipId: string, step: ProcessingStep) {
     .where(eq(clips.id, clipId));
 }
 
-async function runLabeling(args: { clipId: string; signatureHash: string }): Promise<Layer3LabelResult> {
+async function runPipeline2(args: { clipId: string; signatureHash: string }): Promise<Pipeline2Result> {
   "use step";
-  // dense narration (= gemini-video-dense 既定)。 採点はしない (= スコアリングは別レイヤー)。
-  return await callLayer3Labeling({ signatureHash: args.signatureHash });
+  // 既定の preprocess (= labeling) + 採点軸 (= video_technical / motion_content / label_quality)。
+  return await callPipeline2({ signatureHash: args.signatureHash });
 }
 
-async function markReady(args: { clipId: string; labeling: Layer3LabelResult }) {
+async function markReady(args: { clipId: string; result: Pipeline2Result }) {
   "use step";
-  // 品質スコアは付けない (= スコアリングは別レイヤーで後段)。 ラベリング由来の観測
-  // (autoCategory / idleRatio) のみ記録して ready に遷移する。
+  // 軸ベクトル (= 合計なし) をそのまま quality_breakdown 列に保存。 合成スコアは付けない。
+  const vector: QualityVector = { axes: args.result.scores };
+
   console.log(
-    `[process-clip] ready ${args.clipId} (labeling only) ` +
-    `category=${args.labeling.autoCategory} (${args.labeling.autoCategoryConfidence.toFixed(2)}) ` +
-    `segments=${args.labeling.frameLabels.length}`,
+    `[process-clip] ready ${args.clipId} axes=` +
+    Object.entries(args.result.scores).map(([k, v]) => `${k}:${v.score}`).join(" "),
   );
 
   await db
@@ -84,11 +76,9 @@ async function markReady(args: { clipId: string; labeling: Layer3LabelResult }) 
     .set({
       state: "ready",
       processingStep: null,
-      idleRatio: args.labeling.idleRatio.toFixed(4),
+      qualityScore: null,           // 合成しない (= 多軸・合計なし)
+      qualityBreakdown: vector,     // 列名は互換のため据え置き、 中身は品質ベクトル
       updatedAt: new Date(),
     })
     .where(eq(clips.id, args.clipId));
-
-  // rootAssetId / signedJsonUri / processedPrefix は Pipeline 1 (端末) が POST /api/clips 時に
-  // 確定させているので、 ここでは触らない。
 }

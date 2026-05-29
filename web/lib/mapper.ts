@@ -33,7 +33,7 @@ export async function clipToDto(row: Clip): Promise<ClipDto> {
     autoCategoryConfidence,
     processingStep: row.processingStep as ProcessingStep | null,
     qualityScore: row.qualityScore,
-    qualityBreakdown: row.qualityBreakdown,
+    qualityVector: row.qualityBreakdown,
     rootAssetId: row.rootAssetId,
     signedJsonUri: row.signedJsonUri,
     network: (row.network as SolanaNetwork) ?? "devnet",

@@ -9,7 +9,7 @@ export type ClipState = "uploading" | "processing" | "ready" | "staked" | "error
 // 並列で /process Gateway を直接叩く構造。 サーバ flow は 3 層スコアリング + 自動ラベリング。
 // 2026-05-27 方針転換: gtsam-eval は撤去 (= GTSAM 層廃止)。
 export type ProcessingStep =
-  | "labeling";           // dense narration ラベリング (= gemini-video-dense)。 採点は別レイヤー
+  | "scoring";            // Pipeline 2 (= 前処理ラベリング + 多軸採点) 実行中
 
 // ─── Solana ネットワーク (= cNFT 発行先クラスタ) ──────────────────
 export type SolanaNetwork = "devnet" | "mainnet";
@@ -25,65 +25,23 @@ export type AutoCategory =
   | "meal_prep"
   | "other";
 
-// ─── 品質スコア内訳 (= DATA_SPECS §3.2) ──────────────────────────
+// ─── 品質ベクトル (= DATA_SPECS §3、 多軸・合計なし) ──────────────────
+// 2026-05-29 方針転換: 単一合成スコア (旧 layer1+2+3=100) を廃止。 品質は独立した軸ごとに
+// 0-100 で出し、 合算しない (= 異種の品質軸を混ぜない / 重み付けは買い手が用途に応じて行う)。
+// 軸は Pipeline 2 の採点ステージが返す (= video_technical / motion_content / label_quality、 拡張可)。
 
-/// 第 1 層: メタデータ解析 (合計 20 点)
-/// 2026-05-27: ARKit 廃止に伴い tracking_state 由来の trackingQuality 指標は撤去。
-/// 2026-05-28: IMU 撤去で imuGravityCompliance も撤去、 1 点を handLandmarkPresenceBoth に振替。
-export interface Layer1Score {
-  /// 0..20 の整数
-  score: number;
-  /// 両手検出フレームの割合 (= Apple Vision 手ランドマーク 21x2 が両手 ともフレーム内、 0..1)。 配点 9
-  handLandmarkPresenceBoth: number;
-  /// realtime_handpose.jsonl 内で有効な timestamp + frame_index を持つ行の割合 (0..1)。 配点 4
-  rgbSensorSyncRatio: number;
-  /// 0..N-1 のフレーム番号列における連続性 (1 = 欠番なし、 0 = 全て欠番)。 配点 4
-  frameContinuity: number;
-  /// 手首ランドマーク変位の分散を閾値で正規化 (0 = 完全静止、 1 = 十分な動き)。 配点 3
-  handMovement: number;
-  // 2026-05-28 撤去: imuGravityCompliance (= IMU 撤去、 配点 1 点は handLandmarkPresenceBoth に振替)
+/// 1 品質軸の採点結果。 score は 0-100。 method は breakdown からの導出式 (= 監査・再計算用)。
+/// breakdown はスコアの根拠 (= 独立サブ信号 + 生カウント + 閾値)。 買い手はこれで再計算・再重み付けできる。
+export interface QualityAxis {
+  axis: string;
+  score: number;                          // 0-100
+  method: string;
+  breakdown: Record<string, unknown>;
 }
 
-/// 第 2 層: フレームサンプリング解析 (合計 15 点)
-export interface Layer2Score {
-  /// 0..15 の整数
-  score: number;
-  /// 平均輝度が 40〜240 の範囲内のフレーム割合 (0..1)。 配点 4
-  brightnessInRangeRatio: number;
-  /// ラプラシアン分散が閾値以上のフレーム割合 (= シャープネス、 0..1)。 配点 4
-  sharpnessPassRatio: number;
-  /// Farneback 法によるフロー量が閾値以上のフレーム割合 (0..1)。 配点 4
-  opticalFlowPassRatio: number;
-  /// サンプルフレーム間ヒストグラム差分の平均 を 閾値で正規化 (0 = 全フレーム同一、 1 = 十分な変化)。 配点 3
-  frameDiversity: number;
-}
-
-/// 第 3 層: VLM セマンティック解析 (合計 65 点)
-/// 2026-05-27 方針転換: GTSAM 撤去に伴い 55 → 65 点に再配点。
-/// 各基準 0..5 の平均値 (= 全サンプルフレーム平均)、 算出式は (avg/5) × 配点。
-export interface Layer3Score {
-  /// 0..65 の整数
-  score: number;
-  /// 何らかの目的的活動を遂行しているか (0=ぼーっとしている / 5=明確に手作業中)。 配点 22
-  taskActivityAvg: number;
-  /// 手が物体を操作しているか (0=何も触れていない / 5=道具 / 対象物を操作中)。 配点 18
-  objectInteractionAvg: number;
-  /// 環境が活動と合致しているか (0=不自然な状況 / 5=典型的な家事 / 作業環境)。 配点 10
-  sceneMatchAvg: number;
-  /// 本物の人間の手による実際の動作に見えるか (0=明らかに偽造 / 5=自然)。 配点 15
-  authenticityAvg: number;
-  /// task_activity == 0 のフレーム割合 (= ほぼ何もしていない時間)。 カタログフィルタ用、 score には算入しない
-  idleRatio: number;
-}
-
-/// 総合スコア + 3 層内訳
-/// 2026-05-27: GTSAM 層撤去で 4 層 → 3 層 (= 20 + 15 + 65 = 100)。
-export interface QualityBreakdown {
-  /// 0..100 (= 3 層スコアの単純合計)
-  total: number;
-  layer1: Layer1Score | null;
-  layer2: Layer2Score | null;
-  layer3: Layer3Score | null;
+/// 品質ベクトル (= 軸名 → AxisScore)。 合計は持たない (= 売り手が重みを焼き込まない)。
+export interface QualityVector {
+  axes: Record<string, QualityAxis>;
 }
 
 // ─── ClipDto ─────────────────────────────────────────────────────
@@ -94,10 +52,10 @@ export interface ClipDto {
   createdAt: string; // ISO 8601
   /// 現在 Pipeline 2 のどのステップにいるか (= processing 状態時のみ非 null)
   processingStep: ProcessingStep | null;
-  /// 0..100。 ready 以降で値が入る
+  /// 合成スコアは持たない (= 多軸・合計なし)。 後方互換のため field は残すが常に null。
   qualityScore: number | null;
-  /// 3 層の内訳。 ready 以降で値が入る (= 各層の score / 各指標の値)
-  qualityBreakdown: QualityBreakdown | null;
+  /// 品質ベクトル (= 軸ごと 0-100 + 根拠 breakdown)。 ready 以降で値が入る。
+  qualityVector: QualityVector | null;
   /// VLM が事後分類した主カテゴリ (= ready 以降で入る)。
   /// 2026-05-27: 撮影前タスク選択撤去に伴い、 タスク ID は持たず Pipeline 2 で自動分類する。
   autoCategory: AutoCategory | null;

@@ -1,7 +1,7 @@
 import {
   pgTable, text, integer, timestamp, jsonb, index, numeric,
 } from "drizzle-orm/pg-core";
-import type { QualityBreakdown } from "../shared/api-types";
+import type { QualityVector } from "../shared/api-types";
 
 // DATA_SPECS §6 のクリップ状態機械 + §3 のサーバパイプラインを永続化するスキーマ。
 //
@@ -49,15 +49,13 @@ export const clips = pgTable(
     signedMp4Key: text("signed_mp4_key"),
     processedPrefix: text("processed_prefix"),
 
-    /// processing 中の現在ステップ (= Pipeline 2 の進行表示用)。
-    /// 'metadata-scan' | 'frame-sampling' | 'vlm-score'
+    /// processing 中の現在ステップ (= Pipeline 2 の進行表示用)。 'scoring'。
     processingStep: text("processing_step"),
 
-    /// 品質評価結果 (= DATA_SPECS §3)。 3 層スコアリングの構造化 JSON。
-    /// 各層の score + 全 sub-metric 値を保持。 撮影者へのフィードバックと
-    /// 買い手向けカタログフィルタの両方に使う。
+    /// 品質ベクトル (= DATA_SPECS §3、 多軸・合計なし)。 軸名 → {score 0-100, method, breakdown}。
+    /// quality_breakdown 列に格納 (= 列名は互換のため据え置き)。 quality_score は使わない (= 合成しない)。
     qualityScore: integer("quality_score"),
-    qualityBreakdown: jsonb("quality_breakdown").$type<QualityBreakdown>(),
+    qualityBreakdown: jsonb("quality_breakdown").$type<QualityVector>(),
 
     /// idle_ratio (= task_activity == 0 のフレーム割合) は score に算入しないが、
     /// カタログフィルタ用に別カラムで公開する。
