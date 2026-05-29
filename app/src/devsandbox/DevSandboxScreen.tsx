@@ -26,12 +26,14 @@ import {
   dataflowStore,
   storeEventSink,
   teeToConsole,
+  signRecording,
   runPipeline1,
   pollPipeline2,
   triggerPipeline3,
   fetchPipeline3Status,
   type DataflowEvent,
   type EventLevel,
+  type RecordingConfig,
 } from '../dataflow';
 import { WideCapturePreviewView } from '../native/wideCapture';
 import { ArkitCapturePreviewView } from '../native/arkitCapture';
@@ -59,6 +61,13 @@ function formatTs(ts: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+const delay = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// 構成切替時にカメラが解放されるのを待つ猶予 (= AVCaptureSession を stop してから
+// ARSession を start するまでの間。 カメラは排他リソースなので、 即座に貼り直すと
+// FigCaptureSession が衝突してクラッシュする)。
+const CAMERA_RELEASE_DELAY_MS = 450;
+
 const LEVEL_COLOR: Record<EventLevel, string> = {
   info: '#8aa0b6',
   success: '#5fd07a',
@@ -70,11 +79,20 @@ export const DevSandboxScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   // 撮影構成は切替可能 (= ultra_wide ⇄ arkit)。録画待機中のみ切替できる。
+  // selectedConfigId = ユーザーが選んだ構成 (切替の目標)。
+  // activeConfigId   = 実際に session が稼働中の構成 (= 切替完了後に更新)。preview / 録画はこちらを使う。
   const [selectedConfigId, setSelectedConfigId] = useState<string>(DEFAULT_RECORDING_CONFIG.id);
+  const [activeConfigId, setActiveConfigId] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const config = getRecordingConfig(selectedConfigId) ?? DEFAULT_RECORDING_CONFIG;
+  // session 操作 (start/stop) はカメラ排他のため絶対に重ねない。 直列化用の promise チェーン。
+  const sessionOpRef = useRef<Promise<void>>(Promise.resolve());
+  // 現在 session が稼働中の config (= 次の切替で stop する対象)。null なら未稼働。
+  const runningConfigRef = useRef<RecordingConfig | null>(null);
 
   const events = useStore(dataflowStore, (s) => s.events);
   const recording = useStore(dataflowStore, (s) => s.recording);
+  const signedClip = useStore(dataflowStore, (s) => s.signedClip);
   const clip = useStore(dataflowStore, (s) => s.clip);
   const serverStatus = useStore(dataflowStore, (s) => s.serverStatus);
   const busy = useStore(dataflowStore, (s) => s.busy);
@@ -98,31 +116,67 @@ export const DevSandboxScreen: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // 起動時: 撮影構成の可用性を確認し、 使えるなら session (プレビュー) を開始する。
+  // 撮影構成の session ハンドオフ。 config が変わるたびに「旧 session を完全停止 (await) →
+  // カメラ解放待ち → 新 session を開始」を直列で実行する。
+  // ⚠ useEffect cleanup に stop を任せると stop が await されず新 start と race し、
+  //    AVCaptureSession ↔ ARSession がカメラ (排他リソース) を奪い合って FigCaptureSession が
+  //    クラッシュする。 そのため sessionOpRef の promise チェーンで明示的に直列化する。
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const ok = await config.isAvailable().catch(() => false);
-      if (cancelled) return;
-      setAvailable(ok);
-      if (!ok) {
-        sink({ step: 'sandbox', level: 'warn', message: `撮影構成 ${config.id} は当端末で利用不可 (シミュレータ?)` });
-        return;
-      }
-      try {
-        const { setConfigId, setRecording } = dataflowStore.getState();
-        setConfigId(config.id);
-        await config.startSession(sink);
-        if (!cancelled) setRecording('session-active');
-      } catch (e) {
-        sink({ step: 'sandbox', level: 'error', message: `session 開始失敗: ${errMsg(e)}` });
-      }
-    })();
+    const target = config;
+    sessionOpRef.current = sessionOpRef.current
+      .then(async () => {
+        if (cancelled) return;
+        const running = runningConfigRef.current;
+        if (running && running.id === target.id) return; // 既に稼働中
+
+        const ok = await target.isAvailable().catch(() => false);
+        if (cancelled) return;
+        setAvailable(ok);
+        if (!ok) {
+          sink({ step: 'sandbox', level: 'warn', message: `撮影構成 ${target.id} は当端末で利用不可 (シミュレータ?)` });
+          return;
+        }
+
+        setSwitching(true);
+        // 1) 旧 session を完全停止 (await) → カメラ解放を待つ
+        if (running) {
+          await running.stopSession(sink).catch((e) =>
+            sink({ step: 'sandbox', level: 'warn', message: `旧 session 停止: ${errMsg(e)}` }),
+          );
+          runningConfigRef.current = null;
+          setActiveConfigId(null);
+          dataflowStore.getState().setRecording('idle');
+          await delay(CAMERA_RELEASE_DELAY_MS);
+          if (cancelled) return;
+        }
+        // 2) 新 session を開始
+        dataflowStore.getState().setConfigId(target.id);
+        await target.startSession(sink);
+        runningConfigRef.current = target;
+        if (cancelled) return;
+        setActiveConfigId(target.id);
+        dataflowStore.getState().setRecording('session-active');
+      })
+      .catch((e) =>
+        sink({ step: 'sandbox', level: 'error', message: `session 切替失敗: ${errMsg(e)}` }),
+      )
+      .finally(() => {
+        if (!cancelled) setSwitching(false);
+      });
     return () => {
       cancelled = true;
-      config.stopSession(sink).catch(() => {});
     };
   }, [config]);
+
+  // アンマウント時に稼働中 session を停止する。
+  useEffect(() => {
+    return () => {
+      const running = runningConfigRef.current;
+      runningConfigRef.current = null;
+      if (running) running.stopSession(sink).catch(() => {});
+    };
+  }, []);
 
   // イベント追加で末尾へ自動スクロール
   useEffect(() => {
@@ -158,31 +212,42 @@ export const DevSandboxScreen: React.FC = () => {
       const session = await config.startRecording(sink);
       const store = dataflowStore.getState();
       store.setSession(session);
+      store.setSignedClip(null); // 新しい録画 = 前の署名を破棄
+      store.resetClip();
       store.setRecording('recording');
     });
   }, [config, runAction]);
 
+  // 録画停止 → その場で「1 回だけ」署名する (= D1 + blur + D2 + signature_hash 確定)。
+  // 署名は録画ごとに 1 回。 Pipeline 1 は再押下されうるが、 ここで確定した signed を使い回すので
+  // signature_hash は固定され、 hash ベースの冪等 (= 重複排除・既発行 cNFT 再利用) が効く。
   const onStopRecording = useCallback(() => {
-    runAction('録画停止', async () => {
+    runAction('録画停止 + 署名', async () => {
       const session = await config.stopRecording(sink);
       const store = dataflowStore.getState();
       store.setSession(session);
+      const signed = await signRecording(config, session, sink);
+      store.setSignedClip(signed);
       store.setRecording('recorded');
     });
   }, [config, runAction]);
 
-  const onSendPipeline2 = useCallback(() => {
-    runAction('Pipeline 2 送信', async () => {
+  // Pipeline 1 (端末側: 署名 → R2 アップロード → TP /process → clip 登録) を実行する。
+  // 登録 (= finalize) が完了するとサーバ側 Pipeline 2 (スコアリング) が自動起動する。
+  // → 結果は「Pipeline 2 結果確認」でポーリングする。
+  const onRunPipeline1 = useCallback(() => {
+    runAction('Pipeline 1 実行', async () => {
       const store = dataflowStore.getState();
       const session = store.session;
-      if (!session) {
-        sink({ step: 'sandbox', level: 'error', message: '録画済み session がありません。 先に録画してください' });
+      const signed = store.signedClip;
+      if (!session || !signed) {
+        sink({ step: 'sandbox', level: 'error', message: '署名済み録画がありません。 先に録画→停止してください' });
         return;
       }
       store.resetClip();
       store.patchClip({ recordingConfigId: config.id, sessionDir: session.sessionDir, state: 'uploading' });
       const result = await runPipeline1(
-        { config, session, merkleTree: MERKLE_TREE, collection: MERKLE_COLLECTION },
+        { config, session, signed, merkleTree: MERKLE_TREE, collection: MERKLE_COLLECTION },
         sink,
       );
       dataflowStore.getState().patchClip({
@@ -195,6 +260,11 @@ export const DevSandboxScreen: React.FC = () => {
         txSignature: result.txSignature,
         state: 'processing',
       });
+      sink({
+        step: 'sandbox',
+        level: 'success',
+        message: `clip 登録完了 → サーバで Pipeline 2 自動起動。「Pipeline 2 結果確認」で進捗を見てください`,
+      });
     });
   }, [config, runAction]);
 
@@ -202,7 +272,7 @@ export const DevSandboxScreen: React.FC = () => {
     runAction('Pipeline 2 結果確認', async () => {
       const clipId = dataflowStore.getState().clip?.id;
       if (!clipId) {
-        sink({ step: 'sandbox', level: 'error', message: 'clip がありません。 先に Pipeline 2 送信してください' });
+        sink({ step: 'sandbox', level: 'error', message: 'clip がありません。 先に Pipeline 1 を実行してください' });
         return;
       }
       const wallet = walletPubkeyOrThrow();
@@ -220,8 +290,10 @@ export const DevSandboxScreen: React.FC = () => {
     });
   }, [runAction]);
 
-  const onSendPipeline3 = useCallback(() => {
-    runAction('Pipeline 3 送信', async () => {
+  // Pipeline 3 (サーバ側: WiLoR 手ポーズ推定) を手動トリガーする。
+  // Pipeline 2 が ready (= スコアリング完了) になってから実行する。
+  const onRunPipeline3 = useCallback(() => {
+    runAction('Pipeline 3 実行', async () => {
       const clipId = dataflowStore.getState().clip?.id;
       if (!clipId) {
         sink({ step: 'sandbox', level: 'error', message: 'clip がありません。 先に Pipeline 2 を ready まで通してください' });
@@ -246,11 +318,19 @@ export const DevSandboxScreen: React.FC = () => {
 
   const canRecord = available === true && recording === 'session-active';
   const canStop = recording === 'recording';
-  const canSendP2 = recording === 'recorded' && !!dataflowStore.getState().session;
+  const canRunP1 = recording === 'recorded' && !!signedClip;
   const hasClip = !!clip?.id;
-  const canSwitchConfig = !busy && (recording === 'idle' || recording === 'session-active');
-  // プレビューは構成ごとに native view が違う。 native 未登録 (= 未ビルド) なら null。
-  const PreviewView = config.id === 'arkit' ? ArkitCapturePreviewView : WideCapturePreviewView;
+  const canSwitchConfig = !busy && !switching && (recording === 'idle' || recording === 'session-active');
+  // プレビューは「実際に稼働中の構成」の native view を出す (= 切替完了後に swap)。
+  // 選択直後 (= session 起動前) に arkit の ARSCNView を mount するとカメラ競合になるため、
+  // activeConfigId 基準にして session ハンドオフ完了まで preview を貼り替えない。
+  // native 未登録 (= 未ビルド) なら null。
+  const PreviewView =
+    activeConfigId === 'arkit'
+      ? ArkitCapturePreviewView
+      : activeConfigId === 'ultra_wide'
+        ? WideCapturePreviewView
+        : null;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -288,16 +368,18 @@ export const DevSandboxScreen: React.FC = () => {
 
       {/* プレビュー */}
       <View style={styles.preview}>
-        {available && PreviewView ? (
+        {activeConfigId && PreviewView ? (
           <PreviewView style={StyleSheet.absoluteFill} />
         ) : (
           <View style={styles.previewPlaceholder}>
             <Text style={styles.placeholderText}>
-              {available === null
-                ? '撮影構成を確認中…'
-                : !PreviewView
-                  ? `${config.id} preview は未ビルド (実機再ビルドが必要)`
-                  : 'プレビュー利用不可 (実機で起動してください)'}
+              {switching
+                ? `構成切替中… (→ ${config.id})`
+                : available === null
+                  ? '撮影構成を確認中…'
+                  : available === false
+                    ? `${config.id} は当端末で利用不可`
+                    : 'プレビュー起動待ち…'}
             </Text>
           </View>
         )}
@@ -330,19 +412,24 @@ export const DevSandboxScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* ボタン群 */}
+      {/* ボタン群 (= 上から下が処理フロー順: 録画 → P1 → P2 → P3) */}
       <View style={[styles.buttons, { paddingBottom: insets.bottom + 8 }]}>
         <View style={styles.row}>
           <SandboxButton label="録画開始" onPress={onStartRecording} disabled={!canRecord || !!busy} />
           <SandboxButton label="録画停止" onPress={onStopRecording} disabled={!canStop || !!busy} />
         </View>
+        {/* P1 (端末): 署名→アップロード→TP→登録。 完了でサーバ P2 が自動起動する */}
         <View style={styles.row}>
-          <SandboxButton label="Pipeline 2 送信" onPress={onSendPipeline2} disabled={!canSendP2 || !!busy} primary />
-          <SandboxButton label="結果確認" onPress={onCheckPipeline2} disabled={!hasClip || !!busy} />
+          <SandboxButton label="Pipeline 1 実行 (UP→TP→登録)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
         </View>
+        {/* P2 (サーバ自動): スコアリング。 送信ボタンは無い (= P1 登録で起動)、 結果をポーリング */}
         <View style={styles.row}>
-          <SandboxButton label="Pipeline 3 送信" onPress={onSendPipeline3} disabled={!hasClip || !!busy} />
-          <SandboxButton label="結果確認" onPress={onCheckPipeline3} disabled={!hasClip || !!busy} />
+          <SandboxButton label="Pipeline 2 結果確認" onPress={onCheckPipeline2} disabled={!hasClip || !!busy} />
+        </View>
+        {/* P3 (サーバ手動): WiLoR。 P2 ready 後に手動トリガー */}
+        <View style={styles.row}>
+          <SandboxButton label="Pipeline 3 実行" onPress={onRunPipeline3} disabled={!hasClip || !!busy} />
+          <SandboxButton label="Pipeline 3 結果確認" onPress={onCheckPipeline3} disabled={!hasClip || !!busy} />
         </View>
         <View style={styles.row}>
           <SandboxButton label="ログクリア" onPress={() => dataflowStore.getState().clearEvents()} disabled={!!busy} subtle />

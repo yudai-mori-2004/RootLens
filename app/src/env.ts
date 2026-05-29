@@ -28,6 +28,16 @@ function readRequired(key: string): string {
 export const SOLANA_RPC_URL =
   readOptional('EXPO_PUBLIC_SOLANA_RPC_URL') ?? 'https://api.devnet.solana.com';
 
+// cNFT 発行先ネットワーク (= "devnet" | "mainnet")。 clip の重複排除キーの一部として
+// server に送る + mint 前冪等チェックの lookup 条件にする。
+// 明示 env を優先し、 無ければ RPC URL から推定 (= mainnet を含むなら mainnet、 それ以外 devnet)。
+export type SolanaNetwork = 'devnet' | 'mainnet';
+export const SOLANA_NETWORK: SolanaNetwork = ((): SolanaNetwork => {
+  const explicit = readOptional('EXPO_PUBLIC_SOLANA_NETWORK');
+  if (explicit === 'mainnet' || explicit === 'devnet') return explicit;
+  return /mainnet/i.test(SOLANA_RPC_URL) ? 'mainnet' : 'devnet';
+})();
+
 // ─── rootlens-server ────────────────────────────────────────────────────
 // /api/clips, /api/clips/:id, /api/v1/* など全 server エンドポイントの base。
 // デフォルトで本番 (rootlens.io) を指す。 local dev で別ホストを使う場合だけ env 上書き。

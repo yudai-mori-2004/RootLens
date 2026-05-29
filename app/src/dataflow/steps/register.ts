@@ -7,7 +7,7 @@
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
-import { SERVER_URL } from '../../env';
+import { SERVER_URL, SOLANA_NETWORK } from '../../env';
 import type { EventSink } from '../events';
 import type { RegisterInput, RegisterResult } from '../types';
 
@@ -47,6 +47,7 @@ async function postClip(input: RegisterInput): Promise<string> {
       contentSize: input.contentSize,
       rootAssetId: input.rootAssetId,
       signedJsonUri: input.signedJsonUri,
+      network: SOLANA_NETWORK,
     }),
   });
   if (!(res.status === 200 || res.status === 201)) {

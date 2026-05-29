@@ -55,7 +55,7 @@ export {
 export type { PollOptions, Pipeline3TriggerResult } from './steps';
 
 // orchestrator
-export { runPipeline1 } from './orchestrator';
+export { signRecording, runPipeline1 } from './orchestrator';
 export type { Pipeline1Input, Pipeline1Result } from './orchestrator';
 
 // store

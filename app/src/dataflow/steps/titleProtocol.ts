@@ -15,7 +15,7 @@
 import { Buffer } from 'buffer';
 import { Connection, PublicKey, VersionedTransaction } from '@solana/web3.js';
 
-import { SERVER_URL, SOLANA_RPC_URL } from '../../env';
+import { SERVER_URL, SOLANA_RPC_URL, SOLANA_NETWORK } from '../../env';
 import { getAuthProvider, requireCurrentSession } from '../../services/auth/instance';
 import type { EventSink } from '../events';
 import type { TpInput, TpResult } from '../types';
@@ -30,6 +30,28 @@ export async function registerWithTitleProtocol(
   sink: EventSink,
 ): Promise<TpResult> {
   const walletPubkey = requireCurrentSession().pubkey.toBase58();
+
+  // ─── mint 前 冪等チェック ────────────────────────────────────────────
+  // 同 wallet × 同 signature_hash × 同 network で既に cNFT 発行済みなら、 TP /process +
+  // mint を丸ごとスキップして再利用する (= cNFT mint はオンチェーンで非冪等。 再実行ごとに
+  // 新しい asset を発行して SOL を浪費し、 孤児資産を生むのを防ぐ)。
+  // 判定は DB lookup (= 既存 clip) → DAS getAsset (= その rootAssetId が実在するか) の 2 段。
+  const reusable = await findReusableMint(input.signatureHash, walletPubkey, sink);
+  if (reusable) {
+    sink({
+      step: 'cnft-mint',
+      level: 'success',
+      message: `既存 cNFT を再利用 (network=${SOLANA_NETWORK}) rootAssetId=${reusable.rootAssetId}`,
+      detail: { ...reusable, reused: true },
+    });
+    return {
+      rootAssetId: reusable.rootAssetId,
+      signedJsonUri: reusable.signedJsonUri,
+      signatureHash: input.signatureHash,
+      txSignature: '',
+      walletPubkey,
+    };
+  }
 
   // ─── TP /process ───────────────────────────────────────────────────
   sink({ step: 'tp-process', level: 'info', message: 'TP /process (TEE 検証 + signed-json 保存)' });
@@ -63,6 +85,62 @@ export async function registerWithTitleProtocol(
 }
 
 // ─── 内部 ─────────────────────────────────────────────────────────────
+
+/// mint 前冪等チェック: 同 wallet × hash × network の既存 clip を引き、 その rootAssetId が
+/// DAS 上で実在するなら再利用候補として返す。 該当なし / 検証失敗時は null (= 通常 mint へ)。
+/// lookup や DAS の失敗で全体を止めない (= 最悪 mint し直すだけで安全側)。
+async function findReusableMint(
+  signatureHash: string,
+  walletPubkey: string,
+  sink: EventSink,
+): Promise<{ rootAssetId: string; signedJsonUri: string } | null> {
+  let candidate: { rootAssetId: string; signedJsonUri: string } | null = null;
+  try {
+    const url =
+      `${SERVER_URL}/api/clips?signatureHash=${encodeURIComponent(signatureHash)}` +
+      `&network=${encodeURIComponent(SOLANA_NETWORK)}`;
+    const res = await fetch(url, { headers: { 'X-Wallet-Pubkey': walletPubkey } });
+    if (res.ok) {
+      const { clips } = (await res.json()) as {
+        clips: Array<{ rootAssetId: string | null; signedJsonUri: string | null }>;
+      };
+      const hit = clips.find((c) => c.rootAssetId && c.signedJsonUri);
+      if (hit) candidate = { rootAssetId: hit.rootAssetId!, signedJsonUri: hit.signedJsonUri! };
+    }
+  } catch (e) {
+    sink({
+      step: 'cnft-mint',
+      level: 'warn',
+      message: `既存 clip lookup 失敗 (新規 mint で続行): ${e instanceof Error ? e.message : String(e)}`,
+    });
+    return null;
+  }
+  if (!candidate) return null;
+
+  const exists = await dasAssetExists(SOLANA_RPC_URL, candidate.rootAssetId).catch(() => false);
+  if (!exists) {
+    sink({
+      step: 'cnft-mint',
+      level: 'warn',
+      message: `既存 rootAssetId が DAS で確認できず、 新規 mint します (${candidate.rootAssetId})`,
+    });
+    return null;
+  }
+  return candidate;
+}
+
+/// DAS getAsset で asset の実在 (= burn 済でない) を確認する。 標準 RPC が DAS API を同居提供する前提。
+async function dasAssetExists(rpcUrl: string, assetId: string): Promise<boolean> {
+  const res = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 'getAsset', method: 'getAsset', params: { id: assetId } }),
+  });
+  if (!res.ok) return false;
+  const json = (await res.json()) as { result?: { id?: string; burnt?: boolean } };
+  const r = json.result;
+  return !!r && r.id === assetId && r.burnt !== true;
+}
 
 async function callTpProcess(
   signatureHash: string,

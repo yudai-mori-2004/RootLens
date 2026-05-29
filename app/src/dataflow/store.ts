@@ -14,7 +14,7 @@
 import { createStore } from 'zustand/vanilla';
 
 import { makeEvent, type DataflowEvent, type DataflowEventInput, type EventSink } from './events';
-import type { Clip, ServerClipStatus } from './types';
+import type { Clip, ServerClipStatus, SignResult } from './types';
 import type { RecordingSession } from './recording-configs';
 
 /** 録画ライフサイクル。 */
@@ -31,6 +31,10 @@ export interface DataflowState {
   configId: string | null;
   session: RecordingSession | null;
 
+  /** 撮影停止時に signRecording で確定した署名結果 (= signatureHash / signedMp4Uri など)。
+   *  署名は録画ごとに 1 回。 runPipeline1 はこれを使い回す (= 再署名しない)。 */
+  signedClip: SignResult | null;
+
   /** Pipeline 1 が確定させたクリップ情報 (= signatureHash / rootAssetId など) */
   clip: Partial<Clip> | null;
   /** Pipeline 2 polling で受け取った最新サーバ状態 */
@@ -45,6 +49,7 @@ export interface DataflowState {
   clearEvents(): void;
   setRecording(phase: RecordingPhase): void;
   setSession(session: RecordingSession | null): void;
+  setSignedClip(signed: SignResult | null): void;
   setConfigId(id: string | null): void;
   patchClip(patch: Partial<Clip>): void;
   setServerStatus(status: ServerClipStatus | null): void;
@@ -57,11 +62,12 @@ export interface DataflowState {
 
 const INITIAL: Pick<
   DataflowState,
-  'recording' | 'configId' | 'session' | 'clip' | 'serverStatus' | 'busy' | 'events'
+  'recording' | 'configId' | 'session' | 'signedClip' | 'clip' | 'serverStatus' | 'busy' | 'events'
 > = {
   recording: 'idle',
   configId: null,
   session: null,
+  signedClip: null,
   clip: null,
   serverStatus: null,
   busy: null,
@@ -84,6 +90,9 @@ export const dataflowStore = createStore<DataflowState>((set, get) => ({
   },
   setSession(session) {
     set({ session });
+  },
+  setSignedClip(signed) {
+    set({ signedClip: signed });
   },
   setConfigId(id) {
     set({ configId: id });

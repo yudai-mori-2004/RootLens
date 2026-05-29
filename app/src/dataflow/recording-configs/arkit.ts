@@ -22,13 +22,15 @@ import type { OutputFileSpec, RecordingConfig, RecordingSession } from './types'
 //   realtime_handpose.jsonl    手ランドマーク (= ultra_wide と同形の hands) + カメラポーズ (4×4) + tracking_state + IMU snapshot
 //   imu.jsonl                  加速度 / ジャイロ / デバイスモーション (~100 Hz)
 //   metadata.json              機種 / OS / アプリ版 / カメラ画角・解像度・intrinsics / 構成 ID 等の静的情報
-//   depth/<frame>.png          LiDAR 深度 (Pro 端末のみ、 可変枚数)。 単一ファイルではないので outputFiles には含めず、
-//                              現状アップロード対象外 (= 仕様 §3.2「存在すれば使い、 なければスキップ」)。
+//   depth.tar                  LiDAR 深度 (Pro 端末のみ)。 native が 16-bit PNG (mm) / フレームを
+//                              1 本の tar に streaming 追記したもの (= RGB-D 標準形式を単一ファイル化)。
+//                              非 LiDAR 機では生成されない → required:false で「あれば上げる」。
 const OUTPUT_FILES: OutputFileSpec[] = [
   { name: 'rgb.mp4', contentType: 'video/mp4', required: true, isPrimaryVideo: true },
   { name: 'realtime_handpose.jsonl', contentType: 'application/x-ndjson', required: true },
   { name: 'imu.jsonl', contentType: 'application/x-ndjson', required: true },
   { name: 'metadata.json', contentType: 'application/json', required: true },
+  { name: 'depth.tar', contentType: 'application/x-tar', required: false },
 ];
 
 function ensureTrailingSlash(uri: string): string {
