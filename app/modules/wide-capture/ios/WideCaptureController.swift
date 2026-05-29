@@ -29,6 +29,25 @@ enum WideCaptureDisplayOrientation {
   case portrait
   case landscapeLeft
   case landscapeRight
+
+  /// HandTracker / Vision に渡す向き。 sensor landscape buffer をこの表示向きとして解釈させる。
+  var cgImageOrientation: CGImagePropertyOrientation {
+    switch self {
+    case .portrait:       return .right   // 90° CW: sensor landscape → display portrait
+    case .landscapeRight: return .up      // identity (= sensor native)
+    case .landscapeLeft:  return .down    // 180°
+    }
+  }
+
+  /// AVAssetWriterInput.transform に渡す回転。 sensor landscape (1920×1080) を表示向きに回す
+  /// (= ARKit 側 ArSessionController.DisplayOrientation.videoTransform と同一)。
+  var videoTransform: CGAffineTransform {
+    switch self {
+    case .landscapeRight: return .identity
+    case .landscapeLeft:  return CGAffineTransform(rotationAngle: .pi)        // 180°
+    case .portrait:       return CGAffineTransform(rotationAngle: .pi / 2)    // 90° CW
+    }
+  }
 }
 
 protocol WideCaptureControllerDelegate: AnyObject {
@@ -55,7 +74,9 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
   // MARK: - 状態
   private var sessionStarted = false
-  private var displayOrientation: WideCaptureDisplayOrientation = .landscapeRight
+  // 既定は portrait (= ARKit 側と統一)。 DevSandbox など向きを明示設定しない呼出元でも縦向き録画になる。
+  // 旧 landscape 撮影画面は setDisplayOrientation で動的に上書きする。
+  private var displayOrientation: WideCaptureDisplayOrientation = .portrait
 
   /// preview view 側から読まれる現在の orientation (= main thread 同期参照、 race を避けるため
   /// captureQueue 経由の update 後に main で反映される pattern)
@@ -66,14 +87,23 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
   private var previewViews = NSHashTable<WideCapturePreviewView>.weakObjects()
 
   func registerPreviewView(_ view: WideCapturePreviewView) {
-    DispatchQueue.main.async { [weak self] in
-      self?.previewViews.add(view)
+    if Thread.isMainThread {
+      previewViews.add(view)
+    } else {
+      DispatchQueue.main.async { [weak self] in self?.previewViews.add(view) }
     }
   }
 
   func unregisterPreviewView(_ view: WideCapturePreviewView) {
-    DispatchQueue.main.async { [weak self] in
-      self?.previewViews.remove(view)
+    // ⚠ deinit から呼ばれる。 以前は DispatchQueue.main.async に view を捕捉していたが、
+    //   それだと「解放中の view」を escaping closure が強参照し、 後で main キューが
+    //   そのブロックを実行する際に objc_retain で EXC_BAD_ACCESS (SIGSEGV) を起こす。
+    //   これが構成切替 (ultra_wide → arkit) で preview がアンマウントされた瞬間の
+    //   クラッシュの真因だった。 dying view を escaping closure に持ち越さないこと。
+    //   main 上なら同期で外す。 非 main の場合は previewViews が weakObjects なので
+    //   解放後に自動 purge される (= ここで何もしなくて良い)。
+    if Thread.isMainThread {
+      previewViews.remove(view)
     }
   }
 
@@ -83,6 +113,40 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
 
   private override init() {
     super.init()
+    // セッションの中断 / runtime error を監視する (= 構成切替を繰り返した際のカメラ競合や
+    // media services reset で writer が cancelled になる事象の可視化 + 自己復帰)。
+    let nc = NotificationCenter.default
+    nc.addObserver(self, selector: #selector(sessionRuntimeError(_:)),
+                   name: .AVCaptureSessionRuntimeError, object: session)
+    nc.addObserver(self, selector: #selector(sessionWasInterrupted(_:)),
+                   name: .AVCaptureSessionWasInterrupted, object: session)
+    nc.addObserver(self, selector: #selector(sessionInterruptionEnded(_:)),
+                   name: .AVCaptureSessionInterruptionEnded, object: session)
+  }
+
+  // MARK: - session 中断 / runtime error (= 自己復帰 + 診断ログ)
+
+  @objc private func sessionRuntimeError(_ note: Notification) {
+    let err = note.userInfo?[AVCaptureSessionErrorKey] as? NSError
+    NSLog("[WideCaptureController] session runtime error: %@", "\(err?.localizedDescription ?? "?")")
+    // media services reset 等の回復可能エラーは startRunning で復帰を試みる。
+    captureQueue.async { [weak self] in
+      guard let self = self, self.sessionStarted, !self.session.isRunning else { return }
+      self.session.startRunning()
+    }
+  }
+
+  @objc private func sessionWasInterrupted(_ note: Notification) {
+    let reason = note.userInfo?[AVCaptureSessionInterruptionReasonKey]
+    NSLog("[WideCaptureController] session interrupted (reason=%@)", "\(reason ?? "?")")
+  }
+
+  @objc private func sessionInterruptionEnded(_ note: Notification) {
+    NSLog("[WideCaptureController] session interruption ended")
+    captureQueue.async { [weak self] in
+      guard let self = self, self.sessionStarted, !self.session.isRunning else { return }
+      self.session.startRunning()
+    }
   }
 
   // MARK: - availability
@@ -106,10 +170,48 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
     }
   }
 
+  // 構成切替 (ultra_wide → arkit) でカメラ (= 排他リソース) を ARSession へ確実に明け渡すための停止。
+  // ⚠ 単純な stopRunning() だけでは ARSession が同じ ultra-wide カメラを掴んだ瞬間に
+  //   FigCaptureSession が assert クラッシュする。 原因は 2 つ:
+  //     (a) stopRunning() は非同期。 戻ってもキャプチャサーバの teardown は完了していない。
+  //         → AVCaptureSessionDidStopRunning 通知を待って「解放完了」を観測してから返す。
+  //     (b) 保持中の CVPixelBuffer / Vision (HandTracker) が掴んだ IOSurface が宙に浮く。
+  //         dying session の buffer pool の IOSurface が所有 task を失い、 kernel が
+  //         "buffer->fClientTask = 0x0 not found" を連発、 次の session で破綻する。
+  //         → delegate を外して callback を止め、 in-flight の captureOutput / HandTracker を
+  //           drain し (captureQueue 直列実行)、 latestPixelBuffer を解放する。
+  // stopSession は WideCaptureModule が global queue 上で呼ぶので、 通知待ちで block してよい
+  // (= main を固めない)。
   func stopSession() {
+    guard sessionStarted else { return }
+
+    // 1) 新規 callback を止め、 in-flight の captureOutput / HandTracker を drain し、
+    //    保持中の pixel buffer を解放する (= IOSurface を宙に浮かせない)。
     captureQueue.sync {
-      guard sessionStarted else { return }
-      session.stopRunning()
+      videoDataOutput.setSampleBufferDelegate(nil, queue: nil)
+      snapshotLock.lock()
+      latestPixelBuffer = nil
+      snapshotLock.unlock()
+    }
+
+    // 2) stopRunning() の完了 (= キャプチャサーバの teardown) を通知で待つ。
+    let stopped = DispatchSemaphore(value: 0)
+    let token = NotificationCenter.default.addObserver(
+      forName: .AVCaptureSessionDidStopRunning, object: session, queue: nil
+    ) { _ in stopped.signal() }
+    session.stopRunning()
+    _ = stopped.wait(timeout: .now() + 3.0)
+    NotificationCenter.default.removeObserver(token)
+
+    // 3) 停止完了後に input/output を外してカメラデバイスを手放す
+    //    (= frame in-flight 中に外すと buffer mismatch を誘発するため、 必ず stop 完了後)。
+    //    次回 startSession は configureSessionLocked が input/output を再構築する。
+    captureQueue.sync {
+      session.beginConfiguration()
+      session.inputs.forEach { session.removeInput($0) }
+      session.outputs.forEach { session.removeOutput($0) }
+      session.commitConfiguration()
+      videoDeviceInput = nil
       sessionStarted = false
     }
   }
@@ -176,7 +278,13 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
       if connection.isCameraIntrinsicMatrixDeliverySupported {
         connection.isCameraIntrinsicMatrixDeliveryEnabled = true
       }
-      applyOrientationToConnection(connection)
+      // データ出力 buffer は sensor 向き (= landscape 1920×1080) に固定する。 表示向きへの回転は
+      // 録画側 (AVAssetWriterInput.transform) と HandTracker (cgImageOrientation) が担う。
+      // ここで displayOrientation に追従させると buffer が portrait (1080×1920) になり 1920×1080
+      // writer と不一致になる + preview と二重回転する。
+      if connection.isVideoOrientationSupported {
+        connection.videoOrientation = .landscapeRight
+      }
     }
   }
 
@@ -189,7 +297,10 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
       do {
         let videoSize = CGSize(width: 1920, height: 1080)
         let metadata = self.buildSessionMetadata(videoSize: videoSize)
-        let url = try recorder.start(dir: sessionDir, videoSize: videoSize, metadata: metadata)
+        // 録画開始時の表示向きを transform として焼き込む (= sensor landscape → 表示向き)。
+        // 録画中は向きを変えない前提 (= intrinsics 固定)。
+        let transform = self.displayOrientation.videoTransform
+        let url = try recorder.start(dir: sessionDir, videoSize: videoSize, transform: transform, metadata: metadata)
         result = .success(url)
       } catch {
         result = .failure(error)
@@ -278,7 +389,8 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
         userInfo: [NSLocalizedDescriptionKey: "No frame available yet"])
     }
 
-    let ci = CIImage(cvPixelBuffer: pixelBuffer)
+    // buffer は sensor landscape 固定なので、 表示向きに回してから JPEG 化する。
+    let ci = CIImage(cvPixelBuffer: pixelBuffer).oriented(displayOrientation.cgImageOrientation)
     let ctx = CIContext(options: nil)
     guard let cg = ctx.createCGImage(ci, from: ci.extent) else {
       throw NSError(
@@ -303,28 +415,14 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
     captureQueue.async { [weak self] in
       guard let self = self else { return }
       self.displayOrientation = o
-      if let conn = self.videoDataOutput.connection(with: .video) {
-        self.applyOrientationToConnection(conn)
-      }
-      // preview layer 側も同期更新 (= UI thread 経由で view.applyOrientation を呼ぶ)
+      // データ出力 connection は sensor 向き固定なので触らない (= 表示回転は transform / cgImageOrientation)。
+      // preview layer 側だけ同期更新する (= UI thread 経由で view.applyOrientation を呼ぶ)。
       DispatchQueue.main.async { [weak self] in
         guard let self = self else { return }
         for view in self.previewViews.allObjects {
           view.applyOrientation(o)
         }
       }
-    }
-  }
-
-  private func applyOrientationToConnection(_ connection: AVCaptureConnection) {
-    let target: AVCaptureVideoOrientation
-    switch displayOrientation {
-    case .portrait:        target = .portrait
-    case .landscapeLeft:   target = .landscapeLeft
-    case .landscapeRight:  target = .landscapeRight
-    }
-    if connection.isVideoOrientationSupported {
-      connection.videoOrientation = target
     }
   }
 
@@ -340,9 +438,10 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
     latestPixelBuffer = pixelBuffer
     snapshotLock.unlock()
 
-    // hand tracking (= Vision request、 CPU 重い)
+    // hand tracking (= Vision request、 CPU 重い)。 buffer は sensor landscape 固定なので、
+    // 表示向き (displayOrientation) を Vision に渡して landmark を表示座標系に揃える。
     let timestampNs = UInt64(CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer)) * 1e9)
-    let orientation = cgOrientationFromConnection(connection)
+    let orientation = displayOrientation.cgImageOrientation
     let handOutput = handTracker.process(
       pixelBuffer: pixelBuffer,
       orientation: orientation,
@@ -367,17 +466,4 @@ final class WideCaptureController: NSObject, AVCaptureVideoDataOutputSampleBuffe
     }
   }
 
-  private func cgOrientationFromConnection(_ connection: AVCaptureConnection) -> CGImagePropertyOrientation {
-    // videoOrientation は AVCaptureVideoOrientation、 CGImagePropertyOrientation に写像
-    if connection.isVideoOrientationSupported {
-      switch connection.videoOrientation {
-      case .portrait:            return .right
-      case .portraitUpsideDown:  return .left
-      case .landscapeLeft:       return .down
-      case .landscapeRight:      return .up
-      @unknown default:          return .right
-      }
-    }
-    return .right
-  }
 }

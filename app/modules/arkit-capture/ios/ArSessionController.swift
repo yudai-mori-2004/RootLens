@@ -105,6 +105,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // sensor stream state (= recording 中のみ非 nil、 Pipeline 1 出力ファイル群を逐次 append)
   private var sensorsFileHandle: FileHandle?
   private var imuFileHandle: FileHandle?
+  // LiDAR depth (= sceneDepth) を 16-bit PNG (mm) として 1 本の depth.tar に streaming 追記する。
+  // 初回 depth frame で lazy 生成 (= 非 LiDAR 機では nil のまま = depth.tar を作らない)。
+  private var depthTarHandle: FileHandle?
   private var frameIndexCounter: Int = 0
   private let sensorFileQueue = DispatchQueue(label: "io.rootlens.arkit-capture.sensors", qos: .utility)
   private let motionManager = CMMotionManager()
@@ -165,6 +168,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     if !sessionRunning { return }
     session.pause()
     sessionRunning = false
+    // 構成切替 (arkit → ultra_wide) で AVCaptureSession が同じ ultra-wide カメラを掴む前に、
+    // ARKit frame の IOSurface を宙に浮かせないよう、 in-flight の HandTracker (= Vision/ANE) を
+    // drain し、 保持中の pixel buffer / hand output を解放する (= wide-capture 側と対称)。
+    handTrackerQueue.sync {}
+    latestBufferLock.lock()
+    latestPixelBuffer = nil
+    latestBufferLock.unlock()
+    latestHandOutputLock.lock()
+    latestHandOutput = nil
+    latestHandOutputLock.unlock()
   }
 
   // MARK: - Recording lifecycle (Pipeline 1 全 sensor 出力)
@@ -238,10 +251,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let sensorsHandle = try FileHandle(forWritingTo: sensorsURL)
     let imuHandle = try FileHandle(forWritingTo: imuURL)
 
-    // depth ディレクトリ (= Pro 機の sceneDepth は LiDAR、 非 Pro 機では空のまま)
-    let depthDir = sessionDir.appendingPathComponent("depth")
-    try removeIfExists(at: depthDir)
-    try FileManager.default.createDirectory(at: depthDir, withIntermediateDirectories: true)
+    // depth は録画中に depth.tar へ streaming 追記する (= 初回 depth frame で lazy 生成)。
+    // ここでは旧 depth/ dir を念のため除去するだけ。
+    try removeIfExists(at: sessionDir.appendingPathComponent("depth.tar"))
+    try removeIfExists(at: sessionDir.appendingPathComponent("depth"))
 
     // metadata.json は intrinsics 確定するまで待ちたいので、 初回 frame で書く
     // (= ARFrame の camera.intrinsics は最初の didUpdate まで埋まらない可能性)
@@ -285,6 +298,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     var sensorCloseError: Error?
     sensorFileQueue.sync {
       do {
+        self.finalizeDepthTar()  // depth.tar の終端 (= 2×512 zero blocks) を書いて close (= depth が無ければ no-op)
         try self.sensorsFileHandle?.synchronize()
         try self.sensorsFileHandle?.close()
         try self.imuFileHandle?.synchronize()
@@ -302,6 +316,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.rgbMp4URL = nil
     self.sensorsFileHandle = nil
     self.imuFileHandle = nil
+    self.depthTarHandle = nil
     self.frameIndexCounter = 0
 
     if writer.status == .failed {
@@ -445,28 +460,28 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       writeMetadataJson(into: dir, frame: frame)
     }
 
-    // LiDAR depth を depth/<frameIndex:06>.png に書き出す (= sceneDepth がある場合のみ)
-    if let sceneDepth = frame.sceneDepth, let dir = sessionDirURL {
-      let depthDir = dir.appendingPathComponent("depth")
-      let depthURL = depthDir.appendingPathComponent(String(format: "%06d.png", frameIndex))
-      // pixelBuffer は CVPixelBuffer の参照、 retain して queue に流す
+    // LiDAR depth (= sceneDepth がある Pro 機のみ)。 標準形式の 16-bit PNG (mm) を
+    // depth.tar に streaming 追記する (= 数万 loose PNG を避け 1 ファイルで upload。 中身は標準 PNG)。
+    // tar 内パスは depth/<frameIndex:06>.png (= 展開すれば RGB-D 標準の depth/ レイアウト)。
+    if let sceneDepth = frame.sceneDepth, sessionDirURL != nil {
       let buffer = sceneDepth.depthMap
+      let idx = frameIndex
       sensorFileQueue.async {
-        self.writeDepthPng(depthMap: buffer, to: depthURL)
+        self.appendDepthFrameToTar(depthMap: buffer, frameIndex: idx)
       }
     }
   }
 
   /// CVPixelBuffer (= ARKit sceneDepth、 kCVPixelFormatType_DepthFloat32) を
-  /// 16-bit gray PNG として書き出す。 値は float32 m → uint16 mm に量子化。
-  private func writeDepthPng(depthMap: CVPixelBuffer, to url: URL) {
+  /// 16-bit gray PNG (= float32 m → uint16 mm) の Data にして返す。 RGB-D データセット標準形式。
+  private func depthMapToPngData(_ depthMap: CVPixelBuffer) -> Data? {
     CVPixelBufferLockBaseAddress(depthMap, .readOnly)
     defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
 
     let width = CVPixelBufferGetWidth(depthMap)
     let height = CVPixelBufferGetHeight(depthMap)
     let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
-    guard let base = CVPixelBufferGetBaseAddress(depthMap) else { return }
+    guard let base = CVPixelBufferGetBaseAddress(depthMap) else { return nil }
 
     let floatStride = bytesPerRow / MemoryLayout<Float32>.size
     let floatPtr = base.assumingMemoryBound(to: Float32.self)
@@ -484,11 +499,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // CGImage 16-bit gray を組み立て、 ImageIO で PNG として書く
     let cs = CGColorSpaceCreateDeviceGray()
     let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue | CGBitmapInfo.byteOrder16Little.rawValue)
     let data = NSData(bytes: u16, length: u16.count * 2)
-    guard let provider = CGDataProvider(data: data as CFData) else { return }
+    guard let provider = CGDataProvider(data: data as CFData) else { return nil }
     guard let cgImage = CGImage(
       width: width, height: height,
       bitsPerComponent: 16, bitsPerPixel: 16,
@@ -497,11 +511,70 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       provider: provider,
       decode: nil, shouldInterpolate: false,
       intent: .defaultIntent
-    ) else { return }
+    ) else { return nil }
 
-    guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else { return }
+    let out = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(out as CFMutableData, "public.png" as CFString, 1, nil) else { return nil }
     CGImageDestinationAddImage(dest, cgImage, nil)
-    CGImageDestinationFinalize(dest)
+    guard CGImageDestinationFinalize(dest) else { return nil }
+    return out as Data
+  }
+
+  // MARK: - depth.tar streaming writer (= ustar tar、 中身は 16-bit PNG)
+
+  /// 1 depth frame を 16-bit PNG 化して depth.tar に 1 entry として追記する (= sensorFileQueue 上)。
+  /// 初回呼び出しで depth.tar を lazy 生成する (= depth が来ない非 LiDAR 機では作られない)。
+  private func appendDepthFrameToTar(depthMap: CVPixelBuffer, frameIndex: Int) {
+    guard let png = depthMapToPngData(depthMap) else { return }
+    if depthTarHandle == nil {
+      guard let dir = sessionDirURL else { return }
+      let url = dir.appendingPathComponent("depth.tar")
+      FileManager.default.createFile(atPath: url.path, contents: nil)
+      depthTarHandle = try? FileHandle(forWritingTo: url)
+    }
+    guard let h = depthTarHandle else { return }
+    let name = String(format: "depth/%06d.png", frameIndex)
+    do {
+      try h.write(contentsOf: Self.tarHeader(name: name, size: png.count))
+      try h.write(contentsOf: png)
+      let pad = (512 - (png.count % 512)) % 512
+      if pad > 0 { try h.write(contentsOf: Data(count: pad)) }
+    } catch {
+      NSLog("[ArkitCaptureController] depth.tar write failed: %@", "\(error)")
+    }
+  }
+
+  /// tar の終端 (= 2×512 byte の zero block) を書いて close する。 depth が無ければ no-op。
+  private func finalizeDepthTar() {
+    guard let h = depthTarHandle else { return }
+    try? h.write(contentsOf: Data(count: 1024))
+    try? h.synchronize()
+    try? h.close()
+    depthTarHandle = nil
+  }
+
+  /// ustar 形式の 512-byte ヘッダを組む (= regular file)。
+  private static func tarHeader(name: String, size: Int) -> Data {
+    var h = [UInt8](repeating: 0, count: 512)
+    func put(_ s: String, _ offset: Int, _ maxLen: Int) {
+      for (i, b) in Array(s.utf8).prefix(maxLen).enumerated() { h[offset + i] = b }
+    }
+    put(name, 0, 100)                            // name (= "depth/NNNNNN.png"、 100 byte 上限)
+    put("0000644", 100, 7)                       // mode (octal)
+    put("0000000", 108, 7)                       // uid
+    put("0000000", 116, 7)                       // gid
+    put(String(format: "%011o", size), 124, 11)  // size (octal)
+    put("00000000000", 136, 11)                  // mtime (octal、 0)
+    for i in 148..<156 { h[i] = 0x20 }           // chksum 欄は計算前は space 8 個
+    h[156] = UInt8(ascii: "0")                   // typeflag '0' = regular file
+    put("ustar", 257, 5)                         // magic "ustar\0"
+    put("00", 263, 2)                            // version
+    var sum = 0
+    for b in h { sum += Int(b) }
+    put(String(format: "%06o", sum), 148, 6)     // chksum (6 octal)
+    h[154] = 0                                   // null
+    h[155] = 0x20                                // space
+    return Data(h)
   }
 
   private func appendImuLine(motion: CMDeviceMotion) {

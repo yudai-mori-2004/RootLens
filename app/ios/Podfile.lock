@@ -1,4 +1,6 @@
 PODS:
+  - arkit_capture (0.1.0):
+    - ExpoModulesCore
   - boost (1.84.0)
   - c2pa_bridge (0.1.0):
     - ExpoModulesCore
@@ -2255,6 +2257,7 @@ PODS:
     - ZXingObjC/Core
 
 DEPENDENCIES:
+  - arkit_capture (from `../modules/arkit-capture/ios`)
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
   - c2pa_bridge (from `../modules/c2pa-bridge/ios`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
@@ -2379,6 +2382,8 @@ SPEC REPOS:
     - ZXingObjC
 
 EXTERNAL SOURCES:
+  arkit_capture:
+    :path: "../modules/arkit-capture/ios"
   boost:
     :podspec: "../node_modules/react-native/third-party-podspecs/boost.podspec"
   c2pa_bridge:
@@ -2606,6 +2611,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
+  arkit_capture: eb9af0eca1d9f40de99c86f43c438bbca45ae1d0
   boost: 1dca942403ed9342f98334bf4c3621f011aa7946
   c2pa_bridge: c514ea985c681f5c2199a9bbc7a696c14a6c53fe
   DoubleConversion: f16ae600a246532c4020132d54af21d0ddb2a385

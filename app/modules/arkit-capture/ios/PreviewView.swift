@@ -5,8 +5,14 @@ import UIKit
 
 // ARKit プレビュー View。
 //
-// 自動で ARSession を起動 / 停止する。 録画開始までは「プレビューモード」 (= MCAP 出力なし、
-// HandTracker は走る)、 録画中もこの View は session を共有して描画を続ける。
+// session の起動 / 停止は一切しない (= WideCapturePreviewView と同じく「描画専用」)。
+// ARSession のライフサイクルは dataflow 層 (= arkitConfig.startSession/stopSession →
+// ArkitCaptureController) が排他制御する。 View はその session に attach して描画するだけ。
+//
+// ⚠ 以前は didMoveToWindow で startSession/stopSession を自動で呼んでいたが、 これだと
+//    構成切替 (ultra_wide ⇄ arkit) 時に View の mount/unmount が JS のカメラ直列化と独立に
+//    session を起動し、 AVCaptureSession と ARSession がカメラ (排他リソース) を奪い合って
+//    FigCaptureSession がクラッシュした。 session 制御を JS 一本に寄せて競合を断つ。
 //
 // アスペクト挙動: ARSCNView は内部で `displayTransform(for:viewportSize:)` を使って camera
 // 映像を view に貼り付ける。 default の挙動だと iPhone 12 のような縦長 / 横長 display で
@@ -32,16 +38,6 @@ final class ArkitCapturePreviewView: ExpoView {
   }
 
   required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
-
-  override func didMoveToWindow() {
-    super.didMoveToWindow()
-    if window != nil {
-      ArkitCaptureController.shared.startSession()
-    } else {
-      // View が画面から外れた時。 録画中は止めない、 待機中だけ止める。
-      ArkitCaptureController.shared.stopSession()
-    }
-  }
 
   override func layoutSubviews() {
     super.layoutSubviews()

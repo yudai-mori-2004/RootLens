@@ -52,7 +52,7 @@ final class WideCaptureRecorder {
   /// 指定ディレクトリ配下に出力ファイルを準備して録画開始。 戻り値は同ディレクトリ URL。
   /// 引数名は `dir` (= property `sessionDir` の shadow を構造的に排除、 再発防止)。
   /// metadata は controller が組み立てた静的セッション情報 (= metadata.json に書き出す)。
-  func start(dir: URL, videoSize: CGSize, metadata: [String: Any]) throws -> URL {
+  func start(dir: URL, videoSize: CGSize, transform: CGAffineTransform, metadata: [String: Any]) throws -> URL {
     if isRecording {
       throw NSError(
         domain: "WideCaptureRecorder", code: 1,
@@ -78,6 +78,8 @@ final class WideCaptureRecorder {
     ]
     let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
     videoInput.expectsMediaDataInRealTime = true
+    // sensor landscape buffer を表示向きに回すための transform (= プレビューと一致させる)。
+    videoInput.transform = transform
     if writer.canAdd(videoInput) {
       writer.add(videoInput)
     } else {
@@ -133,15 +135,26 @@ final class WideCaptureRecorder {
       guard let self = self else { return }
       // file handle close は writer finalize 後 (= 並走 write 受信 がもう来ない安全な timing)
       self.sensorFileQueue.async {
+        let status = writer.status
+        let writerErr = writer.error
+        // ⚠ 成功・失敗いずれでも状態を完全リセットする (= 失敗した録画が次の録画を壊さないように)。
         try? self.handposeHandle?.close()
         self.handposeHandle = nil
+        self.writer = nil
+        self.videoInput = nil
+        self.videoSourceFormat = nil
+        self.startedAtPts = .invalid
         self.isRecording = false
-        if writer.status == .completed {
+        if status == .completed {
           completion(.success(sessionDir))
         } else {
-          completion(.failure(writer.error ?? NSError(
+          // status: unknown=0 / writing=1 / completed=2 / failed=3 / cancelled=4。
+          // cancelled(4) は通常カメラセッション中断でシステムが writer をキャンセルしたケース。
+          NSLog("[WideCaptureRecorder] finalize not completed: status=%ld error=%@",
+                status.rawValue, "\(writerErr?.localizedDescription ?? "nil")")
+          completion(.failure(writerErr ?? NSError(
             domain: "WideCaptureRecorder", code: 4,
-            userInfo: [NSLocalizedDescriptionKey: "AVAssetWriter finalize failed, status=\(writer.status.rawValue)"])))
+            userInfo: [NSLocalizedDescriptionKey: "AVAssetWriter finalize failed, status=\(status.rawValue) (4=cancelled, カメラセッション中断の可能性)"])))
         }
       }
     }
