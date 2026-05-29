@@ -9,9 +9,7 @@ export type ClipState = "uploading" | "processing" | "ready" | "staked" | "error
 // 並列で /process Gateway を直接叩く構造。 サーバ flow は 3 層スコアリング + 自動ラベリング。
 // 2026-05-27 方針転換: gtsam-eval は撤去 (= GTSAM 層廃止)。
 export type ProcessingStep =
-  | "metadata-scan"       // Layer 1: メタデータ解析 (= realtime_handpose.jsonl を読む)
-  | "frame-sampling"      // Layer 2: フレームサンプリング画像解析
-  | "vlm-score";          // Layer 3: VLM (Claude Haiku 4.5) でセマンティック採点 + 自動分類
+  | "labeling";           // dense narration ラベリング (= gemini-video-dense)。 採点は別レイヤー
 
 // ─── Solana ネットワーク (= cNFT 発行先クラスタ) ──────────────────
 export type SolanaNetwork = "devnet" | "mainnet";

@@ -15,7 +15,7 @@
 // この module は workflow worker context (= ESM only sandbox) に取り込まれる可能性が
 // あるので、 top-level で AWS SDK 等は import しない (= fetch のみ)。
 
-import type { AutoCategory, Layer1Score, Layer2Score, Layer3Score } from "@/shared/api-types";
+import type { AutoCategory } from "@/shared/api-types";
 
 // ─── 共通 helper ──────────────────────────────────────────────────────
 
@@ -34,55 +34,36 @@ async function callModal<T>(endpointEnv: string, params: Record<string, string>)
   return (await res.json()) as T;
 }
 
-// ─── Pipeline 2 各層 ──────────────────────────────────────────────────
+// ─── Pipeline 2: ラベリング (= dense narration) ───────────────────────
+// 品質スコアリング (旧 layer1 metadata / layer2 frame-sampling / layer3 VLM 採点) は
+// この flow から分離した。 スコアリングはタスク定義依存の別レイヤーで後段に被せる (= 現状未実装)。
 
-export async function callMetadataScore(opts: { signatureHash: string }): Promise<Layer1Score> {
-  return await callModal<Layer1Score>("MODAL_METADATA_ENDPOINT", {
-    signature_hash: opts.signatureHash,
-  });
-}
-
-export async function callFrameSampling(opts: {
-  signatureHash: string;
-  sampleIntervalSec?: number;
-}): Promise<Layer2Score> {
-  const params: Record<string, string> = { signature_hash: opts.signatureHash };
-  if (opts.sampleIntervalSec !== undefined) {
-    params.sample_interval_sec = String(opts.sampleIntervalSec);
-  }
-  return await callModal<Layer2Score>("MODAL_FRAME_SAMPLING_ENDPOINT", params);
-}
-
-/// 2026-05-27: tasks 事前選択撤去で task_id 引数を撤去。 VLM が映像から自律的に分類。
-/// 返値に autoCategory / autoCategoryConfidence / frameLabels が追加 (= Layer3Score を拡張)。
-export interface VlmScoreResult extends Layer3Score {
+/// 2026-05-29: layer3 はラベリング専任に分離 (= 採点しない)。 返値はラベル結果のみ。
+/// 品質スコアリングはタスク定義依存の別フローで後段に行う (= ここでは扱わない)。
+export interface Layer3LabelResult {
+  /// 要約キーワードから派生した粗カテゴリ (= marketplace フィルタの目安)
   autoCategory: AutoCategory;
   autoCategoryConfidence: number;
+  /// セグメント被覆から算出した観測統計 (= 手作業していない時間割合。 採点ではない)
+  idleRatio: number;
+  /// クリップ全体の 1 文要約
+  summary: string;
+  /// dense narration セグメント (= semantic.jsonl の内容と対応)
   frameLabels: Array<{
     frameIdx: number;
     tsSec: number;
-    category: AutoCategory;
     description: string;
   }>;
 }
 
-export async function callVlmScore(opts: {
+/// Pipeline 2 ラベリング層 (= layer3 Modal, gemini-video-dense 既定)。 採点はしない。
+export async function callLayer3Labeling(opts: {
   signatureHash: string;
-  vlmIntervalSec?: number;
-  /// layer1 + layer2 のスコアを渡すと、 layer3 が processed/<hash>/quality_scores.json を書き出す。
-  layer1?: Layer1Score;
-  layer2?: Layer2Score;
-}): Promise<VlmScoreResult> {
-  const params: Record<string, string> = {
-    signature_hash: opts.signatureHash,
-  };
-  if (opts.vlmIntervalSec !== undefined) {
-    params.vlm_interval_sec = String(opts.vlmIntervalSec);
-  }
-  if (opts.layer1 && opts.layer2) {
-    params.prior_scores = JSON.stringify({ layer1: opts.layer1, layer2: opts.layer2 });
-  }
-  return await callModal<VlmScoreResult>("MODAL_VLM_ENDPOINT", params);
+  labeler?: string;
+}): Promise<Layer3LabelResult> {
+  const params: Record<string, string> = { signature_hash: opts.signatureHash };
+  if (opts.labeler) params.labeler = opts.labeler;
+  return await callModal<Layer3LabelResult>("MODAL_VLM_ENDPOINT", params);
 }
 
 // ─── Pipeline 3: WiLoR 手ポーズ推定 (= GPU 重処理、 手動トリガー) ──────────

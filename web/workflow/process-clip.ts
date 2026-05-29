@@ -2,34 +2,18 @@ import { eq } from "drizzle-orm";
 import { FatalError } from "workflow";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
-import {
-  callMetadataScore,
-  callFrameSampling,
-  callVlmScore,
-  type VlmScoreResult,
-} from "@/lib/modal";
-import type {
-  ProcessingStep,
-  Layer1Score,
-  Layer2Score,
-  QualityBreakdown,
-} from "@/shared/api-types";
+import { callLayer3Labeling, type Layer3LabelResult } from "@/lib/modal";
+import type { ProcessingStep } from "@/shared/api-types";
 
-// Pipeline 2 (= 品質スコアリング 3 層 + 自動分類) を Vercel Workflow DevKit で実装する (DATA_SPECS §3)。
+// Pipeline 2 (= dense narration ラベリング) を Vercel Workflow DevKit で実装する (DATA_SPECS §3)。
 //
-// VLM (= Layer 3) は映像から自律的にカテゴリを分類し、 autoCategory / autoCategoryConfidence /
-// frameLabels を返す。 autoCategory / autoCategoryConfidence は DB 列追加までログにのみ出す
-// (= mapper は列が無い間は null を返す)。
+// ⚠ 品質スコアリングはこのフローから分離した。 スコアリングはタスク定義に依存する別概念であり、
+//    ラベル (semantic.jsonl) を入力にした別レイヤーで後段に被せる設計 (= 現状未実装)。
+//    したがって現状の Pipeline 2 はラベリング専任: クリップ → dense narration → ready。
 //
 // 入力: 端末が raw/<signature_hash>/ にアップロードしたファイル (= rgb.mp4 は D2 署名済 + 顔ぼかし済)。
-// 流れ:
-//   1. metadata-scan    第 1 層 (= realtime_handpose.jsonl から手検出率等で 20 点)
-//   2. frame-sampling   第 2 層 (= フレームサンプル画像解析で 15 点)
-//   3. vlm-score        第 3 層 (= Claude Haiku 4.5 で 65 点 + 自動分類)
-//   4. ready 遷移       DB 更新
-//
-// processed/<signature_hash>/ への semantic.jsonl / quality_scores.json 書き出しは Modal 側が行う
-// (= WDK worker は R2 を直接叩かない設計)。 ここは Modal 呼び出しの orchestration + DB 更新に専念する。
+// 流れ: labeling (= Modal layer3, gemini-video-dense 既定) → ready 遷移。
+// processed/<signature_hash>/semantic.jsonl の書き出しは Modal 側が行う (= WDK worker は R2 を直接叩かない)。
 //
 // 各 step は durable: 自動 retry、 冪等性、 サーバ再起動を跨いだ resume が WDK で担保される。
 
@@ -48,41 +32,18 @@ export async function processClip(input: ProcessClipInput) {
   }
   if (!clip.rootAssetId) {
     // v0.1.3: Pipeline 2 開始の前提条件 = rootAssetId 確定済 (= Pipeline 1 末尾 cNFT 発行で確定)。
-    // 通常 finalize endpoint で先に弾かれるが、 防御として workflow 自体でも fail-loud。
     throw new FatalError(`Clip ${input.clipId} missing rootAssetId (Pipeline 1 incomplete)`);
   }
 
-  // ステップ 1: 第 1 層 (= メタデータ解析)
-  await setStep(input.clipId, "metadata-scan");
-  const layer1 = await runLayer1({
+  // ラベリング (= dense narration、 採点はしない)
+  await setStep(input.clipId, "labeling");
+  const labeling = await runLabeling({
     clipId: input.clipId,
     signatureHash: clip.signatureHash,
   });
 
-  // ステップ 2: 第 2 層 (= フレームサンプリング画像解析)
-  await setStep(input.clipId, "frame-sampling");
-  const layer2 = await runLayer2({
-    clipId: input.clipId,
-    signatureHash: clip.signatureHash,
-  });
-
-  // ステップ 3: 第 3 層 (= VLM セマンティック解析 + 自動分類、 65 点)
-  // layer1 + layer2 を渡すと layer3 が processed/<hash>/quality_scores.json も書き出す。
-  await setStep(input.clipId, "vlm-score");
-  const layer3 = await runLayer3({
-    clipId: input.clipId,
-    signatureHash: clip.signatureHash,
-    layer1,
-    layer2,
-  });
-
-  // ステップ 4: ready 遷移
-  await markReady({
-    clipId: input.clipId,
-    layer1,
-    layer2,
-    layer3,
-  });
+  // ready 遷移
+  await markReady({ clipId: input.clipId, labeling });
 }
 
 // ─── steps (= 永続化される処理単位、 自動 retry) ────────────────────
@@ -102,54 +63,20 @@ async function setStep(clipId: string, step: ProcessingStep) {
     .where(eq(clips.id, clipId));
 }
 
-async function runLayer1(args: { clipId: string; signatureHash: string }): Promise<Layer1Score> {
+async function runLabeling(args: { clipId: string; signatureHash: string }): Promise<Layer3LabelResult> {
   "use step";
-  return await callMetadataScore({ signatureHash: args.signatureHash });
+  // dense narration (= gemini-video-dense 既定)。 採点はしない (= スコアリングは別レイヤー)。
+  return await callLayer3Labeling({ signatureHash: args.signatureHash });
 }
 
-async function runLayer2(args: { clipId: string; signatureHash: string }): Promise<Layer2Score> {
+async function markReady(args: { clipId: string; labeling: Layer3LabelResult }) {
   "use step";
-  return await callFrameSampling({ signatureHash: args.signatureHash });
-}
-
-async function runLayer3(args: {
-  clipId: string;
-  signatureHash: string;
-  layer1: Layer1Score;
-  layer2: Layer2Score;
-}): Promise<VlmScoreResult> {
-  "use step";
-  // 10 秒間隔 = Ego4D の dense narration (~10s) と同等密度 (DATA_SPECS §3.2.3、 約 $1.2/時)。
-  return await callVlmScore({
-    signatureHash: args.signatureHash,
-    vlmIntervalSec: 10,
-    layer1: args.layer1,
-    layer2: args.layer2,
-  });
-}
-
-async function markReady(args: {
-  clipId: string;
-  layer1: Layer1Score;
-  layer2: Layer2Score;
-  layer3: VlmScoreResult;
-}) {
-  "use step";
-  // 3 層合計 (= 20 + 15 + 65 = 100 上限、 DATA_SPECS §3.2.4)
-  const total = args.layer1.score + args.layer2.score + args.layer3.score;
-  const breakdown: QualityBreakdown = {
-    total,
-    layer1: args.layer1,
-    layer2: args.layer2,
-    layer3: args.layer3,
-  };
-
-  // autoCategory / autoCategoryConfidence は DB 列が追加されるまでログのみ。
-  // mapper.ts は列が無ければ null を返す形なので client にも null として届く。
+  // 品質スコアは付けない (= スコアリングは別レイヤーで後段)。 ラベリング由来の観測
+  // (autoCategory / idleRatio) のみ記録して ready に遷移する。
   console.log(
-    `[process-clip] ready ${args.clipId} score=${total}/100 ` +
-    `category=${args.layer3.autoCategory} (${args.layer3.autoCategoryConfidence.toFixed(2)}) ` +
-    `frameLabels=${args.layer3.frameLabels.length}`,
+    `[process-clip] ready ${args.clipId} (labeling only) ` +
+    `category=${args.labeling.autoCategory} (${args.labeling.autoCategoryConfidence.toFixed(2)}) ` +
+    `segments=${args.labeling.frameLabels.length}`,
   );
 
   await db
@@ -157,14 +84,11 @@ async function markReady(args: {
     .set({
       state: "ready",
       processingStep: null,
-      qualityScore: total,
-      qualityBreakdown: breakdown,
-      idleRatio: args.layer3.idleRatio.toFixed(4),
+      idleRatio: args.labeling.idleRatio.toFixed(4),
       updatedAt: new Date(),
     })
     .where(eq(clips.id, args.clipId));
 
   // rootAssetId / signedJsonUri / processedPrefix は Pipeline 1 (端末) が POST /api/clips 時に
   // 確定させているので、 ここでは触らない。
-  // 端末への push 通知は task 別途。 現状は client が 2 秒 polling で ready を拾う。
 }

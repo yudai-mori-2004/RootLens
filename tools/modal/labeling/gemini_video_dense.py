@@ -1,6 +1,6 @@
 """Gemini の動画ネイティブ取り込みで dense narration を生成する Labeler。
 
-  Pass1 (全体): 動画全体から {summary, scores(4基準0-5)} を得る (= クリップ単位の要約と採点)。
+  Pass1 (全体): 動画全体から summary (= クリップ単位の1文要約) を得る。 採点はしない (= 採点は別フロー)。
   Pass2 (窓):   動画を CHUNK_S 秒窓に分割し、 各窓を WINDOW_FPS / media MEDIUM で個別に渡して
                 窓内相対秒の説明文セグメントを得る。 窓内相対秒 → 絶対秒に変換し尺に clamp する。
                 窓分割は長尺クリップを 1 回の呼び出しで密に出せない (= 出力トークン上限) ための
@@ -26,20 +26,8 @@ MAX_WORKERS = 5      # 窓の並列度。
 
 _GLOBAL_SCHEMA = {
     "type": "object",
-    "properties": {
-        "summary": {"type": "string"},
-        "scores": {
-            "type": "object",
-            "properties": {
-                "task_activity": {"type": "integer"},
-                "object_interaction": {"type": "integer"},
-                "authenticity": {"type": "integer"},
-                "scene_match": {"type": "integer"},
-            },
-            "required": ["task_activity", "object_interaction", "authenticity", "scene_match"],
-        },
-    },
-    "required": ["summary", "scores"],
+    "properties": {"summary": {"type": "string"}},
+    "required": ["summary"],
 }
 
 _SEG_SCHEMA = {
@@ -108,21 +96,16 @@ class GeminiVideoDenseLabeler(Labeler):
             raise RuntimeError(f"gemini file upload failed: {f.state}")
 
         try:
-            # Pass1 (全体): クリップ要約 + 4 基準スコア。
+            # Pass1 (全体): クリップ要約のみ (= 事後カテゴリ派生 + クリップ単位ラベル)。 採点はしない。
             g_prompt = (
-                "Watch this entire first-person (egocentric) video and return JSON with: a one-sentence summary"
-                " of the wearer's activity (summary), and four 0-5 integer scores (scores).\n"
-                "scores: task_activity (is the wearer performing purposeful hand work), object_interaction"
-                " (are the hands actively manipulating an object), authenticity (does it look like a real human"
-                " hand doing a real action), scene_match (does the environment fit a household/work task).\n"
+                "Watch this entire first-person (egocentric) video and return JSON with a one-sentence summary"
+                " of the camera wearer's activity (summary).\n"
                 + GROUNDING_RULES
             )
             gr = gen([f, g_prompt], types.GenerateContentConfig(
                 temperature=0.0, response_mime_type="application/json",
-                response_json_schema=_GLOBAL_SCHEMA, max_output_tokens=1024))
-            glob = extract_json(gr.text) or {}
-            summary = str(glob.get("summary", ""))
-            scores = glob.get("scores") if isinstance(glob.get("scores"), dict) else None
+                response_json_schema=_GLOBAL_SCHEMA, max_output_tokens=512))
+            summary = str((extract_json(gr.text) or {}).get("summary", ""))
 
             # Pass2 (窓): 各窓を独立に密記述。 空窓はそのまま空 (= idle、 区間を作らない)。
             def label_window(a: float, b: float) -> list[Segment]:
@@ -168,7 +151,7 @@ class GeminiVideoDenseLabeler(Labeler):
                     segments.extend(res)
             segments.sort(key=lambda s: s.start_s)
             print(f"[gemini-video-dense] tokens input={usage['in']} output={usage['out']} (clip {duration_s:.0f}s)", flush=True)
-            return LabelResult(segments=segments, summary=summary, scores=scores)
+            return LabelResult(segments=segments, summary=summary)
         finally:
             try:
                 client.files.delete(name=f.name)

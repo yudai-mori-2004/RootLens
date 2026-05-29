@@ -1,16 +1,16 @@
 """
-RootLens Pipeline 2 第 3 層: dense narration + 採点 + 自動分類 (Modal CPU 関数)。
+RootLens Pipeline 2 ラベリング層: dense narration + 自動分類 (Modal CPU 関数)。
+
+⚠ この層は「ラベリング (観測)」専任。 品質スコアリングは行わない。
+   スコアリングはタスク定義に依存する別概念であり、 ラベル (semantic.jsonl) を入力にした
+   別フローで後段に行う設計。 ここでスコアを混ぜない (= 関心の分離)。
 
 ラベリングは labeling/ のプラガブル Labeler (= プロバイダ+手法単位、 既定 gemini-video-dense、
 他に claude-diffsw / claude-single-pass) に委譲する。 labeler は LabelResult
-(segments=説明文のみ / summary / objects / scores) を返す。
+(segments=説明文のみ / summary / objects) を返す。 autoCategory は要約から派生する。
 
-- semantic.jsonl は説明文のみ (= フレームごとに category は付けない)。 クリップ単位の autoCategory は
-  要約から派生する。
-- 採点 (4基準) は labeler の scores を使い、 無い場合は中央値フォールバックする。
-
-入力: signature_hash, labeler (既定 gemini-video-dense), prior_scores。
-出力: VlmScoreResult (camelCase) + processed/<signature_hash>/{semantic.jsonl, quality_scores.json}。
+入力: signature_hash, labeler (既定 gemini-video-dense)。
+出力: ラベリング結果 (camelCase) + processed/<signature_hash>/semantic.jsonl。
 """
 
 import json
@@ -41,17 +41,6 @@ image = (
 
 app = modal.App("rootlens-layer3-vlm", image=image)
 
-
-# ─── 配点 (DATA_SPECS §3.2.4) ───────────────────────────────────────────
-
-WEIGHT_TASK_ACTIVITY = 22
-WEIGHT_OBJECT_INTERACTION = 18
-WEIGHT_AUTHENTICITY = 15
-WEIGHT_SCENE_MATCH = 10
-LAYER3_MAX_SCORE = WEIGHT_TASK_ACTIVITY + WEIGHT_OBJECT_INTERACTION + WEIGHT_AUTHENTICITY + WEIGHT_SCENE_MATCH
-
-FALLBACK_METRIC = 2.5
-FALLBACK_IDLE_RATIO = 0.5
 
 # クリップ単位カテゴリを要約のキーワードから派生する (web/shared/api-types AutoCategory と一致)。
 CATEGORY_KEYWORDS = {
@@ -88,7 +77,7 @@ def _derive_category(summary: str) -> tuple[str, float]:
 def _idle_ratio(segments, duration_s: float) -> float:
     """セグメントが覆っていない時間の割合 (= 何も手作業していない区間)。"""
     if duration_s <= 0 or not segments:
-        return 1.0 if not segments else FALLBACK_IDLE_RATIO
+        return 1.0 if not segments else 0.5
     iv = sorted((max(0.0, s.start_s), min(duration_s, s.end_s)) for s in segments)
     covered, cur_a, cur_b = 0.0, None, None
     for a, b in iv:
@@ -104,30 +93,6 @@ def _idle_ratio(segments, duration_s: float) -> float:
     if cur_a is not None:
         covered += cur_b - cur_a
     return max(0.0, min(1.0, 1.0 - covered / duration_s))
-
-
-def _scoring(result, duration_s: float) -> dict:
-    """LabelResult.scores (0-5) → layer3 スコア。 None なら中央値フォールバック。 idleRatio は segments から。"""
-    sc = result.scores
-    if not sc:
-        return {
-            "score": int(round((FALLBACK_METRIC / 5.0) * LAYER3_MAX_SCORE)),
-            "taskActivityAvg": FALLBACK_METRIC, "objectInteractionAvg": FALLBACK_METRIC,
-            "authenticityAvg": FALLBACK_METRIC, "sceneMatchAvg": FALLBACK_METRIC,
-            "idleRatio": round(_idle_ratio(result.segments, duration_s), 4),
-        }
-
-    def c(v):
-        return max(0.0, min(5.0, float(v)))
-
-    ta, oi, au, sm = c(sc.get("task_activity", 0)), c(sc.get("object_interaction", 0)), c(sc.get("authenticity", 0)), c(sc.get("scene_match", 0))
-    score = int(round(ta / 5 * WEIGHT_TASK_ACTIVITY + oi / 5 * WEIGHT_OBJECT_INTERACTION + au / 5 * WEIGHT_AUTHENTICITY + sm / 5 * WEIGHT_SCENE_MATCH))
-    return {
-        "score": max(0, min(LAYER3_MAX_SCORE, score)),
-        "taskActivityAvg": round(ta, 4), "objectInteractionAvg": round(oi, 4),
-        "authenticityAvg": round(au, 4), "sceneMatchAvg": round(sm, 4),
-        "idleRatio": round(_idle_ratio(result.segments, duration_s), 4),
-    }
 
 
 def _write_semantic(s3, bucket, h, result, duration_s, labeler_name, output_format, work_dir) -> str:
@@ -152,16 +117,6 @@ def _write_semantic(s3, bucket, h, result, duration_s, labeler_name, output_form
     return key
 
 
-def _write_quality_scores(s3, bucket, h, prior_json, layer3) -> str:
-    prior = json.loads(prior_json)
-    l1, l2 = prior["layer1"], prior["layer2"]
-    total = int(round(float(l1.get("score", 0)) + float(l2.get("score", 0)) + float(layer3.get("score", 0))))
-    doc = {"total": total, "layer1": l1, "layer2": l2, "layer3": layer3}
-    key = f"processed/{h}/quality_scores.json"
-    s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8"), ContentType="application/json")
-    return key
-
-
 @app.function(
     cpu=2.0,
     memory=2048,
@@ -173,8 +128,10 @@ def _write_quality_scores(s3, bucket, h, prior_json, layer3) -> str:
     ],
 )
 @modal.fastapi_endpoint(method="POST")
-def score_layer3(signature_hash: str, labeler: str = "", prior_scores: str = "", vlm_interval_sec: float = 0.0):
-    """Pipeline 2 第 3 層。 labeler 既定 = gemini-video-dense。 vlm_interval_sec は legacy 互換で受けるが未使用。"""
+def score_layer3(signature_hash: str, labeler: str = ""):
+    """Pipeline 2 ラベリング層。 labeler 既定 = gemini-video-dense。 採点はしない (= 別フロー)。
+    (endpoint 名は互換のため score_layer3 のまま。 実体はラベリング専任。)
+    未宣言の query param (= 旧 client の prior_scores / vlm_interval_sec) は FastAPI が無視する。"""
     import boto3  # type: ignore
 
     t_start = time.time()
@@ -201,17 +158,20 @@ def score_layer3(signature_hash: str, labeler: str = "", prior_scores: str = "",
     result = impl.label(rgb, duration, fps)
     print(f"[layer3] labeled: {len(result.segments)} segments summary={result.summary[:60]!r} ({time.time()-t_lab:.1f}s)", flush=True)
 
-    layer3 = _scoring(result, duration)
+    # ラベリング結果のみ (= 採点しない)。 autoCategory は要約から派生 (= 観測の分類)。
+    # idleRatio はセグメント被覆から算出する観測由来の統計 (= 採点ではない。 後段スコアリングの素材)。
     auto_cat, auto_conf = _derive_category(result.summary)
-    layer3["autoCategory"] = auto_cat
-    layer3["autoCategoryConfidence"] = auto_conf
-
-    # web 互換 frameLabels (= segments を {frameIdx, tsSec, category, description} に。 category は空 = 派生は別)
     frame_labels = [
-        {"frameIdx": int(s.start_s * fps), "tsSec": round(s.start_s, 3), "category": "", "description": s.description}
+        {"frameIdx": int(s.start_s * fps), "tsSec": round(s.start_s, 3), "description": s.description}
         for s in result.segments
     ]
-    response = {**layer3, "frameLabels": frame_labels}
+    response = {
+        "autoCategory": auto_cat,
+        "autoCategoryConfidence": auto_conf,
+        "idleRatio": round(_idle_ratio(result.segments, duration), 4),
+        "summary": result.summary,
+        "frameLabels": frame_labels,
+    }
 
     try:
         sem_key = _write_semantic(s3, bucket_processed, signature_hash, result, duration, impl.name, impl.output_format, work_dir)
@@ -219,19 +179,12 @@ def score_layer3(signature_hash: str, labeler: str = "", prior_scores: str = "",
     except Exception as e:  # noqa: BLE001
         print(f"[layer3] WARNING semantic.jsonl write failed: {type(e).__name__}: {e}", flush=True)
 
-    if prior_scores:
-        try:
-            q_key = _write_quality_scores(s3, bucket_processed, signature_hash, prior_scores, layer3)
-            print(f"[layer3] wrote {q_key}", flush=True)
-        except Exception as e:  # noqa: BLE001
-            print(f"[layer3] WARNING quality_scores.json write failed: {type(e).__name__}: {e}", flush=True)
-
     try:
         os.remove(rgb)
     except OSError:
         pass
 
-    print(f"[layer3] done {signature_hash} score={layer3['score']}/{LAYER3_MAX_SCORE} "
+    print(f"[layer3] done {signature_hash} segments={len(result.segments)} "
           f"cat={auto_cat} labeler={impl.name} elapsed={time.time()-t_start:.1f}s", flush=True)
     return response
 

@@ -38,13 +38,12 @@ class Segment:
 
 @dataclass
 class LabelResult:
-    """Labeler の出力。 全プロバイダ共通の契約。"""
+    """Labeler の出力。 全プロバイダ共通の契約。 ラベル (観測) のみ。 採点 (品質) は持たない
+    (= スコアリングはラベリングと別概念・別フロー。 タスク定義に依存するためここでは行わない)。"""
 
     segments: list[Segment] = field(default_factory=list)
     summary: str = ""                       # クリップ全体の1文要約 (= 事後カテゴリ派生に使う)
     objects: list[str] = field(default_factory=list)  # 実在物体インベントリ
-    # 4 基準スコア (0-5)。 出せる実装だけ付与 (= Gemini は global パスで返す)。 None なら呼び出し側でフォールバック。
-    scores: dict | None = None
 
 
 @dataclass

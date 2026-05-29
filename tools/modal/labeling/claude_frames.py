@@ -1,5 +1,5 @@
 """Claude フレーム系 Labeler。 動画を内部でフレームサンプルし画像として投げる。 出力は segments (説明文のみ)。
-scores は出さない (= None、 呼び出し側でフォールバック)。 ANTHROPIC_API_KEY を env から読む。
+採点はしない (= ラベリングは観測のみ)。 ANTHROPIC_API_KEY を env から読む。
 
   claude-single-pass : 各フレーム独立にキャプション。
   claude-diffsw      : 前フレーム画像 + 現フレームで差分記述。
@@ -69,7 +69,7 @@ class ClaudeSinglePassLabeler(Labeler):
                     desc[int(e.get("frame_idx", -1))] = str(e.get("description", "")).strip()
                 except (TypeError, ValueError):
                     pass
-        return LabelResult(segments=_segments_from_descs(frames, desc, duration_s), scores=None)
+        return LabelResult(segments=_segments_from_descs(frames, desc, duration_s))
 
 
 class ClaudeDiffSWLabeler(Labeler):
@@ -103,4 +103,4 @@ class ClaudeDiffSWLabeler(Labeler):
                 d = None
             desc[fr.frame_idx] = str((d or {}).get("description", "")).strip()
             prev = fr
-        return LabelResult(segments=_segments_from_descs(frames, desc, duration_s), scores=None)
+        return LabelResult(segments=_segments_from_descs(frames, desc, duration_s))
