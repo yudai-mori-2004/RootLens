@@ -14,14 +14,16 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-# 全 Labeler が共有する接地原則 (= hallucination を防ぐ最重要ルール。 Ego4D #C / EgoHOIBench 知見)。
+# 全 Labeler が共有する接地原則 (= hallucination を防ぐルール)。 モデルに送る文字列は英語で統一
+# する (= プロンプトに日本語が混ざると出力言語が日英で揺れるため)。
 GROUNDING_RULES = (
-    "接地原則 (= 厳守。 ハルシネーション禁止。 訓練データの品質を壊す):\n"
-    "- 記述は『撮影者(カメラ装着者)本人の手が実際に把持・操作している事』だけ。\n"
-    "  物・道具・画面が視界に映っていることと、 操作していることは別 (= 在る ≠ している)。\n"
-    "- 見えていない動作・道具を推測/捏造しない。 与えられた物体インベントリに無い物を新規に登場させない。\n"
-    "- 手が映っていない / 何も操作していない区間は、 区間を作らない (= 空にする)。\n"
-    "- description は『どの手で・何を・どう操作しているか』を簡潔に。 カテゴリ語は付けない。\n"
+    "Grounding rules (strict; do NOT hallucinate — fabrication ruins the training data):\n"
+    "- Describe ONLY what the camera wearer's own hands are actually grasping or manipulating.\n"
+    "  An object, tool, or screen being visible in frame is NOT the same as it being manipulated.\n"
+    "- Do not infer or invent actions or objects you cannot clearly see.\n"
+    "- For spans where no hands are visible or nothing is being manipulated, produce no segment (leave it empty).\n"
+    "- Keep each description concise: which hand, what object, what action. Do not add category words.\n"
+    "- Write all descriptions in English.\n"
 )
 
 
@@ -62,6 +64,10 @@ class Labeler(ABC):
     """
 
     name: str = "base"
+    # 出力ファイル形式の識別子。 layer3 の writer がこれを見て serialize する。 実装ごとに変えられる
+    # (= interface は同じでも、 この実装はこの形式で出す、 が表現できる)。 既定 = dense video captioning
+    # (ActivityNet Captions と format-compatible な区間 {start_s, end_s, description})。
+    output_format: str = "dense_captions"
 
     @abstractmethod
     def label(self, video_path: str, duration_s: float, fps: float) -> LabelResult:

@@ -130,37 +130,23 @@ def _scoring(result, duration_s: float) -> dict:
     }
 
 
-def _semantic_rows(segments, total_frames: int, fps: float) -> list[dict]:
-    """segments (時系列・説明文のみ) を全フレームに展開。 各フレームを覆う segment の description を継承。
-    覆う segment が無いフレーム (= idle) は空 description。"""
-    if total_frames <= 0 or fps <= 0:
-        return []
-    segs = sorted(segments, key=lambda s: s.start_s)
-    rows = []
-    pi = 0
-    cur = None
-    for i in range(total_frames):
-        ts = i / fps
-        while pi < len(segs) and segs[pi].start_s <= ts:
-            cur = segs[pi]
-            pi += 1
-        desc = cur.description if (cur and cur.start_s <= ts <= cur.end_s) else ""
-        rows.append({"frame_index": i, "ts_sec": round(ts, 4), "description": desc})
-    return rows
-
-
-def _write_semantic(s3, bucket, h, result, total_frames, fps, labeler_name, work_dir) -> str:
-    rows = _semantic_rows(result.segments, total_frames, fps)
+def _write_semantic(s3, bucket, h, result, duration_s, labeler_name, output_format, work_dir) -> str:
+    """labeler の宣言した output_format で semantic.jsonl を書く。
+    dense_captions = ActivityNet Captions のイベントスキーマ: 1 行目ヘッダー (duration + provenance) +
+    2 行目以降が時系列イベント {timestamp: [start, end], sentence}。"""
     path = f"{work_dir}/semantic.jsonl"
+    if output_format != "dense_captions":
+        raise ValueError(f"unknown output_format: {output_format}")
+    segs = sorted(result.segments, key=lambda s: s.start_s)
     with open(path, "w") as f:
         f.write(json.dumps({
-            "labeler": labeler_name, "signature_hash": h, "fps": fps, "total_frames": total_frames,
+            "format": "activitynet_dense_captions", "labeler": labeler_name, "signature_hash": h,
+            "duration": round(duration_s, 3),
             "annotation": "auto_generated_unverified",   # 自動生成・未検証 (= 人手アノテーションではない)
-            "summary": result.summary, "objects": result.objects,
-            "fields": ["frame_index", "ts_sec", "description"],  # category は付けない (= 説明文のみ)
+            "fields": ["timestamp", "sentence"],
         }, ensure_ascii=False) + "\n")
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        for s in segs:
+            f.write(json.dumps({"timestamp": [s.start_s, s.end_s], "sentence": s.description}, ensure_ascii=False) + "\n")
     key = f"processed/{h}/semantic.jsonl"
     s3.upload_file(path, bucket, key, ExtraArgs={"ContentType": "application/x-ndjson"})
     return key
@@ -228,8 +214,8 @@ def score_layer3(signature_hash: str, labeler: str = "", prior_scores: str = "",
     response = {**layer3, "frameLabels": frame_labels}
 
     try:
-        sem_key = _write_semantic(s3, bucket_processed, signature_hash, result, total_frames, fps, impl.name, work_dir)
-        print(f"[layer3] wrote {sem_key} ({total_frames} frames, {len(result.segments)} segments)", flush=True)
+        sem_key = _write_semantic(s3, bucket_processed, signature_hash, result, duration, impl.name, impl.output_format, work_dir)
+        print(f"[layer3] wrote {sem_key} ({len(result.segments)} segments, {impl.output_format})", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"[layer3] WARNING semantic.jsonl write failed: {type(e).__name__}: {e}", flush=True)
 

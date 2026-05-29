@@ -16,9 +16,9 @@ INTERVAL_S = 10.0
 RESIZE_WIDTH = 1024
 
 _SYS = (
-    "あなたは一人称視点 (= エゴセントリック) の家庭内活動映像の注釈者です。 撮影者の手作業を記述します。\n"
+    "You are an annotator for first-person (egocentric) home-activity video. Describe the camera wearer's hand actions.\n"
     + GROUNDING_RULES
-    + '出力 JSON のみ。 frame ごとに {"frame_idx": int, "description": str} を返す。 カテゴリは付けない。'
+    + 'Output JSON only. For each frame return {"frame_idx": int, "description": str}. Do not add categories.'
 )
 
 
@@ -56,7 +56,7 @@ class ClaudeSinglePassLabeler(Labeler):
             for fr in batch:
                 content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": fr.b64}})
                 content.append({"type": "text", "text": f"[frame_idx={fr.frame_idx}]"})
-            content.append({"type": "text", "text": f"上記 {len(batch)} 枚の description を JSON で返す。"})
+            content.append({"type": "text", "text": f"Return JSON with a description for each of the above {len(batch)} frames."})
             try:
                 resp = client.messages.create(model=MODEL, max_tokens=4096, temperature=0.0, system=_SYS,
                                               messages=[{"role": "user", "content": content}])
@@ -76,10 +76,10 @@ class ClaudeDiffSWLabeler(Labeler):
     name = "claude-diffsw"
 
     _SYS_DIFF = (
-        "あなたは一人称視点映像に時系列で注釈する注釈者です。 直前フレーム画像と現フレーム画像を見て、\n"
-        "現フレームで撮影者がしている手作業を記述します。\n"
+        "You are an annotator labeling first-person video over time. Looking at the previous-frame image and the\n"
+        "current-frame image, describe the hand action the camera wearer is doing in the current frame.\n"
         + GROUNDING_RULES
-        + '出力 JSON のみ: {"description": str}'
+        + 'Output JSON only: {"description": str}'
     )
 
     def label(self, video_path: str, duration_s: float, fps: float) -> LabelResult:
@@ -90,9 +90,9 @@ class ClaudeDiffSWLabeler(Labeler):
         for fr in frames:
             content: list[dict] = []
             if prev is not None:
-                content.append({"type": "text", "text": "[直前フレーム]"})
+                content.append({"type": "text", "text": "[previous frame]"})
                 content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": prev.b64}})
-            content.append({"type": "text", "text": "[現フレーム] これを記述:"})
+            content.append({"type": "text", "text": "[current frame] describe this:"})
             content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": fr.b64}})
             try:
                 resp = client.messages.create(model=MODEL, max_tokens=512, temperature=0.0, system=self._SYS_DIFF,
