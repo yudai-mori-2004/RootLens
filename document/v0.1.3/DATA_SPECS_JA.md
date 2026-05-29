@@ -160,28 +160,28 @@ ARKit 構成の場合、`imu.jsonl` と `realtime_handpose.jsonl` 内のカメ�
 | オプティカルフロー | Farneback 法によるフレーム間フロー量。静止区間を検出 |
 | フレーム間多様性 | ヒストグラム差分。ループ映像を検出 |
 
-#### 3.2.3 第 3 層: VLM セマンティック解析 + 自動ラベリング
+#### 3.2.3 第 3 層: VLM dense ラベリング + 採点
 
-n_vlm 秒おきにフレームを VLM（Claude Haiku 4.5）に送信（初期値: 10 = Ego4D の dense narration（約 10 秒間隔）と同等密度）。30 分の動画で約 180 フレーム、約 $0.60/クリップ。密度はラベルの学習価値とコストのトレードオフで n_vlm により調整できる（n_vlm=30 なら約 $0.20）。
+クリップを VLM に渡し、撮影者の手作業の時系列記述（dense narration）と 4 基準スコアを得る。
 
-**スコア基準（0〜5）**:
+**ラベリングはプラガブル**: ラベリングは採点（品質ゲート）から分離し、`Labeler` インターフェース（`tools/modal/labeling/`）で実装を差し替えられる。抽象の境界は Python インターフェース + 出力スキーマであり、Modal 関数は実行環境にすぎない。各 Labeler は「ベンダー + 手法」を 1 単位とし（既定 `gemini-video-dense`、他に `claude-diffsw` / `claude-single-pass`）、自前の SDK・認証・リクエスト構造を持つ。**出力ファイル形式も実装が宣言する**（§3.3）。採点ロジックは実装間で固定し、手法を差し替えても比較可能性を保つ。GPU + ローカルモデル等ランタイムが異なる手法のみ別 Modal 関数にし、同じ出力スキーマを満たす。
+
+既定の `gemini-video-dense` は動画をネイティブに取り込み、(1) 全体パスでクリップ要約 + 4 基準スコア、(2) 動画を秒窓に分割し各窓を密記述、(3) 窓内相対秒を絶対秒に変換、の手順で時系列イベントを得る。手の動作を捉えるため窓は適切な fps / 解像度で渡す。窓分割は長尺を 1 回で密に出せない（出力トークン上限）ための機械的分割で、各窓は相互独立なので並列実行する。
+
+**スコア基準（0〜5、クリップ全体）**:
 
 | 基準 | 説明 |
 |------|------|
-| `task_activity` | 目的的活動を遂行しているか |
+| `task_activity` | 目的的な手作業を遂行しているか |
 | `object_interaction` | 手が物体を操作しているか |
-| `scene_match` | 環境が活動と合致しているか |
 | `authenticity` | 本物の人間の手による実際の動作か |
+| `scene_match` | 環境が家事 / 作業と合致するか |
 
-**ラベリング**: 主ラベルはフレームごとの**具体的な行動記述文（dense narration）**。「どの手で・何を・どう操作しているか」を verb + noun を含む自然文で書く（Ego4D 流）。固定カテゴリ（`cleaning` / `laundry` / `cooking` / `studying` / `crafting` / `organizing` / `meal_prep` / `other`）は marketplace フィルタ用の**粗い派生ビュー**として併記するだけで主役ではない。taxonomy は固定せず、ジャンルは記述文の embedding から事後に導出・再分類できる設計とする（= 記述文を再生成せずカテゴリだけ付け替え可能）。クリップ全体の多数決で主カテゴリ + 信頼度を出す。
+**ラベル本体は説明文（dense narration）のみ**で、固定カテゴリは付けない。クリップ単位の主カテゴリは要約から事後に派生する（`cleaning` / `laundry` / `cooking` / `studying` / `crafting` / `organizing` / `meal_prep` / `other`。marketplace フィルタ用の粗い目安であり、ラベル本体ではない。taxonomy は固定せず記述文から再分類できる）。
 
-**ラベリング手法はプラガブル**: ラベリングは採点（品質ゲート）から分離し、`Labeler` インターフェース（`tools/modal/labeling/`）の差し替えで手法を変更できる。抽象の境界は Modal 関数（= 実行/デプロイの器）ではなく **Python インターフェース + 出力スキーマ（semantic.jsonl）** に置く。粒度は**ベンダー単位**（`gemini-video-dense` / `claude-diffsw` / `claude-single-pass` …）= 各 Labeler が自前の SDK・認証 key・リクエスト構造を持つ。同一ランタイム（= CPU 上で動画/フレームを外部 LLM API に投げる）の手法は 1 つの Modal 関数内で registry 切替（`labeler` パラメータ）、GPU + ローカルモデル等ランタイムが異なる手法のみ別 Modal 関数にしつつ同じ出力スキーマを満たす、という二段構成とする。採点ロジックは固定（手法を差し替えても比較可能性を保つ）。
+**接地ルール**（プロンプトで全実装が共有）: 記述は撮影者本人の手が実際に把持・操作している事だけに基づく。物が視界に在ること ≠ 操作していること。手に握っていない道具名は出さない。手作業のない区間は記述しない（空 = idle）。
 
-既定手法は **`gemini-video-dense`（Gemini 動画ネイティブ取り込み）**。フレームを個別画像として独立に投げる手法（`claude-single-pass`）は VLM が「視界に写っている物」を「撮影者がしている操作」に捏造する（object/action hallucination、例: 画面が映る → "マウスを操作している" と捏造）。動画ネイティブ取り込みはフレーム間の時間運動を実際に見るため捏造が出にくく、課金もフレーム枚数ではなく秒数ベースで割安。手法は (1) 全体パスで要約・物体インベントリ・スコアを取り、(2) `videoMetadata` の start/end offset で動画を秒窓に分割し fps=2 / media LOW で各窓を密記述、(3) 相対秒→絶対秒に変換し尺に clamp、で構成する。窓は相互独立なので並列実行し Modal の同期 HTTP 上限内に収める。フレーム系の代替として **DiffSW（差分スライディングウィンドウ、ShareGPT4Video / NeurIPS 2024、= 直前フレーム + 現フレームを与え差分記述）= `claude-diffsw`** も同じインターフェース下に持つ。
-
-全手法 + 採点で共有する**接地原則（GROUNDING_RULES）**として Ego4D の `#C`（撮影者本人の行動のみ記述）を採用する: 視界に在ること ≠ 操作していること、手に握っていない道具名を出さない、見回し/歩行/画面を撮しているだけ/無活動はそのまま無活動として書き task_activity・object_interaction を低くする。
-
-自動ラベルは人手アノテーション（Ego4D / EPIC-KITCHENS / HomER はいずれも人手）ではないため、`semantic.jsonl` に `annotation: "auto_generated_unverified"` + labeler 名を記録して「自動生成・未検証」であることを明示する。将来、少数の人手正解セットとの一致率で「自動で安定して作れるラベル種別 / 人手確認が要る種別」を切り分ける検証ループを設ける。
+ラベルは**自動生成・未検証**であり、`semantic.jsonl` に `annotation: "auto_generated_unverified"` と labeler 名を記録する。ラベル精度は外部標準では担保されないため、別途、人手正解との比較で測定して公開する。
 
 #### 3.2.4 総合スコア
 
@@ -206,16 +206,16 @@ Pipeline 2 の出力は `processed/<signature_hash>/` に書き出す。
 ```
 processed/<signature_hash>/
   quality_scores.json        # 総合スコア + 全サブ指標
-  semantic.jsonl             # フレーム単位のラベル（VLM 未推定フレームは直近の推定値で補間）
+  semantic.jsonl             # dense video captioning 形式の時系列ラベル
 ```
 
-`semantic.jsonl` は 1 行目がヘッダー（`model` / `labeler` / `annotation: "auto_generated_unverified"` / `fps` / `total_frames` / `fields`）、2 行目以降が全フレーム分の行（`frame_index` / `ts_sec` / `category` / `description`）。VLM が n_vlm 秒おきに推定したフレーム間は、直近の推定値（= 実フレーム番号基準の区間）で埋める。
+`semantic.jsonl` は **ActivityNet Captions のイベントスキーマ**で出力する（既定 labeler が宣言する形式）。1 行目はヘッダー（`format` / `labeler` / `signature_hash` / `duration` / `annotation: "auto_generated_unverified"` / `fields`）、2 行目以降が時系列イベント `{timestamp: [start, end], sentence}`。イベントは時間順・非重複で、手作業のない時間はイベントを作らない（= idle）。
 
 DB にも品質スコア、主カテゴリ + 信頼度、ステータス `ready` を書き込む。撮影者に push 通知。
 
 ### 3.4 コスト
 
-30 分クリップあたり約 $0.60（n_vlm=10）。大半は第 3 層 VLM。密度を下げれば比例して安くなる（n_vlm=30 で約 $0.20）。
+大半は第 3 層 VLM。既定 `gemini-video-dense` は動画秒数ベース課金で、1 時間あたり $2 以内に収める。
 
 ### 3.5 冪等性
 
@@ -327,7 +327,7 @@ DB（Supabase）:
 | パイプライン | 対象 | 30 分あたり |
 |-------------|------|-----------|
 | Pipeline 1 | 全クリップ | Solana 手数料のみ |
-| Pipeline 2 | 全クリップ | 約 $0.60（n_vlm=10、 Ego4D 同等密度） |
+| Pipeline 2 | 全クリップ | 1 時間あたり $2 以内（大半は第 3 層 VLM、 gemini-video-dense 動画秒数課金） |
 | Pipeline 3 | 販売対象 | $0.10〜0.20 |
 
-合計 30 分あたり約 $0.70〜0.80（1 時間あたり約 $1.4〜1.6）。 上限 $1〜2/時 の範囲内。 ラベル密度 (n_vlm) を上げた分だけ Pipeline 2 のコストが上がる（= 密度と学習価値のトレードオフ。 n_vlm=30 なら合計 30 分 $0.40 以下）。
+合計で 1 時間あたり $2 以内に収める（大半は第 3 層 VLM）。
