@@ -25,14 +25,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Line } from 'react-native-svg';
 
 import type {
-  AutoCategory,
   Clip,
   Layer1Score,
   Layer2Score,
   Layer3Score,
   QualityBreakdown,
-} from '../services/clipPipeline';
-import { findTask } from '../domain/taskCatalog';
+} from '../dataflow';
+import { clipTitle } from '../domain/clipLabels';
+import { useT } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 interface Props {
@@ -44,6 +44,7 @@ interface Props {
 }
 
 export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpenStake, onRemove }) => {
+  const t = useT();
   if (!clip) {
     return (
       <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -52,8 +53,6 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
     );
   }
 
-  // 旧 taskId 持ち clip (= legacy persistence) の互換表示。 新撮影では undefined。
-  const legacyTask = clip.taskId ? findTask(clip.taskId) : null;
   const breakdown = clip.qualityBreakdown ?? null;
   const total = breakdown?.total ?? clip.qualityScore ?? null;
 
@@ -72,15 +71,15 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* ヘッダ: VLM 自動分類 (= 新仕様) or legacy task name + 撮影日 */}
           <View style={styles.header}>
-            <Text style={styles.taskName}>
-              {clip.autoCategory ? describeAutoCategory(clip.autoCategory) : legacyTask?.name ?? clip.taskId ?? '未分類'}
+            <Text style={styles.taskName} numberOfLines={1} ellipsizeMode="middle">
+              {clipTitle(clip)}
             </Text>
             <Text style={styles.timestamp}>{formatDateTime(clip.createdAt)}</Text>
           </View>
 
           {/* 総合スコア (大型表示) */}
           <View style={styles.scoreBlock}>
-            <Text style={styles.scoreEyebrow}>QUALITY SCORE</Text>
+            <Text style={styles.scoreEyebrow}>{t('detail.qualityScore')}</Text>
             <View style={styles.scoreRow}>
               <Text style={[styles.scoreNumber, scoreTone(total)]}>
                 {total === null ? '—' : String(total)}
@@ -92,7 +91,7 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
           {/* 3 層内訳 (= GTSAM 撤去後) */}
           {breakdown ? (
             <View style={styles.layersBlock}>
-              <Text style={styles.sectionEyebrow}>BREAKDOWN</Text>
+              <Text style={styles.sectionEyebrow}>{t('detail.breakdown')}</Text>
               <Layer1Card data={breakdown.layer1} />
               <Layer2Card data={breakdown.layer2} />
               <Layer3Card data={breakdown.layer3} />
@@ -101,8 +100,8 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
             <View style={styles.noScoreCard}>
               <Text style={styles.noScoreText}>
                 {clip.state === 'processing'
-                  ? 'まだ採点中です。'
-                  : 'スコア内訳がありません。'}
+                  ? t('detail.scoringInProgress')
+                  : t('detail.noBreakdown')}
               </Text>
             </View>
           )}
@@ -110,41 +109,30 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
           {/* オンチェーン情報 (= rootAssetId 等) */}
           {clip.rootAssetId ? (
             <View style={styles.onchainBlock}>
-              <Text style={styles.sectionEyebrow}>ON-CHAIN</Text>
-              <Row label="ROOT ASSET" value={shortBase58(clip.rootAssetId)} onPress={onSolscan} mono />
-              {clip.delegate ? <Row label="DELEGATE" value={shortBase58(clip.delegate)} mono /> : null}
-              <Row label="LICENSES SOLD" value={String(clip.licenseCount ?? 0)} />
+              <Text style={styles.sectionEyebrow}>{t('detail.onChain')}</Text>
+              <Row label={t('detail.rootAsset')} value={shortBase58(clip.rootAssetId)} onPress={onSolscan} mono />
+              {clip.delegate ? <Row label={t('detail.delegate')} value={shortBase58(clip.delegate)} mono /> : null}
+              <Row label={t('detail.licensesSold')} value={String(clip.licenseCount ?? 0)} />
               <Row
-                label="REVENUE"
+                label={t('detail.revenue')}
                 value={`$${(clip.revenueUsdc ?? 0).toFixed(2)} USDC`}
                 tone={clip.revenueUsdc && clip.revenueUsdc > 0 ? 'ok' : undefined}
               />
             </View>
           ) : null}
 
-          {/* 自動分類 (= 新仕様、 Pipeline 2 の VLM ラベル付け結果) */}
-          {clip.autoCategory ? (
+          {/* signature_hash (= クリップの一意 id。 blur 後 D2 署名で確定する確定動画の id) */}
+          {clip.signatureHash ? (
             <View style={styles.taskBlock}>
-              <Text style={styles.sectionEyebrow}>AUTO LABEL</Text>
-              <Row label="CATEGORY" value={describeAutoCategory(clip.autoCategory)} />
-              {clip.autoCategoryConfidence !== undefined ? (
-                <Row label="CONFIDENCE" value={`${Math.round(clip.autoCategoryConfidence * 100)}%`} />
-              ) : null}
-            </View>
-          ) : legacyTask ? (
-            // legacy: 旧 capture flow で taskId 持ちのクリップを互換表示
-            <View style={styles.taskBlock}>
-              <Text style={styles.sectionEyebrow}>LEGACY TASK</Text>
-              <Row label="ID" value={legacyTask.id} mono />
-              <Row label="INTENSITY" value={legacyTask.intensity} />
-              <Row label="ORIENTATION" value={legacyTask.orientation} />
+              <Text style={styles.sectionEyebrow}>{t('detail.signatureHash')}</Text>
+              <Row label="SHA-256" value={clip.signatureHash} mono multiline />
             </View>
           ) : null}
 
           {/* エラー表示 */}
           {clip.state === 'error' && clip.errorMessage ? (
             <View style={styles.errorBlock}>
-              <Text style={styles.sectionEyebrow}>ERROR</Text>
+              <Text style={styles.sectionEyebrow}>{t('detail.error')}</Text>
               <Text style={styles.errorText} numberOfLines={6}>{clip.errorMessage}</Text>
             </View>
           ) : null}
@@ -154,7 +142,7 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
         <View style={styles.actions}>
           {clip.state === 'ready' && onOpenStake ? (
             <ActionButton
-              label="STAKE THIS CLIP"
+              label={t('detail.stakeThisClip')}
               kind="primary"
               onPress={() => {
                 onClose();
@@ -164,7 +152,7 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
           ) : null}
           {(clip.state === 'ready' || clip.state === 'error') && onRemove ? (
             <ActionButton
-              label="DELETE"
+              label={t('common.delete')}
               kind="ghost-danger"
               onPress={() => {
                 onClose();
@@ -172,7 +160,7 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
               }}
             />
           ) : null}
-          <ActionButton label="CLOSE" kind="ghost" onPress={onClose} />
+          <ActionButton label={t('common.close')} kind="ghost" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>
@@ -317,19 +305,6 @@ const ActionButton: React.FC<{
 );
 
 // ─── helpers ──────────────────────────────────────────────────────
-
-function describeAutoCategory(c: AutoCategory): string {
-  switch (c) {
-    case 'cleaning':   return '掃除';
-    case 'laundry':    return '洗濯';
-    case 'cooking':    return '料理';
-    case 'studying':   return '勉強';
-    case 'crafting':   return '工作';
-    case 'organizing': return '整理整頓';
-    case 'meal_prep':  return '食事の支度';
-    case 'other':      return 'その他';
-  }
-}
 
 function pctOrNa(v: number | null | undefined): string {
   if (v === null || v === undefined) return '—';
@@ -544,6 +519,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansSemibold,
     fontSize: 12,
     letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   actionLabelPrimary: { color: colors.textOnInk },
   actionLabelGhost: { color: colors.ink },

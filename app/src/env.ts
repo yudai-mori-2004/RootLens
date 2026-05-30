@@ -21,6 +21,12 @@ function readRequired(key: string): string {
   return v;
 }
 
+// ─── 開発: 起点切替 ───────────────────────────────────────────────────────
+// 既定は本番 UI (RootNavigator)。 EXPO_PUBLIC_USE_SANDBOX=1 の時だけ DevSandbox を起点にする。
+// DevSandbox は dataflow 層の単体検証ハーネスとして温存する (= 削除しない)。
+// ⚠ EXPO_PUBLIC_* は build 時に inline されるため、 値変更には rebuild が要る。
+export const USE_DEV_SANDBOX = readOptional('EXPO_PUBLIC_USE_SANDBOX') === '1';
+
 // ─── Solana ─────────────────────────────────────────────────────────────
 // 公式 devnet RPC は DAS API (= getAssetsByOwner / getAssetsByGroup) も同居で提供する
 // ので、 アプリ全体で 1 URL に統合。 専用 RPC (= Helius) を使う場合だけ env で上書き。

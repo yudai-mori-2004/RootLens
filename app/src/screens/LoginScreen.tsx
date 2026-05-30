@@ -20,12 +20,14 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import type { RootStackParamList } from '../app/types';
 import { useAuth } from '../services/auth';
+import { useT } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { provider, state } = useAuth();
+  const t = useT();
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +50,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const providerLabel = provider.id === 'debug' ? 'Debug wallet · auto-generated' : provider.id;
+  const providerLabel = provider.id === 'debug' ? t('login.debugWallet') : provider.id;
 
   return (
     <SafeAreaView style={styles.root}>
@@ -59,26 +61,29 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         <View style={styles.heroBlock}>
-          <Text style={styles.heroLineA}>Capture chores.</Text>
-          <Text style={styles.heroLineB}>Earn from <Text style={styles.heroLineBAccent}>AI labs.</Text></Text>
+          <Text style={styles.heroLineA}>{t('login.heroLineA')}</Text>
+          <Text style={styles.heroLineB}>
+            {t('login.heroBPrefix')}
+            <Text style={styles.heroLineBAccent}>{t('login.heroBAccent')}</Text>
+            {t('login.heroBSuffix')}
+          </Text>
         </View>
 
         <Text style={styles.lede}>
-          Record household tasks while wearing the phone. The clip is signed, blurred,
-          and minted on Solana as a Root NFT you own.
+          {t('login.lede')}
         </Text>
 
         <View style={styles.providerCard}>
-          <Text style={styles.providerEyebrow}>AUTH PROVIDER</Text>
+          <Text style={styles.providerEyebrow}>{t('settings.authProvider')}</Text>
           <Text style={styles.providerValue}>{providerLabel}</Text>
           <Text style={styles.providerNote}>
-            Privy embedded wallet は次の更新で。 今は端末ローカルにデバッグ wallet を作成して使う。
+            {t('login.providerNote')}
           </Text>
         </View>
 
         {error && (
           <View style={styles.errorBlock}>
-            <Text style={styles.errorLabel}>SIGN-IN FAILED</Text>
+            <Text style={styles.errorLabel}>{t('login.signInFailed')}</Text>
             <Text style={styles.errorBody}>{error}</Text>
           </View>
         )}
@@ -97,11 +102,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           {loggingIn ? (
             <ActivityIndicator color={colors.textOnInk} />
           ) : (
-            <Text style={styles.ctaLabel}>SIGN IN</Text>
+            <Text style={styles.ctaLabel}>{t('login.signIn')}</Text>
           )}
         </Pressable>
         <Text style={styles.tos}>
-          続行することで利用規約と Privacy Policy に同意したものとみなされます。
+          {t('login.tos')}
         </Text>
       </View>
     </SafeAreaView>
@@ -209,6 +214,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansSemibold,
     fontSize: 12,
     letterSpacing: 2.4,
+    textTransform: 'uppercase',
   },
   tos: {
     ...typography.caption,

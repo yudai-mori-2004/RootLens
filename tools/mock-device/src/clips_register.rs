@@ -2,12 +2,13 @@
 // signature_hash + rootAssetId + signedJsonUri が必須 (= Pipeline 2 起動の前提条件)。
 //
 // zod schema (= web/app/api/clips/route.ts) 参照:
-//   taskId               : string, min 1
-//   achievementConfidence: int 0-100
-//   signatureHash            : sha256 hex 64 chars (= "sha256:" prefix なし)
-//   contentSize          : positive int (= rgb.mp4 のバイト数)
-//   rootAssetId          : base58 32-44 chars (= cNFT asset id)
-//   signedJsonUri        : URL (= R2 signed-json/<signature_hash>.json の公開 URL)
+//   signatureHash   : sha256 hex 64 chars (= "sha256:" prefix なし)
+//   contentSize     : positive int (= rgb.mp4 のバイト数)
+//   rootAssetId     : base58 32-44 chars (= cNFT asset id)
+//   signedJsonUri   : URL (= R2 signed-json/<signature_hash>.json の公開 URL)
+//   recordingConfig : "ultra_wide" | "arkit" (= 撮影構成)
+//   deviceModel     : utsname machine 相当 (= mock は "mock-device")
+//   durationMs      : 省略 (= サーバが Pipeline 2 で算出)
 //
 // wallet pubkey は `X-Wallet-Pubkey` header で渡す (= web/lib/auth.ts requireWalletPubkey)。
 
@@ -16,10 +17,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 struct CreateClipBody<'a> {
-    #[serde(rename = "taskId")]
-    task_id: &'a str,
-    #[serde(rename = "achievementConfidence")]
-    achievement_confidence: u32,
     #[serde(rename = "signatureHash")]
     signature_hash: &'a str,
     #[serde(rename = "contentSize")]
@@ -28,6 +25,10 @@ struct CreateClipBody<'a> {
     root_asset_id: &'a str,
     #[serde(rename = "signedJsonUri")]
     signed_json_uri: &'a str,
+    #[serde(rename = "recordingConfig")]
+    recording_config: &'a str,
+    #[serde(rename = "deviceModel")]
+    device_model: &'a str,
 }
 
 #[derive(Deserialize)]
@@ -44,21 +45,20 @@ struct ClipDto {
 pub async fn register_clip(
     api_base: &str,
     wallet_pubkey: &str,
-    task_id: &str,
-    achievement_confidence: u32,
     signature_hash_hex: &str,
     content_size: u64,
     root_asset_id: &str,
     signed_json_uri: &str,
+    recording_config: &str,
 ) -> Result<String> {
     let url = format!("{}/api/clips", api_base.trim_end_matches('/'));
     let body = CreateClipBody {
-        task_id,
-        achievement_confidence,
         signature_hash: signature_hash_hex,
         content_size,
         root_asset_id,
         signed_json_uri,
+        recording_config,
+        device_model: "mock-device",
     };
 
     let client = reqwest::Client::builder()

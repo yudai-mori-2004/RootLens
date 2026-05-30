@@ -14,16 +14,8 @@ export type ProcessingStep =
 // ─── Solana ネットワーク (= cNFT 発行先クラスタ) ──────────────────
 export type SolanaNetwork = "devnet" | "mainnet";
 
-// ─── VLM 自動分類カテゴリ (= DATA_SPECS §3.2.3) ──────────────────
-export type AutoCategory =
-  | "cleaning"
-  | "laundry"
-  | "cooking"
-  | "studying"
-  | "crafting"
-  | "organizing"
-  | "meal_prep"
-  | "other";
+// ─── 撮影構成 (= DATA_SPECS §2.2) ────────────────────────────────
+export type RecordingConfig = "ultra_wide" | "arkit";
 
 // ─── 品質ベクトル (= DATA_SPECS §3、 多軸・合計なし) ──────────────────
 // 2026-05-29 方針転換: 単一合成スコア (旧 layer1+2+3=100) を廃止。 品質は独立した軸ごとに
@@ -52,15 +44,24 @@ export interface ClipDto {
   createdAt: string; // ISO 8601
   /// 現在 Pipeline 2 のどのステップにいるか (= processing 状態時のみ非 null)
   processingStep: ProcessingStep | null;
-  /// 合成スコアは持たない (= 多軸・合計なし)。 後方互換のため field は残すが常に null。
-  qualityScore: number | null;
-  /// 品質ベクトル (= 軸ごと 0-100 + 根拠 breakdown)。 ready 以降で値が入る。
+
+  // ── 撮影ファクト (= 端末申告 / サーバ算出) ──
+  /// 採用された撮影構成 (= 'ultra_wide' | 'arkit')。
+  recordingConfig: RecordingConfig;
+  /// 録画尺 (ms)。 Pipeline 2 の labeling が算出 (= ready 以降)。 端末申告があれば登録時から入る。
+  durationMs: number | null;
+  /// ぼかし済 rgb.mp4 のバイト数。
+  contentSize: number | null;
+  /// 撮影端末の機種 (= "iPhone15,2" 等)。
+  deviceModel: string | null;
+
+  // ── Pipeline 2 結果 ──
+  /// 品質ベクトル (= 軸ごと 0-100 + 根拠 breakdown)。 ready 以降で値が入る。 合計は持たない。
   qualityVector: QualityVector | null;
-  /// VLM が事後分類した主カテゴリ (= ready 以降で入る)。
-  /// 2026-05-27: 撮影前タスク選択撤去に伴い、 タスク ID は持たず Pipeline 2 で自動分類する。
-  autoCategory: AutoCategory | null;
-  /// autoCategory の信頼度 (= 0..1、 multi-frame 多数決の比率)
-  autoCategoryConfidence: number | null;
+  /// クリップの 1 行要約 (= labeling の Gemini 全体パス)。 ready 以降で入る。 可読ラベル。
+  summary: string | null;
+
+  // ── オンチェーン / 来歴 ──
   /// Title Protocol が発行した Root NFT の cNFT asset ID (= base58、 ready 以降で入る)
   rootAssetId: string | null;
   /// TP /process が返した signed_json への R2 URI (= signed-json/<signature_hash>.json)。
@@ -70,10 +71,13 @@ export interface ClipDto {
   network: SolanaNetwork;
   /// Bubblegum delegate (= staked 状態時のみ非 null)
   delegate: string | null;
+
+  // ── 収益 ──
   /// ライセンス販売累計 (= staked 後に更新)
   licenseCount: number;
   /// 累積収益 USDC
   revenueUsdc: number;
+
   /// 処理エラー時のメッセージ (= error 状態時のみ非 null)
   errorMessage: string | null;
   /// 撮影者プレビュー用の R2 GET URL (= 署名済 rgb.mp4 への 1 時間 presigned URL)
@@ -86,8 +90,6 @@ export interface ClipDto {
 /// POST /api/clips
 /// 端末で R2 upload + TP /process + cNFT 発行が完了した直後に呼ぶ。
 /// rootAssetId が確定済の状態でのみクリップ行が作成される (= Pipeline 2 の前提条件)。
-/// 2026-05-27: 新仕様では taskId / achievementConfidence は送らない (= 事前タスク選択 + VLM gate 廃止)。
-/// 段階削除中の旧 client 互換のため optional として残置、 server は受信しても fallback で吸収する。
 export interface CreateClipRequest {
   /// 端末で確定した signature_hash (= C2PA D2 アクティブマニフェスト署名の SHA-256 hex)
   /// DATA_SPECS §1.1 参照。 重複アップロード検知 + 冪等キーに使う
@@ -101,9 +103,12 @@ export interface CreateClipRequest {
   signedJsonUri: string;
   /// cNFT を発行した Solana ネットワーク (= 重複排除キーの一部)。 省略時は server が devnet 扱い (legacy)。
   network?: SolanaNetwork;
-  /// legacy: 旧 client が送ってきた場合のみ受信、 新 client は省略
-  taskId?: string;
-  achievementConfidence?: number;
+  /// 採用された撮影構成 (= 'ultra_wide' | 'arkit')。 省略時は server が ultra_wide 扱い (= 旧 client 互換、 移行用)。
+  recordingConfig?: RecordingConfig;
+  /// 録画尺 (ms)。 端末が record stop−start から算出。 省略時はサーバが Pipeline 2 で算出して埋める。
+  durationMs?: number;
+  /// 撮影端末の機種 (= "iPhone15,2" 等、 metadata.json と同じ utsname machine)。
+  deviceModel?: string;
 }
 
 /// 撮影構成が並走出力するファイル分の presigned PUT URL (DATA_SPECS §2.2)。

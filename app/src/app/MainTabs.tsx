@@ -13,6 +13,7 @@ import { HomeIcon, CameraIcon, SettingsIcon } from '../components/TabIcons';
 // MainTabs は createBottomTabNavigator が screen に component を要求するので、
 // 中身が空の placeholder を渡す。
 const CameraTabPlaceholder: React.FC = () => null;
+import { useT } from '../i18n';
 import { colors, fonts, spacing } from '../theme';
 
 // UI_SPECS_JA §2.1 — 3 タブ構造。
@@ -43,6 +44,7 @@ const renderLabel = (focused: boolean, label: string) => (
 
 const CameraTabButton: React.FC<{ children?: React.ReactNode }> = () => {
   const rootNav = useNavigation<RootNav>();
+  const t = useT();
   const open = () => {
     // RootStack の CaptureMode を fullscreen modal で push (UI_SPECS §2.2)。
     // タブの Camera screen 自体は dummy で、 描画されない。
@@ -53,14 +55,16 @@ const CameraTabButton: React.FC<{ children?: React.ReactNode }> = () => {
       onPress={open}
       style={({ pressed }) => [styles.cameraButton, pressed && styles.cameraButtonPressed]}
       accessibilityRole="button"
-      accessibilityLabel="撮影モードを開始"
+      accessibilityLabel={t('tab.captureA11y')}
     >
       <CameraIcon active={false} size={28} />
     </Pressable>
   );
 };
 
-export const MainTabs: React.FC = () => (
+export const MainTabs: React.FC = () => {
+  const t = useT();
+  return (
   <Tab.Navigator
     screenOptions={{
       headerShown: false,
@@ -80,7 +84,7 @@ export const MainTabs: React.FC = () => (
             <HomeIcon active={focused} />
           </View>
         ),
-        tabBarLabel: ({ focused }) => renderLabel(focused, 'HOME'),
+        tabBarLabel: ({ focused }) => renderLabel(focused, t('tab.home')),
       }}
     />
     <Tab.Screen
@@ -100,11 +104,12 @@ export const MainTabs: React.FC = () => (
             <SettingsIcon active={focused} />
           </View>
         ),
-        tabBarLabel: ({ focused }) => renderLabel(focused, 'SETTINGS'),
+        tabBarLabel: ({ focused }) => renderLabel(focused, t('tab.settings')),
       }}
     />
   </Tab.Navigator>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   tabBar: {
@@ -130,6 +135,7 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     letterSpacing: 1.4,
     marginTop: 2,
+    textTransform: 'uppercase',
   },
   cameraButton: {
     flex: 1,

@@ -83,5 +83,5 @@ enum HandGesture: String {
 struct FrameClassification {
   let hands: [ClassifiedHand]
   let wearerHandCount: Int     // = 0, 1, 2 (本人の手だけ数える)
-  let gesture: HandGesture?    // 装着者の両手が同じサインを 1 フレームで示しているとき
+  // gesture の集約 (= 両手の合議 / nil 許容) は TS 側で per-hand gesture から行う (= wide と同方針)。
 }

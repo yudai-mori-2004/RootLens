@@ -1,7 +1,7 @@
 // 撮影モード用の効果音 player。
 //
 // 設計:
-//   - 8 種類の SFX を起動時に preload (= 再生時のラグを排除)
+//   - 7 種類の SFX を起動時に preload (= 再生時のラグを排除)
 //   - 名前 (= キー文字列) で play() を呼ぶ簡素 API
 //   - 同じ音を連続再生する時は replayAsync で先頭から再生し直す
 //   - file は app/assets/sounds/*.mp3、 後から差替えやすいよう外部 file 参照
@@ -19,23 +19,31 @@ export type SfxName =
   | 'detect_thumbs_up'
   | 'countdown_tick'
   | 'countdown_end'
-  | 'rec_start'
   | 'rec_stop'
   | 'warn_hand_lost';
 
-// require() の path resolution は static 文字列のみで動くため、 明示的に書く。
-// ファイルが無い (= sub-agent の DL が未完了) 段階でも JS は壊れない (= require の解決は実 build 時)。
-// この module を import するだけでバンドラが該当 file を含めようとするため、 file 不在だと
-// build error になる可能性ある。 try-require を避け、 file 存在を前提に書く。
+// 効果音の意図する仕様 (= 役割・音色・長さ)。 ファイル名にも長さと内容を埋め込んである。
+// 音源を差し替える時はこの仕様 (短く・テンポ良く) に沿った音を同じファイル名で置くこと。
+// ⚠ 鳴らすタイミングは音声シーケンサが「前の音/TTS の完了を待って」 から順に再生するので、
+//   多少長くても重ならないが、 UX のテンポのため下記の短い長さを推奨。
+//
+//   enter_capture    入場時の柔らかいチャイム         ~0.4s   (session 開始時に 1 回)
+//   detect_palm      キャリブ確定の肯定的な確定音      ~0.4s   (手のひら中央 OK)
+//   detect_thumbs_up サムズアップ → 停止の確定音        ~0.4s
+//   countdown_tick   3/2/1 の極短ブリップ               ~0.15s  (各カウントで 1 回)
+//   countdown_end    カウント終了 = 録画開始の合図音    ~0.5s   (上昇音など「ゴー」)
+//   rec_stop         録画停止音                          ~0.4s
+//   warn_hand_lost   手がフレーム外の警告 (繰り返し用)  ~0.6s   (短く、 耳障りでない程度)
+//
+// require() の path は static 文字列のみ解決可。 ファイル名に長さ・内容を含める。
 const SOURCES: Record<SfxName, AVPlaybackSource> = {
-  enter_capture:    require('../../assets/sounds/enter_capture.mp3'),
-  detect_palm:      require('../../assets/sounds/detect_palm.mp3'),
-  detect_thumbs_up: require('../../assets/sounds/detect_thumbs_up.mp3'),
-  countdown_tick:   require('../../assets/sounds/countdown_tick.mp3'),
-  countdown_end:    require('../../assets/sounds/countdown_end.mp3'),
-  rec_start:        require('../../assets/sounds/rec_start.mp3'),
-  rec_stop:         require('../../assets/sounds/rec_stop.mp3'),
-  warn_hand_lost:   require('../../assets/sounds/warn_hand_lost.mp3'),
+  enter_capture:    require('../../assets/sounds/enter_capture_chime_0.4s.mp3'),
+  detect_palm:      require('../../assets/sounds/detect_palm_confirm_0.4s.mp3'),
+  detect_thumbs_up: require('../../assets/sounds/detect_thumbs_up_confirm_0.4s.mp3'),
+  countdown_tick:   require('../../assets/sounds/countdown_tick_blip_0.15s.mp3'),
+  countdown_end:    require('../../assets/sounds/countdown_end_go_0.5s.mp3'),
+  rec_stop:         require('../../assets/sounds/rec_stop_soft_0.4s.mp3'),
+  warn_hand_lost:   require('../../assets/sounds/warn_hand_lost_alert_0.6s.mp3'),
 };
 
 const sounds: Partial<Record<SfxName, Audio.Sound>> = {};
@@ -56,7 +64,7 @@ async function ensureAudioMode(): Promise<void> {
   }
 }
 
-/// 起動時 1 度だけ呼ぶ。 全 8 file を Sound インスタンスに展開して preload。
+/// 起動時 1 度だけ呼ぶ。 全 file を Sound インスタンスに展開して preload。
 export async function preloadCaptureSounds(): Promise<void> {
   if (preloaded) return;
   if (preloading) return preloading;
@@ -84,6 +92,40 @@ export function playSfx(name: SfxName): void {
   const s = sounds[name];
   if (!s) return;
   s.replayAsync().catch(() => {});
+}
+
+/// 名前指定で再生し、 再生完了まで待つ (= 音声シーケンサが重なりを避けるために使う)。
+/// didJustFinish で解決。 取りこぼし対策に safety timeout も張る。 未 load 時は即解決。
+export async function playSfxAwait(name: SfxName): Promise<void> {
+  // preload 未完なら待ってから再生する (= 起動直後の enter_capture 等が「未ロードだから skip」 で
+  // 無音になり、 後続の TTS だけ流れて順序が崩れるのを防ぐ)。
+  if (!sounds[name]) await preloadCaptureSounds();
+  const s = sounds[name];
+  if (!s) return;
+  await new Promise<void>((resolve) => {
+    let done = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (timer) clearTimeout(timer);
+      s.setOnPlaybackStatusUpdate(null);
+      resolve();
+    };
+    s.setOnPlaybackStatusUpdate((st) => {
+      if (st.isLoaded && st.didJustFinish) finish();
+    });
+    s.replayAsync().catch(() => finish());
+    // didJustFinish が来ないケースの保険 (= 想定最大長 + 余裕)。
+    timer = setTimeout(finish, 8000);
+  });
+}
+
+/// 再生中の全 SFX を停止する (= 音声シーケンサの割り込み/クリア用)。
+export function stopAllSfx(): void {
+  for (const name of Object.keys(sounds) as SfxName[]) {
+    sounds[name]?.stopAsync().catch(() => {});
+  }
 }
 
 /// アプリ終了 / 撮影モード退場で呼ぶ。 メモリ解放。

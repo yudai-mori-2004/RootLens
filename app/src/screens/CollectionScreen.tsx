@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Image,
   RefreshControl,
@@ -15,14 +17,17 @@ import { ClipCard } from '../components/ClipCard';
 import { StakeSheet } from '../components/StakeSheet';
 import { ClipDetailSheet } from '../components/ClipDetailSheet';
 import { priceFromLicenseUrl } from '../domain/licenseCatalog';
-import { clipStore, useClips, type Clip } from '../services/clipPipeline';
+import { useClips } from '../clips/hooks';
+import { dataflowStore, storeEventSink, advanceClip, discardClip, fetchClipStatusByHash, type Clip } from '../dataflow';
+import { useT } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 // COLLECTION タブ — 撮影者が自分のクリップを管理する場所。
 //
 // SPECS_JA §2.7 のクリップ状態機械を可視化する:
-//   • アップロード中 / 処理中 / 準備完了 / 不合格 / 処理エラー はローカル pipeline (= clipPipeline)
-//     の発火源 (= 撮影完了時の「送る」 押下)
+//   • アップロード中 / 処理中 / 準備完了 / 不合格 / 処理エラー は dataflowStore (= 撮影完了時に
+//     enqueueRecording → advanceClip で段レジューム駆動) が発火源
+
 //   • ステーキング済み はオンチェーン (DAS) からも hydrate される (= 過去にステーキング済みの cNFT)
 //
 // 両方を 1 つの Clip[] にマージして ClipCard に渡す。 タップして開く Stake シートは「準備完了」
@@ -141,6 +146,21 @@ export const CollectionScreen: React.FC = () => {
 
   useEffect(() => { fetchOnChain(); }, [fetchOnChain]);
 
+  // processing クリップ (= Pipeline 2 実行中 / アプリ再起動で取り残し) を signature_hash で 1 回更新する。
+  // Pipeline 2 はサーバ側で進む / 取り残しは server ops が再投入するので、 端末は観測だけ行う (= 再試行ボタンは出さない)。
+  useEffect(() => {
+    const wallet = ownerPubkey?.toBase58();
+    if (!wallet) return;
+    const clips = Object.values(dataflowStore.getState().clips);
+    for (const c of clips) {
+      if (c.state === 'processing' && c.signatureHash) {
+        fetchClipStatusByHash(c.signatureHash, wallet)
+          .then((st) => { if (st) dataflowStore.getState().applyServerStatus(c.id, st); })
+          .catch(() => {});
+      }
+    }
+  }, [ownerPubkey]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchOnChain();
@@ -157,7 +177,6 @@ export const CollectionScreen: React.FC = () => {
       .filter((oc) => !pipelineAssetIds.has(oc.rootAssetId))
       .map((oc) => ({
         id: oc.rootAssetId,
-        taskId: '',  // legacy on-chain clip: task association unknown
         state: 'staked' as const,
         createdAt: (oc.createdAtUnix ?? 0) * 1000,
         rootAssetId: oc.rootAssetId,
@@ -197,8 +216,13 @@ export const CollectionScreen: React.FC = () => {
   // 詳細シート内の「Stake」 ボタンで stake シートを open する 2 段構造。
   const onOpenDetail = useCallback((clip: Clip) => setDetailTarget(clip), []);
   const onOpenStake = useCallback((clip: Clip) => setStakeTarget(clip), []);
-  const onRemove = useCallback((clip: Clip) => clipStore.remove(clip.id), []);
-  const onRetry = useCallback((clip: Clip) => clipStore.retry(clip.id), []);
+  // 破棄 = ローカル削除 + durable な clip dir (録画 + 署名中間物) の掃除。 サーバ DELETE は叩かない。
+  const onRemove = useCallback((clip: Clip) => { void discardClip(clip.id); }, []);
+  // 再試行 = 段レジューム (= advanceClip)。 失敗した Pipeline 1 段から成果物を再利用して再開する。
+  // 登録済み (= Pipeline 2 段) のクリップでは advanceClip は no-op (= P2 のユーザー再試行はしない)。
+  const onRetry = useCallback((clip: Clip) => {
+    void advanceClip(clip.id, storeEventSink);
+  }, []);
   const onCloseStake = useCallback(() => setStakeTarget(null), []);
   const onCloseDetail = useCallback(() => setDetailTarget(null), []);
 
@@ -214,24 +238,28 @@ export const CollectionScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />
         }
         ListHeaderComponent={
-          <Hero
-            ownerPubkey={ownerPubkey?.toBase58() ?? null}
-            totals={totals}
-            spark={spark}
-            loading={loading}
-          />
+          <FadeInItem>
+            <Hero
+              ownerPubkey={ownerPubkey?.toBase58() ?? null}
+              totals={totals}
+              spark={spark}
+              loading={loading}
+            />
+          </FadeInItem>
         }
         ListEmptyComponent={
           <EmptyState loading={loading} error={onChainError} hasWallet={!!ownerPubkey} />
         }
-        renderItem={({ item }) => (
-          <ClipCard
-            clip={item}
-            onOpenStake={onOpenStake}
-            onOpenDetail={onOpenDetail}
-            onRemove={onRemove}
-            onRetry={onRetry}
-          />
+        renderItem={({ item, index }) => (
+          <FadeInItem delay={120 + Math.min(index, 8) * 55}>
+            <ClipCard
+              clip={item}
+              onOpenStake={onOpenStake}
+              onOpenDetail={onOpenDetail}
+              onRemove={onRemove}
+              onRetry={onRetry}
+            />
+          </FadeInItem>
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
       />
@@ -253,6 +281,31 @@ export const CollectionScreen: React.FC = () => {
   );
 };
 
+// ─── Entrance motion ─────────────────────────────────────────────────
+// マウント時に下からふわっと立ち上げる (= staggered)。 RN コア Animated (= 確実に動く)。
+const FadeInItem: React.FC<{ delay?: number; children: React.ReactNode }> = ({ delay = 0, children }) => {
+  const p = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(p, {
+      toValue: 1,
+      duration: 440,
+      delay,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [p, delay]);
+  return (
+    <Animated.View
+      style={{
+        opacity: p,
+        transform: [{ translateY: p.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
 // ─── Hero ────────────────────────────────────────────────────────────
 
 const HERO_DECOR = require('../../assets/decor/earnings-stack.png');
@@ -263,12 +316,13 @@ const Hero: React.FC<{
   spark: number[] | null;
   loading: boolean;
 }> = ({ ownerPubkey, totals, spark, loading }) => {
+  const t = useT();
   const short = ownerPubkey ? `${ownerPubkey.slice(0, 4)}…${ownerPubkey.slice(-4)}` : '—';
   const hasAnyEarnings = spark && spark.length >= 2 && spark[spark.length - 1] > 0;
   return (
     <View style={styles.hero}>
       <View style={styles.heroTop}>
-        <Text style={styles.heroTitle}>Collection</Text>
+        <Text style={styles.heroTitle}>{t('home.collection')}</Text>
         <View style={styles.walletPill}>
           <View style={styles.walletDot} />
           <Text style={styles.walletPillText}>{short}</Text>
@@ -277,7 +331,7 @@ const Hero: React.FC<{
 
       <View style={styles.heroCard}>
         <View style={styles.heroCardLeft}>
-          <Text style={styles.heroEyebrow}>LIFETIME EARNINGS</Text>
+          <Text style={styles.heroEyebrow}>{t('home.lifetimeEarnings')}</Text>
           <View style={styles.heroNumberRow}>
             <Text style={styles.heroCurrency}>$</Text>
             <Text style={styles.heroNumber}>{loading ? '—' : totals.earned.toFixed(2)}</Text>
@@ -295,15 +349,15 @@ const Hero: React.FC<{
       </View>
 
       <View style={styles.statsRow}>
-        <StatTile label="LICENSES SOLD" value={loading ? '—' : String(totals.licenses)} accent />
+        <StatTile label={t('home.licensesSold')} value={loading ? '—' : String(totals.licenses)} accent />
         <View style={styles.statSep} />
-        <StatTile label="CLIPS" value={loading ? '—' : String(totals.clips)} />
+        <StatTile label={t('home.clips')} value={loading ? '—' : String(totals.clips)} />
       </View>
 
       <View style={styles.listIntro}>
-        <Text style={styles.listIntroLabel}>YOUR CLIPS</Text>
+        <Text style={styles.listIntroLabel}>{t('home.yourClips')}</Text>
         <Text style={styles.listIntroHint}>
-          撮影したクリップはここで状態が見えます。 「準備完了」 のカードをタップするとステーキング画面が開きます。
+          {t('home.yourClipsHint')}
         </Text>
       </View>
     </View>
@@ -357,18 +411,19 @@ const Sparkline: React.FC<{ points: number[]; width: number; height: number }> =
 const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: boolean }> = ({
   loading, error, hasWallet,
 }) => {
+  const t = useT();
   if (loading) {
     return (
       <View style={styles.empty}>
         <ActivityIndicator color={colors.ink} />
-        <Text style={styles.emptyText}>Loading…</Text>
+        <Text style={styles.emptyText}>{t('common.loading')}</Text>
       </View>
     );
   }
   if (error) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyEyebrow}>DAS ERROR</Text>
+        <Text style={styles.emptyEyebrow}>{t('home.dasError')}</Text>
         <Text style={styles.emptyText}>{error}</Text>
       </View>
     );
@@ -376,9 +431,9 @@ const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: 
   if (!hasWallet) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyEyebrow}>NO WALLET</Text>
+        <Text style={styles.emptyEyebrow}>{t('home.noWallet')}</Text>
         <Text style={styles.emptyText}>
-          認証 provider が初期化中、 もしくは未認証です。 設定画面で確認してください。
+          {t('home.noWalletHint')}
         </Text>
       </View>
     );
@@ -394,9 +449,9 @@ const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: 
         />
         <Circle cx={32} cy={32} r={4} fill={colors.textFaint} />
       </Svg>
-      <Text style={styles.emptyEyebrow}>NO CLIPS YET</Text>
+      <Text style={styles.emptyEyebrow}>{t('home.noClipsYet')}</Text>
       <Text style={styles.emptyText}>
-        中央のカメラボタンから撮影を始めると、 撮影完了後ここに表示されます。
+        {t('home.noClipsHint')}
       </Text>
     </View>
   );

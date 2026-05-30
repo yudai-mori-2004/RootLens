@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -10,23 +10,9 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import type { AutoCategory, Clip } from '../services/clipPipeline';
-import { describeProcessingStep, processingStepIndex, PROCESSING_TOTAL_STEPS } from '../services/clipPipeline';
-import { findTask, type TaskDef } from '../domain/taskCatalog';
-
-/// 2026-05-27 新仕様: autoCategory の短い日本語表示 (= カード用、 sheet 用と分けて短く)
-function describeAutoCategoryShort(c: AutoCategory): string {
-  switch (c) {
-    case 'cleaning':   return '掃除';
-    case 'laundry':    return '洗濯';
-    case 'cooking':    return '料理';
-    case 'studying':   return '勉強';
-    case 'crafting':   return '工作';
-    case 'organizing': return '整理整頓';
-    case 'meal_prep':  return '食事の支度';
-    case 'other':      return 'その他';
-  }
-}
+import type { Clip } from '../dataflow';
+import { clipTitle } from '../domain/clipLabels';
+import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 // クリップカード。
@@ -56,60 +42,51 @@ interface Props {
 }
 
 export const ClipCard: React.FC<Props> = ({ clip, onOpenStake, onOpenDetail, onRemove, onRetry }) => {
-  const task = useMemo(() => findTask(clip.taskId), [clip.taskId]);
-
   switch (clip.state) {
     case 'uploading':
-      return <UploadingCard clip={clip} task={task} onRemove={onRemove} />;
+      return <UploadingCard clip={clip} onRemove={onRemove} />;
     case 'processing':
-      return <ProcessingCard clip={clip} task={task} />;
+      return <ProcessingCard clip={clip} />;
     case 'ready':
-      return <ReadyCard clip={clip} task={task} onOpenDetail={onOpenDetail} />;
+      return <ReadyCard clip={clip} onOpenDetail={onOpenDetail} />;
     case 'staked':
-      return <StakedCard clip={clip} task={task} onOpenDetail={onOpenDetail} />;
+      return <StakedCard clip={clip} onOpenDetail={onOpenDetail} />;
     case 'error':
-      return <ErrorCard clip={clip} task={task} onOpenDetail={onOpenDetail} onRemove={onRemove} onRetry={onRetry} />;
+      return <ErrorCard clip={clip} onOpenDetail={onOpenDetail} onRemove={onRemove} onRetry={onRetry} />;
   }
 };
 
 // ─── 共通要素 ──────────────────────────────────────────────────────────
 
-const TaskThumb: React.FC<{ task: TaskDef | undefined; muted?: boolean }> = ({ task, muted }) => {
-  if (!task) {
-    return (
-      <View style={[styles.thumb, muted && styles.thumbMuted]}>
-        <Text style={styles.thumbFallback}>cNFT</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={[styles.thumb, muted && styles.thumbMuted]}>
-      <Image source={task.illustration} style={styles.thumbImage} resizeMode="cover" />
-    </View>
-  );
-};
+// クリップのサムネ枠。 将来は各動画の実サムネイル画像を入れる予定 (= 録画フレーム / ぼかし済 preview)。
+// 現状は中立のプレースホルダ (= 画像枠アイコン)。
+// ⚠ SVG は固定サイズで描く (= width/height を % にすると aspectRatio 解決前に高さ 0 → Circle 座標が NaN →
+//    CALayerInvalidGeometry でクラッシュする。 過去にこれで落ちた)。
+const ClipThumb: React.FC<{ muted?: boolean }> = ({ muted }) => (
+  <View style={[styles.thumb, muted && styles.thumbMuted]}>
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Path d="M3.5 6.5h17v11h-17z" stroke={colors.textFaint} strokeWidth={1.3} strokeLinejoin="round" />
+      <Circle cx={9} cy={10.5} r={1.7} fill={colors.textFaint} />
+      <Path d="M5 17l4.5-4.2 3 2.6 3-3.2L20 16" stroke={colors.textFaint} strokeWidth={1.3} strokeLinejoin="round" strokeLinecap="round" />
+    </Svg>
+  </View>
+);
 
-const TaskName: React.FC<{ task: TaskDef | undefined; clip: Clip; mono?: boolean }> = ({ task, clip, mono }) => {
-  // 2026-05-27 方針転換: 新仕様では撮影前タスク選択を撤去、 Pipeline 2 の VLM が事後分類する。
-  // 表示優先順位: autoCategory (= 新クリップ) > legacy task name > "Clip XXX" (= 未分類 fallback)
-  const displayName = clip.autoCategory
-    ? describeAutoCategoryShort(clip.autoCategory)
-    : (task?.name ?? `Clip ${clip.id.slice(-6)}`);
-  const isMono = mono || (!task && !clip.autoCategory);
-  return (
-    <Text style={[styles.cardName, isMono && styles.cardNameMono]} numberOfLines={1}>
-      {displayName}
-    </Text>
-  );
-};
+// クリップ名はもう使わない。 一意 id = signature_hash の短縮を出す (= 未署名なら「署名処理中…」)。
+const ClipName: React.FC<{ clip: Clip }> = ({ clip }) => (
+  <Text style={[styles.cardName, styles.cardNameMono]} numberOfLines={1}>
+    {clipTitle(clip)}
+  </Text>
+);
 
 const formatTimestamp = (ts: number): string => {
+  const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
   const d = new Date(ts);
   const sameDay = isSameDay(d, new Date());
   if (sameDay) {
-    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
   }
-  return d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(tag, { month: 'short', day: 'numeric' });
 };
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -118,16 +95,17 @@ function isSameDay(a: Date, b: Date): boolean {
 
 // ─── アップロード中 ─────────────────────────────────────────────────────
 
-const UploadingCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onRemove?: (c: Clip) => void }> = ({
-  clip, task, onRemove,
+const UploadingCard: React.FC<{ clip: Clip; onRemove?: (c: Clip) => void }> = ({
+  clip, onRemove,
 }) => {
+  const t = useT();
   const progress = Math.max(0, Math.min(1, clip.uploadProgress ?? 0));
   return (
     <View style={styles.card}>
-      <TaskThumb task={task} />
+      <ClipThumb />
       <View style={styles.cardMid}>
-        <TaskName clip={clip} task={task} />
-        <Text style={styles.eyebrowMuted}>アップロード中 · {Math.round(progress * 100)}%</Text>
+        <ClipName clip={clip} />
+        <Text style={styles.eyebrowMuted}>{t('clip.uploading')} · {Math.round(progress * 100)}%</Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
         </View>
@@ -136,7 +114,7 @@ const UploadingCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onRemove?
         onPress={() => onRemove?.(clip)}
         hitSlop={8}
         style={({ pressed }) => [styles.cornerBtn, pressed && styles.cornerBtnPressed]}
-        accessibilityLabel="キャンセル"
+        accessibilityLabel={t('common.cancel')}
       >
         <Svg width={14} height={14} viewBox="0 0 14 14">
           <Line x1={3} y1={3} x2={11} y2={11} stroke={colors.textMute} strokeWidth={1.6} strokeLinecap="round" />
@@ -149,50 +127,46 @@ const UploadingCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onRemove?
 
 // ─── 処理中 ────────────────────────────────────────────────────────────
 
-const ProcessingCard: React.FC<{ clip: Clip; task: TaskDef | undefined }> = ({ clip, task }) => {
-  const stepIdx = processingStepIndex(clip.processingStep);  // 1..3
-  const stepLabel = describeProcessingStep(clip.processingStep);
-  // 現在ステップの dot を pulse
-  const pulse = useRef(new Animated.Value(0)).current;
+// サーバ Pipeline 2 は段数を公開しない (= 単一の scoring ステップ) ので、 進捗率ではなく
+// 「進行中」 を示す不確定ローディングバーを出す (= ハイライトがトラックを繰り返し流れる)。
+const IndeterminateBar: React.FC = () => {
+  const anim = useRef(new Animated.Value(0)).current;
+  const [trackW, setTrackW] = useState(0);
   useEffect(() => {
     const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
-        Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
-      ]),
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 1200,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }),
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [anim]);
+  const segW = Math.max(24, trackW * 0.4);
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [-segW, trackW] });
+  return (
+    <View
+      style={styles.progressTrack}
+      onLayout={(e) => setTrackW(e.nativeEvent.layout.width)}
+    >
+      {trackW > 0 ? (
+        <Animated.View style={[styles.indeterminateFill, { width: segW, transform: [{ translateX }] }]} />
+      ) : null}
+    </View>
+  );
+};
 
+const ProcessingCard: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const t = useT();
   return (
     <View style={styles.card}>
-      <TaskThumb task={task} />
+      <ClipThumb />
       <View style={styles.cardMid}>
-        <TaskName clip={clip} task={task} />
-        <Text style={styles.eyebrowMuted}>処理中 ({stepIdx}/{PROCESSING_TOTAL_STEPS}) · {stepLabel}</Text>
-        <View style={styles.dotRow}>
-          {Array.from({ length: PROCESSING_TOTAL_STEPS }, (_, i) => i + 1).map((i) => {
-            const isDone = i < stepIdx;
-            const isCurrent = i === stepIdx;
-            return (
-              <View key={i} style={styles.dotWrap}>
-                {isCurrent ? (
-                  <Animated.View
-                    style={[
-                      styles.dot,
-                      styles.dotCurrent,
-                      { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) },
-                    ]}
-                  />
-                ) : (
-                  <View style={[styles.dot, isDone ? styles.dotDone : styles.dotPending]} />
-                )}
-                {i < 4 ? <View style={[styles.dotBar, isDone && styles.dotBarDone]} /> : null}
-              </View>
-            );
-          })}
-        </View>
+        <ClipName clip={clip} />
+        <Text style={styles.eyebrowMuted}>{t('clip.processing')}</Text>
+        <IndeterminateBar />
       </View>
     </View>
   );
@@ -200,27 +174,32 @@ const ProcessingCard: React.FC<{ clip: Clip; task: TaskDef | undefined }> = ({ c
 
 // ─── 準備完了 (= action 要請、 視覚最強) ──────────────────────────────
 
-const ReadyCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenDetail?: (c: Clip) => void }> = ({
-  clip, task, onOpenDetail,
+const ReadyCard: React.FC<{ clip: Clip; onOpenDetail?: (c: Clip) => void }> = ({
+  clip, onOpenDetail,
 }) => {
+  const t = useT();
   return (
     <Pressable
       onPress={() => onOpenDetail?.(clip)}
       style={({ pressed }) => [styles.card, styles.cardReady, pressed && styles.cardReadyPressed]}
-      accessibilityLabel={`${task?.name ?? 'クリップ'} の詳細を見る`}
+      accessibilityLabel={t('clip.viewDetailA11y')}
     >
-      <TaskThumb task={task} />
+      <ClipThumb />
       <View style={styles.cardMid}>
-        <TaskName clip={clip} task={task} />
-        <Text style={styles.eyebrowEmerald}>準備完了 · {formatTimestamp(clip.createdAt)}</Text>
+        <ClipName clip={clip} />
+        <Text style={styles.eyebrowEmerald}>{t('clip.ready')} · {formatTimestamp(clip.createdAt)}</Text>
         {typeof clip.qualityScore === 'number' && clip.reward ? (
           <Text style={styles.cardSub}>
-            品質 {clip.qualityScore}  ·  ${clip.reward.rangeUsdcLow.toFixed(2)}〜${clip.reward.rangeUsdcHigh.toFixed(2)}
+            {t('clip.qualityReward', {
+              score: clip.qualityScore,
+              low: clip.reward.rangeUsdcLow.toFixed(2),
+              high: clip.reward.rangeUsdcHigh.toFixed(2),
+            })}
           </Text>
         ) : null}
       </View>
       <View style={styles.stakeCta}>
-        <Text style={styles.stakeCtaLabel}>Stake</Text>
+        <Text style={styles.stakeCtaLabel}>{t('clip.stakeCta')}</Text>
         <Svg width={12} height={12} viewBox="0 0 12 12">
           <Path d="M3 6h6m-2 -2 2 2 -2 2" stroke="#fff" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </Svg>
@@ -231,23 +210,24 @@ const ReadyCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenDetail?
 
 // ─── ステーキング済み ──────────────────────────────────────────────────
 
-const StakedCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenDetail?: (c: Clip) => void }> = ({
-  clip, task, onOpenDetail,
+const StakedCard: React.FC<{ clip: Clip; onOpenDetail?: (c: Clip) => void }> = ({
+  clip, onOpenDetail,
 }) => {
+  const t = useT();
   const licenseCount = clip.licenseCount ?? 0;
   const revenue = clip.revenueUsdc ?? 0;
   return (
     <Pressable
       onPress={() => onOpenDetail?.(clip)}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      accessibilityLabel={`${task?.name ?? 'クリップ'} の詳細を見る`}
+      accessibilityLabel={t('clip.viewDetailA11y')}
     >
-      <TaskThumb task={task} />
+      <ClipThumb />
       <View style={styles.cardMid}>
-        <TaskName clip={clip} task={task} />
+        <ClipName clip={clip} />
         <View style={styles.cardMeta}>
           <View style={[styles.statusChip, styles.statusChipStaked]}>
-            <Text style={[styles.statusChipText, { color: colors.emeraldDeep }]}>STAKED</Text>
+            <Text style={[styles.statusChipText, { color: colors.emeraldDeep }]}>{t('clip.statusStaked')}</Text>
           </View>
           <Text style={styles.cardSub}>· {formatTimestamp(clip.createdAt)}</Text>
         </View>
@@ -255,14 +235,14 @@ const StakedCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenDetail
       <View style={styles.cardRight}>
         <View style={styles.statCol}>
           <Text style={styles.statColValue}>{licenseCount}</Text>
-          <Text style={styles.statColLabel}>LIC</Text>
+          <Text style={styles.statColLabel}>{t('clip.statLic')}</Text>
         </View>
         <View style={styles.statColSep} />
         <View style={styles.statCol}>
           <Text style={[styles.statColValue, revenue > 0 ? { color: colors.emeraldDeep } : { color: colors.textFaint }]}>
             ${revenue.toFixed(2)}
           </Text>
-          <Text style={styles.statColLabel}>EARNED</Text>
+          <Text style={styles.statColLabel}>{t('clip.statEarned')}</Text>
         </View>
       </View>
     </Pressable>
@@ -272,26 +252,30 @@ const StakedCard: React.FC<{ clip: Clip; task: TaskDef | undefined; onOpenDetail
 // ─── 処理エラー ────────────────────────────────────────────────────────
 
 const ErrorCard: React.FC<{
-  clip: Clip; task: TaskDef | undefined;
+  clip: Clip;
   onOpenDetail?: (c: Clip) => void;
   onRemove?: (c: Clip) => void; onRetry?: (c: Clip) => void;
-}> = ({ clip, task, onOpenDetail, onRemove, onRetry }) => {
+}> = ({ clip, onOpenDetail, onRemove, onRetry }) => {
+  const t = useT();
   return (
     <Pressable
       onPress={() => onOpenDetail?.(clip)}
       style={({ pressed }) => [styles.card, styles.cardMuted, pressed && styles.cardPressed]}
-      accessibilityLabel={`${task?.name ?? 'クリップ'} のエラー詳細を見る`}
+      accessibilityLabel={t('clip.viewErrorA11y')}
     >
-      <TaskThumb task={task} muted />
+      <ClipThumb muted />
       <View style={styles.cardMid}>
-        <TaskName clip={clip} task={task} />
-        <Text style={styles.eyebrowDanger}>処理エラー</Text>
+        <ClipName clip={clip} />
+        <Text style={styles.eyebrowDanger}>{t('clip.errorEyebrow')}</Text>
         <Text style={styles.cardSub} numberOfLines={2}>
-          {clip.errorMessage ?? 'サーバ処理が失敗しました。 タップで詳細を確認。'}
+          {clip.errorMessage ?? t('clip.errorDefault')}
         </Text>
         <View style={styles.actionRow}>
-          <SmallActionBtn label="削除" onPress={() => onRemove?.(clip)} />
-          <SmallActionBtn label="もう一度試す" onPress={() => onRetry?.(clip)} accent />
+          <SmallActionBtn label={t('common.delete')} onPress={() => onRemove?.(clip)} />
+          {/* 再試行は Pipeline 1 段の失敗のみ (= 登録済み以降の Pipeline 2 はサーバ側で再投入、 ユーザー再試行はしない) */}
+          {clip.stage !== 'registered' ? (
+            <SmallActionBtn label={t('clip.tryAgain')} onPress={() => onRetry?.(clip)} accent />
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -436,6 +420,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.emerald,
     borderRadius: 2,
   },
+  // 不確定ローディング (= 処理中。 ハイライトがトラックを繰り返し流れる)
+  indeterminateFill: {
+    height: 4,
+    backgroundColor: colors.emerald,
+    borderRadius: 2,
+  },
 
   // corner cancel
   cornerBtn: {
@@ -446,25 +436,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   cornerBtnPressed: { backgroundColor: colors.borderLight },
-
-  // processing dots
-  dotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
-    paddingRight: spacing.md,
-  },
-  dotWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  dotDone: { backgroundColor: colors.emerald },
-  dotCurrent: { backgroundColor: colors.emerald },
-  dotPending: { backgroundColor: colors.borderLight },
-  dotBar: { flex: 1, height: 1, backgroundColor: colors.borderLight, marginHorizontal: 4 },
-  dotBarDone: { backgroundColor: colors.emerald },
 
   // ready: stake CTA pill
   stakeCta: {

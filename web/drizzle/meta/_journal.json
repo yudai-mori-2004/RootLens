@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1779787565234,
-      "tag": "0000_nasty_doctor_faustus",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1779824868384,
-      "tag": "0001_flimsy_lady_vermin",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1779911111111,
-      "tag": "0002_signature_hash_processed",
+      "when": 1780121659648,
+      "tag": "0000_clips_init",
       "breakpoints": true
     }
   ]

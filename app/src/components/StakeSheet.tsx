@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,8 +12,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Line } from 'react-native-svg';
 import { Video, ResizeMode } from 'expo-av';
-import { clipStore, type Clip, type QualityBreakdown } from '../services/clipPipeline';
-import { findTask } from '../domain/taskCatalog';
+import { dataflowStore, storeEventSink, stakeClip, type Clip, type QualityBreakdown } from '../dataflow';
+import { requireCurrentSession } from '../services/auth';
+import { clipTitle } from '../domain/clipLabels';
+import { useT } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 // ステーキング確認シート。
@@ -34,6 +36,7 @@ interface Props {
 }
 
 export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
+  const t = useT();
   const [agreed, setAgreed] = useState(false);
   const [finalConfirm, setFinalConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -47,8 +50,6 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
     }
   }, [visible]);
 
-  const task = useMemo(() => (clip ? findTask(clip.taskId) : undefined), [clip]);
-
   if (!clip) return null;
 
   const onStakePress = () => {
@@ -59,7 +60,10 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
   const onFinalConfirm = async () => {
     setSubmitting(true);
     try {
-      await clipStore.stake(clip.id);
+      const wallet = requireCurrentSession().pubkey.toBase58();
+      // clip.id = signature_hash。 stakeClip が hash から server id を解決して /stake を叩く。
+      const updated = await stakeClip(clip.id, wallet, storeEventSink);
+      dataflowStore.getState().applyServerStatus(clip.id, updated);
       onClose();
     } finally {
       setSubmitting(false);
@@ -78,12 +82,12 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
         <View style={styles.header}>
           <View style={styles.handle} />
           <View style={styles.headerRow}>
-            <Text style={styles.headerTitle}>ステーキング</Text>
+            <Text style={styles.headerTitle}>{t('stake.title')}</Text>
             <Pressable
               onPress={onClose}
               hitSlop={10}
               style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
-              accessibilityLabel="閉じる"
+              accessibilityLabel={t('common.close')}
             >
               <Svg width={16} height={16} viewBox="0 0 16 16">
                 <Line x1={4} y1={4} x2={12} y2={12} stroke={colors.ink} strokeWidth={1.8} strokeLinecap="round" />
@@ -97,26 +101,22 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
         >
-          {/* タスクサマリ */}
+          {/* クリップサマリ (= 一意 id = signature_hash) */}
           <View style={styles.taskRow}>
-            {task ? (
-              <Image source={task.illustration} style={styles.taskThumb} resizeMode="cover" />
-            ) : (
-              <View style={[styles.taskThumb, styles.taskThumbEmpty]} />
-            )}
+            <View style={[styles.taskThumb, styles.taskThumbEmpty]} />
             <View style={styles.taskMeta}>
-              <Text style={styles.eyebrow}>TASK</Text>
-              <Text style={styles.taskName}>{task?.name ?? clip.id}</Text>
+              <Text style={styles.eyebrow}>{t('stake.clipEyebrow')}</Text>
+              <Text style={styles.taskName} numberOfLines={1} ellipsizeMode="middle">{clipTitle(clip)}</Text>
             </View>
           </View>
 
           {/* ぼかし済みプレビュー (= サーバ生成 MP4 を再生して確認) */}
-          <Section title="ぼかし済みプレビュー" hint="再生して、 顔と文字が全フレームで適切にぼかされているか確認してください">
+          <Section title={t('stake.blurPreview')} hint={t('stake.blurPreviewHint')}>
             <BlurPreviewPlayer videoUrl={clip.previewVideoUrl} fallbackImageUri={clip.previewUris?.[0]} />
           </Section>
 
           {/* 品質スコア */}
-          <Section title="品質スコア" hint="サーバ側パイプラインによる評価結果">
+          <Section title={t('stake.qualityScore')} hint={t('stake.qualityScoreHint')}>
             <View style={styles.scoreCard}>
               <View style={styles.scoreNumberRow}>
                 <Text style={styles.scoreNumber}>{clip.qualityScore ?? '—'}</Text>
@@ -129,7 +129,7 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
           </Section>
 
           {/* 想定報酬 */}
-          <Section title="想定報酬レンジ" hint="ライセンス販売時の参考値、 実販売価格は別途決定">
+          <Section title={t('stake.rewardRange')} hint={t('stake.rewardRangeHint')}>
             <View style={styles.rewardCard}>
               <Text style={styles.rewardLow}>${(clip.reward?.rangeUsdcLow ?? 0).toFixed(2)}</Text>
               <Text style={styles.rewardSep}>〜</Text>
@@ -139,7 +139,7 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
           </Section>
 
           {/* 撤回不能性の注意喚起 (= SPECS §4.2 二段階確認 前半) */}
-          <Section title="撤回できない点について">
+          <Section title={t('stake.irrevocableTitle')}>
             <Pressable
               onPress={() => setAgreed((a) => !a)}
               style={({ pressed }) => [styles.consentRow, pressed && { opacity: 0.7 }]}
@@ -153,7 +153,7 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
                 ) : null}
               </View>
               <Text style={styles.consentBody}>
-                このクリップについて License NFT が 1 つでも発行された後は、 撤回はできません。 ステーキングを解除しても既発行のライセンスは永続します。 上記を理解しました。
+                {t('stake.consentBody')}
               </Text>
             </Pressable>
           </Section>
@@ -171,7 +171,7 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
             ]}
           >
             <Text style={[styles.stakeBtnLabel, !agreed && styles.stakeBtnLabelDisabled]}>
-              ステーキングする
+              {t('stake.cta')}
             </Text>
           </Pressable>
         </View>
@@ -185,9 +185,9 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
         >
           <View style={styles.dialogBackdrop}>
             <View style={styles.dialogCard}>
-              <Text style={styles.dialogTitle}>本当にステーキングしますか？</Text>
+              <Text style={styles.dialogTitle}>{t('stake.confirmTitle')}</Text>
               <Text style={styles.dialogBody}>
-                ステーキング後、 このクリップは AI 企業に対するライセンス販売の対象となります。 License NFT 発行後は撤回できません。
+                {t('stake.confirmBody')}
               </Text>
               <View style={styles.dialogActions}>
                 <Pressable
@@ -195,7 +195,7 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
                   disabled={submitting}
                   style={({ pressed }) => [styles.dialogBtn, pressed && styles.dialogBtnPressed]}
                 >
-                  <Text style={styles.dialogBtnLabel}>キャンセル</Text>
+                  <Text style={styles.dialogBtnLabel}>{t('common.cancel')}</Text>
                 </Pressable>
                 <Pressable
                   onPress={onFinalConfirm}
@@ -210,7 +210,7 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <Text style={[styles.dialogBtnLabel, styles.dialogBtnLabelConfirm]}>
-                      実行する
+                      {t('stake.confirmExecute')}
                     </Text>
                   )}
                 </Pressable>
@@ -240,6 +240,7 @@ const BlurPreviewPlayer: React.FC<{
   videoUrl?: string;
   fallbackImageUri?: string;
 }> = ({ videoUrl, fallbackImageUri }) => {
+  const t = useT();
   if (videoUrl) {
     return (
       <View style={styles.previewVideoWrap}>
@@ -259,35 +260,36 @@ const BlurPreviewPlayer: React.FC<{
       <View style={styles.previewVideoWrap}>
         <Image source={{ uri: fallbackImageUri }} style={styles.previewVideo} resizeMode="contain" />
         <View style={styles.previewVideoOverlay}>
-          <Text style={styles.previewPlaceholderText}>プレビュー動画を準備中…</Text>
+          <Text style={styles.previewPlaceholderText}>{t('stake.previewPreparing')}</Text>
         </View>
       </View>
     );
   }
   return (
     <View style={[styles.previewVideoWrap, styles.previewPlaceholder]}>
-      <Text style={styles.previewPlaceholderText}>プレビュー準備中</Text>
+      <Text style={styles.previewPlaceholderText}>{t('stake.previewNotReady')}</Text>
     </View>
   );
 };
 
 const QualityBreakdownDisplay: React.FC<{ breakdown: QualityBreakdown }> = ({ breakdown }) => {
+  const t = useT();
   // 2026-05-27: 4 → 3 層 (= GTSAM 撤去) + Layer3 配点 55 → 65。
   // 詳細な指標は ClipDetailSheet 側で全部見せる。
   const rows: Array<{ label: string; ratio: number | null; raw?: string }> = [
-    { label: '合計スコア', ratio: null, raw: `${breakdown.total} / 100` },
+    { label: t('stake.totalScore'), ratio: null, raw: `${breakdown.total} / 100` },
     {
-      label: 'Layer 1 メタデータ',
+      label: t('stake.layer1'),
       ratio: null,
       raw: breakdown.layer1 ? `${breakdown.layer1.score} / 20` : '—',
     },
     {
-      label: 'Layer 2 フレーム解析',
+      label: t('stake.layer2'),
       ratio: null,
       raw: breakdown.layer2 ? `${breakdown.layer2.score} / 15` : '—',
     },
     {
-      label: 'Layer 3 VLM 採点',
+      label: t('stake.layer3'),
       ratio: null,
       raw: breakdown.layer3 ? `${breakdown.layer3.score} / 65` : '—',
     },

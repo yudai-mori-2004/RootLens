@@ -29,16 +29,17 @@ export interface WearerHandObservation {
   handedness: 'left' | 'right' | 'unknown';
   confidence: number;
   landmarks: HandLandmark[];   // 必ず 21 要素
+  /// この手単体のジェスチャー (= native per-hand 判定。 検出不能は null)。 集約は TS 側。
+  gesture: 'open_palm' | 'thumbs_up' | null;
 }
 
-/** 検出された 1 つのフレームの手の状態 */
+/** 検出された 1 つのフレームの手の状態。 frame-level gesture は廃止 (= per-hand を TS で集約)。 */
 export interface HandTrackEvent {
   timestampNs: string;             // CMSampleBuffer.presentationTimeStamp 由来 ns (bigint 互換 string)
   imageWidth: number;
   imageHeight: number;
   wearerHandCount: number;         // 0 / 1 / 2
   wearerHands: WearerHandObservation[];
-  gesture: 'open_palm' | 'thumbs_up' | null;
   /// 互換性のためのフィールド。 2026-05-27 hand framing 判定撤去で常に 0.0
   segmentationCoverage: number;
   segmentationEdgeRatio: number;

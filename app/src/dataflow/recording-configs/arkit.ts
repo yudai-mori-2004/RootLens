@@ -7,15 +7,27 @@
 //    native module wrapper (../../native/arkitCapture) は内部で react-native を使うが、
 //    ここが import するのは関数 export のみ (= React component は触らない)。
 
+import * as FileSystem from 'expo-file-system';
+
 import {
   isArkitCaptureAvailable,
   startArkitSession,
   stopArkitSession,
   startArkitRecording,
   stopArkitRecording,
+  captureArkitSnapshot,
+  setArkitDisplayOrientation,
+  subscribeHandTrack as subscribeArkitHandTrack,
 } from '../../native/arkitCapture';
 import type { EventSink } from '../events';
-import type { OutputFileSpec, RecordingConfig, RecordingSession } from './types';
+import type {
+  DisplayOrientation,
+  HandTrackEvent,
+  HandTrackSubscription,
+  OutputFileSpec,
+  RecordingConfig,
+  RecordingSession,
+} from './types';
 
 // ARKit 構成の出力ファイル (DATA_SPECS §2.2):
 //   rgb.mp4                    wide (1x) RGB 映像 (30 fps)
@@ -61,7 +73,9 @@ export const arkitConfig: RecordingConfig = {
 
   async startRecording(sink: EventSink): Promise<RecordingSession> {
     sink({ step: 'record', level: 'info', message: '録画開始 (ARKit)' });
-    const dir = await startArkitRecording();
+    // durable な Documents 配下に録画 (= app-kill 後の Pipeline 1 再開のため。 ultraWide と同方針)。
+    const dirUri = `${FileSystem.documentDirectory}recordings/rec-${Date.now()}/`;
+    const dir = await startArkitRecording(dirUri.replace(/^file:\/\//, ''));
     const sessionDir = ensureTrailingSlash(dir);
     sink({ step: 'record', level: 'success', message: '録画開始完了', detail: { sessionDir } });
     return { sessionDir };
@@ -84,5 +98,17 @@ export const arkitConfig: RecordingConfig = {
     const primary = OUTPUT_FILES.find((f) => f.isPrimaryVideo);
     if (!primary) throw new Error('arkit config has no primary video file');
     return `${ensureTrailingSlash(session.sessionDir)}${primary.name}`;
+  },
+
+  subscribeHandTrack(listener: (e: HandTrackEvent) => void): HandTrackSubscription {
+    return subscribeArkitHandTrack(listener);
+  },
+
+  captureSnapshot(): Promise<string> {
+    return captureArkitSnapshot();
+  },
+
+  setDisplayOrientation(orientation: DisplayOrientation): Promise<void> {
+    return setArkitDisplayOrientation(orientation);
   },
 };

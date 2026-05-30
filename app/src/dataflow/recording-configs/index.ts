@@ -15,7 +15,17 @@ import { ultraWideConfig } from './ultraWide';
 import { arkitConfig } from './arkit';
 import type { RecordingConfig } from './types';
 
-export type { RecordingConfig, RecordingSession, OutputFileSpec } from './types';
+export type {
+  RecordingConfig,
+  RecordingSession,
+  OutputFileSpec,
+  HandLandmark,
+  WearerHandObservation,
+  GestureKind,
+  HandTrackEvent,
+  DisplayOrientation,
+  HandTrackSubscription,
+} from './types';
 
 export type DevicePlatform = 'ios' | 'android';
 

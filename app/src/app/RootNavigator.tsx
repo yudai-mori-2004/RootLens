@@ -52,7 +52,10 @@ export const RootNavigator: React.FC = () => {
     state.status === 'authenticated' ? 'Main' : 'Login';
 
   return (
-    <Stack.Navigator initialRouteName={initialRoute} screenOptions={navigationHeaderOptions}>
+    <Stack.Navigator
+      initialRouteName={initialRoute}
+      screenOptions={{ ...navigationHeaderOptions, orientation: 'portrait' }}
+    >
       <Stack.Screen name="Onboarding" options={{ headerShown: false }}>
         {({ navigation }) => (
           <OnboardingScreen
@@ -68,7 +71,17 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen
         name="CaptureMode"
         component={CalibrationCaptureScreen}
-        options={{ headerShown: false, presentation: 'fullScreenModal' }}
+        // 撮影画面だけ横向き固定。 react-native-screens がネイティブで強制する (= expo-screen-orientation
+        // の lockAsync は react-native-screens に上書きされ効かないため、 こちらが正攻法)。
+        // ⚠ 映像が上下逆なら 'landscape_right' → 'landscape_left' に。
+        // animation:'none' = 退場アニメと向き変更が競合して「横のまま戻って 0.5s 後に縦」 とフラッシュ
+        // するのを防ぐ (= アニメを切ると向きが即座に切り替わる。 既知の rns 挙動への定番回避)。
+        options={{
+          headerShown: false,
+          presentation: 'fullScreenModal',
+          orientation: 'landscape_right',
+          animation: 'none',
+        }}
       />
     </Stack.Navigator>
   );

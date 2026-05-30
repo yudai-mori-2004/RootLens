@@ -5,7 +5,6 @@ import { db } from "@/db/client";
 import { clips } from "@/db/schema";
 import { requireWalletPubkey } from "@/lib/auth";
 import { presignRawSessionUploads } from "@/lib/r2";
-import { signedMp4Key, processedPrefix } from "@/lib/r2-keys";
 import { clipToDto, clipsToDtos } from "@/lib/mapper";
 import { makeClipId } from "@/lib/clipId";
 import type {
@@ -48,8 +47,6 @@ export async function GET(req: Request) {
 // POST /api/clips
 // 端末が R2 upload + TP /process + cNFT 発行を終え、 rootAssetId 確定後に呼ぶ。
 // rootAssetId + signedJsonUri は v0.1.3 で必須 (= Pipeline 2 起動の前提条件)。
-// 2026-05-27 方針転換: taskId / achievementConfidence は新仕様では送られない。
-// 旧 client 互換のため zod は optional で受信 (= 受け取っても新 schema では無視 or fallback)。
 const createSchema = z.object({
   // signature_hash は SHA-256 hex 64 文字 (= "sha256:" prefix なしの hex 部分のみ受ける)
   signatureHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
@@ -60,9 +57,12 @@ const createSchema = z.object({
   signedJsonUri: z.string().url(),
   // cNFT 発行先ネットワーク (= 重複排除キーの一部)。 省略時は devnet 扱い (legacy)。
   network: z.enum(["devnet", "mainnet"]).optional(),
-  // legacy 互換 (= 段階削除中、 旧 client からも来うる)
-  taskId: z.string().min(1).optional(),
-  achievementConfidence: z.number().int().min(0).max(100).optional(),
+  // 撮影構成。 省略時は ultra_wide 扱い (= 端末が送るまでの移行用 fallback)。
+  recordingConfig: z.enum(["ultra_wide", "arkit"]).optional(),
+  // 録画尺 (ms)。 端末申告。 省略時はサーバが Pipeline 2 で算出して埋める。
+  durationMs: z.number().int().positive().optional(),
+  // 撮影端末の機種 (= utsname machine)。
+  deviceModel: z.string().min(1).max(64).optional(),
 }) satisfies z.ZodType<CreateClipRequest>;
 
 export async function POST(req: Request) {
@@ -121,16 +121,16 @@ export async function POST(req: Request) {
     .values({
       id,
       walletPubkey,
-      // 2026-05-27: taskId は DB schema が notNull なので fallback で埋める (= 別 task で nullable migration 予定)
-      taskId: parsed.data.taskId ?? "legacy",
       state: "uploading",
-      achievementConfidence: parsed.data.achievementConfidence ?? null,
       signatureHash: parsed.data.signatureHash,
       network,
-      signedMp4Key: signedMp4Key(parsed.data.signatureHash),
+      // 撮影ファクト (= 端末申告)。 recordingConfig は移行用に ultra_wide fallback。
+      recordingConfig: parsed.data.recordingConfig ?? "ultra_wide",
+      contentSize: parsed.data.contentSize,
+      durationMs: parsed.data.durationMs ?? null,
+      deviceModel: parsed.data.deviceModel ?? null,
       rootAssetId: parsed.data.rootAssetId,
       signedJsonUri: parsed.data.signedJsonUri,
-      processedPrefix: processedPrefix(parsed.data.signatureHash),
     })
     .returning();
 

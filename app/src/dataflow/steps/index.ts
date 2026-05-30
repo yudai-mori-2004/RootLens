@@ -2,11 +2,12 @@
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
-export { signClip, makeSignTmpDir, cleanupTmpDir } from './sign';
+export { signClip, makeSignTmpDir, cleanupTmpDir, captureSign, blurSign, d1UriIn, signedUriIn } from './sign';
 export { uploadToR2 } from './upload';
 export { registerWithTitleProtocol } from './titleProtocol';
 export { registerClip } from './register';
-export { fetchClipStatus, pollPipeline2 } from './pipeline2';
+export { fetchClipStatus, fetchClipStatusByHash, pollPipeline2 } from './pipeline2';
 export type { PollOptions } from './pipeline2';
 export { triggerPipeline3, fetchPipeline3Status } from './pipeline3';
 export type { Pipeline3TriggerResult } from './pipeline3';
+export { stakeClip, resolveServerClipId } from './lifecycle';

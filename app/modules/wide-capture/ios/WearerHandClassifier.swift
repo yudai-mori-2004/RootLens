@@ -24,7 +24,9 @@ enum WearerHandClassifier {
   static let footMisdetectDistance: Float = 0.06
   static let nonWearerHandDistance: Float = 0.18
   static let maxWearerHands: Int = 2
-  static let minHandScoreForWearer: Float = 0.5
+  // 装着者の手として採用する最低 confidence。 0.5 だと明瞭に映る手でも Vision の信頼度が一時的に
+  // 割り込んで片手が消える (= パーアイコンが点滅) ため、 0.3 に緩める (= 5/5〜7 の体感に寄せる)。
+  static let minHandScoreForWearer: Float = 0.3
 
   /// body pose の点が「実際に画面内にあるか」 を判定する。
   /// 重要: confidence だけだと、 Vision は画面外でも arm から幻覚予測することがあるので
@@ -160,47 +162,82 @@ enum WearerHandClassifier {
     let wearerHands = finalAll.filter { $0.isWearer }
     let wearerCount = wearerHands.count
 
-    // ジェスチャ判定: 装着者の全手が同じサインのときだけ返す
-    var gesture: HandGesture? = nil
-    if wearerHands.count >= 1 {
-      let gestures = wearerHands.map { detectGesture(hand: $0.raw) }
-      if let first = gestures.first, first != nil, gestures.allSatisfy({ $0 == first }) {
-        gesture = first
-      }
-    }
-
-    return FrameClassification(hands: finalAll, wearerHandCount: wearerCount, gesture: gesture)
+    // gesture の集約 (= 両手の合議 / 単フレーム nil 許容) は TS 側で行う。 native は per-hand の
+    // detectGesture を payload に載せるだけ (= 判定ポリシーを再ビルド不要で詰められるようにする)。
+    return FrameClassification(hands: finalAll, wearerHandCount: wearerCount)
   }
 
   // MARK: - サイン判定
-
+  //
+  // ヘッドマウント下向き超広角という視点で、 旧距離比ヒューリスティックの 2 大誤りを構造的に潰す:
+  //   ・タイピング → thumbs_up 誤検出: 旧実装の「画像 y で親指が手首より上」は、 下向き視点だと
+  //     机上の手で常に成立した。 向き(画像 y)ではなく「手の形」で判定する → thumbs_up は指が
+  //     コンパクトに畳まれた握り + 親指が握りから突き出すこと。 タイピングは指がキーに広がる
+  //     (spread 大) のでコンパクト条件で弾かれる。 画像 y は一切使わない。
+  //   ・全力パー → 未検出: 旧実装は 4 本 AND で 1 本でも信頼度/短縮(foreshortening)で落ちると不成立。
+  //     既知指の過半 (N-of-known) に緩め、 低信頼度の指は「曲げ」でなく「不明」として数に入れない
+  //     (= 未検出方向のバイアスを除去)。
+  //   ・距離比は視点依存だったので、 指の伸展/屈曲は関節角度で判定し、 距離は掌幅で正規化する。
   static func detectGesture(hand: RawHand) -> HandGesture? {
     let lm = hand.landmarks
     guard lm.count >= 21 else { return nil }
     if hand.confidence < 0.5 { return nil }
 
-    let thumbExt  = isThumbExtended(lm)
-    let indexExt  = isFingerExtended(lm, mcp: HandJoint.indexMcp,  pip: HandJoint.indexPip,  tip: HandJoint.indexTip)
-    let middleExt = isFingerExtended(lm, mcp: HandJoint.middleMcp, pip: HandJoint.middlePip, tip: HandJoint.middleTip)
-    let ringExt   = isFingerExtended(lm, mcp: HandJoint.ringMcp,   pip: HandJoint.ringPip,   tip: HandJoint.ringTip)
-    let pinkyExt  = isFingerExtended(lm, mcp: HandJoint.pinkyMcp,  pip: HandJoint.pinkyPip,  tip: HandJoint.pinkyTip)
+    // 掌幅 = indexMcp..pinkyMcp。 スケール正規化の基準。 取れなければ判定不能。
+    let idxMcp = lm[HandJoint.indexMcp]
+    let pkyMcp = lm[HandJoint.pinkyMcp]
+    guard idxMcp.confidence >= 0.3, pkyMcp.confidence >= 0.3 else { return nil }
+    let palmW = dist(idxMcp, pkyMcp)
+    guard palmW > 1e-5 else { return nil }
 
-    let allFold = !indexExt && !middleExt && !ringExt && !pinkyExt
-    let allExt  =  indexExt &&  middleExt &&  ringExt &&  pinkyExt
-
-    if thumbExt && allFold {
-      let thumbTip = lm[HandJoint.thumbTip]
-      let wrist = lm[HandJoint.wrist]
-      if thumbTip.y < wrist.y {
-        return .thumbsUp
+    // index/middle/ring/pinky の伸展・屈曲を関節角度で判定。 低信頼度の指は unknown (= 数に入れない)。
+    let fingers: [(mcp: Int, pip: Int, tip: Int)] = [
+      (HandJoint.indexMcp,  HandJoint.indexPip,  HandJoint.indexTip),
+      (HandJoint.middleMcp, HandJoint.middlePip, HandJoint.middleTip),
+      (HandJoint.ringMcp,   HandJoint.ringPip,   HandJoint.ringTip),
+      (HandJoint.pinkyMcp,  HandJoint.pinkyPip,  HandJoint.pinkyTip),
+    ]
+    var knownCount = 0
+    var extCount = 0
+    var curlCount = 0
+    var tips: [HLandmark] = []
+    for f in fingers {
+      let m = lm[f.mcp], p = lm[f.pip], t = lm[f.tip]
+      if m.confidence < 0.3 || p.confidence < 0.3 || t.confidence < 0.3 { continue }
+      knownCount += 1
+      tips.append(t)
+      let c = angleCos(m, p, t)   // 直線(伸展) ≈ -1、 屈曲ほど 0 / 正に寄る
+      if c < -0.7 {
+        extCount += 1
+      } else if c > -0.35 {
+        curlCount += 1
       }
     }
-    if thumbExt && allExt {
+    guard knownCount >= 2 else { return nil }
+
+    let thumbExt = isThumbExtended(lm)
+    let needMajority = max(2, knownCount - 1)   // 既知指の過半 (= 1 本のノイズを許容)
+    let spread = maxPairwiseDist(tips)          // 既知 tip の最大間隔 (= 開き/コンパクトさ)
+
+    // open_palm: 親指 + 既知指の過半が伸展 + 指が開いている。
+    if thumbExt && extCount >= needMajority && spread > 0.8 * palmW {
       return .openPalm
+    }
+
+    // thumbs_up: 親指伸展 + 既知指の過半が屈曲 + 握りがコンパクト + 親指が握りから突き出す。
+    if thumbExt && curlCount >= needMajority && spread < 0.7 * palmW {
+      let cx = tips.reduce(Float(0)) { $0 + $1.x } / Float(tips.count)
+      let cy = tips.reduce(Float(0)) { $0 + $1.y } / Float(tips.count)
+      let thumbTip = lm[HandJoint.thumbTip]
+      let thumbAway = distXY(thumbTip.x, thumbTip.y, cx, cy) > 0.7 * palmW
+      if thumbAway {
+        return .thumbsUp
+      }
     }
     return nil
   }
 
+  /// 親指が伸びているか。 CMC→TIP が CMC→MCP の 1.4 倍以上 (= 掌幅非依存の比)。
   private static func isThumbExtended(_ lm: [HLandmark]) -> Bool {
     let cmc = lm[HandJoint.thumbCmc]
     let mcp = lm[HandJoint.thumbMcp]
@@ -209,16 +246,37 @@ enum WearerHandClassifier {
     let dTip = distXY(cmc.x, cmc.y, tip.x, tip.y)
     let dMid = distXY(cmc.x, cmc.y, mcp.x, mcp.y)
     if dMid < 1e-6 { return false }
-    return dTip / dMid > 1.8
+    return dTip / dMid > 1.4
   }
 
-  private static func isFingerExtended(_ lm: [HLandmark], mcp: Int, pip: Int, tip: Int) -> Bool {
-    let m = lm[mcp]; let p = lm[pip]; let t = lm[tip]
-    if m.confidence < 0.3 || t.confidence < 0.3 { return false }
-    let dTip = distXY(m.x, m.y, t.x, t.y)
-    let dPip = distXY(m.x, m.y, p.x, p.y)
-    if dPip < 1e-6 { return false }
-    return dTip / dPip > 1.6
+  /// 3 点 a-b-c の b における角の cos。 直線 (b が中点で a,c が一直線) で -1、 屈曲で 0 / 正へ。
+  private static func angleCos(_ a: HLandmark, _ b: HLandmark, _ c: HLandmark) -> Float {
+    let v1x = a.x - b.x, v1y = a.y - b.y
+    let v2x = c.x - b.x, v2y = c.y - b.y
+    let n1 = (v1x * v1x + v1y * v1y).squareRoot()
+    let n2 = (v2x * v2x + v2y * v2y).squareRoot()
+    if n1 < 1e-6 || n2 < 1e-6 { return 0 }
+    return (v1x * v2x + v1y * v2y) / (n1 * n2)
+  }
+
+  private static func dist(_ a: HLandmark, _ b: HLandmark) -> Float {
+    distXY(a.x, a.y, b.x, b.y)
+  }
+
+  /// tips の最大ペア間距離 (= 開き/コンパクトさの指標)。
+  private static func maxPairwiseDist(_ pts: [HLandmark]) -> Float {
+    var mx: Float = 0
+    var i = 0
+    while i < pts.count {
+      var j = i + 1
+      while j < pts.count {
+        let d = dist(pts[i], pts[j])
+        if d > mx { mx = d }
+        j += 1
+      }
+      i += 1
+    }
+    return mx
   }
 
   // MARK: - utilities

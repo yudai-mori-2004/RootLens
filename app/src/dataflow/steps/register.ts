@@ -48,6 +48,10 @@ async function postClip(input: RegisterInput): Promise<string> {
       rootAssetId: input.rootAssetId,
       signedJsonUri: input.signedJsonUri,
       network: SOLANA_NETWORK,
+      recordingConfig: input.recordingConfig,
+      // 取れた時だけ送る (= サーバ側で省略時は ultra_wide fallback / duration はサーバ算出)。
+      ...(input.durationMs != null ? { durationMs: input.durationMs } : {}),
+      ...(input.deviceModel ? { deviceModel: input.deviceModel } : {}),
     }),
   });
   if (!(res.status === 200 || res.status === 201)) {

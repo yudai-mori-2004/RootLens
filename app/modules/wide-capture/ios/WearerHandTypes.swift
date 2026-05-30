@@ -80,8 +80,9 @@ enum HandGesture: String {
 }
 
 /// 1 フレーム分の最終結果 (= UI に出す前の単一フレーム判定)。
+/// gesture の集約 (= 両手の合議 / nil 許容) は TS 側 (CalibrationCaptureScreen) が per-hand gesture から行う。
+/// native は per-hand のジオメトリ判定だけを担う薄いセンサーに徹する。
 struct FrameClassification {
   let hands: [ClassifiedHand]
   let wearerHandCount: Int     // = 0, 1, 2 (本人の手だけ数える)
-  let gesture: HandGesture?    // 装着者の両手が同じサインを 1 フレームで示しているとき
 }

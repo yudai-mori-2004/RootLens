@@ -89,13 +89,9 @@ struct Args {
     #[arg(long, default_value = "https://www.rootlens.io")]
     api_base: String,
 
-    /// タスクカタログ ID (= /api/clips の taskId field)。
-    #[arg(long, default_value = "dishes")]
-    task_id: String,
-
-    /// 端末側 VLM 達成確度 (= 0..100)。
-    #[arg(long, default_value_t = 85)]
-    achievement: u32,
+    /// 撮影構成 (= /api/clips の recordingConfig field)。 mock は ultra_wide を模擬。
+    #[arg(long, default_value = "ultra_wide")]
+    recording_config: String,
 
     /// 進捗ログを抑制
     #[arg(long)]
@@ -461,12 +457,11 @@ async fn main() -> Result<()> {
                 match clips_register::register_clip(
                     &args.api_base,
                     &wallet_pubkey,
-                    &args.task_id,
-                    args.achievement,
                     &signature_hash_hex,
                     content_size,
                     &root_asset_id,
                     &signed_json_uri,
+                    &args.recording_config,
                 )
                 .await
                 {

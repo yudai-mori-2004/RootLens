@@ -6,7 +6,6 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import {
   useFonts,
   Fraunces_300Light,
@@ -27,11 +26,12 @@ import { useCertificateProvisioning } from './src/hooks/useCertificateProvisioni
 import { AuthGate } from './src/services/auth';
 // 2026-05-27 撤去: voicePref / voiceAgent / sherpa-onnx 系は段階削除済み
 import { colors, fonts, typography } from './src/theme';
+import { USE_DEV_SANDBOX } from './src/env';
+import { initClipPersistence } from './src/clips/persistence';
+import { initLocale, useT } from './src/i18n';
 
-// 開発ビルドでは本番 UI (RootNavigator) ではなく dataflow sandbox を起動する。
-// UI フローから独立して、 単体クリップのデータフローを 1 ボタンずつ検証するため。
-// 本番ビルド (= __DEV__ === false) では従来どおり RootNavigator を出す。
-const USE_DEV_SANDBOX = __DEV__;
+// 起点は既定で本番 UI (RootNavigator)。 EXPO_PUBLIC_USE_SANDBOX=1 の時だけ dataflow sandbox を起点にする。
+// (= dataflow 層の単体検証ハーネス。 本番フローはこれと同じ dataflow を呼ぶ別の Layer-3 消費者)
 
 // 統合フェーズ entry point。
 // CertGate (Unit A の TEE 証明書プロビジョニング) を起動時に解決してから
@@ -50,10 +50,15 @@ const navTheme = {
 };
 
 export default function App() {
-  // 起動時 baseline: portrait に lock しておく (= 全 screen の既定方向)。
-  // 撮影画面だけ task に応じて override し、 unmount で portrait に戻す。
+  // 画面の向きは RootNavigator の native-stack `orientation` オプションが screen 単位で管理する
+  // (= タブ portrait、 撮影だけ landscape)。 expo-screen-orientation の lockAsync は
+  // react-native-screens に上書きされ効かないので、 ここでは扱わない。
+  const [localeReady, setLocaleReady] = React.useState(false);
   useEffect(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+    // クリップ永続化 (= Layer 2 アダプタ) を起動: 保存済みクリップを hydrate + 以降の変更を persist。
+    initClipPersistence().catch(() => {});
+    // 保存済み locale を hydrate してから描画 (= 既定 locale のちらつきを防ぐ)。
+    initLocale().finally(() => setLocaleReady(true));
   }, []);
 
   const [fontsLoaded] = useFonts({
@@ -67,7 +72,7 @@ export default function App() {
     Inter_700Bold,
   });
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !localeReady) {
     return (
       <View style={[styles.center, { backgroundColor: colors.paper }]}>
         <ActivityIndicator color={colors.ink} />
@@ -103,14 +108,15 @@ export default function App() {
  */
 const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const cert = useCertificateProvisioning();
+  const t = useT();
 
   if (cert.status === 'checking' || cert.status === 'provisioning') {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.ink} />
-        <Text style={[styles.eyebrow, { marginTop: 16 }]}>DEVICE CERTIFICATE</Text>
+        <Text style={[styles.eyebrow, { marginTop: 16 }]}>{t('app.deviceCertificate')}</Text>
         <Text style={styles.body}>
-          {cert.status === 'checking' ? 'Checking…' : 'Provisioning…'}
+          {cert.status === 'checking' ? t('app.checking') : t('app.provisioning')}
         </Text>
       </View>
     );
@@ -119,12 +125,12 @@ const CertGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (cert.status === 'error') {
     return (
       <View style={styles.center}>
-        <Text style={styles.eyebrow}>SETUP FAILED</Text>
+        <Text style={styles.eyebrow}>{t('app.setupFailed')}</Text>
         <Text style={styles.body} numberOfLines={4}>
-          {cert.error ?? 'Unknown error'}
+          {cert.error ?? t('app.unknownError')}
         </Text>
         <Pressable style={styles.retry} onPress={cert.retry}>
-          <Text style={styles.retryLabel}>Retry</Text>
+          <Text style={styles.retryLabel}>{t('app.retry')}</Text>
         </Pressable>
       </View>
     );

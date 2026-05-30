@@ -8,11 +8,11 @@
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
-import { SERVER_URL } from '../../env';
+import { SERVER_URL, SOLANA_NETWORK } from '../../env';
 import type { EventSink } from '../events';
 import type { ServerClipStatus } from '../types';
 
-/** GET /api/clips/:id を 1 回叩いて状態を返す。 */
+/** GET /api/clips/:id を 1 回叩いて状態を返す (= server surrogate id 指定)。 */
 export async function fetchClipStatus(
   clipId: string,
   walletPubkey: string,
@@ -26,6 +26,21 @@ export async function fetchClipStatus(
   }
   const { clip } = (await res.json()) as { clip: ServerClipStatus };
   return clip;
+}
+
+/** signature_hash で状態を取得する (= 端末は signature_hash で一貫。 GET /api/clips?signatureHash=&network=)。
+ *  該当が無ければ null (= まだ登録されていない / 別 network)。 */
+export async function fetchClipStatusByHash(
+  signatureHash: string,
+  walletPubkey: string,
+): Promise<ServerClipStatus | null> {
+  const url =
+    `${SERVER_URL}/api/clips?signatureHash=${encodeURIComponent(signatureHash)}` +
+    `&network=${encodeURIComponent(SOLANA_NETWORK)}`;
+  const res = await fetch(url, { headers: { 'X-Wallet-Pubkey': walletPubkey } });
+  if (!res.ok) return null;
+  const { clips } = (await res.json()) as { clips: ServerClipStatus[] };
+  return clips[0] ?? null;
 }
 
 export interface PollOptions {
@@ -86,12 +101,8 @@ export async function pollPipeline2(
         sink({
           step: 'pipeline2',
           level: 'success',
-          message: `Pipeline 2 完了 state=${status.state} score=${status.qualityScore ?? '?'}/100`,
-          detail: {
-            qualityScore: status.qualityScore,
-            autoCategory: status.autoCategory,
-            autoCategoryConfidence: status.autoCategoryConfidence,
-          },
+          message: `Pipeline 2 完了 state=${status.state}`,
+          detail: { qualityVector: status.qualityVector },
         });
       }
       return status;

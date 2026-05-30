@@ -25,8 +25,9 @@ export async function processClip(input: ProcessClipInput) {
   "use workflow";
 
   const clip = await loadClip(input.clipId);
-  if (!clip.signatureHash || !clip.signedMp4Key) {
-    throw new FatalError(`Clip ${input.clipId} missing signatureHash / signedMp4Key`);
+  if (!clip.signatureHash) {
+    // raw key (raw/<sig>/rgb.mp4) は signature_hash から導出する。
+    throw new FatalError(`Clip ${input.clipId} missing signatureHash`);
   }
   if (!clip.rootAssetId) {
     // v0.1.3: Pipeline 2 開始の前提条件 = rootAssetId 確定済 (= Pipeline 1 末尾 cNFT 発行で確定)。
@@ -63,22 +64,30 @@ async function runPipeline2(args: { clipId: string; signatureHash: string }): Pr
 
 async function markReady(args: { clipId: string; result: Pipeline2Result }) {
   "use step";
-  // 軸ベクトル (= 合計なし) をそのまま quality_breakdown 列に保存。 合成スコアは付けない。
+  // 軸ベクトル (= 合計なし) をそのまま quality_vector 列に保存。 合成スコアは持たない。
   const vector: QualityVector = { axes: args.result.scores };
+
+  // labeling 前処理の meta から summary (= Gemini 全体パスの 1 行要約) と duration (= cv2 probe、 秒) を拾う。
+  // DATA_SPECS §3.4: semantic.jsonl ヘッダの summary / duration と同源。 DB に非正規化して可読ラベル + 録画尺にする。
+  const labelMeta = args.result.preprocessed.find((p) => p.name === "labeling")?.meta ?? {};
+  const summary = typeof labelMeta.summary === "string" ? labelMeta.summary : null;
+  const durationSec = typeof labelMeta.duration === "number" ? labelMeta.duration : null;
+  const durationMs = durationSec !== null ? Math.round(durationSec * 1000) : null;
 
   console.log(
     `[process-clip] ready ${args.clipId} axes=` +
     Object.entries(args.result.scores).map(([k, v]) => `${k}:${v.score}`).join(" "),
   );
 
-  await db
-    .update(clips)
-    .set({
-      state: "ready",
-      processingStep: null,
-      qualityScore: null,           // 合成しない (= 多軸・合計なし)
-      qualityBreakdown: vector,     // 列名は互換のため据え置き、 中身は品質ベクトル
-      updatedAt: new Date(),
-    })
-    .where(eq(clips.id, args.clipId));
+  // summary / durationMs は取れた時だけ更新 (= 端末申告 duration を上書きしない)。
+  const patch: Partial<typeof clips.$inferInsert> = {
+    state: "ready",
+    processingStep: null,
+    qualityVector: vector,
+    updatedAt: new Date(),
+  };
+  if (summary !== null) patch.summary = summary;
+  if (durationMs !== null) patch.durationMs = durationMs;
+
+  await db.update(clips).set(patch).where(eq(clips.id, args.clipId));
 }

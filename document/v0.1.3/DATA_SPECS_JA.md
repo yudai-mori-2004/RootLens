@@ -252,13 +252,19 @@ rootlens-processed/
 
 `raw/` と `processed/` は同じ `signature_hash` をキーにする。同一動画は同一ハッシュになるため、重複が自然に吸収される。`root_asset_id` が必要な場合は `raw/<signature_hash>/signed-json.json` を参照する。
 
-DB（Supabase）:
+DB（Supabase）: 1 クリップ = `clips` 1 行。R2 に置く大容量データ（`rgb.mp4` / `realtime_handpose.jsonl` / `semantic.jsonl` / `wilor.jsonl` 等）は DB に持たず `signature_hash` で参照する。ストレージキー（`raw/<sig>/rgb.mp4` 等）は `signature_hash` から導出可能なため列に持たない。
 
-| カテゴリ | 内容 |
-|---------|------|
-| クリップ | `signature_hash`、`root_asset_id`（notNull）、`recording_config`、デバイス情報、撮影日時、撮影時間、ステータス |
-| Pipeline 2 | 品質スコア、VLM 分類カテゴリ + 信頼度 |
-| ユーザー | ウォレットアドレス、KYC リファレンス |
+| グループ | 列 |
+|---------|----|
+| 識別・所有 | `id`、`wallet_pubkey`、`signature_hash`（notNull、実体キー）、`network`。重複排除 = UNIQUE (`wallet_pubkey`,`signature_hash`,`network`) |
+| ライフサイクル | `state`、`created_at`（=撮影日時）、`updated_at`、`processing_step`、`error_message`、`workflow_run_id` |
+| 撮影ファクト | `recording_config`（notNull）、`duration_ms`（=撮影時間、Pipeline 2 が算出 / 端末申告で前倒し）、`content_size`、`device_model` |
+| オンチェーン・来歴 | `root_asset_id`（notNull）、`signed_json_uri`（notNull）、`delegate`（≠owner で staked） |
+| Pipeline 2 結果 | `quality_vector`（多軸・合計なし、§3.3）、`summary`（Gemini 全体パスの 1 行要約） |
+| 収益 | `license_count`、`revenue_usdc` |
+| ユーザー（別テーブル） | ウォレットアドレス、KYC リファレンス、ToS 同意ログ |
+
+合成スコア（`quality_score`）・固定分類カテゴリ（`auto_category`）は持たない（§3.2 / §3.3 で廃止）。主カテゴリが要る場合は `summary` から事後派生する。`device_model` 以外のデバイス詳細（カメラ画角・内部パラメータ・calibration baseline）は R2 `metadata.json` に置き、必要なら後で `recording_meta`（jsonb）に取り込む。
 
 ---
 

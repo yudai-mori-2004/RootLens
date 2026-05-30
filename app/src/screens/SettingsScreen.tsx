@@ -28,12 +28,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { config } from '../config';
 import { COSIGN_AUTHORITY, SOLANA_RPC_URL } from '../env';
 import { useAuth } from '../services/auth';
+import { useT, useLocale, setLocale, type Locale } from '../i18n';
 // 2026-05-27 方針転換: 音声入力 (= voicePref / voiceAgent / sherpa-onnx) は撤去対象。
 // UI からは外す、 module の rm は段階削除 task #6 で。
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
+  const t = useT();
+  const locale = useLocale();
   const ownerStr = state.status === 'authenticated' ? state.session.pubkey.toBase58() : null;
   const [signingOut, setSigningOut] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -67,12 +70,12 @@ export const SettingsScreen: React.FC = () => {
 
   const onClearCache = () => {
     Alert.alert(
-      'キャッシュをクリア',
-      '撮影中の一時ファイルを削除します。 アップロード待ちのクリップは消えません。',
+      t('settings.clearCacheTitle'),
+      t('settings.clearCacheMessage'),
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: '削除',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -92,14 +95,14 @@ export const SettingsScreen: React.FC = () => {
 
   const onLogout = () => {
     Alert.alert(
-      'サインアウト',
+      t('settings.signOut'),
       provider.id === 'debug'
-        ? 'デバッグウォレットを削除して再生成します。 撮影済みクリップは新しい wallet からは見えなくなります。'
-        : 'サインアウトします。',
+        ? t('settings.signOutDebugMessage')
+        : t('settings.signOutMessage'),
       [
-        { text: 'キャンセル', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'サインアウト',
+          text: t('settings.signOut'),
           style: 'destructive',
           onPress: async () => {
             setSigningOut(true);
@@ -118,15 +121,29 @@ export const SettingsScreen: React.FC = () => {
     <SafeAreaView style={styles.root}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.heroBlock}>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>RootLens · Physical AI training-data marketplace</Text>
+          <Text style={styles.title}>{t('settings.title')}</Text>
+          <Text style={styles.subtitle}>{t('settings.subtitle')}</Text>
         </View>
 
+        {/* ── 言語 ── */}
+        <Section title={t('settings.section.language')}>
+          <SegmentRow
+            label={t('settings.languageLabel')}
+            sublabel={t('settings.languageDesc')}
+            value={locale}
+            options={[
+              { value: 'ja', label: t('settings.languageJa') },
+              { value: 'en', label: t('settings.languageEn') },
+            ]}
+            onChange={(v) => setLocale(v as Locale)}
+          />
+        </Section>
+
         {/* ── アカウント ── */}
-        <Section title="アカウント">
+        <Section title={t('settings.section.account')}>
           <Row
-            label="WALLET"
-            value={ownerStr ? shortBase58(ownerStr) : '未認証'}
+            label={t('settings.wallet')}
+            value={ownerStr ? shortBase58(ownerStr) : t('settings.unauthenticated')}
             mono
             onPress={
               ownerStr
@@ -134,81 +151,81 @@ export const SettingsScreen: React.FC = () => {
                 : undefined
             }
           />
-          <Row label="AUTH PROVIDER" value={provider.id} />
-          <Row label="KYC STATUS" value="未対応 (= 次の更新で実装)" tone="mute" />
+          <Row label={t('settings.authProvider')} value={provider.id} />
+          <Row label={t('settings.kycStatus')} value={t('settings.kycPending')} tone="mute" />
         </Section>
 
         {/* ── 通知 ── */}
-        <Section title="通知">
+        <Section title={t('settings.section.notifications')}>
           <SwitchRow
-            label="プッシュ通知"
-            sublabel="クリップ処理完了 / ライセンス販売の通知"
+            label={t('settings.pushNotifications')}
+            sublabel={t('settings.pushNotificationsDesc')}
             value={pushEnabled}
             onValueChange={setPushEnabled}
             disabled={true}
-            disabledNote="未実装 (= expo-notifications 統合予定)"
+            disabledNote={t('settings.pushNotImplemented')}
           />
         </Section>
 
         {/* ── 撮影 ── */}
-        <Section title="撮影">
+        <Section title={t('settings.section.capture')}>
           <SwitchRow
-            label="ハンドトラッキング表示"
-            sublabel="プレビュー上に手のスケルトンを描画"
+            label={t('settings.handOverlay')}
+            sublabel={t('settings.handOverlayDesc')}
             value={showHandOverlay}
             onValueChange={setShowHandOverlay}
             disabled={true}
-            disabledNote="次の更新で有効化"
+            disabledNote={t('settings.handOverlaySoon')}
           />
           <ActionRow
-            label="キャリブレーション再校正"
+            label={t('settings.recalibrate')}
             onPress={async () => {
               try {
                 await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
               } catch {}
             }}
           />
-          <Row label="BGM トラック" value="ambient-01 (default)" tone="mute" />
+          <Row label={t('settings.bgmTrack')} value="ambient-01 (default)" tone="mute" />
         </Section>
 
         {/* ── データ ── */}
-        <Section title="データ">
+        <Section title={t('settings.section.data')}>
           <Row
-            label="ストレージ使用量"
-            value={cacheSize === null ? '計算中…' : formatBytes(cacheSize)}
+            label={t('settings.storageUsage')}
+            value={cacheSize === null ? t('settings.calculating') : formatBytes(cacheSize)}
           />
-          <ActionRow label="キャッシュをクリア" onPress={onClearCache} kind="warn" />
+          <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
         </Section>
 
         {/* ── サポート ── */}
-        <Section title="サポート">
+        <Section title={t('settings.section.support')}>
           <ActionRow
-            label="利用規約"
+            label={t('settings.terms')}
             onPress={() => Linking.openURL(`${config.serverUrl}/legal/terms`).catch(() => {})}
           />
           <ActionRow
-            label="プライバシーポリシー"
+            label={t('settings.privacy')}
             onPress={() => Linking.openURL(`${config.serverUrl}/legal/privacy`).catch(() => {})}
           />
           <ActionRow
-            label="お問い合わせ"
+            label={t('settings.contact')}
             onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
           />
         </Section>
 
         {/* ── アプリ情報 ── */}
-        <Section title="アプリ情報">
-          <Row label="VERSION" value={version} />
-          <Row label="BUILD" value="devnet · debug" tone="mute" />
+        <Section title={t('settings.section.appInfo')}>
+          <Row label={t('settings.version')} value={version} />
+          <Row label={t('settings.build')} value="devnet · debug" tone="mute" />
           <ActionRow
-            label="GitHub リポジトリ"
+            label={t('settings.githubRepo')}
             onPress={() => Linking.openURL('https://github.com/yudai-mori-2004/root-lens').catch(() => {})}
           />
         </Section>
 
         {/* ── DEVELOPER (= debug provider 時のみ表示) ── */}
         {provider.id === 'debug' ? (
-          <Section title="Developer" tone="muted">
+          <Section title={t('settings.section.developer')} tone="muted">
             <Row label="CLUSTER" value="devnet" tone="ok" />
             <Row label="SOLANA RPC" value={SOLANA_RPC_URL} mono />
             <Row label="COSIGN AUTHORITY" value={shortBase58(COSIGN_AUTHORITY)} mono />
@@ -228,7 +245,7 @@ export const SettingsScreen: React.FC = () => {
             (signingOut || state.status !== 'authenticated') && styles.signOutBtnDisabled,
           ]}
         >
-          <Text style={styles.signOutLabel}>{signingOut ? 'SIGNING OUT…' : 'SIGN OUT'}</Text>
+          <Text style={styles.signOutLabel}>{signingOut ? t('settings.signingOut') : t('settings.signOut')}</Text>
         </Pressable>
 
         <Text style={styles.footnote}>v{version} · {provider.id}</Text>
@@ -500,6 +517,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansSemibold,
     fontSize: 12,
     letterSpacing: 2,
+    textTransform: 'uppercase',
     color: colors.danger,
   },
 

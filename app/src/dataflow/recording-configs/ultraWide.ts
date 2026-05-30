@@ -7,15 +7,27 @@
 //    native module wrapper (../../native/wideCapture) は内部で react-native を使うが、
 //    ここが import するのは関数 export のみ (= React component は触らない)。
 
+import * as FileSystem from 'expo-file-system';
+
 import {
   isWideCaptureAvailable,
   startWideSession,
   stopWideSession,
   startWideRecording,
   stopWideRecording,
+  captureWideSnapshot,
+  setWideDisplayOrientation,
+  subscribeWideHandTrack,
 } from '../../native/wideCapture';
 import type { EventSink } from '../events';
-import type { OutputFileSpec, RecordingConfig, RecordingSession } from './types';
+import type {
+  DisplayOrientation,
+  HandTrackEvent,
+  HandTrackSubscription,
+  OutputFileSpec,
+  RecordingConfig,
+  RecordingSession,
+} from './types';
 
 // 超広角構成の出力ファイル (DATA_SPECS §2.2):
 //   rgb.mp4                    超広角 RGB 映像 (30 fps)
@@ -56,7 +68,11 @@ export const ultraWideConfig: RecordingConfig = {
 
   async startRecording(sink: EventSink): Promise<RecordingSession> {
     sink({ step: 'record', level: 'info', message: '録画開始' });
-    const dir = await startWideRecording();
+    // app-kill 後も Pipeline 1 を再開できるよう durable な Documents 配下に録画する
+    // (= tmp/ は OS が purge し得るので、 blur 中に kill されると再署名の元データも失う)。
+    // native は plain path を要求するので file:// を剥がして渡す (= 返値は file:// URI)。
+    const dirUri = `${FileSystem.documentDirectory}recordings/rec-${Date.now()}/`;
+    const dir = await startWideRecording(dirUri.replace(/^file:\/\//, ''));
     const sessionDir = ensureTrailingSlash(dir);
     sink({ step: 'record', level: 'success', message: '録画開始完了', detail: { sessionDir } });
     return { sessionDir };
@@ -79,5 +95,17 @@ export const ultraWideConfig: RecordingConfig = {
     const primary = OUTPUT_FILES.find((f) => f.isPrimaryVideo);
     if (!primary) throw new Error('ultra_wide config has no primary video file');
     return `${ensureTrailingSlash(session.sessionDir)}${primary.name}`;
+  },
+
+  subscribeHandTrack(listener: (e: HandTrackEvent) => void): HandTrackSubscription {
+    return subscribeWideHandTrack(listener);
+  },
+
+  captureSnapshot(): Promise<string> {
+    return captureWideSnapshot();
+  },
+
+  setDisplayOrientation(orientation: DisplayOrientation): Promise<void> {
+    return setWideDisplayOrientation(orientation);
   },
 };

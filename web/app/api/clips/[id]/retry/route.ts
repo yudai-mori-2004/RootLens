@@ -39,9 +39,11 @@ export async function POST(req: Request, ctx: Ctx) {
       { status: 409 },
     );
   }
-  if (!clip.signatureHash || !clip.signedMp4Key) {
+  // raw key は signature_hash から導出する (= raw/<sig>/rgb.mp4)。 signature_hash は notNull だが
+  // 念のため空チェック。
+  if (!clip.signatureHash) {
     return NextResponse.json(
-      { error: "Missing signatureHash / signedMp4Key (= raw 削除済の可能性)" },
+      { error: "Missing signatureHash" },
       { status: 409 },
     );
   }

@@ -1,93 +1,93 @@
 import {
-  pgTable, text, integer, timestamp, jsonb, index, numeric,
+  pgTable, text, integer, bigint, timestamp, jsonb, index, uniqueIndex, numeric,
 } from "drizzle-orm/pg-core";
 import type { QualityVector } from "../shared/api-types";
 
 // DATA_SPECS §6 のクリップ状態機械 + §3 のサーバパイプラインを永続化するスキーマ。
 //
-// 1 クリップ = 1 行。 同じ wallet が同じ signature_hash (= D2 active manifest signature SHA-256) を
-// 同じ network で 2 度登録しようとした場合は idempotent に既存行を返す (= 重複排除)。
-// 重複排除キーは (wallet_pubkey, signature_hash, network)。 network を含めるのは、 devnet で
-// 発行済みの動画を後で mainnet で発行し直せるようにするため (= network が違えば別 clip 扱い)。
+// 1 クリップ = 1 行。 列は論理グループ (識別 / ライフサイクル / 撮影ファクト / 来歴 / Pipeline 2 / 収益)
+// で並べる。 R2 に置く大容量データ (rgb.mp4 / realtime_handpose.jsonl / semantic.jsonl / wilor.jsonl 等) は
+// DB に持たず、 signature_hash をキーに参照する (= DATA_SPECS §5)。 ストレージキーは signature_hash から
+// 100% 導出可能 (raw/<sig>/rgb.mp4 等) なので列に持たない (= コード側ヘルパーで導出)。
+//
+// 重複排除キー (wallet_pubkey, signature_hash, network) は UNIQUE 制約で DB が保証する。 network を
+// 含めるのは devnet で発行済みの動画を後で mainnet で発行し直せるようにするため (= network 違いは別 clip)。
 
 export const clips = pgTable(
   "clips",
   {
-    /// 内部 ID (= 端末から指定された UUID、 または server 生成)。
-    /// Root NFT 発行後も主キーは変わらない (= 永続的識別子)。
+    // ── 識別・所有 ───────────────────────────────────────────────────
+    /// 内部 ID (= 端末指定 UUID、 または server 生成)。 Root NFT 発行後も不変。
     id: text("id").primaryKey(),
 
     /// 撮影者の Solana wallet pubkey (base58)。
     walletPubkey: text("wallet_pubkey").notNull(),
 
-    /// タスクカタログ ID 参照。
-    taskId: text("task_id").notNull(),
-
-    /// DATA_SPECS §6 の状態。
-    /// 'uploading' | 'processing' | 'ready' | 'staked' | 'error'
-    state: text("state").notNull().default("uploading"),
-
-    /// 行作成時刻 (= 撮影者「送る」 押下時刻)。
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-
-    /// 端末側 VLM 達成確度 (= 0..100)。 撮影者「送る」 押下時に渡される。
-    achievementConfidence: integer("achievement_confidence"),
-
     /// C2PA D2 アクティブマニフェスト署名の SHA-256 hex (= DATA_SPECS §1.1)。
-    /// 端末で確定し、 以降全パイプラインを通じて不変の識別子。
-    signatureHash: text("signature_hash"),
+    /// 端末で確定し、 全パイプラインを通じて不変の実体キー。 raw/ と processed/ の dir キー。
+    signatureHash: text("signature_hash").notNull(),
 
-    /// cNFT を発行した Solana ネットワーク (= "devnet" | "mainnet")。
-    /// 重複排除キーの一部 (= 同 wallet × 同 signature_hash でも network が違えば別 clip)。
-    /// devnet で撮った動画を後で mainnet で発行し直せるようにするため必須。
+    /// cNFT を発行した Solana ネットワーク (= "devnet" | "mainnet")。 重複排除キーの一部。
     network: text("network").notNull().default("devnet"),
 
-    /// R2 オブジェクトキー / プレフィックス。
-    /// signedMp4Key = raw/<signature_hash>/rgb.mp4 (= 端末が C2PA D2 署名 + 顔ぼかしを終えてアップロードした MP4)
-    /// processedPrefix = processed/<signature_hash>/ (= Pipeline 2 / 3 の計算結果出力先)
-    signedMp4Key: text("signed_mp4_key"),
-    processedPrefix: text("processed_prefix"),
+    // ── ライフサイクル ───────────────────────────────────────────────
+    /// DATA_SPECS §6 の状態。 'uploading' | 'processing' | 'ready' | 'staked' | 'error'
+    state: text("state").notNull().default("uploading"),
+
+    /// 行作成時刻 (= 撮影者「送る」 押下時刻 ≒ 撮影日時)。
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 
     /// processing 中の現在ステップ (= Pipeline 2 の進行表示用)。 'scoring'。
     processingStep: text("processing_step"),
 
-    /// 品質ベクトル (= DATA_SPECS §3、 多軸・合計なし)。 軸名 → {score 0-100, method, breakdown}。
-    /// quality_breakdown 列に格納 (= 列名は互換のため据え置き)。 quality_score は使わない (= 合成しない)。
-    qualityScore: integer("quality_score"),
-    qualityBreakdown: jsonb("quality_breakdown").$type<QualityVector>(),
+    /// 処理エラー時の最終メッセージ。
+    errorMessage: text("error_message"),
 
-    /// idle_ratio (= task_activity == 0 のフレーム割合) は score に算入しないが、
-    /// カタログフィルタ用に別カラムで公開する。
-    idleRatio: numeric("idle_ratio", { precision: 5, scale: 4 }),
+    /// WDK workflow の run id (= status query / 手動 cancel 用)。
+    workflowRunId: text("workflow_run_id"),
 
-    /// TP 発行された Root NFT の asset id (= Bubblegum cNFT id、 base58)。
-    /// v0.1.3 で Pipeline 1 末尾の cNFT 発行で確定する前提条件 (= Pipeline 2 起動の必須条件)。
+    // ── 撮影ファクト (端末申告 / サーバ算出) ─────────────────────────
+    /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit' | ...、 DATA_SPECS §2.2)。 端末が登録時に申告。
+    recordingConfig: text("recording_config").notNull(),
+
+    /// 録画尺 (ms)。 Pipeline 2 の labeling が rgb.mp4 から算出 (= cv2 probe)。 端末申告でも上書き可。
+    durationMs: integer("duration_ms"),
+
+    /// ぼかし済 rgb.mp4 のバイト数 (= 端末が登録時に申告)。
+    contentSize: bigint("content_size", { mode: "number" }),
+
+    /// 撮影端末の機種 (= utsname machine、 例 "iPhone15,2")。 来歴 / 市場フィルタ用。
+    deviceModel: text("device_model"),
+
+    // ── オンチェーン / 来歴 ──────────────────────────────────────────
+    /// TP 発行された Root NFT の cNFT asset id (= Bubblegum、 base58)。 Pipeline 2 起動の前提条件。
     rootAssetId: text("root_asset_id").notNull(),
 
-    /// TP が返した signed_json_uri (= TEE 署名済メタデータ JSON への URI)。
-    /// v0.1.3 で R2 上の signed-json/<signature_hash>.json を指す。 cNFT 発行と同時に確定。
+    /// TP /process が返した signed_json への URI (= TEE 署名済メタデータ JSON)。 cNFT 発行と同時に確定。
     signedJsonUri: text("signed_json_uri").notNull(),
 
     /// Bubblegum delegate (= owner と等しければ unstaked、 異なれば staked)。
     delegate: text("delegate"),
 
-    /// ライセンス販売の集計 (= staked 後に更新)。 別 worker で再集計してもよい。
+    // ── Pipeline 2 結果 ──────────────────────────────────────────────
+    /// 多軸品質ベクトル (= DATA_SPECS §3、 軸名 → {axis, score 0-100, method, breakdown})。 合計は持たない。
+    qualityVector: jsonb("quality_vector").$type<QualityVector>(),
+
+    /// クリップの 1 行要約 (= labeling の Gemini 全体パス。 semantic.jsonl ヘッダ summary)。 可読ラベル。
+    summary: text("summary"),
+
+    // ── 収益 ─────────────────────────────────────────────────────────
+    /// ライセンス販売の集計 (= staked 後に更新)。
     licenseCount: integer("license_count").notNull().default(0),
     revenueUsdc: numeric("revenue_usdc", { precision: 18, scale: 6 }).notNull().default("0"),
-
-    /// 処理エラー時の最終メッセージ (= 撮影者にサポート連絡を促す文言)。
-    errorMessage: text("error_message"),
-
-    /// WDK workflow の run id (= status query / 手動 cancel 用に保持)。
-    workflowRunId: text("workflow_run_id"),
   },
   (t) => [
     index("clips_wallet_idx").on(t.walletPubkey),
     index("clips_state_idx").on(t.state),
     index("clips_signature_hash_idx").on(t.signatureHash),
-    // 重複排除 lookup (= POST /api/clips dedup + 端末の mint 前チェック) 用の複合 index。
-    index("clips_wallet_sig_network_idx").on(t.walletPubkey, t.signatureHash, t.network),
+    // 重複排除を DB で保証 (= 同 wallet × 同 signature_hash × 同 network は 1 行)。
+    uniqueIndex("clips_wallet_sig_network_uq").on(t.walletPubkey, t.signatureHash, t.network),
   ],
 );
 

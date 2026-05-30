@@ -127,6 +127,8 @@ public class WideCaptureModule: Module, WideCaptureControllerDelegate {
           "handedness": ch.raw.handedness,
           "confidence": ch.raw.confidence,
           "landmarks": lms,
+          // per-hand のジェスチャー (= 集約は TS 側)。 検出不能は null。
+          "gesture": WearerHandClassifier.detectGesture(hand: ch.raw)?.rawValue ?? NSNull(),
         ]
       }
     return [
@@ -135,7 +137,6 @@ public class WideCaptureModule: Module, WideCaptureControllerDelegate {
       "imageHeight": out.imageHeight,
       "wearerHandCount": out.classification.wearerHandCount,
       "wearerHands": wearerHands,
-      "gesture": out.classification.gesture?.rawValue ?? NSNull() as Any,
       "segmentationCoverage": out.segmentationCoverage,
       "segmentationEdgeRatio": out.segmentationEdgeRatio,
     ]

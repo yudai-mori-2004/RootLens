@@ -23,34 +23,35 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path } from 'react-native-svg';
 
+import { useT, type TranslationKey } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 const STORAGE_KEY = 'rootlens.onboarding.completed.v1';
 
 interface Slide {
-  eyebrow: string;
-  headline: string;
-  body: string;
+  eyebrow: TranslationKey;
+  headline: TranslationKey;
+  body: TranslationKey;
   glyph: 'eye' | 'shield' | 'circle';
 }
 
 const SLIDES: Slide[] = [
   {
-    eyebrow: 'CAPTURE',
-    headline: 'Record household chores.',
-    body: 'カメラを頭やネックストラップに装着して、 普段の家事をそのまま記録。 ジェスチャーで開始 / 終了。',
+    eyebrow: 'onb.slide1.eyebrow',
+    headline: 'onb.slide1.headline',
+    body: 'onb.slide1.body',
     glyph: 'eye',
   },
   {
-    eyebrow: 'PRIVACY',
-    headline: 'Faces blurred on device.',
-    body: 'Apple Vision で映像内の顔を端末上でぼかしてから署名 + アップロード。 元映像はサーバに送りません。',
+    eyebrow: 'onb.slide2.eyebrow',
+    headline: 'onb.slide2.headline',
+    body: 'onb.slide2.body',
     glyph: 'shield',
   },
   {
-    eyebrow: 'EARN',
-    headline: 'Own each clip as an NFT.',
-    body: '署名済クリップは Solana 上の Root NFT になります。 AI 企業がライセンス購入すると USDC で収益発生。',
+    eyebrow: 'onb.slide3.eyebrow',
+    headline: 'onb.slide3.headline',
+    body: 'onb.slide3.body',
     glyph: 'circle',
   },
 ];
@@ -97,6 +98,7 @@ export async function isOnboardingCompleted(): Promise<boolean> {
 const SCREEN_W = Dimensions.get('window').width;
 
 const WelcomeCarousel: React.FC<{ onNext: () => void }> = ({ onNext }) => {
+  const t = useT();
   const [page, setPage] = useState(0);
 
   return (
@@ -117,7 +119,7 @@ const WelcomeCarousel: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         style={styles.carousel}
       >
         {SLIDES.map((slide) => (
-          <Slide key={slide.eyebrow} slide={slide} />
+          <Slide key={slide.glyph} slide={slide} />
         ))}
       </ScrollView>
 
@@ -132,23 +134,26 @@ const WelcomeCarousel: React.FC<{ onNext: () => void }> = ({ onNext }) => {
           onPress={onNext}
           style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
         >
-          <Text style={styles.ctaLabel}>{page === SLIDES.length - 1 ? 'CONTINUE' : 'SKIP'}</Text>
+          <Text style={styles.ctaLabel}>{page === SLIDES.length - 1 ? t('onb.continue') : t('onb.skip')}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
   );
 };
 
-const Slide: React.FC<{ slide: Slide }> = ({ slide }) => (
-  <View style={[styles.slide, { width: SCREEN_W }]}>
-    <View style={styles.glyphWrap}>
-      <SlideGlyph kind={slide.glyph} />
+const Slide: React.FC<{ slide: Slide }> = ({ slide }) => {
+  const t = useT();
+  return (
+    <View style={[styles.slide, { width: SCREEN_W }]}>
+      <View style={styles.glyphWrap}>
+        <SlideGlyph kind={slide.glyph} />
+      </View>
+      <Text style={styles.slideEyebrow}>{t(slide.eyebrow)}</Text>
+      <Text style={styles.slideHeadline}>{t(slide.headline)}</Text>
+      <Text style={styles.slideBody}>{t(slide.body)}</Text>
     </View>
-    <Text style={styles.slideEyebrow}>{slide.eyebrow}</Text>
-    <Text style={styles.slideHeadline}>{slide.headline}</Text>
-    <Text style={styles.slideBody}>{slide.body}</Text>
-  </View>
-);
+  );
+};
 
 const SlideGlyph: React.FC<{ kind: 'eye' | 'shield' | 'circle' }> = ({ kind }) => {
   switch (kind) {
@@ -207,69 +212,71 @@ const TosConsent: React.FC<{
   onToggle: () => void;
   onContinue: () => void;
   onBack: () => void;
-}> = ({ tosAccepted, onToggle, onContinue, onBack }) => (
-  <SafeAreaView style={styles.root}>
-    <View style={styles.brandRow}>
-      <Pressable onPress={onBack} hitSlop={8} style={styles.backBtn}>
-        <Text style={styles.backChevron}>‹</Text>
-      </Pressable>
-      <BrandMark />
-      <Text style={styles.brandText}>ROOTLENS</Text>
-    </View>
-
-    <ScrollView contentContainerStyle={styles.tosScroll} showsVerticalScrollIndicator={false}>
-      <Text style={styles.tosEyebrow}>STEP 2 OF 2 · TERMS OF USE</Text>
-      <Text style={styles.tosHeadline}>使い始める前に。</Text>
-      <Text style={styles.tosLede}>
-        RootLens を使うと、 撮影 / アップロード / NFT 化 / ライセンス販売の各処理に同意したことになります。
-        概要を確認のうえ、 全文へのリンクから本文をチェックしてください。
-      </Text>
-
-      <View style={styles.tosCard}>
-        <SummaryBullet text="撮影クリップは端末上で顔ぼかし + C2PA 署名され、 暗号化 R2 ストレージに保存されます。" />
-        <SummaryBullet text="ステーキング後、 ライセンスを購入した AI 企業に映像が引き渡されます。 撤回はできません。" />
-        <SummaryBullet text="ライセンス売上の 95% が撮影者、 5% が運営に分配されます。" />
-        <SummaryBullet text="本人が映る場合のみ撮影してください。 第三者の顔は端末側ぼかしで対応しますが、 居住者の同意は撮影者の責任で取得してください。" />
+}> = ({ tosAccepted, onToggle, onContinue, onBack }) => {
+  const t = useT();
+  return (
+    <SafeAreaView style={styles.root}>
+      <View style={styles.brandRow}>
+        <Pressable onPress={onBack} hitSlop={8} style={styles.backBtn}>
+          <Text style={styles.backChevron}>‹</Text>
+        </Pressable>
+        <BrandMark />
+        <Text style={styles.brandText}>ROOTLENS</Text>
       </View>
 
-      <View style={styles.linksRow}>
-        <Text style={styles.linkText}>利用規約</Text>
-        <View style={styles.linkDot} />
-        <Text style={styles.linkText}>プライバシーポリシー</Text>
-      </View>
-    </ScrollView>
-
-    <View style={styles.tosFooter}>
-      <Pressable
-        onPress={onToggle}
-        style={({ pressed }) => [styles.checkboxRow, pressed && { opacity: 0.7 }]}
-      >
-        <View style={[styles.checkbox, tosAccepted && styles.checkboxChecked]}>
-          {tosAccepted ? (
-            <Svg width={14} height={14} viewBox="0 0 14 14">
-              <Path d="M3 7 l3 3 l5 -6" stroke={colors.card} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </Svg>
-          ) : null}
-        </View>
-        <Text style={styles.checkboxLabel}>
-          利用規約 と プライバシーポリシー を読み、 同意します
+      <ScrollView contentContainerStyle={styles.tosScroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.tosEyebrow}>{t('onb.tosEyebrow')}</Text>
+        <Text style={styles.tosHeadline}>{t('onb.tosHeadline')}</Text>
+        <Text style={styles.tosLede}>
+          {t('onb.tosLede')}
         </Text>
-      </Pressable>
 
-      <Pressable
-        onPress={onContinue}
-        disabled={!tosAccepted}
-        style={({ pressed }) => [
-          styles.cta,
-          !tosAccepted && styles.ctaDisabled,
-          pressed && tosAccepted && styles.ctaPressed,
-        ]}
-      >
-        <Text style={styles.ctaLabel}>CONTINUE</Text>
-      </Pressable>
-    </View>
-  </SafeAreaView>
-);
+        <View style={styles.tosCard}>
+          <SummaryBullet text={t('onb.bullet1')} />
+          <SummaryBullet text={t('onb.bullet2')} />
+          <SummaryBullet text={t('onb.bullet3')} />
+          <SummaryBullet text={t('onb.bullet4')} />
+        </View>
+
+        <View style={styles.linksRow}>
+          <Text style={styles.linkText}>{t('settings.terms')}</Text>
+          <View style={styles.linkDot} />
+          <Text style={styles.linkText}>{t('settings.privacy')}</Text>
+        </View>
+      </ScrollView>
+
+      <View style={styles.tosFooter}>
+        <Pressable
+          onPress={onToggle}
+          style={({ pressed }) => [styles.checkboxRow, pressed && { opacity: 0.7 }]}
+        >
+          <View style={[styles.checkbox, tosAccepted && styles.checkboxChecked]}>
+            {tosAccepted ? (
+              <Svg width={14} height={14} viewBox="0 0 14 14">
+                <Path d="M3 7 l3 3 l5 -6" stroke={colors.card} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
+            ) : null}
+          </View>
+          <Text style={styles.checkboxLabel}>
+            {t('onb.tosConsent')}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={onContinue}
+          disabled={!tosAccepted}
+          style={({ pressed }) => [
+            styles.cta,
+            !tosAccepted && styles.ctaDisabled,
+            pressed && tosAccepted && styles.ctaPressed,
+          ]}
+        >
+          <Text style={styles.ctaLabel}>{t('onb.continue')}</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+};
 
 const SummaryBullet: React.FC<{ text: string }> = ({ text }) => (
   <View style={styles.bulletRow}>
@@ -367,6 +374,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansSemibold,
     fontSize: 12,
     letterSpacing: 2.4,
+    textTransform: 'uppercase',
   },
 
   tosScroll: {

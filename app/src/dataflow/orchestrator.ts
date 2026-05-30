@@ -1,15 +1,13 @@
 // Pipeline 1 の連結 orchestrator (DATA_SPECS §2)。
 //
-// 責務分割:
-//   signRecording  撮影停止直後に「1 回だけ」実行する署名 (= D1 + blur + D2 + signature_hash)。
-//                  署名済み MP4 を session dir に永続化する。 撮影ライフサイクルの一部。
-//   runPipeline1   署名済みクリップを入力に upload → title-protocol → register を実行する。
-//                  hash で冪等 (= 再実行しても上書き / 重複排除 / 既発行 cNFT 再利用)。
+//   runPipeline1   署名済みクリップ (= signature_hash 確定済み) を入力に upload → title-protocol →
+//                  register + finalize を実行する。 hash で冪等 (= 再実行しても R2 上書き /
+//                  既発行 cNFT 再利用 / clip 行重複排除)。
 //
-// ⚠ 署名と Pipeline 1 を分ける理由: C2PA D2 署名は RFC3161 TSA タイムスタンプ (sigTst2) を
-//    埋め込むため、 同じ動画でも署名のたびに署名バイト列 → signature_hash が変わる。 署名を
-//    runPipeline1 (= ボタン再押下で再実行されうる) の中に置くと毎回別ハッシュになり、 hash ベースの
-//    冪等 (= 重複排除・既発行 cNFT 再利用) が一切効かず二重 mint する。 署名は「撮影終了時に 1 回」。
+// ⚠ 署名 (D1 / blur+D2) は dataflow/pipeline.ts の advanceClip が段として実行し、 signature_hash を
+//    確定させてから runPipeline1 を呼ぶ。 署名を runPipeline1 内に置かない理由: C2PA D2 は RFC3161
+//    TSA タイムスタンプを埋めるため再署名で signature_hash が変わり、 hash ベース冪等が壊れ二重 mint する。
+//    署名は段レジュームで「1 回だけ」 行い、 以降は同じ signature_hash を使い回す。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
@@ -18,7 +16,6 @@ import * as FileSystem from 'expo-file-system';
 import type { EventSink } from './events';
 import type { RecordingConfig, RecordingSession } from './recording-configs';
 import type { SignResult } from './types';
-import { signClip, makeSignTmpDir } from './steps/sign';
 import { uploadToR2 } from './steps/upload';
 import { registerWithTitleProtocol } from './steps/titleProtocol';
 import { registerClip } from './steps/register';
@@ -26,12 +23,15 @@ import { registerClip } from './steps/register';
 export interface Pipeline1Input {
   config: RecordingConfig;
   session: RecordingSession;
-  /** 撮影停止時に signRecording で確定済みの署名結果 (= ここで再署名はしない)。 */
+  /** ぼかし署名段 (blurSign) で確定済みの署名結果 (= ここで再署名はしない)。 */
   signed: SignResult;
   /** Bubblegum cNFT 発行先 merkle tree pubkey */
   merkleTree: string;
   /** MPL Core collection (= public tree なら省略可) */
   collection?: string;
+  /** 撮影ファクト (= POST /api/clips で申告)。 録画尺 (ms) と端末機種。 */
+  durationMs?: number | null;
+  deviceModel?: string | null;
 }
 
 export interface Pipeline1Result {
@@ -46,31 +46,8 @@ export interface Pipeline1Result {
 }
 
 /**
- * 撮影停止直後に「1 回だけ」実行する署名。 生 MP4 → D1 → ぼかし → D2 → signature_hash を確定する。
- * 署名済み MP4 (= signedMp4Uri) を以降の runPipeline1 (= 再押下されうる) が使い回すため、
- * 署名 tmpDir は cleanup せずに残す。 中間ファイル (d1 / blurred / d2) だけ消して署名済み rgb.mp4 を残す。
- *
- * ⚠ session dir (= native が tmp/ に作る録画 dir) へコピーしようとすると copyAsync が失敗したため、
- *    expo cache 配下の署名 dir にそのまま残す方式にした (= クロスディレクトリ copy を避ける)。
- */
-export async function signRecording(
-  config: RecordingConfig,
-  session: RecordingSession,
-  sink: EventSink,
-): Promise<SignResult> {
-  const rawMp4Uri = config.primaryVideoUri(session);
-  const tmpDir = await makeSignTmpDir();
-  const signed = await signClip({ rawMp4Uri }, tmpDir, sink);
-  // 中間ファイルだけ削除して署名済み rgb.mp4 (= signed.signedMp4Uri) を残す。 tmpDir 自体は残す。
-  for (const name of ['d1.mp4', 'blurred.mp4', 'd2.mp4']) {
-    await FileSystem.deleteAsync(`${tmpDir}${name}`, { idempotent: true }).catch(() => {});
-  }
-  return signed;
-}
-
-/**
  * 署名済みクリップを upload → TP → register まで通し、 clip 登録 + Pipeline 2 起動まで行う。
- * 署名はしない (= signRecording で確定済みの input.signed を使う)。
+ * 署名はしない (= ぼかし署名段で確定済みの input.signed を使う)。
  * signature_hash は固定なので再実行しても冪等: R2 は上書き、 cNFT は既発行なら再利用 (titleProtocol)、
  * clip 行は重複排除される。
  */
@@ -116,6 +93,9 @@ export async function runPipeline1(
       rootAssetId: tp.rootAssetId,
       signedJsonUri: tp.signedJsonUri,
       walletPubkey: tp.walletPubkey,
+      recordingConfig: input.config.id,
+      durationMs: input.durationMs,
+      deviceModel: input.deviceModel,
     },
     sink,
   );

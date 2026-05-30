@@ -1,5 +1,5 @@
 {
-  "id": "20b07d31-06f2-4423-8c45-b41bfb62bd5d",
+  "id": "bbb3e12e-2c48-4c4a-ba2d-4aa97c3aaf2a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -20,11 +20,18 @@
           "primaryKey": false,
           "notNull": true
         },
-        "task_id": {
-          "name": "task_id",
+        "signature_hash": {
+          "name": "signature_hash",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "network": {
+          "name": "network",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'devnet'"
         },
         "state": {
           "name": "state",
@@ -47,51 +54,45 @@
           "notNull": true,
           "default": "now()"
         },
-        "achievement_confidence": {
-          "name": "achievement_confidence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "content_id": {
-          "name": "content_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "signed_mp4_key": {
-          "name": "signed_mp4_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dataset_prefix": {
-          "name": "dataset_prefix",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "processing_step": {
           "name": "processing_step",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "quality_score": {
-          "name": "quality_score",
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "workflow_run_id": {
+          "name": "workflow_run_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recording_config": {
+          "name": "recording_config",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "duration_ms": {
+          "name": "duration_ms",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "quality_breakdown": {
-          "name": "quality_breakdown",
-          "type": "jsonb",
+        "content_size": {
+          "name": "content_size",
+          "type": "bigint",
           "primaryKey": false,
           "notNull": false
         },
-        "idle_ratio": {
-          "name": "idle_ratio",
-          "type": "numeric(5, 4)",
+        "device_model": {
+          "name": "device_model",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -99,16 +100,28 @@
           "name": "root_asset_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "signed_json_uri": {
           "name": "signed_json_uri",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "delegate": {
           "name": "delegate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quality_vector": {
+          "name": "quality_vector",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary": {
+          "name": "summary",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -126,18 +139,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'0'"
-        },
-        "error_message": {
-          "name": "error_message",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "workflow_run_id": {
-          "name": "workflow_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -171,17 +172,44 @@
           "method": "btree",
           "with": {}
         },
-        "clips_content_id_idx": {
-          "name": "clips_content_id_idx",
+        "clips_signature_hash_idx": {
+          "name": "clips_signature_hash_idx",
           "columns": [
             {
-              "expression": "content_id",
+              "expression": "signature_hash",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "clips_wallet_sig_network_uq": {
+          "name": "clips_wallet_sig_network_uq",
+          "columns": [
+            {
+              "expression": "wallet_pubkey",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "signature_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "network",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}

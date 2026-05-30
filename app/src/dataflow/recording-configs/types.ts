@@ -15,6 +15,50 @@
 
 import type { EventSink } from '../events';
 
+// ─── リアルタイム手検出 (= 撮影構成が提供する、 ジェスチャー層が乗る土台) ───────────
+// ジェスチャー / キャリブレーション UX は「撮影構成の上に薄く乗るソース」 であり、 構成ごとの
+// native (wide-capture / arkit-capture) 差異を意識しない。 そのため手検出イベントの subscribe を
+// 構成抽象が提供し、 UX 層は config.subscribeHandTrack() だけを見る (= 構成非依存)。
+// 型は両 native (wideCapture / arkitCapture) の onHandTrack payload と同形 (= 段階削除中の互換)。
+
+export interface HandLandmark {
+  x: number;        // 0..1 (左上原点)
+  y: number;        // 0..1
+  confidence: number;
+}
+
+export type GestureKind = 'open_palm' | 'thumbs_up';
+
+export interface WearerHandObservation {
+  handedness: 'left' | 'right' | 'unknown';
+  confidence: number;
+  landmarks: HandLandmark[];   // 必ず 21 要素 (MediaPipe 順)
+  /** この手単体のジェスチャー判定 (= native の per-hand 幾何判定。 検出不能は null)。
+   *  両手の合議 (= フレーム gesture の集約) は TS 側 (= 撮影画面) が per-hand から行う。 */
+  gesture: GestureKind | null;
+}
+
+/** 1 フレームの手の状態。 native onHandTrack の payload と同形。
+ *  frame-level gesture は廃止 (= per-hand gesture を TS で集約する方針へ移行)。 */
+export interface HandTrackEvent {
+  timestampNs: string;
+  imageWidth: number;
+  imageHeight: number;
+  wearerHandCount: number;          // 0 / 1 / 2
+  wearerHands: WearerHandObservation[];
+  /// 互換フィールド (= 2026-05-27 hand framing 判定撤去で wide では 0.0)。
+  segmentationCoverage: number;
+  segmentationEdgeRatio: number;
+}
+
+/** 表示 orientation (= native が frame を回す向き)。 撮影は横持ち固定なので portrait は廃止。 */
+export type DisplayOrientation = 'landscapeLeft' | 'landscapeRight';
+
+/** 手検出 subscribe のハンドル。 */
+export interface HandTrackSubscription {
+  remove(): void;
+}
+
 /** 撮影構成が session dir に出力する 1 ファイルの宣言。 */
 export interface OutputFileSpec {
   /** session dir 内のファイル名 (= R2 raw/<signature_hash>/ 配下にも同名で並ぶ) */
@@ -64,4 +108,12 @@ export interface RecordingConfig {
 
   /** session dir 内の primary video (= 署名/ぼかし対象 MP4) の file:// URI を返す。 */
   primaryVideoUri(session: RecordingSession): string;
+
+  // ─── リアルタイム操作面 (= ジェスチャー UX が乗る土台。 構成非依存) ──────────────
+  /** リアルタイム手検出イベントを購読する (= ~15-30 Hz)。 */
+  subscribeHandTrack(listener: (e: HandTrackEvent) => void): HandTrackSubscription;
+  /** 最新フレームを JPEG として temp に書き出し file:// URI を返す (= 次タスク提案用)。 */
+  captureSnapshot(): Promise<string>;
+  /** native に表示 orientation を伝える (= 録画開始前に確定させる)。 */
+  setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
 }

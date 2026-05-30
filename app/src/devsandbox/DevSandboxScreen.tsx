@@ -26,11 +26,13 @@ import {
   dataflowStore,
   storeEventSink,
   teeToConsole,
-  signRecording,
-  runPipeline1,
-  pollPipeline2,
+  enqueueRecording,
+  advanceClip,
+  fetchClipStatusByHash,
+  resolveServerClipId,
   triggerPipeline3,
   fetchPipeline3Status,
+  selectCurrentClip,
   type DataflowEvent,
   type EventLevel,
   type RecordingConfig,
@@ -38,7 +40,6 @@ import {
 import { WideCapturePreviewView } from '../native/wideCapture';
 import { ArkitCapturePreviewView } from '../native/arkitCapture';
 import { getCurrentSession } from '../services/auth/instance';
-import { MERKLE_TREE, MERKLE_COLLECTION } from '../env';
 
 // console にもミラーする sink (= Metro ログでも追える)
 const sink = teeToConsole(storeEventSink, 'sandbox');
@@ -92,9 +93,8 @@ export const DevSandboxScreen: React.FC = () => {
 
   const events = useStore(dataflowStore, (s) => s.events);
   const recording = useStore(dataflowStore, (s) => s.recording);
-  const signedClip = useStore(dataflowStore, (s) => s.signedClip);
-  const clip = useStore(dataflowStore, (s) => s.clip);
-  const serverStatus = useStore(dataflowStore, (s) => s.serverStatus);
+  // 進行中クリップ (= currentClipId が指すもの)。 段の進行 / server 状態はここにマージされる。
+  const clip = useStore(dataflowStore, selectCurrentClip);
   const busy = useStore(dataflowStore, (s) => s.busy);
 
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -212,105 +212,87 @@ export const DevSandboxScreen: React.FC = () => {
       const session = await config.startRecording(sink);
       const store = dataflowStore.getState();
       store.setSession(session);
-      store.setSignedClip(null); // 新しい録画 = 前の署名を破棄
-      store.resetClip();
+      store.resetCurrent(); // 新しい録画 = 前の署名 + 進行中クリップ追跡を破棄
       store.setRecording('recording');
     });
   }, [config, runAction]);
 
-  // 録画停止 → その場で「1 回だけ」署名する (= D1 + blur + D2 + signature_hash 確定)。
-  // 署名は録画ごとに 1 回。 Pipeline 1 は再押下されうるが、 ここで確定した signed を使い回すので
-  // signature_hash は固定され、 hash ベースの冪等 (= 重複排除・既発行 cNFT 再利用) が効く。
+  // 録画停止 → クリップを起こす (= stage 'unsigned'、 local id で進行表示対象に)。
+  // 署名は「Pipeline 実行」 (= advanceClip) の段で行われる (= 失敗段から再開できる)。
   const onStopRecording = useCallback(() => {
-    runAction('録画停止 + 署名', async () => {
+    runAction('録画停止', async () => {
       const session = await config.stopRecording(sink);
       const store = dataflowStore.getState();
       store.setSession(session);
-      const signed = await signRecording(config, session, sink);
-      store.setSignedClip(signed);
+      await enqueueRecording({ config, session });
       store.setRecording('recorded');
     });
   }, [config, runAction]);
 
-  // Pipeline 1 (端末側: 署名 → R2 アップロード → TP /process → clip 登録) を実行する。
-  // 登録 (= finalize) が完了するとサーバ側 Pipeline 2 (スコアリング) が自動起動する。
-  // → 結果は「Pipeline 2 結果確認」でポーリングする。
+  // Pipeline 実行 = 段レジュームランナー (advanceClip)。 未署名 → 撮影署名 → ぼかし署名
+  // (signature_hash 誕生) → upload/TP/mint/登録 → Pipeline 2 polling までを一気に駆動する。
+  // 失敗した段は clip.state='error' に反映され、 もう一度押すとその段から再開する。
   const onRunPipeline1 = useCallback(() => {
-    runAction('Pipeline 1 実行', async () => {
-      const store = dataflowStore.getState();
-      const session = store.session;
-      const signed = store.signedClip;
-      if (!session || !signed) {
-        sink({ step: 'sandbox', level: 'error', message: '署名済み録画がありません。 先に録画→停止してください' });
-        return;
-      }
-      store.resetClip();
-      store.patchClip({ recordingConfigId: config.id, sessionDir: session.sessionDir, state: 'uploading' });
-      const result = await runPipeline1(
-        { config, session, signed, merkleTree: MERKLE_TREE, collection: MERKLE_COLLECTION },
-        sink,
-      );
-      dataflowStore.getState().patchClip({
-        id: result.clipId,
-        signatureHash: result.signatureHash,
-        contentSize: result.contentSize,
-        facesBlurred: result.facesBlurred,
-        rootAssetId: result.rootAssetId,
-        signedJsonUri: result.signedJsonUri,
-        txSignature: result.txSignature,
-        state: 'processing',
-      });
-      sink({
-        step: 'sandbox',
-        level: 'success',
-        message: `clip 登録完了 → サーバで Pipeline 2 自動起動。「Pipeline 2 結果確認」で進捗を見てください`,
-      });
-    });
-  }, [config, runAction]);
-
-  const onCheckPipeline2 = useCallback(() => {
-    runAction('Pipeline 2 結果確認', async () => {
-      const clipId = dataflowStore.getState().clip?.id;
+    runAction('Pipeline 実行 (段レジューム)', async () => {
+      const clipId = dataflowStore.getState().currentClipId;
       if (!clipId) {
-        sink({ step: 'sandbox', level: 'error', message: 'clip がありません。 先に Pipeline 1 を実行してください' });
+        sink({ step: 'sandbox', level: 'error', message: 'クリップがありません。 先に録画 → 停止してください' });
         return;
       }
-      const wallet = walletPubkeyOrThrow();
-      const status = await pollPipeline2(clipId, wallet, sink, {
-        onStatus: (s) => dataflowStore.getState().setServerStatus(s),
-      });
-      dataflowStore.getState().patchClip({
-        state: status.state,
-        qualityScore: status.qualityScore,
-        qualityBreakdown: status.qualityBreakdown,
-        autoCategory: status.autoCategory,
-        autoCategoryConfidence: status.autoCategoryConfidence,
-        errorMessage: status.errorMessage,
-      });
+      await advanceClip(clipId, sink);
     });
   }, [runAction]);
 
-  // Pipeline 3 (サーバ側: WiLoR 手ポーズ推定) を手動トリガーする。
-  // Pipeline 2 が ready (= スコアリング完了) になってから実行する。
-  const onRunPipeline3 = useCallback(() => {
-    runAction('Pipeline 3 実行', async () => {
-      const clipId = dataflowStore.getState().clip?.id;
-      if (!clipId) {
-        sink({ step: 'sandbox', level: 'error', message: 'clip がありません。 先に Pipeline 2 を ready まで通してください' });
+  // Pipeline 2 状態更新 = signature_hash で最新状態を 1 回引いて反映する (= 観測のみ)。
+  const onCheckPipeline2 = useCallback(() => {
+    runAction('Pipeline 2 状態更新', async () => {
+      const c = selectCurrentClip(dataflowStore.getState());
+      if (!c?.signatureHash) {
+        sink({ step: 'sandbox', level: 'error', message: 'signature_hash 未確定 (= まだぼかし署名前)' });
         return;
       }
-      await triggerPipeline3(clipId, walletPubkeyOrThrow(), sink);
+      const st = await fetchClipStatusByHash(c.signatureHash, walletPubkeyOrThrow());
+      if (st) {
+        dataflowStore.getState().applyServerStatus(c.id, st);
+        sink({ step: 'sandbox', level: 'success', message: `状態更新: ${st.state} axes=${st.qualityVector ? Object.keys(st.qualityVector.axes).length : 0}` });
+      } else {
+        sink({ step: 'sandbox', level: 'warn', message: 'サーバにクリップが見つかりません (= 未登録)' });
+      }
+    });
+  }, [runAction]);
+
+  // Pipeline 3 (サーバ側: WiLoR 手ポーズ推定) を手動トリガーする。 signature_hash → server id 解決して叩く。
+  const onRunPipeline3 = useCallback(() => {
+    runAction('Pipeline 3 実行', async () => {
+      const c = selectCurrentClip(dataflowStore.getState());
+      if (!c?.signatureHash) {
+        sink({ step: 'sandbox', level: 'error', message: 'signature_hash 未確定。 先に登録まで通してください' });
+        return;
+      }
+      const wallet = walletPubkeyOrThrow();
+      const serverId = await resolveServerClipId(c.signatureHash, wallet);
+      if (!serverId) {
+        sink({ step: 'sandbox', level: 'error', message: 'server clip 未登録 (= 先に Pipeline 実行で登録)' });
+        return;
+      }
+      await triggerPipeline3(serverId, wallet, sink);
     });
   }, [runAction]);
 
   const onCheckPipeline3 = useCallback(() => {
     runAction('Pipeline 3 結果確認', async () => {
-      const clipId = dataflowStore.getState().clip?.id;
-      if (!clipId) {
-        sink({ step: 'sandbox', level: 'error', message: 'clip がありません' });
+      const c = selectCurrentClip(dataflowStore.getState());
+      if (!c?.signatureHash) {
+        sink({ step: 'sandbox', level: 'error', message: 'signature_hash 未確定' });
         return;
       }
-      await fetchPipeline3Status(clipId, walletPubkeyOrThrow(), sink);
+      const wallet = walletPubkeyOrThrow();
+      const serverId = await resolveServerClipId(c.signatureHash, wallet);
+      if (!serverId) {
+        sink({ step: 'sandbox', level: 'error', message: 'server clip 未登録' });
+        return;
+      }
+      await fetchPipeline3Status(serverId, wallet, sink);
     });
   }, [runAction]);
 
@@ -318,7 +300,7 @@ export const DevSandboxScreen: React.FC = () => {
 
   const canRecord = available === true && recording === 'session-active';
   const canStop = recording === 'recording';
-  const canRunP1 = recording === 'recorded' && !!signedClip;
+  const canRunP1 = recording === 'recorded' && !!clip?.id;
   const hasClip = !!clip?.id;
   const canSwitchConfig = !busy && !switching && (recording === 'idle' || recording === 'session-active');
   // プレビューは「実際に稼働中の構成」の native view を出す (= 切替完了後に swap)。
@@ -398,8 +380,8 @@ export const DevSandboxScreen: React.FC = () => {
         <StatusRow label="rootAssetId" value={clip?.rootAssetId} mono />
         <StatusRow
           label="server state"
-          value={serverStatus?.state ?? clip?.state}
-          extra={serverStatus?.qualityScore != null ? `score ${serverStatus.qualityScore}/100` : undefined}
+          value={clip?.state}
+          extra={clip?.qualityScore != null ? `score ${clip.qualityScore}/100` : undefined}
         />
       </View>
 
@@ -420,7 +402,7 @@ export const DevSandboxScreen: React.FC = () => {
         </View>
         {/* P1 (端末): 署名→アップロード→TP→登録。 完了でサーバ P2 が自動起動する */}
         <View style={styles.row}>
-          <SandboxButton label="Pipeline 1 実行 (UP→TP→登録)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
+          <SandboxButton label="Pipeline 実行 (署名→UP→TP→登録→P2)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
         </View>
         {/* P2 (サーバ自動): スコアリング。 送信ボタンは無い (= P1 登録で起動)、 結果をポーリング */}
         <View style={styles.row}>

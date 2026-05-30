@@ -34,16 +34,17 @@ export interface WearerHandObservation {
   handedness: 'left' | 'right' | 'unknown';
   confidence: number;
   landmarks: HandLandmark[];   // 必ず 21 要素
+  /// この手単体のジェスチャー (= native per-hand 判定。 検出不能は null)。 集約は TS 側。
+  gesture: 'open_palm' | 'thumbs_up' | null;
 }
 
-/** 検出された 1 つのフレームの手の状態 */
+/** 検出された 1 つのフレームの手の状態。 frame-level gesture は廃止 (= per-hand を TS で集約)。 */
 export interface HandTrackEvent {
   timestampNs: string;            // ARFrame.timestamp 由来 ns (= bigint 互換のため string)
   imageWidth: number;
   imageHeight: number;
   wearerHandCount: number;        // 0 / 1 / 2 (= ジェスチャ判定のみで使う)
   wearerHands: WearerHandObservation[];
-  gesture: 'open_palm' | 'thumbs_up' | null;
   /// フレーミング判定の主信号: ARKit personSegmentation で「人」 と判定されたピクセル割合
   /// segmentationCoverage = 画面全体に対する人ピクセルの割合 (= 0..1)
   /// segmentationEdgeRatio = 人ピクセルのうち画面外周 8% 内側に居る割合 (= 0..1)

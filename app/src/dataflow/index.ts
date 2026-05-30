@@ -8,9 +8,10 @@
 // 型
 export type {
   Clip,
+  ClipReward,
   ClipState,
+  Pipeline1Stage,
   ProcessingStep,
-  AutoCategory,
   QualityBreakdown,
   Layer1Score,
   Layer2Score,
@@ -31,7 +32,17 @@ export type { DataflowEvent, DataflowEventInput, EventSink, EventLevel } from '.
 export { makeEvent, noopSink, teeToConsole } from './events';
 
 // 撮影構成
-export type { RecordingConfig, RecordingSession, OutputFileSpec } from './recording-configs';
+export type {
+  RecordingConfig,
+  RecordingSession,
+  OutputFileSpec,
+  HandLandmark,
+  WearerHandObservation,
+  GestureKind,
+  HandTrackEvent,
+  DisplayOrientation,
+  HandTrackSubscription,
+} from './recording-configs';
 export {
   RECORDING_CONFIGS,
   DEFAULT_RECORDING_CONFIG,
@@ -44,20 +55,34 @@ export {
   signClip,
   makeSignTmpDir,
   cleanupTmpDir,
+  captureSign,
+  blurSign,
   uploadToR2,
   registerWithTitleProtocol,
   registerClip,
   fetchClipStatus,
+  fetchClipStatusByHash,
   pollPipeline2,
   triggerPipeline3,
   fetchPipeline3Status,
+  stakeClip,
+  resolveServerClipId,
 } from './steps';
 export type { PollOptions, Pipeline3TriggerResult } from './steps';
 
-// orchestrator
-export { signRecording, runPipeline1 } from './orchestrator';
+// orchestrator (= 純粋 Pipeline 1: upload → TP/mint → register + finalize)
+export { runPipeline1 } from './orchestrator';
 export type { Pipeline1Input, Pipeline1Result } from './orchestrator';
 
+// 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → 署名段 → 登録 → Pipeline 2)
+export { enqueueRecording, advanceClip, discardClip } from './pipeline';
+
 // store
-export { dataflowStore, storeEventSink } from './store';
+export {
+  dataflowStore,
+  storeEventSink,
+  clipList,
+  selectClip,
+  selectCurrentClip,
+} from './store';
 export type { DataflowState, RecordingPhase } from './store';

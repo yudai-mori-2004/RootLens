@@ -173,13 +173,13 @@ export const radii = {
 } as const;
 
 export const shadows = {
-  // Hairline shadow — for cards floating on paper
+  // Warm, soft float — cards lifting off warm paper (warm-toned shadow, not cold navy).
   card: {
-    shadowColor: '#0E1F44',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: '#33271A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
   },
   // More pronounced — for modal / popover
   pop: {
