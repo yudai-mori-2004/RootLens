@@ -16,7 +16,7 @@ import { Buffer } from 'buffer';
 import { Connection, PublicKey, VersionedTransaction } from '@solana/web3.js';
 
 import { SERVER_URL, SOLANA_RPC_URL, SOLANA_NETWORK } from '../../env';
-import { getAuthProvider, requireCurrentSession } from '../../services/auth/instance';
+import { requireCurrentSession } from '../../services/auth/instance';
 import type { EventSink } from '../events';
 import type { TpInput, TpResult } from '../types';
 
@@ -64,11 +64,9 @@ export async function registerWithTitleProtocol(
   });
 
   // ─── cNFT mint ───────────────────────────────────────────────────
-  // 手数料スポンサー: 新規ユーザーは SOL を持たないので、 mint 前にサーバ経由で少額補給する
-  // (= /api/v1/fund-wallet が fee-payer 鍵の SOL を wallet に送る)。 失敗しても致命ではない
-  // (= 既に残高があれば mint は通る) ので warn して続行する。
-  await ensureWalletFunded(walletPubkey, sink);
-
+  // 手数料はサーバ側スポンサー (fee payer) が払う設計 (D 案)。 ユーザーは leaf_owner のみで
+  // tx 署名も SOL も不要。 サーバ /api/v1/tp-mint-tx が fee_payer slot をスポンサー鍵で署名して
+  // 「完全署名済み tx」 を返す。 端末はそれを broadcast するだけ (= 下記 signAndBroadcastMint)。
   sink({ step: 'cnft-mint', level: 'info', message: 'partial mint tx を取得' });
   const partialTxB64 = await fetchPartialMintTx({
     offchainDataUrl: signedJsonUri,
@@ -77,8 +75,8 @@ export async function registerWithTitleProtocol(
     collection: input.collection,
   });
 
-  sink({ step: 'cnft-mint', level: 'info', message: 'wallet 署名 + broadcast (confirmed 待機)' });
-  const { rootAssetId, txSignature } = await signAndBroadcastMint(partialTxB64, input.merkleTree);
+  sink({ step: 'cnft-mint', level: 'info', message: 'broadcast (= fee payer はサーバ署名済み、 confirmed 待機)' });
+  const { rootAssetId, txSignature } = await broadcastMint(partialTxB64, input.merkleTree);
   sink({
     step: 'cnft-mint',
     level: 'success',
@@ -147,33 +145,6 @@ async function dasAssetExists(rpcUrl: string, assetId: string): Promise<boolean>
   return !!r && r.id === assetId && r.burnt !== true;
 }
 
-/// 手数料スポンサー補給: wallet の SOL 残高が低ければサーバが少額補給する (= /api/v1/fund-wallet)。
-/// 補給失敗は致命ではない (= 既に残高があれば mint は通る) ので throw せず warn して続行する。
-async function ensureWalletFunded(walletPubkey: string, sink: EventSink): Promise<void> {
-  try {
-    const res = await fetch(`${SERVER_URL}/api/v1/fund-wallet`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wallet: walletPubkey }),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      sink({ step: 'cnft-mint', level: 'warn', message: `手数料補給に失敗 (mint を試行): ${res.status} ${text.slice(0, 120)}` });
-      return;
-    }
-    const json = (await res.json()) as { funded?: boolean; balanceSol?: number };
-    if (json.funded) {
-      sink({ step: 'cnft-mint', level: 'info', message: `手数料を補給しました (残高 ${json.balanceSol?.toFixed(4)} SOL)` });
-    }
-  } catch (e) {
-    sink({
-      step: 'cnft-mint',
-      level: 'warn',
-      message: `手数料補給の呼び出し失敗 (続行): ${e instanceof Error ? e.message : String(e)}`,
-    });
-  }
-}
-
 async function callTpProcess(
   signatureHash: string,
 ): Promise<{ signedJsonUri: string; signatureHash: string }> {
@@ -208,15 +179,14 @@ async function fetchPartialMintTx(args: {
   return partialTx;
 }
 
-async function signAndBroadcastMint(
+/// サーバから返る tx は「完全署名済み」 (= TEE が tree_creator_or_delegate、 サーバが fee payer を署名済み)。
+/// leaf_owner (= ユーザー wallet) は signer ではないので端末は署名しない。 broadcast + asset_id 導出のみ。
+async function broadcastMint(
   partialTxB64: string,
   merkleTree: string,
 ): Promise<{ rootAssetId: string; txSignature: string }> {
   const bytes = Buffer.from(partialTxB64, 'base64');
   const tx = VersionedTransaction.deserialize(new Uint8Array(bytes));
-
-  const provider = getAuthProvider();
-  await provider.signTransaction(tx);
 
   const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
   const txSignature = await connection.sendRawTransaction(tx.serialize(), {
