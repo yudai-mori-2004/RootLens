@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "gen:legal": "node scripts/gen-legal.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.1022.0",

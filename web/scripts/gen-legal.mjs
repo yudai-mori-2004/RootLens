@@ -23,7 +23,7 @@ const LOCALES = ['ja', 'en'];
 //   除外対象: メタ行(種別/状態/言語)、§0(層化メカニズム説明)、内部キーワードを含む引用ブロック
 //   (= 監査メモ / 公開前に弁護士確認 / Important バナー / 既存公開版への言及 等)。
 const INTERNAL_KW = [
-  '監査メモ', 'audit memo', '公開前', 'counsel review', 'review by qualified counsel',
+  '監査メモ', 'audit memo', 'audit note', '公開前', 'counsel review', 'review by qualified counsel',
   'before publication', 'before publishing', 'important:', '重要:', '既存の公開版',
   'existing published', 'content authenticity', 'privacypolicypage', '叩き台',
   'this draft reflects', 'reflects the decisions',
@@ -42,6 +42,8 @@ function cleanForPublic(md) {
     if (/^\*\*(種別|Type)\*\*/.test(line.trim())) { i++; continue; }
     // §0 セクション (## 0. ... を次の ## まで)
     if (/^##\s+0[\.\s]/.test(line.trim())) { i++; while (i < lines.length && !/^##\s/.test(lines[i].trim())) i++; continue; }
+    // 改訂履歴 (内部変更ログ) は末尾まで丸ごと除外
+    if (/^##\s+(改訂履歴|revision\s+history|change\s*log|changelog)/i.test(line.trim())) break;
     // 内部キーワードを含む引用ブロックを除外
     if (line.trim().startsWith('>')) {
       const grp = []; let j = i;
@@ -149,7 +151,7 @@ const banner =
 
 const body =
   banner +
-  "export type LegalDocKey = 'privacy-policy' | 'tester-consent';\n" +
+  `export type LegalDocKey = ${DOCS.map((d) => `'${d}'`).join(' | ')};\n` +
   "export type LegalLocale = 'ja' | 'en';\n\n" +
   'export interface LegalDocContent { title: string; hash: string; html: string; }\n\n' +
   `export const legalDocs: Record<LegalLocale, Record<LegalDocKey, LegalDocContent>> = ${JSON.stringify(result, null, 2)};\n\n` +
