@@ -21,7 +21,7 @@
 > - **Recording request**: please record only when alone; do not record other people or children.
 > - **Contact**: contact@rootlens.io
 >
-> This is a summary. The official content is in the full text below (§2 onward).
+> This is a summary. The official content is in the full text below.
 
 ## 2. Operator & scope
 
@@ -30,7 +30,7 @@ RootLens ("we"; entity formation in progress; until then the operating individua
 > Audit note: the existing page's contact `contact@titleprotocol.org` is incorrect; this document standardizes on `contact@rootlens.io`.
 
 ### 2.2 Scope
-All handling of personal data across our app, website, and data-sale service. It concerns not only the recording user but also **people who may be captured** in recordings (handled in §2.7/§8).
+All handling of personal data across our app, website, and data-sale service. It concerns not only the recording user but also **people who may be captured** in recordings (addressed in "Third parties, children, private spaces" below).
 
 ## 3. Information we collect
 - **Video and audio** from the head-mounted camera
@@ -48,44 +48,44 @@ All handling of personal data across our app, website, and data-sale service. It
 
 ## 5. Third-party provision, sale, sublicensing
 - We **license/provide/sell** datasets to outside parties (this is the core of the business).
-- Licensing is activated via an off-chain license document, using an on-chain token (NFT) as a **pointer** (the NFT itself has no legal effect; see [`terms-of-service`](../terms-of-service/en.md) and the v0.1.2 license design).
-- Buyers are contractually bound by **no-re-identification, use limitations, and downstream flow-through obligations** ([`buyer-license`](../buyer-license/en.md)).
+- Licensing is activated via an off-chain license document, using an on-chain token (NFT) as a **pointer** (the NFT itself has no legal effect; the binding terms are in the license document and our Terms of Service).
+- Buyers are contractually bound by **no-re-identification, use limitations, and downstream flow-through obligations**.
 
 ## 6. Cross-border transfer
-Data **may be provided to companies outside Japan**. Recipients/destinations follow the gating in [`legal-policy`](../legal-policy/en.md) §8; excluded regions (US all-party-consent states, mainland China, EU, etc., until ready) are not served.
+Data **may be provided to companies outside Japan**. Recipients and destinations are limited by our internal transfer rules; excluded regions (US all-party-consent states, mainland China, EU, etc., until ready) are not served.
 
-## 7. Privacy processing (no overstatement / D5·D2)
+## 7. Privacy processing
 - Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via voice, body, room, possessions). We do not call it "anonymized."
 - Because audio is recorded, **voice is also treated as identifying information**.
 
-## 8. Third parties, children, private spaces (D3·D4)
+## 8. Third parties, children, private spaces
 - We assume and require that **only the recording user appears**.
-- **Clips containing identifiable third parties are not sold** (detection → exclusion).
-- **Children, illegal content, and private spaces (bathroom/bedroom/toilet, etc.) are blocked**; detected illegal material is handled/reported per law ([`incident-runbook`](../incident-runbook/en.md)).
+- **Clips containing identifiable third parties are not sold** (detection then exclusion).
+- **Children, illegal content, and private spaces (bathroom/bedroom/toilet, etc.) are blocked**; detected illegal material is handled and reported as required by law.
 
 ## 9. Retention
 Retained for as long as necessary for the purposes and as required by law, then deleted or rendered non-distributable (specific periods to be added once fixed).
 
-## 10. Your rights (D6 / honest scope)
+## 10. Your rights
 - You may request access, correction, suspension of use, deletion, and withdrawal of consent.
 - **Deletion scope**: data before training use is deleted. **After training use**, it is excluded from future training, but **past training cannot be undone**. We do not promise "complete deletion anytime."
 - The blockchain retains tokens and transaction records, but the **personal data itself is off-chain**, and deleting it removes substantive value.
 - Requests: contact@rootlens.io
 
 ## 11. Withdrawal of consent and its effect
-The user may withdraw consent anytime. After withdrawal, we stop new collection/sale and delete un-trained data. Effects on already-issued licenses and trained models are per §10 (the past cannot be undone).
+The user may withdraw consent anytime. After withdrawal, we stop new collection/sale and delete un-trained data. Effects on already-issued licenses and trained models are as described in "Your rights" above (the past cannot be undone).
 
 ## 12. Security
 Because video is sensitive, we apply encryption, access control, and retention management. Breaches are notified per law.
 
 ## 13. Children's information
-We do not allow children as subjects (§8). The recording user must be 18 or older.
+We do not allow children as subjects. The recording user must be 18 or older.
 
 ## 14. Applicable regions
-Per the phased rollout in [`legal-policy`](../legal-policy/en.md) §8. Currently Japan-first.
+We expand availability in stages. Currently Japan-first.
 
 ## 15. Amendments
-This policy may be amended. Material changes are announced; versions and hashes are managed ([`consent-log-spec`](../consent-log-spec/en.md)).
+This policy may be amended. Material changes are announced; versions and hashes are managed.
 
 ## 16. Contact
 contact@rootlens.io
@@ -94,3 +94,4 @@ contact@rootlens.io
 | Date | Change |
 |------|--------|
 | (initial) | Authoritative draft reflecting the real business (data sale, staking, KYC, audio, third parties). Layered structure. Counsel review before publishing |
+| (rev 2) | Cleaned internal references (section numbers, internal-doc slugs, D-codes) into plain prose for public output; unified contact to contact@rootlens.io |
