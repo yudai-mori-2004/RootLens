@@ -39,7 +39,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const FIXTURES_PATH = resolve(__dirname, "fixtures.json");
-const KEYS_DIR = resolve(__dirname, "../../keys");
+const KEYS_DIR = resolve(__dirname, "../../keys/dev/solana");
 
 interface FixtureLeaf {
   name: string;

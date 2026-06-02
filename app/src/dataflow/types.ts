@@ -234,6 +234,8 @@ export interface RegisterResult {
 export interface ServerClipStatus {
   id: string;
   state: ClipState;
+  /** 行作成時刻 (= ISO 8601、 撮影日時)。 list 取得時に使う。 */
+  createdAt?: string;
   processingStep?: ProcessingStep | null;
   /** 多軸品質ベクトル (= ready 以降)。 合成スコア (qualityScore) は持たない。 */
   qualityVector?: QualityVector | null;

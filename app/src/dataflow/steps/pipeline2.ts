@@ -28,6 +28,22 @@ export async function fetchClipStatus(
   return clip;
 }
 
+/** wallet の全クリップを取得する (= GET /api/clips、 Portfolio 画面の一覧ソース)。
+ *  サーバ登録済み (processing / ready / staked / error) のクリップを full ClipDto で返す。
+ *  失敗時は空配列 (= UI は local store + on-chain で degrade)。 */
+export async function fetchAllClips(walletPubkey: string): Promise<ServerClipStatus[]> {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/clips`, {
+      headers: { 'X-Wallet-Pubkey': walletPubkey },
+    });
+    if (!res.ok) return [];
+    const { clips } = (await res.json()) as { clips: ServerClipStatus[] };
+    return Array.isArray(clips) ? clips : [];
+  } catch {
+    return [];
+  }
+}
+
 /** signature_hash で状態を取得する (= 端末は signature_hash で一貫。 GET /api/clips?signatureHash=&network=)。
  *  該当が無ければ null (= まだ登録されていない / 別 network)。 */
 export async function fetchClipStatusByHash(

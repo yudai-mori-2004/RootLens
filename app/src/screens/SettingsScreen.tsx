@@ -32,6 +32,8 @@ import { useT, useLocale, setLocale, type Locale } from '../i18n';
 // 2026-05-27 方針転換: 音声入力 (= voicePref / voiceAgent / sherpa-onnx) は撤去対象。
 // UI からは外す、 module の rm は段階削除 task #6 で。
 import { colors, fonts, radii, spacing, typography } from '../theme';
+import { LegalDocModal } from '../components/LegalDocModal';
+import type { LegalDocKey } from '../content/legalDocs.generated';
 
 export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
@@ -42,6 +44,7 @@ export const SettingsScreen: React.FC = () => {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [showHandOverlay, setShowHandOverlay] = useState(true);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
+  const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
 
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.1.0';
 
@@ -199,14 +202,8 @@ export const SettingsScreen: React.FC = () => {
 
         {/* ── サポート ── */}
         <Section title={t('settings.section.support')}>
-          <ActionRow
-            label={t('settings.terms')}
-            onPress={() => Linking.openURL(`${config.serverUrl}/legal/terms`).catch(() => {})}
-          />
-          <ActionRow
-            label={t('settings.privacy')}
-            onPress={() => Linking.openURL(`${config.serverUrl}/legal/privacy`).catch(() => {})}
-          />
+          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
+          <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
           <ActionRow
             label={t('settings.contact')}
             onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
@@ -250,6 +247,8 @@ export const SettingsScreen: React.FC = () => {
 
         <Text style={styles.footnote}>v{version} · {provider.id}</Text>
       </ScrollView>
+
+      <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </SafeAreaView>
   );
 };

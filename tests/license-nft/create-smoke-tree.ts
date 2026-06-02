@@ -27,7 +27,7 @@ import {
 } from "@metaplex-foundation/umi-web3js-adapters";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const KEYS_DIR = resolve(__dirname, "../../keys");
+const KEYS_DIR = resolve(__dirname, "../../keys/dev/solana");
 
 const deployer = Keypair.fromSecretKey(
   Uint8Array.from(JSON.parse(readFileSync(resolve(KEYS_DIR, "deployer.json"), "utf-8")))

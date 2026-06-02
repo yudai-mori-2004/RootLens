@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Line } from 'react-native-svg';
 import { Video, ResizeMode } from 'expo-av';
-import { dataflowStore, storeEventSink, stakeClip, type Clip, type QualityBreakdown } from '../dataflow';
+import { dataflowStore, storeEventSink, stakeClip, type Clip } from '../dataflow';
 import { requireCurrentSession } from '../services/auth';
 import { clipTitle } from '../domain/clipLabels';
 import { useT } from '../i18n';
@@ -24,10 +24,13 @@ import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 //   1. ぼかし済みコンテンツのプレビュー (= 「ぼかしの確認」 と同義)
 //   2. 品質スコアと内訳
 //   3. 想定報酬レンジ
-//   4. 撤回不能性の注意喚起 + 撮影者の明示同意 (= 二段階確認の前半)
-//   5. ステーキング実行ボタン (= 二段階確認の後半: 最終ダイアログ)
+//   4. 撮影内容の確認 (= LEGAL_POLICY D3/D4: 第三者・子ども・私的空間が映っていない表明)
+//   5. 撤回不能性 + AI 学習用販売への明示同意 (= 二段階確認の前半)
+//   6. ステーキング実行ボタン (= 二段階確認の後半: 最終ダイアログ)
 //
-// ぼかしの確認 / Root NFT 発行の承認 / ステーキング を別画面に分けず、 同じ意思決定の中に置く。
+// 4 と 5 の両方にチェックして初めて出品可。 同意の根拠は匿名化でなく本人の明示同意に置く
+// (= legal/legal-policy D1)。 第三者・子ども・私的空間は顔ぼかしでヘッジせず、 そもそも
+// 映っていないことを本人に確認させる (= D3/D4)。
 
 interface Props {
   visible: boolean;
@@ -37,6 +40,7 @@ interface Props {
 
 export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
   const t = useT();
+  const [attested, setAttested] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [finalConfirm, setFinalConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -44,6 +48,7 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
   // visible が false になったら次回開いたときに残らないようリセット
   useEffect(() => {
     if (!visible) {
+      setAttested(false);
       setAgreed(false);
       setFinalConfirm(false);
       setSubmitting(false);
@@ -52,8 +57,10 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
 
   if (!clip) return null;
 
+  const canStake = attested && agreed;
+
   const onStakePress = () => {
-    if (!agreed) return;
+    if (!canStake) return;
     setFinalConfirm(true);
   };
 
@@ -115,62 +122,56 @@ export const StakeSheet: React.FC<Props> = ({ visible, clip, onClose }) => {
             <BlurPreviewPlayer videoUrl={clip.previewVideoUrl} fallbackImageUri={clip.previewUris?.[0]} />
           </Section>
 
-          {/* 品質スコア */}
-          <Section title={t('stake.qualityScore')} hint={t('stake.qualityScoreHint')}>
-            <View style={styles.scoreCard}>
-              <View style={styles.scoreNumberRow}>
-                <Text style={styles.scoreNumber}>{clip.qualityScore ?? '—'}</Text>
-                <Text style={styles.scoreOutOf}>/ 100</Text>
+          {/* スコア内訳・価格目安は詳細シート側に集約し、 ここでは出さない
+              (= 同じ情報を二度見せない / 価格は現段階では蛇足) */}
+
+          {/* 出品前の確認 (= 二段階確認 前半)。 2 つを 1 枚のチェックリストにまとめて分かりやすく。
+              1: D3/D4 第三者・子ども・私的空間の非映り込み表明 / 2: D1/D6 販売明示同意 + 撤回不能 */}
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmHeading}>{t('stake.confirmHeading')}</Text>
+
+            <Pressable
+              onPress={() => setAttested((a) => !a)}
+              style={({ pressed }) => [styles.checkItem, pressed && { opacity: 0.7 }]}
+            >
+              <View style={[styles.checkbox, attested && styles.checkboxOn]}>
+                {attested ? <CheckMark /> : null}
               </View>
-              {clip.qualityBreakdown ? (
-                <QualityBreakdownDisplay breakdown={clip.qualityBreakdown} />
-              ) : null}
-            </View>
-          </Section>
+              <View style={styles.checkTextWrap}>
+                <Text style={styles.checkItemTitle}>{t('stake.attestTitle')}</Text>
+                <Text style={styles.checkItemBody}>{t('stake.attestBody')}</Text>
+              </View>
+            </Pressable>
 
-          {/* 想定報酬 */}
-          <Section title={t('stake.rewardRange')} hint={t('stake.rewardRangeHint')}>
-            <View style={styles.rewardCard}>
-              <Text style={styles.rewardLow}>${(clip.reward?.rangeUsdcLow ?? 0).toFixed(2)}</Text>
-              <Text style={styles.rewardSep}>〜</Text>
-              <Text style={styles.rewardHigh}>${(clip.reward?.rangeUsdcHigh ?? 0).toFixed(2)}</Text>
-              <Text style={styles.rewardUnit}>USDC</Text>
-            </View>
-          </Section>
+            <View style={styles.checkDivider} />
 
-          {/* 撤回不能性の注意喚起 (= SPECS §4.2 二段階確認 前半) */}
-          <Section title={t('stake.irrevocableTitle')}>
             <Pressable
               onPress={() => setAgreed((a) => !a)}
-              style={({ pressed }) => [styles.consentRow, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.checkItem, pressed && { opacity: 0.7 }]}
             >
               <View style={[styles.checkbox, agreed && styles.checkboxOn]}>
-                {agreed ? (
-                  <Svg width={12} height={12} viewBox="0 0 12 12">
-                    <Line x1={2} y1={6.5} x2={5} y2={9.5} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
-                    <Line x1={5} y1={9.5} x2={10} y2={3} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
-                  </Svg>
-                ) : null}
+                {agreed ? <CheckMark /> : null}
               </View>
-              <Text style={styles.consentBody}>
-                {t('stake.consentBody')}
-              </Text>
+              <View style={styles.checkTextWrap}>
+                <Text style={styles.checkItemTitle}>{t('stake.irrevocableTitle')}</Text>
+                <Text style={styles.checkItemBody}>{t('stake.consentBody')}</Text>
+              </View>
             </Pressable>
-          </Section>
+          </View>
         </ScrollView>
 
         {/* 実行ボタン (= sticky footer) */}
         <View style={styles.footer}>
           <Pressable
             onPress={onStakePress}
-            disabled={!agreed || submitting}
+            disabled={!canStake || submitting}
             style={({ pressed }) => [
               styles.stakeBtn,
-              !agreed && styles.stakeBtnDisabled,
-              pressed && agreed && styles.stakeBtnPressed,
+              !canStake && styles.stakeBtnDisabled,
+              pressed && canStake && styles.stakeBtnPressed,
             ]}
           >
-            <Text style={[styles.stakeBtnLabel, !agreed && styles.stakeBtnLabelDisabled]}>
+            <Text style={[styles.stakeBtnLabel, !canStake && styles.stakeBtnLabelDisabled]}>
               {t('stake.cta')}
             </Text>
           </Pressable>
@@ -235,6 +236,13 @@ const Section: React.FC<{ title: string; hint?: string; children: React.ReactNod
   </View>
 );
 
+const CheckMark: React.FC = () => (
+  <Svg width={12} height={12} viewBox="0 0 12 12">
+    <Line x1={2} y1={6.5} x2={5} y2={9.5} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
+    <Line x1={5} y1={9.5} x2={10} y2={3} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
+  </Svg>
+);
+
 /// サーバ生成のぼかし済 MP4 を再生。 まだ準備中 (= サーバ処理完了前) は撮影時 snapshot を見せる。
 const BlurPreviewPlayer: React.FC<{
   videoUrl?: string;
@@ -268,49 +276,6 @@ const BlurPreviewPlayer: React.FC<{
   return (
     <View style={[styles.previewVideoWrap, styles.previewPlaceholder]}>
       <Text style={styles.previewPlaceholderText}>{t('stake.previewNotReady')}</Text>
-    </View>
-  );
-};
-
-const QualityBreakdownDisplay: React.FC<{ breakdown: QualityBreakdown }> = ({ breakdown }) => {
-  const t = useT();
-  // 2026-05-27: 4 → 3 層 (= GTSAM 撤去) + Layer3 配点 55 → 65。
-  // 詳細な指標は ClipDetailSheet 側で全部見せる。
-  const rows: Array<{ label: string; ratio: number | null; raw?: string }> = [
-    { label: t('stake.totalScore'), ratio: null, raw: `${breakdown.total} / 100` },
-    {
-      label: t('stake.layer1'),
-      ratio: null,
-      raw: breakdown.layer1 ? `${breakdown.layer1.score} / 20` : '—',
-    },
-    {
-      label: t('stake.layer2'),
-      ratio: null,
-      raw: breakdown.layer2 ? `${breakdown.layer2.score} / 15` : '—',
-    },
-    {
-      label: t('stake.layer3'),
-      ratio: null,
-      raw: breakdown.layer3 ? `${breakdown.layer3.score} / 65` : '—',
-    },
-  ];
-  return (
-    <View style={styles.breakdownList}>
-      {rows.map((r) => (
-        <View key={r.label} style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>{r.label}</Text>
-          {r.raw ? (
-            <Text style={styles.breakdownValue}>{r.raw}</Text>
-          ) : r.ratio !== null ? (
-            <View style={styles.breakdownRight}>
-              <Text style={styles.breakdownValue}>{Math.round(r.ratio * 100)}%</Text>
-              <View style={styles.breakdownBarTrack}>
-                <View style={[styles.breakdownBarFill, { width: `${Math.min(100, r.ratio * 100)}%` }]} />
-              </View>
-            </View>
-          ) : null}
-        </View>
-      ))}
     </View>
   );
 };
@@ -507,32 +472,48 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
 
-  consentRow: {
+  confirmCard: {
+    backgroundColor: colors.card,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.md,
+    ...shadows.card,
+  },
+  confirmHeading: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 14,
+    color: colors.ink,
+    letterSpacing: 0.1,
+  },
+  checkItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.warnSoft,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.warn,
   },
+  checkTextWrap: { flex: 1, gap: 3 },
+  checkItemTitle: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 13.5,
+    color: colors.ink,
+  },
+  checkItemBody: {
+    ...typography.caption,
+    color: colors.textBody,
+    lineHeight: 19,
+  },
+  checkDivider: { height: 1, backgroundColor: colors.border },
   checkbox: {
     width: 20, height: 20, borderRadius: 4,
     borderWidth: 1.5, borderColor: colors.ink,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.card,
-    marginTop: 2,
+    marginTop: 1,
   },
   checkboxOn: {
     backgroundColor: colors.ink,
     borderColor: colors.ink,
-  },
-  consentBody: {
-    flex: 1,
-    ...typography.caption,
-    color: colors.ink,
-    lineHeight: 19,
   },
 
   footer: {

@@ -22,7 +22,7 @@ url = "https://api.apr.dev"
 cluster = "Devnet"
 # プロジェクトローカル鍵を使う。~/.config/solana/id.json は別プロジェクトの
 # 鍵 (例: title-protocol authority) と衝突する可能性があるため依存しない。
-wallet = "keys/deployer.json"
+wallet = "keys/dev/solana/deployer.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 'tests/license-nft/**/*.spec.ts'"

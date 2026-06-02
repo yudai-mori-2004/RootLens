@@ -1,18 +1,22 @@
 // 初回起動時のオンボーディング (UI_SPECS_JA §9)。
 //
 // 仕様の 5 step のうち、 v0.1.3 では以下を実装:
-//   ✅ Step 1 ウェルカム (= 3 枚カルーセル、 概要説明)
+//   ✅ Step 1 ウェルカム (= 3 枚カルーセル、 温かいフリマ風イラスト)
 //   ⏳ Step 2 KYC (= 第三者サービス連携、 別タスク)
-//   ✅ Step 3 利用規約 + プライバシーポリシー 同意
-//   ⏳ Step 4 カメラ権限 (= OS 権限ダイアログは撮影画面初回で出る)。 マイク権限は不要 (= 2026-05-27 音声入力撤去)
+//   ✅ Step 3 利用規約 + プライバシーポリシー 同意 (= 全文は LegalDocModal で読める)
+//   ⏳ Step 4 カメラ権限 (= OS 権限ダイアログは撮影画面初回で出る)
 //   ⏳ Step 5 チュートリアル (= 撮影モード初回で別途実装)
 //
-// 完了状態は AsyncStorage に永続化。 RootNavigator が起動時に判定して
-// 未完了なら Login の前に押し込む。
+// デザイン方針 (= feedback_no_ai_slop_ui / project_portfolio_warm_furima):
+//   抽象的な線画アイコン (= 旧 eye/shield/target SVG) は監視っぽく主婦向けに不適だったため、
+//   assets/decor の温かいイラストに統一。 ジャーゴン (NFT/USDC/Solana) は出さない。
+//
+// 完了状態は AsyncStorage に永続化。 RootNavigator が起動時に判定して未完了なら Login の前に押し込む。
 
 import React, { useState } from 'react';
 import {
   Dimensions,
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -24,6 +28,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useT, type TranslationKey } from '../i18n';
+import { LegalDocModal } from '../components/LegalDocModal';
+import type { LegalDocKey } from '../content/legalDocs.generated';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
 const STORAGE_KEY = 'rootlens.onboarding.completed.v1';
@@ -32,7 +38,7 @@ interface Slide {
   eyebrow: TranslationKey;
   headline: TranslationKey;
   body: TranslationKey;
-  glyph: 'eye' | 'shield' | 'circle';
+  image: number; // require(...) asset
 }
 
 const SLIDES: Slide[] = [
@@ -40,19 +46,19 @@ const SLIDES: Slide[] = [
     eyebrow: 'onb.slide1.eyebrow',
     headline: 'onb.slide1.headline',
     body: 'onb.slide1.body',
-    glyph: 'eye',
+    image: require('../../assets/decor/home-warm.png'),
   },
   {
     eyebrow: 'onb.slide2.eyebrow',
     headline: 'onb.slide2.headline',
     body: 'onb.slide2.body',
-    glyph: 'shield',
+    image: require('../../assets/decor/privacy-shield.png'),
   },
   {
     eyebrow: 'onb.slide3.eyebrow',
     headline: 'onb.slide3.headline',
     body: 'onb.slide3.body',
-    glyph: 'circle',
+    image: require('../../assets/decor/earnings-stack.png'),
   },
 ];
 
@@ -119,7 +125,7 @@ const WelcomeCarousel: React.FC<{ onNext: () => void }> = ({ onNext }) => {
         style={styles.carousel}
       >
         {SLIDES.map((slide) => (
-          <Slide key={slide.glyph} slide={slide} />
+          <Slide key={slide.image} slide={slide} />
         ))}
       </ScrollView>
 
@@ -145,56 +151,14 @@ const Slide: React.FC<{ slide: Slide }> = ({ slide }) => {
   const t = useT();
   return (
     <View style={[styles.slide, { width: SCREEN_W }]}>
-      <View style={styles.glyphWrap}>
-        <SlideGlyph kind={slide.glyph} />
+      <View style={styles.illustrationPanel}>
+        <Image source={slide.image} style={styles.illustration} resizeMode="cover" />
       </View>
       <Text style={styles.slideEyebrow}>{t(slide.eyebrow)}</Text>
       <Text style={styles.slideHeadline}>{t(slide.headline)}</Text>
       <Text style={styles.slideBody}>{t(slide.body)}</Text>
     </View>
   );
-};
-
-const SlideGlyph: React.FC<{ kind: 'eye' | 'shield' | 'circle' }> = ({ kind }) => {
-  switch (kind) {
-    case 'eye':
-      return (
-        <Svg width={120} height={120} viewBox="0 0 120 120" fill="none">
-          <Circle cx={60} cy={60} r={58} stroke={colors.ink} strokeWidth={1.4} />
-          <Path d="M14 60 Q60 20 106 60 Q60 100 14 60 Z" stroke={colors.ink} strokeWidth={1.6} fill="none" />
-          <Circle cx={60} cy={60} r={14} stroke={colors.emerald} strokeWidth={1.8} />
-          <Circle cx={60} cy={60} r={5} fill={colors.emerald} />
-        </Svg>
-      );
-    case 'shield':
-      return (
-        <Svg width={120} height={120} viewBox="0 0 120 120" fill="none">
-          <Circle cx={60} cy={60} r={58} stroke={colors.ink} strokeWidth={1.4} />
-          <Path
-            d="M60 22 L88 36 V60 Q88 84 60 98 Q32 84 32 60 V36 Z"
-            stroke={colors.ink}
-            strokeWidth={1.6}
-            fill="none"
-          />
-          <Circle cx={60} cy={58} r={10} fill={colors.emeraldSoft} stroke={colors.emerald} strokeWidth={1.6} />
-          <Path d="M55 58 l4 4 l8 -8" stroke={colors.emeraldDeep} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        </Svg>
-      );
-    case 'circle':
-      return (
-        <Svg width={120} height={120} viewBox="0 0 120 120" fill="none">
-          <Circle cx={60} cy={60} r={58} stroke={colors.ink} strokeWidth={1.4} />
-          <Circle cx={60} cy={60} r={30} stroke={colors.emerald} strokeWidth={1.6} />
-          <Circle cx={60} cy={60} r={8} fill={colors.emerald} />
-          <Path
-            d="M60 12 v18 M60 90 v18 M12 60 h18 M90 60 h18"
-            stroke={colors.ink}
-            strokeWidth={1.4}
-            strokeLinecap="round"
-          />
-        </Svg>
-      );
-  }
 };
 
 const BrandMark: React.FC = () => (
@@ -214,6 +178,8 @@ const TosConsent: React.FC<{
   onBack: () => void;
 }> = ({ tosAccepted, onToggle, onContinue, onBack }) => {
   const t = useT();
+  const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
+
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.brandRow}>
@@ -239,9 +205,13 @@ const TosConsent: React.FC<{
         </View>
 
         <View style={styles.linksRow}>
-          <Text style={styles.linkText}>{t('settings.terms')}</Text>
+          <Pressable onPress={() => setLegalDoc('tester-consent')} hitSlop={8}>
+            <Text style={styles.linkText}>{t('settings.terms')}</Text>
+          </Pressable>
           <View style={styles.linkDot} />
-          <Text style={styles.linkText}>{t('settings.privacy')}</Text>
+          <Pressable onPress={() => setLegalDoc('privacy-policy')} hitSlop={8}>
+            <Text style={styles.linkText}>{t('settings.privacy')}</Text>
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -274,6 +244,8 @@ const TosConsent: React.FC<{
           <Text style={styles.ctaLabel}>{t('onb.continue')}</Text>
         </Pressable>
       </View>
+
+      <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </SafeAreaView>
   );
 };
@@ -321,12 +293,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.sm,
   },
-  glyphWrap: { marginBottom: spacing.xl, alignSelf: 'flex-start' },
+  illustrationPanel: {
+    width: '100%',
+    aspectRatio: 1.2,
+    backgroundColor: '#ffffff',
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+  },
+  illustration: { width: '100%', height: '100%' },
   slideEyebrow: { ...typography.label, color: colors.textMute },
   slideHeadline: {
     fontFamily: fonts.serifLight,
-    fontSize: 36,
-    lineHeight: 42,
+    fontSize: 32,
+    lineHeight: 38,
     letterSpacing: -0.6,
     color: colors.ink,
     marginTop: spacing.xs,
@@ -335,7 +319,8 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textBody,
     marginTop: spacing.sm,
-    maxWidth: 340,
+    maxWidth: 360,
+    lineHeight: 23,
   },
 
   pagerDots: {
@@ -396,6 +381,7 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textBody,
     marginTop: spacing.xs,
+    lineHeight: 23,
   },
 
   tosCard: {
@@ -413,7 +399,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.emerald,
     marginTop: 7,
   },
-  bulletText: { flex: 1, ...typography.body, color: colors.textBody, fontSize: 13.5, lineHeight: 19 },
+  bulletText: { flex: 1, ...typography.body, color: colors.textBody, fontSize: 13.5, lineHeight: 20 },
 
   linksRow: {
     flexDirection: 'row',

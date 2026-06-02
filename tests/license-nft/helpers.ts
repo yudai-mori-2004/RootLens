@@ -40,7 +40,7 @@ export function loadNetwork(): NetworkConfig {
 }
 
 export function loadKeypair(filename: string): Keypair {
-  const path = resolve(__dirname, "../../keys", filename);
+  const path = resolve(__dirname, "../../keys/dev/solana", filename);
   const bytes = JSON.parse(readFileSync(path, "utf-8"));
   return Keypair.fromSecretKey(Uint8Array.from(bytes));
 }

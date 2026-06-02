@@ -1,13 +1,21 @@
 // クリップ表示ラベル (= 純粋関数、 presentation 層の helper)。
 //
-// クリップの一意 id = signature_hash (= blur 後 D2 署名で確定する確定動画の id) を表示用に整形する。
-// 旧 autoCategory (8 値カテゴリ) は廃止、 旧 3 段 ProcessingStep 表示も廃止 (= サーバは単一 scoring
-// ステップ + 不確定ローディング表示に移行)。
+// 主婦が一目でわかる「動画の正体」 を出す。 優先順位:
+//   1. summary (= Pipeline 2 の AI 要約、 例「食器を洗っている」)。 人が読める正体。
+//   2. 撮影日時 (= 要約がまだ無い撮影中/準備中の動画)。
+// signature_hash (= 64 桁 hex) は絶対に出さない (= ユーザーに意味がない)。
 
-/**
- * クリップ一覧 / 詳細で出すタイトル。 signature_hash の短縮表示。
- * まだ署名前 (= signature_hash 未確定) は「署名処理中…」。
- */
-export function clipTitle(clip: { signatureHash?: string }): string {
-  return clip.signatureHash ? `${clip.signatureHash.slice(0, 16)}…` : '署名処理中…';
+import { getLocale } from '../i18n';
+
+export function clipTitle(clip: { summary?: string | null; createdAt?: number }): string {
+  const s = clip.summary?.trim();
+  if (s) return s;
+  if (clip.createdAt) return formatCaptureLabel(clip.createdAt);
+  return getLocale() === 'en' ? 'Untitled video' : '撮影した動画';
+}
+
+/** 撮影日時の親しみやすいラベル (例「5月30日 14:05」)。 */
+export function formatCaptureLabel(ts: number): string {
+  const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
+  return new Date(ts).toLocaleString(tag, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }

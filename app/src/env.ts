@@ -8,7 +8,24 @@
 //
 // .env.example も本ファイルと 1:1 で対応させること。
 
-const ENV = process.env as Record<string, string | undefined>;
+// ⚠ Expo は **静的な** `process.env.EXPO_PUBLIC_XXX`（リテラルのプロパティ参照）だけを
+//    ビルド時にインライン化する。 `process.env[変数]` のような動的アクセスは置換されず、
+//    リリースビルドでは undefined になる (= dev では Metro が実行時 env を注入するので動くが、
+//    TestFlight / 本番では env.* が全部 undefined → readRequired が起動時に throw して即クラッシュ)。
+//    そこで全 EXPO_PUBLIC_ キーを「静的アクセスで」一度オブジェクトに集約し、 以降はそこから読む。
+const ENV: Record<string, string | undefined> = {
+  EXPO_PUBLIC_USE_SANDBOX: process.env.EXPO_PUBLIC_USE_SANDBOX,
+  EXPO_PUBLIC_SOLANA_RPC_URL: process.env.EXPO_PUBLIC_SOLANA_RPC_URL,
+  EXPO_PUBLIC_SOLANA_NETWORK: process.env.EXPO_PUBLIC_SOLANA_NETWORK,
+  EXPO_PUBLIC_SERVER_URL: process.env.EXPO_PUBLIC_SERVER_URL,
+  EXPO_PUBLIC_TP_GATEWAY_ENDPOINT: process.env.EXPO_PUBLIC_TP_GATEWAY_ENDPOINT,
+  EXPO_PUBLIC_COSIGN_AUTHORITY: process.env.EXPO_PUBLIC_COSIGN_AUTHORITY,
+  EXPO_PUBLIC_MERKLE_TREE: process.env.EXPO_PUBLIC_MERKLE_TREE,
+  EXPO_PUBLIC_MERKLE_COLLECTION: process.env.EXPO_PUBLIC_MERKLE_COLLECTION,
+  EXPO_PUBLIC_DEBUG_WALLET_BASE58: process.env.EXPO_PUBLIC_DEBUG_WALLET_BASE58,
+  EXPO_PUBLIC_BUYER_WALLET_ADDRESS: process.env.EXPO_PUBLIC_BUYER_WALLET_ADDRESS,
+  EXPO_PUBLIC_BUYER_KEYPAIR_BASE58: process.env.EXPO_PUBLIC_BUYER_KEYPAIR_BASE58,
+};
 
 function readOptional(key: string): string | undefined {
   const v = ENV[key];
@@ -58,11 +75,12 @@ export const SERVER_URL =
 export const TP_GATEWAY_URL =
   readOptional('EXPO_PUBLIC_TP_GATEWAY_ENDPOINT') ?? 'http://13.113.217.17:3000';
 
-// ─── Anthropic (= VLM gate dev-mode 用) ────────────────────────────────
-// 撮影シーケンス Step 2 / Step 6 で Claude に直接送る。 server proxy を経由
-// する本番 mode に切り替わるまでは必須。
-
-export const ANTHROPIC_API_KEY = readRequired('EXPO_PUBLIC_ANTHROPIC_API_KEY');
+// ─── (撤去済) Anthropic API key ─────────────────────────────────────────
+// 旧 VLM gate (撮影 Step 2/6 で Claude 直叩き) 用だったが、 2026-05-27 にジェスチャー式へ
+// 作り替えて VLM gate を撤去済み。 現在どこからも使われていない。
+// ⚠ EXPO_PUBLIC_* は client バンドルに inline されるため、 秘密鍵をここで必須にすると
+//    出荷ビルドの IPA から漏洩する。 未使用なので export ごと撤去した (= EXPO_PUBLIC_ANTHROPIC_API_KEY
+//    は EAS env / 出荷ビルドに載せない)。
 
 // ─── Solana onchain config ──────────────────────────────────────────────
 // RootLens 運営側のオンチェーン pubkey 群。 必須。

@@ -1,18 +1,18 @@
 // クリップ詳細シート (UI_SPECS §3.3 / §3.4)。
 //
-// Home タブのカードをタップすると開く。 ready / staked / error の状態別に内容を切替え、
-// 品質スコアの 3 層内訳 + 自動分類カテゴリ + オンチェーン情報 + アクションを提示する。
+// Home タブのカードをタップすると開く。 ready / staked / error / processing の状態別に内容を切替える。
 //
-// 2026-05-27 方針転換: 4 → 3 層 (= GTSAM 撤去)、 タスク事前選択撤去で TASK ブロックは
-// autoCategory 表示に置換。
-//
-// デザイン方針:
-//   ・ Bottom Sheet 風の modal (= 上部に handle bar、 背景は scrim)
-//   ・ Editorial Fintech 美学 (= warm cream、 navy ink、 emerald accent)
-//   ・ 各層の細指標は折り畳まず一覧表示 (= デバッグ + 改善学習用)
+// 画面設計 (= 主婦向けに整理。 旧版はスコア羅列が先頭でプレビュー無し・削除が出品と同格・
+// 「オンチェーン/署名ハッシュ/Layer 英語指標」 が露出して分かりにくかった):
+//   1. まずプレビュー (動画) を最上部に置く (= 最初に見たいのは評価でなく中身)
+//   2. 品質スコアは簡潔に (大きい数字 + 一言)
+//   3. 売れていれば「販売状況」を平易に (= 売れた数 / 収入)
+//   4. Layer 内訳・rootAssetId・署名ハッシュ等の専門情報は「詳しい内訳」に畳む (既定で閉じる)
+//   5. 主アクションは「出品する」 1 つ。 削除は小さな文字リンクに格下げ。 閉じるは scrim タップ。
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
+  Image,
   Linking,
   Modal,
   Pressable,
@@ -22,14 +22,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Line } from 'react-native-svg';
+import { Video, ResizeMode } from 'expo-av';
+import Svg, { Path } from 'react-native-svg';
 
 import type {
   Clip,
   Layer1Score,
   Layer2Score,
   Layer3Score,
-  QualityBreakdown,
 } from '../dataflow';
 import { clipTitle } from '../domain/clipLabels';
 import { useT } from '../i18n';
@@ -45,6 +45,8 @@ interface Props {
 
 export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpenStake, onRemove }) => {
   const t = useT();
+  const [showDetails, setShowDetails] = useState(false);
+
   if (!clip) {
     return (
       <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -55,6 +57,7 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
 
   const breakdown = clip.qualityBreakdown ?? null;
   const total = breakdown?.total ?? clip.qualityScore ?? null;
+  const hasSales = clip.state === 'staked' || (clip.licenseCount ?? 0) > 0 || (clip.revenueUsdc ?? 0) > 0;
 
   const onSolscan = () => {
     if (clip.rootAssetId) {
@@ -69,109 +72,162 @@ export const ClipDetailSheet: React.FC<Props> = ({ visible, clip, onClose, onOpe
         <View style={styles.handle} />
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* ヘッダ: VLM 自動分類 (= 新仕様) or legacy task name + 撮影日 */}
+          {/* 1. プレビュー (最上部) */}
+          <PreviewPlayer clip={clip} />
+
+          {/* 2. タイトル + 撮影日時 */}
           <View style={styles.header}>
-            <Text style={styles.taskName} numberOfLines={1} ellipsizeMode="middle">
+            <Text style={styles.taskName} numberOfLines={2} ellipsizeMode="tail">
               {clipTitle(clip)}
             </Text>
             <Text style={styles.timestamp}>{formatDateTime(clip.createdAt)}</Text>
           </View>
 
-          {/* 総合スコア (大型表示) */}
-          <View style={styles.scoreBlock}>
-            <Text style={styles.scoreEyebrow}>{t('detail.qualityScore')}</Text>
-            <View style={styles.scoreRow}>
-              <Text style={[styles.scoreNumber, scoreTone(total)]}>
-                {total === null ? '—' : String(total)}
-              </Text>
-              <Text style={styles.scoreOutOf}>/ 100</Text>
-            </View>
-          </View>
-
-          {/* 3 層内訳 (= GTSAM 撤去後) */}
-          {breakdown ? (
-            <View style={styles.layersBlock}>
-              <Text style={styles.sectionEyebrow}>{t('detail.breakdown')}</Text>
-              <Layer1Card data={breakdown.layer1} />
-              <Layer2Card data={breakdown.layer2} />
-              <Layer3Card data={breakdown.layer3} />
+          {/* 3. 品質スコア (簡潔) */}
+          {total !== null ? (
+            <View style={styles.scoreBlock}>
+              <View style={styles.scoreRow}>
+                <Text style={[styles.scoreNumber, scoreTone(total)]}>{String(total)}</Text>
+                <Text style={styles.scoreOutOf}>/ 100</Text>
+              </View>
+              <Text style={styles.scoreHint}>{t('detail.scoreHint')}</Text>
             </View>
           ) : (
             <View style={styles.noScoreCard}>
               <Text style={styles.noScoreText}>
-                {clip.state === 'processing'
-                  ? t('detail.scoringInProgress')
-                  : t('detail.noBreakdown')}
+                {clip.state === 'processing' ? t('detail.scoringInProgress') : t('detail.noBreakdown')}
               </Text>
             </View>
           )}
 
-          {/* オンチェーン情報 (= rootAssetId 等) */}
-          {clip.rootAssetId ? (
-            <View style={styles.onchainBlock}>
-              <Text style={styles.sectionEyebrow}>{t('detail.onChain')}</Text>
-              <Row label={t('detail.rootAsset')} value={shortBase58(clip.rootAssetId)} onPress={onSolscan} mono />
-              {clip.delegate ? <Row label={t('detail.delegate')} value={shortBase58(clip.delegate)} mono /> : null}
+          {/* 4. 販売状況 (= 売れている時だけ、 平易に) */}
+          {hasSales ? (
+            <View style={styles.salesBlock}>
+              <Text style={styles.sectionEyebrow}>{t('detail.sales')}</Text>
               <Row label={t('detail.licensesSold')} value={String(clip.licenseCount ?? 0)} />
               <Row
                 label={t('detail.revenue')}
-                value={`$${(clip.revenueUsdc ?? 0).toFixed(2)} USDC`}
+                value={`$${(clip.revenueUsdc ?? 0).toFixed(2)}`}
                 tone={clip.revenueUsdc && clip.revenueUsdc > 0 ? 'ok' : undefined}
               />
             </View>
           ) : null}
 
-          {/* signature_hash (= クリップの一意 id。 blur 後 D2 署名で確定する確定動画の id) */}
-          {clip.signatureHash ? (
-            <View style={styles.taskBlock}>
-              <Text style={styles.sectionEyebrow}>{t('detail.signatureHash')}</Text>
-              <Row label="SHA-256" value={clip.signatureHash} mono multiline />
-            </View>
-          ) : null}
-
-          {/* エラー表示 */}
+          {/* エラー */}
           {clip.state === 'error' && clip.errorMessage ? (
             <View style={styles.errorBlock}>
               <Text style={styles.sectionEyebrow}>{t('detail.error')}</Text>
               <Text style={styles.errorText} numberOfLines={6}>{clip.errorMessage}</Text>
             </View>
           ) : null}
+
+          {/* 5. 詳しい内訳 (= 専門情報は畳む) */}
+          {breakdown || clip.rootAssetId || clip.signatureHash ? (
+            <View>
+              <Pressable
+                onPress={() => setShowDetails((v) => !v)}
+                style={({ pressed }) => [styles.detailsToggle, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={styles.detailsToggleLabel}>{t('detail.showDetails')}</Text>
+                <Chevron open={showDetails} />
+              </Pressable>
+
+              {showDetails ? (
+                <View style={styles.detailsBody}>
+                  {breakdown ? (
+                    <>
+                      <Layer1Card data={breakdown.layer1} />
+                      <Layer2Card data={breakdown.layer2} />
+                      <Layer3Card data={breakdown.layer3} />
+                    </>
+                  ) : null}
+                  {clip.rootAssetId ? (
+                    <View style={styles.techBlock}>
+                      <Row label={t('detail.rootAsset')} value={shortBase58(clip.rootAssetId)} onPress={onSolscan} mono />
+                      {clip.delegate ? <Row label={t('detail.delegate')} value={shortBase58(clip.delegate)} mono /> : null}
+                    </View>
+                  ) : null}
+                  {clip.signatureHash ? (
+                    <View style={styles.techBlock}>
+                      <Row label={t('detail.signatureHash')} value={clip.signatureHash} mono multiline />
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </ScrollView>
 
-        {/* アクション (= 状態別) */}
+        {/* アクション: 出品が主役、 削除は小さな文字リンク */}
         <View style={styles.actions}>
           {clip.state === 'ready' && onOpenStake ? (
-            <ActionButton
-              label={t('detail.stakeThisClip')}
-              kind="primary"
-              onPress={() => {
-                onClose();
-                onOpenStake(clip);
-              }}
-            />
+            <Pressable
+              onPress={() => { onClose(); onOpenStake(clip); }}
+              style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
+            >
+              <Text style={styles.primaryLabel}>{t('detail.stakeThisClip')}</Text>
+            </Pressable>
           ) : null}
           {(clip.state === 'ready' || clip.state === 'error') && onRemove ? (
-            <ActionButton
-              label={t('common.delete')}
-              kind="ghost-danger"
-              onPress={() => {
-                onClose();
-                onRemove(clip);
-              }}
-            />
+            <Pressable
+              onPress={() => { onClose(); onRemove(clip); }}
+              hitSlop={8}
+              style={({ pressed }) => [styles.deleteLink, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.deleteLinkText}>{t('detail.deleteThis')}</Text>
+            </Pressable>
           ) : null}
-          <ActionButton label={t('common.close')} kind="ghost" onPress={onClose} />
         </View>
       </SafeAreaView>
     </Modal>
   );
 };
 
-// ─── レイヤカード ──────────────────────────────────────────────────
+// ─── プレビュー ────────────────────────────────────────────────────
+const PreviewPlayer: React.FC<{ clip: Clip }> = ({ clip }) => {
+  const t = useT();
+  const videoUrl = clip.previewVideoUrl;
+  const fallback = clip.previewUris?.[0];
+  if (videoUrl) {
+    return (
+      <View style={styles.previewWrap}>
+        <Video
+          source={{ uri: videoUrl }}
+          style={styles.previewVideo}
+          useNativeControls
+          resizeMode={ResizeMode.CONTAIN}
+          isLooping={false}
+          shouldPlay={false}
+        />
+      </View>
+    );
+  }
+  if (fallback) {
+    return (
+      <View style={styles.previewWrap}>
+        <Image source={{ uri: fallback }} style={styles.previewVideo} resizeMode="contain" />
+        <View style={styles.previewOverlay}>
+          <Text style={styles.previewPlaceholderText}>{t('stake.previewPreparing')}</Text>
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View style={[styles.previewWrap, styles.previewPlaceholder]}>
+      <Text style={styles.previewPlaceholderText}>{t('stake.previewNotReady')}</Text>
+    </View>
+  );
+};
+
+const Chevron: React.FC<{ open: boolean }> = ({ open }) => (
+  <Svg width={14} height={14} viewBox="0 0 14 14" style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}>
+    <Path d="M5 3 l4 4 l-4 4" stroke={colors.textMute} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+  </Svg>
+);
+
+// ─── レイヤカード (= 詳しい内訳の中身。 デバッグ + 改善学習用) ─────────────
 
 const Layer1Card: React.FC<{ data: Layer1Score | null }> = ({ data }) => (
-  // 2026-05-27: ARKit 撤去で trackingQuality 行削除
-  // 2026-05-28: IMU 撤去で imuGravityCompliance 行削除、 配点は handLandmarkPresenceBoth に振替
   <LayerCard title="Layer 1 · Metadata" max={20} data={data} renderRows={(d) => (
     <>
       <MetricRow label="Hand presence (both)" value={pctOrNa(d.handLandmarkPresenceBoth)} />
@@ -194,7 +250,6 @@ const Layer2Card: React.FC<{ data: Layer2Score | null }> = ({ data }) => (
 );
 
 const Layer3Card: React.FC<{ data: Layer3Score | null }> = ({ data }) => (
-  // 2026-05-27: GTSAM 撤去で 55 → 65 点 + 配点を再分配
   <LayerCard title="Layer 3 · VLM semantic" max={65} data={data} renderRows={(d) => (
     <>
       <MetricRow label="Task activity (avg, 0-5)" value={d.taskActivityAvg.toFixed(2)} />
@@ -238,8 +293,6 @@ const MetricRow: React.FC<{ label: string; value: string }> = ({ label, value })
   </View>
 );
 
-// ─── Generic Row + Action ──────────────────────────────────────────
-
 const Row: React.FC<{
   label: string;
   value: string;
@@ -275,34 +328,6 @@ const Row: React.FC<{
   }
   return inner;
 };
-
-const ActionButton: React.FC<{
-  label: string;
-  kind: 'primary' | 'ghost' | 'ghost-danger';
-  onPress: () => void;
-}> = ({ label, kind, onPress }) => (
-  <Pressable
-    onPress={onPress}
-    style={({ pressed }) => [
-      styles.actionBtn,
-      kind === 'primary' && styles.actionBtnPrimary,
-      kind === 'ghost' && styles.actionBtnGhost,
-      kind === 'ghost-danger' && styles.actionBtnGhostDanger,
-      pressed && styles.actionBtnPressed,
-    ]}
-  >
-    <Text
-      style={[
-        styles.actionLabel,
-        kind === 'primary' && styles.actionLabelPrimary,
-        kind === 'ghost' && styles.actionLabelGhost,
-        kind === 'ghost-danger' && styles.actionLabelDanger,
-      ]}
-    >
-      {label}
-    </Text>
-  </Pressable>
-);
 
 // ─── helpers ──────────────────────────────────────────────────────
 
@@ -354,17 +379,37 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
     gap: spacing.lg,
   },
 
+  // プレビュー
+  previewWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    backgroundColor: colors.bgInk,
+    position: 'relative',
+  },
+  previewVideo: { width: '100%', height: '100%' },
+  previewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(8,18,38,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  previewPlaceholderText: { ...typography.caption, color: '#fff' },
+
   header: { gap: 4 },
   taskName: {
     fontFamily: fonts.serifMedium,
-    fontSize: 26,
+    fontSize: 24,
     letterSpacing: -0.4,
     color: colors.ink,
+    lineHeight: 30,
   },
   timestamp: {
     fontFamily: fonts.mono,
@@ -373,33 +418,21 @@ const styles = StyleSheet.create({
     color: colors.textMute,
   },
 
-  scoreBlock: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  scoreEyebrow: { ...typography.label, color: colors.textMute },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 4,
-    gap: 6,
-  },
+  scoreBlock: { gap: 2 },
+  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   scoreNumber: {
     fontFamily: fonts.serifLight,
-    fontSize: 72,
-    letterSpacing: -2,
-    lineHeight: 78,
+    fontSize: 52,
+    letterSpacing: -1.5,
+    lineHeight: 56,
   },
-  scoreOutOf: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 14,
-    color: colors.textMute,
-  },
+  scoreOutOf: { fontFamily: fonts.sansSemibold, fontSize: 14, color: colors.textMute },
+  scoreHint: { ...typography.caption, color: colors.textMute },
 
   sectionEyebrow: { ...typography.label, color: colors.textMute, marginBottom: spacing.sm },
-  layersBlock: { gap: spacing.sm },
+
+  salesBlock: { gap: 0 },
+
   noScoreCard: {
     padding: spacing.lg,
     borderRadius: radii.md,
@@ -408,6 +441,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   noScoreText: { ...typography.body, color: colors.textBody },
+
+  // 詳しい内訳トグル
+  detailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  detailsToggleLabel: { ...typography.label, color: colors.textMute },
+  detailsBody: { gap: spacing.sm, marginTop: spacing.md },
+  techBlock: { gap: 0 },
 
   layerCard: {
     backgroundColor: colors.card,
@@ -424,24 +471,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: 6,
   },
-  layerTitle: {
-    fontFamily: fonts.serifMedium,
-    fontSize: 14,
-    color: colors.ink,
-    letterSpacing: -0.1,
-  },
+  layerTitle: { fontFamily: fonts.serifMedium, fontSize: 14, color: colors.ink, letterSpacing: -0.1 },
   layerScoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
-  layerScore: {
-    fontFamily: fonts.serifMedium,
-    fontSize: 18,
-    letterSpacing: -0.3,
-  },
-  layerScoreOutOf: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 10,
-    color: colors.textMute,
-    letterSpacing: 0.5,
-  },
+  layerScore: { fontFamily: fonts.serifMedium, fontSize: 18, letterSpacing: -0.3 },
+  layerScoreOutOf: { fontFamily: fonts.sansSemibold, fontSize: 10, color: colors.textMute, letterSpacing: 0.5 },
   layerMetrics: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
@@ -457,19 +490,9 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     paddingVertical: 4,
   },
-  metricLabel: {
-    ...typography.caption,
-    color: colors.textMute,
-    flex: 1,
-  },
-  metricValue: {
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    color: colors.ink,
-  },
+  metricLabel: { ...typography.caption, color: colors.textMute, flex: 1 },
+  metricValue: { fontFamily: fonts.mono, fontSize: 12, color: colors.ink },
 
-  onchainBlock: { gap: 0 },
-  taskBlock: { gap: 0 },
   errorBlock: {
     padding: spacing.md,
     borderRadius: radii.md,
@@ -492,36 +515,32 @@ const styles = StyleSheet.create({
   rowValueLink: { textDecorationLine: 'underline' },
 
   actions: {
-    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
     gap: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.card,
   },
-  actionBtn: {
+  primaryBtn: {
     paddingVertical: 16,
     borderRadius: radii.md,
     alignItems: 'center',
+    backgroundColor: colors.ink,
   },
-  actionBtnPrimary: { backgroundColor: colors.ink },
-  actionBtnGhost: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  actionBtnGhostDanger: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.dangerSoft,
-  },
-  actionBtnPressed: { opacity: 0.7 },
-  actionLabel: {
+  primaryBtnPressed: { backgroundColor: colors.inkSoft },
+  primaryLabel: {
     fontFamily: fonts.sansSemibold,
     fontSize: 12,
     letterSpacing: 2,
     textTransform: 'uppercase',
+    color: colors.textOnInk,
   },
-  actionLabelPrimary: { color: colors.textOnInk },
-  actionLabelGhost: { color: colors.ink },
-  actionLabelDanger: { color: colors.danger },
+  deleteLink: { alignSelf: 'center', paddingVertical: spacing.sm },
+  deleteLinkText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.danger,
+  },
 });

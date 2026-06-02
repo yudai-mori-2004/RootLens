@@ -7,7 +7,7 @@
 //   1. tests/license-nft/fixtures.json 存在 (license-nft の setup 済)
 //   2. web/ dev server 起動中 (`cd web && npm run dev`)
 //   3. app/.env に EXPO_PUBLIC_BUYER_KEYPAIR_BASE58 と EXPO_PUBLIC_LICENSE_USDC_MINT
-//   4. keys/cosign-delegate.json + keys/deployer.json 存在
+//   4. keys/dev/solana/cosign-delegate.json + keys/deployer.json 存在
 //
 // 実行:
 //   cd tests/staking && npx mocha --import tsx/esm --timeout 120000 03-api-license-issue.spec.ts
@@ -94,7 +94,7 @@ function loadAppEnv(): Record<string, string> {
 }
 
 function loadCosignDelegatePubkey(): PublicKey {
-  const p = resolve(REPO_ROOT, "keys/cosign-delegate.json");
+  const p = resolve(REPO_ROOT, "keys/dev/solana/cosign-delegate.json");
   const arr = JSON.parse(readFileSync(p, "utf-8")) as number[];
   return Keypair.fromSecretKey(new Uint8Array(arr)).publicKey;
 }

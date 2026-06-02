@@ -245,7 +245,7 @@ final class HandPoseCameraController: NSObject {
         .builtInWideAngleCamera,
       ],
       mediaType: .video,
-      position: .back,
+      position: .back
     )
     let sorted = session.devices.sorted { lhs, rhs in
       lhs.activeFormat.videoFieldOfView > rhs.activeFormat.videoFieldOfView

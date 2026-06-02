@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// `update_config` IX を CLI から叩く運用ツール。 admin keypair (= keys/authority.json)
+// `update_config` IX を CLI から叩く運用ツール。 admin keypair (= keys/dev/solana/authority.json)
 // で署名する。 値を Some / None で指定可能、 渡したフィールドのみ更新する。
 //
 // 使い方:
@@ -61,7 +61,7 @@ function parseArgs(): Args {
 }
 
 function loadAuthority(): Keypair {
-  const path = resolve(__dirname, "../../keys/authority.json");
+  const path = resolve(__dirname, "../../keys/dev/solana/authority.json");
   const arr = JSON.parse(readFileSync(path, "utf-8")) as number[];
   return Keypair.fromSecretKey(Uint8Array.from(arr));
 }

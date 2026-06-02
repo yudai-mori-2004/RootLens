@@ -2,7 +2,9 @@ import { requireOptionalNativeModule, type EventSubscription } from 'expo-module
 
 // On-device privacy blur unit (SPECS §2.3 step 7)。
 //
-// 入力 mp4 の **顔** を Gaussian blur で匿名化した mp4 を出力する。
+// 入力 mp4 の **顔** を Gaussian blur で隠した (= 顔マスキング) mp4 を出力する。
+// 「匿名化」とは呼ばない: 声・体・間取り等で再識別余地が残るため、 これは合法性の根拠でなく
+// 偶発第三者向けの補助的リスク低減層 (= legal/legal-policy D1/D5)。
 // iOS のみ実装 (Vision + CoreImage + Metal)。Android は後続タスク。
 //
 // 想定 caller:

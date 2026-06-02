@@ -89,3 +89,7 @@ app/modules/hand-pose/android/build/
 web/public/lp/sample/*.mp4
 web/public/lp/sample/dataset/
 
+
+# iOS build artifacts (large, never commit)
+*.ipa
+app/build-*.ipa

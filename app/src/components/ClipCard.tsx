@@ -9,7 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Polygon } from 'react-native-svg';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 import type { Clip } from '../dataflow';
 import { clipTitle } from '../domain/clipLabels';
 import { useT, getLocale } from '../i18n';
@@ -39,14 +40,18 @@ interface Props {
   onOpenDetail?: (clip: Clip) => void;
   onRemove?: (clip: Clip) => void;
   onRetry?: (clip: Clip) => void;
+  /// 強制ローディング表示 (= Pipeline 2 でスタック中/エラー。 ユーザー操作不可なので「採点中」 と同じ見た目)。
+  forceLoading?: boolean;
 }
 
-export const ClipCard: React.FC<Props> = ({ clip, onOpenStake, onOpenDetail, onRemove, onRetry }) => {
+export const ClipCard: React.FC<Props> = ({ clip, onOpenStake, onOpenDetail, onRemove, onRetry, forceLoading }) => {
+  // Pipeline 2 stuck (= processing / 登録後 error) はユーザー主導権が無いので常にローディング表示。
+  if (forceLoading) return <ProcessingCard clip={clip} onOpenDetail={onOpenDetail} />;
   switch (clip.state) {
     case 'uploading':
       return <UploadingCard clip={clip} onRemove={onRemove} />;
     case 'processing':
-      return <ProcessingCard clip={clip} />;
+      return <ProcessingCard clip={clip} onOpenDetail={onOpenDetail} />;
     case 'ready':
       return <ReadyCard clip={clip} onOpenDetail={onOpenDetail} />;
     case 'staked':
@@ -58,23 +63,44 @@ export const ClipCard: React.FC<Props> = ({ clip, onOpenStake, onOpenDetail, onR
 
 // ─── 共通要素 ──────────────────────────────────────────────────────────
 
-// クリップのサムネ枠。 将来は各動画の実サムネイル画像を入れる予定 (= 録画フレーム / ぼかし済 preview)。
-// 現状は中立のプレースホルダ (= 画像枠アイコン)。
-// ⚠ SVG は固定サイズで描く (= width/height を % にすると aspectRatio 解決前に高さ 0 → Circle 座標が NaN →
-//    CALayerInvalidGeometry でクラッシュする。 過去にこれで落ちた)。
-const ClipThumb: React.FC<{ muted?: boolean }> = ({ muted }) => (
-  <View style={[styles.thumb, muted && styles.thumbMuted]}>
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path d="M3.5 6.5h17v11h-17z" stroke={colors.textFaint} strokeWidth={1.3} strokeLinejoin="round" />
-      <Circle cx={9} cy={10.5} r={1.7} fill={colors.textFaint} />
-      <Path d="M5 17l4.5-4.2 3 2.6 3-3.2L20 16" stroke={colors.textFaint} strokeWidth={1.3} strokeLinejoin="round" strokeLinecap="round" />
-    </Svg>
-  </View>
-);
+// クリップのサムネ枠。 ぼかし済み preview MP4 (= previewVideoUrl) から実フレームを 1 枚生成して見せる。
+// ⚠ 一覧で全動画を毎回 DL すると重い (= 「件数に耐える」 に反する) ので、 (a) previewVideoUrl がある
+//    動画だけ生成、 (b) signature_hash でモジュールキャッシュして再生成しない、 (c) 仮想化で可視分だけ。
+//    将来はサーバ生成 poster (= previewThumbUrl) に寄せてクライアント生成を無くすのが本筋。
+// 未生成/未対応はプレースホルダ (= 再生グリフ)。
+const thumbCache = new Map<string, string>();
 
-// クリップ名はもう使わない。 一意 id = signature_hash の短縮を出す (= 未署名なら「署名処理中…」)。
+const ClipThumb: React.FC<{ clip: Clip; muted?: boolean }> = ({ clip, muted }) => {
+  const url = clip.previewVideoUrl;
+  const key = clip.signatureHash ?? clip.id;
+  const [uri, setUri] = useState<string | null>(url ? thumbCache.get(key) ?? null : null);
+
+  useEffect(() => {
+    if (!url || thumbCache.has(key)) return;
+    let cancelled = false;
+    VideoThumbnails.getThumbnailAsync(url, { time: 800, quality: 0.5 })
+      .then((r) => { thumbCache.set(key, r.uri); if (!cancelled) setUri(r.uri); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [url, key]);
+
+  return (
+    <View style={[styles.thumb, muted && styles.thumbMuted]}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.thumbImage} resizeMode="cover" />
+      ) : (
+        <Svg width={22} height={22} viewBox="0 0 22 22" fill="none">
+          <Circle cx={11} cy={11} r={10} stroke={colors.textFaint} strokeWidth={1.2} />
+          <Polygon points="9,7.5 15,11 9,14.5" fill={colors.textFaint} />
+        </Svg>
+      )}
+    </View>
+  );
+};
+
+// 動画の「正体」 = AI 要約 or 撮影日時 (= clipTitle)。 hash は出さない。
 const ClipName: React.FC<{ clip: Clip }> = ({ clip }) => (
-  <Text style={[styles.cardName, styles.cardNameMono]} numberOfLines={1}>
+  <Text style={styles.cardName} numberOfLines={2}>
     {clipTitle(clip)}
   </Text>
 );
@@ -102,7 +128,7 @@ const UploadingCard: React.FC<{ clip: Clip; onRemove?: (c: Clip) => void }> = ({
   const progress = Math.max(0, Math.min(1, clip.uploadProgress ?? 0));
   return (
     <View style={styles.card}>
-      <ClipThumb />
+      <ClipThumb clip={clip} />
       <View style={styles.cardMid}>
         <ClipName clip={clip} />
         <Text style={styles.eyebrowMuted}>{t('clip.uploading')} · {Math.round(progress * 100)}%</Text>
@@ -158,17 +184,21 @@ const IndeterminateBar: React.FC = () => {
   );
 };
 
-const ProcessingCard: React.FC<{ clip: Clip }> = ({ clip }) => {
+const ProcessingCard: React.FC<{ clip: Clip; onOpenDetail?: (c: Clip) => void }> = ({ clip, onOpenDetail }) => {
   const t = useT();
   return (
-    <View style={styles.card}>
-      <ClipThumb />
+    <Pressable
+      onPress={() => onOpenDetail?.(clip)}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      accessibilityLabel={t('clip.viewDetailA11y')}
+    >
+      <ClipThumb clip={clip} />
       <View style={styles.cardMid}>
         <ClipName clip={clip} />
         <Text style={styles.eyebrowMuted}>{t('clip.processing')}</Text>
         <IndeterminateBar />
       </View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -184,25 +214,19 @@ const ReadyCard: React.FC<{ clip: Clip; onOpenDetail?: (c: Clip) => void }> = ({
       style={({ pressed }) => [styles.card, styles.cardReady, pressed && styles.cardReadyPressed]}
       accessibilityLabel={t('clip.viewDetailA11y')}
     >
-      <ClipThumb />
+      <ClipThumb clip={clip} />
       <View style={styles.cardMid}>
         <ClipName clip={clip} />
-        <Text style={styles.eyebrowEmerald}>{t('clip.ready')} · {formatTimestamp(clip.createdAt)}</Text>
-        {typeof clip.qualityScore === 'number' && clip.reward ? (
-          <Text style={styles.cardSub}>
-            {t('clip.qualityReward', {
-              score: clip.qualityScore,
-              low: clip.reward.rangeUsdcLow.toFixed(2),
-              high: clip.reward.rangeUsdcHigh.toFixed(2),
-            })}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.stakeCta}>
-        <Text style={styles.stakeCtaLabel}>{t('clip.stakeCta')}</Text>
-        <Svg width={12} height={12} viewBox="0 0 12 12">
-          <Path d="M3 6h6m-2 -2 2 2 -2 2" stroke="#fff" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        </Svg>
+        <View style={styles.cardFoot}>
+          <Text style={styles.cardSub}>{formatTimestamp(clip.createdAt)}</Text>
+          <View style={styles.cardFootSpacer} />
+          <View style={styles.sellChip}>
+            <Text style={styles.sellChipLabel}>{t('clip.stakeCta')}</Text>
+            <Svg width={12} height={12} viewBox="0 0 12 12">
+              <Path d="M3 6h6m-2 -2 2 2 -2 2" stroke="#fff" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </Svg>
+          </View>
+        </View>
       </View>
     </Pressable>
   );
@@ -222,7 +246,7 @@ const StakedCard: React.FC<{ clip: Clip; onOpenDetail?: (c: Clip) => void }> = (
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       accessibilityLabel={t('clip.viewDetailA11y')}
     >
-      <ClipThumb />
+      <ClipThumb clip={clip} />
       <View style={styles.cardMid}>
         <ClipName clip={clip} />
         <View style={styles.cardMeta}>
@@ -263,7 +287,7 @@ const ErrorCard: React.FC<{
       style={({ pressed }) => [styles.card, styles.cardMuted, pressed && styles.cardPressed]}
       accessibilityLabel={t('clip.viewErrorA11y')}
     >
-      <ClipThumb muted />
+      <ClipThumb clip={clip} muted />
       <View style={styles.cardMid}>
         <ClipName clip={clip} />
         <Text style={styles.eyebrowDanger}>{t('clip.errorEyebrow')}</Text>
@@ -305,7 +329,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -314,22 +338,22 @@ const styles = StyleSheet.create({
   cardPressed: { backgroundColor: colors.paperDeep },
   cardMuted: { backgroundColor: colors.paperDeep },
 
+  // 出品可能カード: 緑で埋めず、 白ベース + エメラルドのヘアライン枠で上品に差別化。
   cardReady: {
-    backgroundColor: colors.emeraldFaint,
     borderColor: colors.borderEmerald,
   },
   cardReadyPressed: {
-    backgroundColor: colors.emeraldSoft,
+    backgroundColor: colors.paperDeep,
   },
 
   thumb: {
-    width: 64,
+    width: 88,
     aspectRatio: 1,
     backgroundColor: colors.paperDeep,
     alignItems: 'center',
     justifyContent: 'center',
     margin: spacing.sm,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
@@ -346,14 +370,20 @@ const styles = StyleSheet.create({
   },
   cardName: {
     fontFamily: fonts.sansSemibold,
-    fontSize: 15,
+    fontSize: 16,
+    lineHeight: 21,
     color: colors.ink,
     letterSpacing: -0.1,
   },
-  cardNameMono: {
-    fontFamily: fonts.mono,
-    fontSize: 13,
+  // 出品カードのフッタ行 (= 日時 + 出品 chip を下段に逃がしてタイトルを全幅にする)
+  cardFoot: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: spacing.sm },
+  cardFootSpacer: { flex: 1 },
+  sellChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 14, paddingVertical: 7,
+    backgroundColor: colors.emerald, borderRadius: radii.full,
   },
+  sellChipLabel: { fontFamily: fonts.sansSemibold, fontSize: 12, letterSpacing: 0.6, color: '#fff' },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
   cardSub: { ...typography.caption, color: colors.textMute },
 

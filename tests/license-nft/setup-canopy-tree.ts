@@ -52,12 +52,12 @@ const __dirname = dirname(__filename);
 
 const NETWORK_PATH = resolve(__dirname, "../../network.json");
 const FIXTURES_PATH = resolve(__dirname, "fixtures-canopy.json");
-const KEYS_DIR = resolve(__dirname, "../../keys");
+const KEYS_DIR = resolve(__dirname, "../../keys/dev/solana");
 
-// production cosign delegate の pubkey は keys/cosign-delegate.json (= サーバが
+// production cosign delegate の pubkey は keys/dev/solana/cosign-delegate.json (= サーバが
 // COSIGN_DELEGATE_PRIVATE_KEY_BASE58 env で読む secret key と同じもの) から派生する。
 // ハードコードしていた頃は env / .env / ここの 3 箇所が暗黙の同期前提で、 鍵
-// ローテーションのたびに齟齬が出ていた。 唯一の出処は keys/cosign-delegate.json。
+// ローテーションのたびに齟齬が出ていた。 唯一の出処は keys/dev/solana/cosign-delegate.json。
 function loadProdCosignDelegateB58(): string {
   const path = resolve(KEYS_DIR, "cosign-delegate.json");
   const arr = JSON.parse(readFileSync(path, "utf-8")) as number[];

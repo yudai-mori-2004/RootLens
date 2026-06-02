@@ -6,7 +6,7 @@ export { signClip, makeSignTmpDir, cleanupTmpDir, captureSign, blurSign, d1UriIn
 export { uploadToR2 } from './upload';
 export { registerWithTitleProtocol } from './titleProtocol';
 export { registerClip } from './register';
-export { fetchClipStatus, fetchClipStatusByHash, pollPipeline2 } from './pipeline2';
+export { fetchClipStatus, fetchClipStatusByHash, fetchAllClips, pollPipeline2 } from './pipeline2';
 export type { PollOptions } from './pipeline2';
 export { triggerPipeline3, fetchPipeline3Status } from './pipeline3';
 export type { Pipeline3TriggerResult } from './pipeline3';

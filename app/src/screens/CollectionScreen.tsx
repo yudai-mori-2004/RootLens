@@ -1,267 +1,131 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// Portfolio タブ — 撮影者が自分のクリップ (= 収益を生む保有データ資産) を管理する場所。
+//
+// 構成:
+//   • ヒーローカード (PortfolioHero): 時計/$ トグルで 撮影時間 と 収益 を可視化
+//   • セクション (折りたたみ可): 採点待ち / 採点済み・承認待ち / 販売中
+//
+// データは usePortfolioData がサーバ GET /api/clips + ローカル store + オンチェーンをマージして供給する。
+// 一覧は SectionList で仮想化し、 件数が増えても耐える。
+
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Easing,
-  FlatList,
-  Image,
   RefreshControl,
   SafeAreaView,
+  SectionList,
   StyleSheet,
   Text,
   View,
+  Image,
+  Pressable,
+  ActivityIndicator,
 } from 'react-native';
-import Svg, { Circle, Path, Polyline } from 'react-native-svg';
-import { useAuth } from '../services/auth';
+import Svg, { Circle, Path } from 'react-native-svg';
+
 import { ClipCard } from '../components/ClipCard';
 import { StakeSheet } from '../components/StakeSheet';
 import { ClipDetailSheet } from '../components/ClipDetailSheet';
-import { priceFromLicenseUrl } from '../domain/licenseCatalog';
-import { useClips } from '../clips/hooks';
-import { dataflowStore, storeEventSink, advanceClip, discardClip, fetchClipStatusByHash, type Clip } from '../dataflow';
-import { useT } from '../i18n';
-import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
+import { storeEventSink, advanceClip, discardClip, type Clip } from '../dataflow';
+import { useT, type TranslationKey } from '../i18n';
+import { colors, fonts, radii, spacing, typography } from '../theme';
+import { usePortfolioData } from './portfolio/usePortfolioData';
+import { PortfolioHero } from './portfolio/PortfolioHero';
 
-// COLLECTION タブ — 撮影者が自分のクリップを管理する場所。
-//
-// SPECS_JA §2.7 のクリップ状態機械を可視化する:
-//   • アップロード中 / 処理中 / 準備完了 / 不合格 / 処理エラー は dataflowStore (= 撮影完了時に
-//     enqueueRecording → advanceClip で段レジューム駆動) が発火源
+// Pipeline 2 でスタック中 (= processing / 登録後 error) か。 ユーザー操作不可 → ローディング表示。
+const isP2Stuck = (c: Clip) => c.state === 'processing' || (c.state === 'error' && c.stage === 'registered');
 
-//   • ステーキング済み はオンチェーン (DAS) からも hydrate される (= 過去にステーキング済みの cNFT)
-//
-// 両方を 1 つの Clip[] にマージして ClipCard に渡す。 タップして開く Stake シートは「準備完了」
-// 状態にのみ作用する (= SPECS §4.2 で UI 上の入口がここに統合された)。
-
-import { SOLANA_RPC_URL } from '../env';
-
-const DAS_URL = SOLANA_RPC_URL;
-
-const LICENSE_COLLECTION_MINT = 'BvhuJiTWDW6n5cSzE4XmzYcwLry7vcstS1U7fD7n9N1b';
-
-function priceFromUri(uri: string | null | undefined): number {
-  return priceFromLicenseUrl(uri) ?? 0;
+interface SectionDef {
+  key: 'awaiting' | 'approval' | 'onSale';
+  titleKey: TranslationKey;
+  hintKey: TranslationKey;
+  data: Clip[];
 }
 
-function rootMintFromUri(uri: string | null | undefined): string | null {
-  if (!uri) return null;
-  const m = uri.match(/[?&]root_mint=([1-9A-HJ-NP-Za-km-z]{32,44})/);
-  return m ? m[1] : null;
-}
-
-interface OnChainStakedClip {
-  rootAssetId: string;
-  delegate: string | null;
-  ownerEqualsDelegate: boolean;
-  createdAtUnix: number | null;
-  licenseCount: number;
-  revenueUsdc: number;
+// 時間帯であいさつを選ぶ (= 家事感・温かさ。 5時前/深夜は「おつかれさま」)。
+function greetingKeyForNow(): TranslationKey {
+  const h = new Date().getHours();
+  if (h < 5) return 'portfolio.greetingNight';
+  if (h < 11) return 'portfolio.greetingMorning';
+  if (h < 17) return 'portfolio.greetingDay';
+  if (h < 23) return 'portfolio.greetingEvening';
+  return 'portfolio.greetingNight';
 }
 
 export const CollectionScreen: React.FC = () => {
-  const { state } = useAuth();
-  const ownerPubkey = state.status === 'authenticated' ? state.session.pubkey : null;
-  const pipelineClips = useClips();
-
-  const [onChain, setOnChain] = useState<OnChainStakedClip[] | null>(null);
-  const [onChainError, setOnChainError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const t = useT();
+  const { metrics, groups, loading, refreshing, onRefresh } = usePortfolioData();
 
   const [stakeTarget, setStakeTarget] = useState<Clip | null>(null);
-  // タップしたクリップの詳細シート (UI_SPECS §3.3 / §3.4)。 ready / staked / error 共通。
   const [detailTarget, setDetailTarget] = useState<Clip | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const fetchOnChain = useCallback(async () => {
-    if (!ownerPubkey) {
-      setOnChain([]);
-      return;
-    }
-    setOnChainError(null);
-    try {
-      const ownedRes = await fetch(DAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 'rl-coll-owned', method: 'getAssetsByOwner',
-          params: {
-            ownerAddress: ownerPubkey.toBase58(),
-            page: 1, limit: 100,
-            sortBy: { sortBy: 'created', sortDirection: 'desc' },
-          },
-        }),
-      });
-      const ownedJson = await ownedRes.json();
-      const ownedItems: any[] = ownedJson?.result?.items ?? [];
-
-      const licRes = await fetch(DAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 'rl-coll-licenses', method: 'getAssetsByGroup',
-          params: {
-            groupKey: 'collection',
-            groupValue: LICENSE_COLLECTION_MINT,
-            page: 1, limit: 1000,
-          },
-        }),
-      });
-      const licJson = await licRes.json();
-      const licItems: any[] = licJson?.result?.items ?? [];
-
-      const rev = new Map<string, { count: number; usdc: number }>();
-      for (const lic of licItems) {
-        const uri: string | undefined =
-          lic?.content?.json_uri ?? lic?.content?.metadata?.uri ?? lic?.content?.links?.uri;
-        const rootMint = rootMintFromUri(uri);
-        if (!rootMint) continue;
-        const price = priceFromUri(uri);
-        const cur = rev.get(rootMint) ?? { count: 0, usdc: 0 };
-        cur.count += 1;
-        cur.usdc = +(cur.usdc + price).toFixed(2);
-        rev.set(rootMint, cur);
-      }
-
-      const mapped: OnChainStakedClip[] = ownedItems
-        .filter((a) => a?.compression?.compressed === true)
-        .map((a) => {
-          const owner: string = a?.ownership?.owner ?? '';
-          const delegate: string | null = a?.ownership?.delegate ?? null;
-          const r = rev.get(String(a.id)) ?? { count: 0, usdc: 0 };
-          return {
-            rootAssetId: String(a.id),
-            delegate,
-            ownerEqualsDelegate: !delegate || delegate === owner,
-            createdAtUnix: typeof a?.compression?.created_at === 'number' ? a.compression.created_at : null,
-            licenseCount: r.count,
-            revenueUsdc: r.usdc,
-          };
-        });
-
-      setOnChain(mapped);
-    } catch (e: any) {
-      setOnChainError(e?.message ?? String(e));
-      setOnChain([]);
-    }
-  }, [ownerPubkey]);
-
-  useEffect(() => { fetchOnChain(); }, [fetchOnChain]);
-
-  // processing クリップ (= Pipeline 2 実行中 / アプリ再起動で取り残し) を signature_hash で 1 回更新する。
-  // Pipeline 2 はサーバ側で進む / 取り残しは server ops が再投入するので、 端末は観測だけ行う (= 再試行ボタンは出さない)。
-  useEffect(() => {
-    const wallet = ownerPubkey?.toBase58();
-    if (!wallet) return;
-    const clips = Object.values(dataflowStore.getState().clips);
-    for (const c of clips) {
-      if (c.state === 'processing' && c.signatureHash) {
-        fetchClipStatusByHash(c.signatureHash, wallet)
-          .then((st) => { if (st) dataflowStore.getState().applyServerStatus(c.id, st); })
-          .catch(() => {});
-      }
-    }
-  }, [ownerPubkey]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchOnChain();
-    setRefreshing(false);
-  }, [fetchOnChain]);
-
-  // pipeline clips + on-chain clips を 1 つの Clip[] にマージ
-  // ローカル pipeline 内にすでに同じ rootAssetId がある場合は pipeline 側を優先する。
-  const mergedClips: Clip[] = useMemo(() => {
-    const pipelineAssetIds = new Set(
-      pipelineClips.filter((c) => c.rootAssetId).map((c) => c.rootAssetId!),
-    );
-    const onChainOnly: Clip[] = (onChain ?? [])
-      .filter((oc) => !pipelineAssetIds.has(oc.rootAssetId))
-      .map((oc) => ({
-        id: oc.rootAssetId,
-        state: 'staked' as const,
-        createdAt: (oc.createdAtUnix ?? 0) * 1000,
-        rootAssetId: oc.rootAssetId,
-        delegate: oc.delegate,
-        licenseCount: oc.licenseCount,
-        revenueUsdc: oc.revenueUsdc,
-      }));
-    return [...pipelineClips, ...onChainOnly].sort((a, b) => b.createdAt - a.createdAt);
-  }, [pipelineClips, onChain]);
-
-  // ヒーロー totals (= 全 staked clip の合算)
-  const totals = useMemo(() => {
-    let earned = 0;
-    let licenses = 0;
-    for (const c of mergedClips) {
-      if (c.state === 'staked') {
-        earned += c.revenueUsdc ?? 0;
-        licenses += c.licenseCount ?? 0;
-      }
-    }
-    return { earned: +earned.toFixed(2), licenses, clips: mergedClips.length };
-  }, [mergedClips]);
-
-  const spark = useMemo(() => {
-    const staked = mergedClips.filter((c) => c.state === 'staked');
-    if (staked.length === 0) return null;
-    let acc = 0;
-    const pts: number[] = [];
-    for (const c of [...staked].reverse()) {
-      acc += c.revenueUsdc ?? 0;
-      pts.push(acc);
-    }
-    return pts;
-  }, [mergedClips]);
-
-  // ready / staked / error カードをタップしたら詳細シートを開く (UI_SPECS §3.3 / §3.4)。
-  // 詳細シート内の「Stake」 ボタンで stake シートを open する 2 段構造。
   const onOpenDetail = useCallback((clip: Clip) => setDetailTarget(clip), []);
   const onOpenStake = useCallback((clip: Clip) => setStakeTarget(clip), []);
-  // 破棄 = ローカル削除 + durable な clip dir (録画 + 署名中間物) の掃除。 サーバ DELETE は叩かない。
   const onRemove = useCallback((clip: Clip) => { void discardClip(clip.id); }, []);
-  // 再試行 = 段レジューム (= advanceClip)。 失敗した Pipeline 1 段から成果物を再利用して再開する。
-  // 登録済み (= Pipeline 2 段) のクリップでは advanceClip は no-op (= P2 のユーザー再試行はしない)。
-  const onRetry = useCallback((clip: Clip) => {
-    void advanceClip(clip.id, storeEventSink);
-  }, []);
-  const onCloseStake = useCallback(() => setStakeTarget(null), []);
+  const onRetry = useCallback((clip: Clip) => { void advanceClip(clip.id, storeEventSink); }, []);
+  const onCloseStake = useCallback(() => { setStakeTarget(null); void onRefresh(); }, [onRefresh]);
   const onCloseDetail = useCallback(() => setDetailTarget(null), []);
+  const toggle = useCallback((key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] })), []);
 
-  const loading = onChain === null;
+  const sections = useMemo(() => {
+    const defs: SectionDef[] = [
+      { key: 'awaiting', titleKey: 'portfolio.sectionAwaiting', hintKey: 'portfolio.sectionAwaitingHint', data: groups.awaitingScoring },
+      { key: 'approval', titleKey: 'portfolio.sectionApproval', hintKey: 'portfolio.sectionApprovalHint', data: groups.readyForApproval },
+      { key: 'onSale', titleKey: 'portfolio.sectionOnSale', hintKey: 'portfolio.sectionOnSaleHint', data: groups.onSale },
+    ];
+    return defs
+      .filter((d) => d.data.length > 0)
+      .map((d) => ({ ...d, count: d.data.length, data: collapsed[d.key] ? [] : d.data }));
+  }, [groups, collapsed]);
 
   return (
     <SafeAreaView style={styles.root}>
-      <FlatList
-        data={mergedClips}
-        keyExtractor={(c) => c.id}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        stickySectionHeadersEnabled={false}
         contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />}
+        initialNumToRender={8}
+        windowSize={11}
+        removeClippedSubviews
         ListHeaderComponent={
-          <FadeInItem>
-            <Hero
-              ownerPubkey={ownerPubkey?.toBase58() ?? null}
-              totals={totals}
-              spark={spark}
-              loading={loading}
-            />
-          </FadeInItem>
+          <View style={styles.header}>
+            <View style={styles.banner}>
+              <Image
+                source={require('../../assets/decor/home-banner.png')}
+                style={styles.bannerImg}
+                resizeMode="cover"
+              />
+              <View style={styles.bannerText}>
+                <Text style={styles.greeting}>{t(greetingKeyForNow())}</Text>
+                <Text style={styles.greetingSub}>{t('portfolio.greetingSub')}</Text>
+              </View>
+            </View>
+            <PortfolioHero metrics={metrics} loading={loading} />
+          </View>
         }
-        ListEmptyComponent={
-          <EmptyState loading={loading} error={onChainError} hasWallet={!!ownerPubkey} />
-        }
-        renderItem={({ item, index }) => (
-          <FadeInItem delay={120 + Math.min(index, 8) * 55}>
+        renderSectionHeader={({ section }) => (
+          <SectionHeader
+            title={t(section.titleKey)}
+            hint={t(section.hintKey)}
+            count={section.count}
+            collapsed={!!collapsed[section.key]}
+            onPress={() => toggle(section.key)}
+          />
+        )}
+        renderItem={({ item, section }) => (
+          <View style={styles.itemWrap}>
             <ClipCard
               clip={item}
               onOpenStake={onOpenStake}
               onOpenDetail={onOpenDetail}
               onRemove={onRemove}
               onRetry={onRetry}
+              forceLoading={section.key === 'awaiting' && isP2Stuck(item)}
             />
-          </FadeInItem>
+          </View>
         )}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
+        ListEmptyComponent={loading ? null : <EmptyState />}
       />
 
       <ClipDetailSheet
@@ -271,294 +135,87 @@ export const CollectionScreen: React.FC = () => {
         onOpenStake={onOpenStake}
         onRemove={onRemove}
       />
-
-      <StakeSheet
-        visible={stakeTarget !== null}
-        clip={stakeTarget}
-        onClose={onCloseStake}
-      />
+      <StakeSheet visible={stakeTarget !== null} clip={stakeTarget} onClose={onCloseStake} />
     </SafeAreaView>
   );
 };
 
-// ─── Entrance motion ─────────────────────────────────────────────────
-// マウント時に下からふわっと立ち上げる (= staggered)。 RN コア Animated (= 確実に動く)。
-const FadeInItem: React.FC<{ delay?: number; children: React.ReactNode }> = ({ delay = 0, children }) => {
-  const p = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(p, {
-      toValue: 1,
-      duration: 440,
-      delay,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [p, delay]);
-  return (
-    <Animated.View
-      style={{
-        opacity: p,
-        transform: [{ translateY: p.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
-      }}
-    >
-      {children}
-    </Animated.View>
-  );
-};
-
-// ─── Hero ────────────────────────────────────────────────────────────
-
-const HERO_DECOR = require('../../assets/decor/earnings-stack.png');
-
-const Hero: React.FC<{
-  ownerPubkey: string | null;
-  totals: { earned: number; licenses: number; clips: number };
-  spark: number[] | null;
-  loading: boolean;
-}> = ({ ownerPubkey, totals, spark, loading }) => {
-  const t = useT();
-  const short = ownerPubkey ? `${ownerPubkey.slice(0, 4)}…${ownerPubkey.slice(-4)}` : '—';
-  const hasAnyEarnings = spark && spark.length >= 2 && spark[spark.length - 1] > 0;
-  return (
-    <View style={styles.hero}>
-      <View style={styles.heroTop}>
-        <Text style={styles.heroTitle}>{t('home.collection')}</Text>
-        <View style={styles.walletPill}>
-          <View style={styles.walletDot} />
-          <Text style={styles.walletPillText}>{short}</Text>
-        </View>
+// ─── セクションヘッダ (= 折りたたみトグル) ──────────────────────────────
+const SectionHeader: React.FC<{
+  title: string; hint: string; count: number; collapsed: boolean; onPress: () => void;
+}> = ({ title, hint, count, collapsed, onPress }) => (
+  <Pressable onPress={onPress} style={({ pressed }) => [styles.sectionHeader, pressed && styles.sectionHeaderPressed]}>
+    <View style={styles.sectionHeaderTop}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionCountPill}>
+        <Text style={styles.sectionCount}>{count}</Text>
       </View>
-
-      <View style={styles.heroCard}>
-        <View style={styles.heroCardLeft}>
-          <Text style={styles.heroEyebrow}>{t('home.lifetimeEarnings')}</Text>
-          <View style={styles.heroNumberRow}>
-            <Text style={styles.heroCurrency}>$</Text>
-            <Text style={styles.heroNumber}>{loading ? '—' : totals.earned.toFixed(2)}</Text>
-            <Text style={styles.heroUnit}>USDC</Text>
-          </View>
-          {hasAnyEarnings ? (
-            <Sparkline points={spark!} width={170} height={36} />
-          ) : (
-            <View style={{ height: 36 }} />
-          )}
-        </View>
-        <View style={styles.heroDecorWrap}>
-          <Image source={HERO_DECOR} style={styles.heroDecor} resizeMode="contain" />
-        </View>
-      </View>
-
-      <View style={styles.statsRow}>
-        <StatTile label={t('home.licensesSold')} value={loading ? '—' : String(totals.licenses)} accent />
-        <View style={styles.statSep} />
-        <StatTile label={t('home.clips')} value={loading ? '—' : String(totals.clips)} />
-      </View>
-
-      <View style={styles.listIntro}>
-        <Text style={styles.listIntroLabel}>{t('home.yourClips')}</Text>
-        <Text style={styles.listIntroHint}>
-          {t('home.yourClipsHint')}
-        </Text>
-      </View>
+      <View style={styles.sectionHeaderSpacer} />
+      <Chevron collapsed={collapsed} />
     </View>
-  );
-};
-
-const StatTile: React.FC<{ label: string; value: string; accent?: boolean }> = ({
-  label, value, accent,
-}) => (
-  <View style={styles.statTile}>
-    <Text style={[styles.statValue, accent && { color: colors.emeraldDeep }]}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
+    {!collapsed ? <Text style={styles.sectionHint}>{hint}</Text> : null}
+  </Pressable>
 );
 
-const Sparkline: React.FC<{ points: number[]; width: number; height: number }> = ({
-  points, width, height,
-}) => {
-  if (points.length < 2) return null;
-  const max = Math.max(...points);
-  const min = Math.min(...points, 0);
-  const span = max - min || 1;
-  const stepX = width / (points.length - 1);
-  const polyPoints = points
-    .map((y, i) => {
-      const x = i * stepX;
-      const py = height - ((y - min) / span) * height;
-      return `${x.toFixed(1)},${py.toFixed(1)}`;
-    })
-    .join(' ');
-  const lastX = (points.length - 1) * stepX;
-  const lastY = height - ((points[points.length - 1] - min) / span) * height;
-  return (
-    <Svg width={width} height={height} style={{ marginTop: 6 }}>
-      <Polyline
-        points={polyPoints}
-        fill="none"
-        stroke={colors.emerald}
-        strokeWidth={1.6}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <Circle cx={lastX} cy={lastY} r={3.5} fill={colors.emerald} />
-      <Circle cx={lastX} cy={lastY} r={1.4} fill={colors.card} />
-    </Svg>
-  );
-};
+const Chevron: React.FC<{ collapsed: boolean }> = ({ collapsed }) => (
+  <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+    <Path
+      d={collapsed ? 'M6 4l4 4-4 4' : 'M4 6l4 4 4-4'}
+      stroke={colors.textMute}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
 
-// ─── Empty / Error / Loading ─────────────────────────────────────────
-
-const EmptyState: React.FC<{ loading: boolean; error: string | null; hasWallet: boolean }> = ({
-  loading, error, hasWallet,
-}) => {
+// ─── 空状態 ──────────────────────────────────────────────────────────
+const EmptyState: React.FC = () => {
   const t = useT();
-  if (loading) {
-    return (
-      <View style={styles.empty}>
-        <ActivityIndicator color={colors.ink} />
-        <Text style={styles.emptyText}>{t('common.loading')}</Text>
-      </View>
-    );
-  }
-  if (error) {
-    return (
-      <View style={styles.empty}>
-        <Text style={styles.emptyEyebrow}>{t('home.dasError')}</Text>
-        <Text style={styles.emptyText}>{error}</Text>
-      </View>
-    );
-  }
-  if (!hasWallet) {
-    return (
-      <View style={styles.empty}>
-        <Text style={styles.emptyEyebrow}>{t('home.noWallet')}</Text>
-        <Text style={styles.emptyText}>
-          {t('home.noWalletHint')}
-        </Text>
-      </View>
-    );
-  }
   return (
     <View style={styles.empty}>
-      <Svg width={64} height={64} viewBox="0 0 64 64" fill="none">
-        <Path
-          d="M16 22l16-9 16 9v20l-16 9-16-9V22z"
-          stroke={colors.textFaint}
-          strokeWidth={1.6}
-          strokeLinejoin="round"
-        />
+      <Svg width={56} height={56} viewBox="0 0 64 64" fill="none">
+        <Path d="M16 22l16-9 16 9v20l-16 9-16-9V22z" stroke={colors.textFaint} strokeWidth={1.6} strokeLinejoin="round" />
         <Circle cx={32} cy={32} r={4} fill={colors.textFaint} />
       </Svg>
-      <Text style={styles.emptyEyebrow}>{t('home.noClipsYet')}</Text>
-      <Text style={styles.emptyText}>
-        {t('home.noClipsHint')}
-      </Text>
+      <Text style={styles.emptyTitle}>{t('portfolio.emptyTitle')}</Text>
+      <Text style={styles.emptyHint}>{t('portfolio.emptyHint')}</Text>
     </View>
   );
 };
 
 // ─── styles ──────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, paddingTop: spacing.sm },
 
-  hero: {
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
-    gap: spacing.lg,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  heroTitle: {
-    fontFamily: fonts.serifSemibold,
-    fontSize: 32,
-    letterSpacing: -0.5,
-    color: colors.ink,
-  },
-  walletPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  walletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.emerald },
-  walletPillText: {
-    ...typography.mono,
-    fontSize: 11,
-    color: colors.textBody,
-  },
-
-  heroCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.card,
+  header: { gap: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  banner: {
+    height: 172,
     borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    paddingVertical: spacing.xl,
-    gap: spacing.md,
     overflow: 'hidden',
-    ...shadows.card,
+    backgroundColor: '#F6E9C6',
   },
-  heroCardLeft: { flex: 1, gap: 4, justifyContent: 'center' },
-  heroEyebrow: { ...typography.label, color: colors.textMute },
-  heroNumberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 4 },
-  heroCurrency: {
-    fontFamily: fonts.serifLight,
-    fontSize: 32, color: colors.ink, lineHeight: 36,
-  },
-  heroNumber: {
-    fontFamily: fonts.serifLight,
-    fontSize: 56, color: colors.ink, letterSpacing: -1.5, lineHeight: 60,
-  },
-  heroUnit: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 11, letterSpacing: 1.4, color: colors.textMute,
-    marginLeft: 6, marginBottom: 6,
-  },
-  heroDecorWrap: { width: 110, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  heroDecor: { width: '100%', height: '100%' },
+  bannerImg: { width: '100%', height: '100%' },
+  bannerText: { position: 'absolute', top: spacing.lg, left: spacing.lg, right: '42%', gap: 2 },
+  greeting: { fontFamily: fonts.serifMedium, fontSize: 28, letterSpacing: -0.4, color: colors.ink },
+  greetingSub: { ...typography.caption, color: colors.inkMute, lineHeight: 18 },
 
-  statsRow: {
-    flexDirection: 'row',
-    backgroundColor: colors.card,
-    borderRadius: radii.lg,
-    borderWidth: 1, borderColor: colors.border,
-    paddingVertical: spacing.lg,
-    ...shadows.card,
+  sectionHeader: { paddingTop: spacing.lg, paddingBottom: spacing.sm, gap: 4 },
+  sectionHeaderPressed: { opacity: 0.6 },
+  sectionHeaderTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionTitle: { ...typography.label, color: colors.ink },
+  sectionCountPill: {
+    minWidth: 20, paddingHorizontal: 6, paddingVertical: 1,
+    borderRadius: radii.full, backgroundColor: colors.paperDeep, alignItems: 'center',
   },
-  statTile: { flex: 1, alignItems: 'center', gap: 2 },
-  statSep: { width: 1, backgroundColor: colors.border, marginVertical: 4 },
-  statValue: {
-    fontFamily: fonts.serifMedium,
-    fontSize: 28, color: colors.ink, letterSpacing: -0.5,
-  },
-  statLabel: { ...typography.labelSmall, color: colors.textMute },
+  sectionCount: { ...typography.labelSmall, color: colors.textMute },
+  sectionHeaderSpacer: { flex: 1 },
+  sectionHint: { ...typography.caption, color: colors.textMute },
 
-  listIntro: { paddingTop: spacing.md, paddingHorizontal: 2, gap: 4 },
-  listIntroLabel: { ...typography.label, color: colors.textMute },
-  listIntroHint: { ...typography.caption, color: colors.textBody, lineHeight: 19 },
+  itemWrap: { marginBottom: spacing.md },
 
-  empty: {
-    paddingTop: spacing.xxl,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  emptyEyebrow: { ...typography.label, color: colors.textMute, marginTop: spacing.sm },
-  emptyText: {
-    ...typography.body,
-    color: colors.textBody,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
+  empty: { paddingTop: spacing.xxl, paddingHorizontal: spacing.lg, alignItems: 'center', gap: spacing.sm },
+  emptyTitle: { ...typography.label, color: colors.textMute, marginTop: spacing.sm },
+  emptyHint: { ...typography.body, color: colors.textBody, textAlign: 'center', maxWidth: 280 },
 });

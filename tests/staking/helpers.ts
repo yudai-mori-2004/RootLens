@@ -80,7 +80,7 @@ export function loadKeypair(secret: number[]): Keypair {
 
 /** keys/<filename> から keypair を読む (license-nft tests と同じ流儀) */
 export function loadKeypairFromFile(filename: string): Keypair {
-  const path = resolve(__dirname, "../../keys", filename);
+  const path = resolve(__dirname, "../../keys/dev/solana", filename);
   const bytes = JSON.parse(readFileSync(path, "utf-8"));
   return Keypair.fromSecretKey(Uint8Array.from(bytes));
 }

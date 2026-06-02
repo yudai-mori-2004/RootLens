@@ -18,7 +18,7 @@
 #     無ければ `cd web && vercel env pull .env.local --yes` で取得
 #   - mock-device の release build 済 (= cargo build --release in tools/mock-device)
 #   - MERKLE_TREE env (= cNFT mint 先 tree pubkey、 devnet)
-#   - SOLANA_KEYPAIR env (= 既定 root-lens/keys/deployer.json)
+#   - SOLANA_KEYPAIR env (= 既定 root-lens/keys/dev/solana/deployer.json)
 #
 # 使い方:
 #   MERKLE_TREE=<pubkey> bash tools/smoke-test.sh [--input <path>] [--api-base <url>]
@@ -34,7 +34,7 @@ INPUT_MP4="${INPUT_MP4:-/Users/forest/WebCreations/title-protocol/legacy/v0.1.0/
 TASK_ID="${TASK_ID:-dishes}"
 ACHIEVEMENT="${ACHIEVEMENT:-85}"
 API_BASE="${API_BASE:-https://www.rootlens.io}"
-SOLANA_KEYPAIR="${SOLANA_KEYPAIR:-$REPO_ROOT/keys/deployer.json}"
+SOLANA_KEYPAIR="${SOLANA_KEYPAIR:-$REPO_ROOT/keys/dev/solana/deployer.json}"
 SOLANA_RPC_URL="${SOLANA_RPC_URL:-https://api.devnet.solana.com}"
 TP_GATEWAY="${TP_GATEWAY:-http://13.113.217.17:3000}"
 COLLECTION="${COLLECTION:-Dfg52e4aG9zusPedUSMQ7q8kRs3W4QebNCQqJf3GjYBy}"

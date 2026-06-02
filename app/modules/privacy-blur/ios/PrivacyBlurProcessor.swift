@@ -270,7 +270,7 @@ public final class PrivacyBlurProcessor {
                 preferredTransform: preferredTransform,
                 displaySize: displaySize,
                 frameIndex: frameIndex,
-                pool: adaptor.pixelBufferPool,
+                pool: adaptor.pixelBufferPool
               )
             }
             if !adaptor.append(outBuffer, withPresentationTime: pts) {

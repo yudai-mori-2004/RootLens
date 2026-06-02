@@ -65,7 +65,7 @@ struct Args {
     bucket: Option<String>,
 
     /// Solana payer keypair JSON path (= prod profile で cNFT 発行に必須、 既定 keys/deployer.json)。
-    #[arg(long, default_value = "keys/deployer.json")]
+    #[arg(long, default_value = "keys/dev/solana/deployer.json")]
     solana_keypair: PathBuf,
 
     /// Solana RPC URL (= cNFT broadcast 用、 既定は devnet)。

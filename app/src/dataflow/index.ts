@@ -62,6 +62,7 @@ export {
   registerClip,
   fetchClipStatus,
   fetchClipStatusByHash,
+  fetchAllClips,
   pollPipeline2,
   triggerPipeline3,
   fetchPipeline3Status,

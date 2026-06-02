@@ -64,6 +64,11 @@ export async function registerWithTitleProtocol(
   });
 
   // ─── cNFT mint ───────────────────────────────────────────────────
+  // 手数料スポンサー: 新規ユーザーは SOL を持たないので、 mint 前にサーバ経由で少額補給する
+  // (= /api/v1/fund-wallet が fee-payer 鍵の SOL を wallet に送る)。 失敗しても致命ではない
+  // (= 既に残高があれば mint は通る) ので warn して続行する。
+  await ensureWalletFunded(walletPubkey, sink);
+
   sink({ step: 'cnft-mint', level: 'info', message: 'partial mint tx を取得' });
   const partialTxB64 = await fetchPartialMintTx({
     offchainDataUrl: signedJsonUri,
@@ -140,6 +145,33 @@ async function dasAssetExists(rpcUrl: string, assetId: string): Promise<boolean>
   const json = (await res.json()) as { result?: { id?: string; burnt?: boolean } };
   const r = json.result;
   return !!r && r.id === assetId && r.burnt !== true;
+}
+
+/// 手数料スポンサー補給: wallet の SOL 残高が低ければサーバが少額補給する (= /api/v1/fund-wallet)。
+/// 補給失敗は致命ではない (= 既に残高があれば mint は通る) ので throw せず warn して続行する。
+async function ensureWalletFunded(walletPubkey: string, sink: EventSink): Promise<void> {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/v1/fund-wallet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallet: walletPubkey }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      sink({ step: 'cnft-mint', level: 'warn', message: `手数料補給に失敗 (mint を試行): ${res.status} ${text.slice(0, 120)}` });
+      return;
+    }
+    const json = (await res.json()) as { funded?: boolean; balanceSol?: number };
+    if (json.funded) {
+      sink({ step: 'cnft-mint', level: 'info', message: `手数料を補給しました (残高 ${json.balanceSol?.toFixed(4)} SOL)` });
+    }
+  } catch (e) {
+    sink({
+      step: 'cnft-mint',
+      level: 'warn',
+      message: `手数料補給の呼び出し失敗 (続行): ${e instanceof Error ? e.message : String(e)}`,
+    });
+  }
 }
 
 async function callTpProcess(

@@ -824,36 +824,43 @@ const CalibrationCaptureBody: React.FC<Props> = ({ navigation }) => {
         ) : null}
       </View>
 
-      {/* 撮影構成スイッチャ (= キャリブレーション待機中のみ、 画面下中央) */}
-      {RECORDING_CONFIGS.length > 1 ? (
-        <View
-          style={[styles.configSwitcher, { bottom: safeBottom + 16, left: safeLeft, right: safeRight }]}
-          pointerEvents={canSwitchConfig ? 'auto' : 'none'}
-        >
-          {RECORDING_CONFIGS.map((c) => {
-            const selected = c.id === config.id;
-            const avail = availByConfig[c.id];
-            const disabled = avail === false || !canSwitchConfig || selected;
-            return (
-              <Pressable
-                key={c.id}
-                onPress={() => onSelectConfig(c.id)}
-                disabled={disabled}
-                style={[
-                  styles.configChip,
-                  selected && styles.configChipSel,
-                  (avail === false || !canSwitchConfig) && styles.configChipDim,
-                ]}
-                hitSlop={6}
-              >
-                <Text style={[styles.configChipText, selected && styles.configChipTextSel]}>
-                  {c.id}{avail === false ? ' ✕' : ''}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+      {/*
+        撮影構成スイッチャ (ultra_wide ⇄ arkit) は当面 1 構成運用のため UI を非表示にする。
+        ⚠ 将来また切り替えを出す可能性がある。 ただし切り替え処理 (= onSelectConfig + 上の session
+           ハンドオフ effect: カメラ排他のため「旧 session 完全停止 → 解放待ち → 新 session 起動」を
+           直列化する処理) は非常にデリケートで壊しやすい。 ロジック自体はコード上にそのまま温存し、
+           ここの UI だけ畳んでおく。 復活時はこのコメントを外せば戻せるよう原文を残す:
+
+        {RECORDING_CONFIGS.length > 1 ? (
+          <View
+            style={[styles.configSwitcher, { bottom: safeBottom + 16, left: safeLeft, right: safeRight }]}
+            pointerEvents={canSwitchConfig ? 'auto' : 'none'}
+          >
+            {RECORDING_CONFIGS.map((c) => {
+              const selected = c.id === config.id;
+              const avail = availByConfig[c.id];
+              const disabled = avail === false || !canSwitchConfig || selected;
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => onSelectConfig(c.id)}
+                  disabled={disabled}
+                  style={[
+                    styles.configChip,
+                    selected && styles.configChipSel,
+                    (avail === false || !canSwitchConfig) && styles.configChipDim,
+                  ]}
+                  hitSlop={6}
+                >
+                  <Text style={[styles.configChipText, selected && styles.configChipTextSel]}>
+                    {c.id}{avail === false ? ' x' : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      */}
 
       {/* 左上: 戻る */}
       <View style={[styles.chromeTopLeft, { top: safeTop + 12, left: safeLeft + 12 }]}>
