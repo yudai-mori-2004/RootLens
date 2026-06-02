@@ -4,7 +4,7 @@
 
 > Important: This is an external legal document and **requires review by qualified counsel before publication** ([`legal-policy`](../legal-policy/en.md) §10). This draft reflects the [`legal-policy`](../legal-policy/en.md) decisions (D1–D8).
 >
-> The existing public version (`web/components/lp/PrivacyPolicyPage.tsx`) describes the business only as a "content authenticity platform" and omits data sale, licensing, staking, KYC, audio, and third parties — **diverging from the actual business**. This document is the authoritative replacement.
+> The existing public version (`web/components/lp/PrivacyPolicyPage.tsx`) describes the business only as a "content authenticity platform" and omits data sale, licensing, staking, KYC, audio, and third parties, **diverging from the actual business**. This document is the authoritative replacement.
 
 ## 0. Presentation (layered)
 
@@ -12,22 +12,22 @@
 - **Layer 2 = Full text (§2 onward)**: this document is **authoritative and binding**. If they conflict, the full text prevails.
 - Consent/acknowledgement is logged with version + hash via [`consent-log-spec`](../consent-log-spec/en.md).
 
-## 1. Layer 1 — Summary (non-binding)
+## 1. Summary (non-binding)
 
 > - **What we collect**: **video and audio** of housework etc., sensor data such as hand motion, device info, and identity-verification info.
 > - **What we use it for**: building training data to improve AI and robots, and **providing/selling it to outside companies** (including outside Japan).
 > - **Privacy processing**: faces etc. are blurred before sharing, but you may not become fully unidentifiable (we do not say "anonymized").
 > - **Your rights**: view, correct, delete, and stop (withdraw consent). However, data already used for training cannot be removed from past training.
 > - **Recording request**: please record only when alone; do not record other people or children.
-> - **Contact**: legal@rootlens.io
+> - **Contact**: contact@rootlens.io
 >
 > This is a summary. The official content is in the full text below (§2 onward).
 
-## 2. Full text — Operator & scope
+## 2. Operator & scope
 
 ### 2.1 Operator (personal-data handler / controller)
-RootLens ("we"; entity formation in progress; until then the operating individual is the handler). Contact: legal@rootlens.io.
-> Audit note: the existing page's contact `contact@titleprotocol.org` is incorrect; this document standardizes on `legal@rootlens.io`.
+RootLens ("we"; entity formation in progress; until then the operating individual is the handler). Contact: contact@rootlens.io.
+> Audit note: the existing page's contact `contact@titleprotocol.org` is incorrect; this document standardizes on `contact@rootlens.io`.
 
 ### 2.2 Scope
 All handling of personal data across our app, website, and data-sale service. It concerns not only the recording user but also **people who may be captured** in recordings (handled in §2.7/§8).
@@ -70,7 +70,7 @@ Retained for as long as necessary for the purposes and as required by law, then 
 - You may request access, correction, suspension of use, deletion, and withdrawal of consent.
 - **Deletion scope**: data before training use is deleted. **After training use**, it is excluded from future training, but **past training cannot be undone**. We do not promise "complete deletion anytime."
 - The blockchain retains tokens and transaction records, but the **personal data itself is off-chain**, and deleting it removes substantive value.
-- Requests: legal@rootlens.io
+- Requests: contact@rootlens.io
 
 ## 11. Withdrawal of consent and its effect
 The user may withdraw consent anytime. After withdrawal, we stop new collection/sale and delete un-trained data. Effects on already-issued licenses and trained models are per §10 (the past cannot be undone).
@@ -88,7 +88,7 @@ Per the phased rollout in [`legal-policy`](../legal-policy/en.md) §8. Currently
 This policy may be amended. Material changes are announced; versions and hashes are managed ([`consent-log-spec`](../consent-log-spec/en.md)).
 
 ## 16. Contact
-legal@rootlens.io
+contact@rootlens.io
 
 ## Change log
 | Date | Change |
