@@ -11,8 +11,8 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// 既定の TP Gateway。 現状は固定 IP、 env (= TP_GATEWAY_URL) で override 可能。
-pub const DEFAULT_TP_GATEWAY: &str = "http://13.113.217.17:3000";
+// TP Gateway URL は env 一本 (= TP_GATEWAY_URL) か CLI (--tp-gateway) で渡す。
+// EC2 再起動で公開 IP が変わるので、 固定 IP はコードに焼かない。
 
 #[derive(Serialize)]
 struct ProcessRequest<'a> {
@@ -35,7 +35,8 @@ pub async fn register_with_tp(
     content_url: &str,
     gateway_url: Option<&str>,
 ) -> Result<ProcessResponse> {
-    let gw = gateway_url.unwrap_or(DEFAULT_TP_GATEWAY);
+    let gw = gateway_url
+        .ok_or_else(|| anyhow!("TP gateway URL not set (--tp-gateway or env TP_GATEWAY_URL)"))?;
     let url = format!("{}/process", gw.trim_end_matches('/'));
     let body = ProcessRequest {
         input_type: "single",

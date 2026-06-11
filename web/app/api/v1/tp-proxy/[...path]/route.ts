@@ -20,10 +20,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+// gateway は env 一本 (= TP_GATEWAY_URL)。 複数 gateway を切替えたい時だけ
+// TP_GATEWAY_PROXY_TARGETS (カンマ区切り) で override。 ハードコード IP は持たない
+// (= EC2 再起動で IP が変わるため。 詳細は web/lib/tp-gateway.ts)。
 const ALLOWED_GATEWAYS = (
   process.env.TP_GATEWAY_PROXY_TARGETS ??
-  "http://13.113.217.17:3000"
-).split(",").map((u) => u.trim().replace(/\/$/, ""));
+  process.env.TP_GATEWAY_URL ??
+  ""
+).split(",").map((u) => u.trim().replace(/\/$/, "")).filter(Boolean);
 
 // path[0] (= URL の最初のセグメント) で whitelist 判定する。
 // /extension/solana のような multi-segment path は path[0]=extension で許可される。

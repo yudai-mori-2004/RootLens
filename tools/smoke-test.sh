@@ -36,7 +36,9 @@ ACHIEVEMENT="${ACHIEVEMENT:-85}"
 API_BASE="${API_BASE:-https://www.rootlens.io}"
 SOLANA_KEYPAIR="${SOLANA_KEYPAIR:-$REPO_ROOT/keys/dev/solana/deployer.json}"
 SOLANA_RPC_URL="${SOLANA_RPC_URL:-https://api.devnet.solana.com}"
-TP_GATEWAY="${TP_GATEWAY:-http://13.113.217.17:3000}"
+# env 一本: TP_GATEWAY (or TP_GATEWAY_URL) で gateway を指定する。 固定 IP は焼かない
+# (= EC2 再起動で公開 IP が変わるため)。
+TP_GATEWAY="${TP_GATEWAY:-${TP_GATEWAY_URL:-}}"
 COLLECTION="${COLLECTION:-Dfg52e4aG9zusPedUSMQ7q8kRs3W4QebNCQqJf3GjYBy}"
 
 while [[ $# -gt 0 ]]; do

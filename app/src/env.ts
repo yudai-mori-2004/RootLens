@@ -69,11 +69,10 @@ export const SERVER_URL =
   readOptional('EXPO_PUBLIC_SERVER_URL') ?? 'https://www.rootlens.io';
 
 // ─── Title Protocol Gateway ─────────────────────────────────────────────
-// 端末から TP /process + /extension/solana を直接叩く URL。 default は v0.1.3 で
-// 公開している devnet 用 gateway。
-
-export const TP_GATEWAY_URL =
-  readOptional('EXPO_PUBLIC_TP_GATEWAY_ENDPOINT') ?? 'http://13.113.217.17:3000';
+// ⚠ 本流 (dataflow/steps/titleProtocol.ts) は web proxy (/api/v1/tp-*) 経由なので gateway を直叩き
+//    しない。 これは legacy / DevSandbox の直叩き経路用。 IP はハードコードしない (= EC2 再起動で
+//    変わるため)。 直叩きするなら EXPO_PUBLIC_TP_GATEWAY_ENDPOINT を設定する。
+export const TP_GATEWAY_URL = readOptional('EXPO_PUBLIC_TP_GATEWAY_ENDPOINT') ?? '';
 
 // ─── (撤去済) Anthropic API key ─────────────────────────────────────────
 // 旧 VLM gate (撮影 Step 2/6 で Claude 直叩き) 用だったが、 2026-05-27 にジェスチャー式へ

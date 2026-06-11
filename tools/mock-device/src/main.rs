@@ -352,7 +352,7 @@ async fn main() -> Result<()> {
                 .tp_gateway
                 .clone()
                 .or(env_gateway)
-                .unwrap_or_else(|| tp_register::DEFAULT_TP_GATEWAY.to_string());
+                .ok_or_else(|| anyhow!("TP gateway URL not set: use --tp-gateway or env TP_GATEWAY_URL"))?;
 
             let tp_ok = match register_tp(
                 &client,

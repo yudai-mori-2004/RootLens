@@ -19,9 +19,9 @@ import { z } from "zod";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { presignSignedMp4Get, r2, BUCKET_RAW } from "@/lib/r2";
 import { uploadPublic } from "@/lib/server/r2";
+import { tpGatewayUrl } from "@/lib/tp-gateway";
 
 const CONTENT_ID_RE = /^[0-9a-f]{64}$/;
-const TP_GATEWAY = process.env.TP_GATEWAY_URL ?? "http://13.113.217.17:3000";
 
 const RequestSchema = z.object({
   signatureHash: z.string().regex(CONTENT_ID_RE, "signatureHash must be 64-char lowercase hex"),
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   // 2. POST TP Gateway /process
   let processJson: unknown;
   try {
-    const upstream = await fetch(`${TP_GATEWAY.replace(/\/$/, "")}/process`, {
+    const upstream = await fetch(`${tpGatewayUrl()}/process`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

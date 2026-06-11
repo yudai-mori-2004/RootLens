@@ -29,8 +29,7 @@ import { z } from "zod";
 import bs58 from "bs58";
 import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
 import { SOLANA_RPC_URL } from "@/lib/verify/config";
-
-const TP_GATEWAY = process.env.TP_GATEWAY_URL ?? "http://13.113.217.17:3000";
+import { tpGatewayUrl } from "@/lib/tp-gateway";
 
 const BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -99,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   let json: { partial_tx?: string };
   try {
-    const upstream = await fetch(`${TP_GATEWAY.replace(/\/$/, "")}/extension/solana`, {
+    const upstream = await fetch(`${tpGatewayUrl()}/extension/solana`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(upstreamBody),
