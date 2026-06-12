@@ -47,6 +47,10 @@ const RequestSchema = z.object({
   payer: z.string().regex(BASE58_RE),
   merkleTree: z.string().regex(BASE58_RE),
   collection: z.string().regex(BASE58_RE).optional(),
+  /// 手数料スポンサー経路 (= D 案) を使うか。 新 client だけ true を送る。
+  /// 旧 client (= 公開済み TestFlight 等) はこのフラグを知らない → 従来どおり
+  /// 「payer (= 撮影者) が署名して手数料も払う」 tx を返す (= 後方互換)。
+  sponsored: z.boolean().optional(),
 });
 
 export const runtime = "nodejs";
@@ -65,14 +69,16 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  const { offchainDataUrl, payer, merkleTree, collection } = parsed.data;
+  const { offchainDataUrl, payer, merkleTree, collection, sponsored } = parsed.data;
 
-  // 手数料スポンサー鍵を読む (= fee payer。 これで手数料を肩代わりする)。
-  let feePayer: Keypair;
-  try {
-    feePayer = loadFeePayer();
-  } catch (e: unknown) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  // 手数料スポンサー鍵 (= sponsored 時のみ使用)。
+  let feePayer: Keypair | null = null;
+  if (sponsored) {
+    try {
+      feePayer = loadFeePayer();
+    } catch (e: unknown) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    }
   }
 
   // 最新 blockhash を取得 (= partial_tx は recent_blockhash 付きで返ってくる必要)
@@ -86,14 +92,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `getLatestBlockhash failed: ${msg}` }, { status: 502 });
   }
 
-  // TP Gateway /extension/solana に転送。 payer=leaf owner (撮影者)、 fee_payer=スポンサーで分離。
+  // TP Gateway /extension/solana に転送。
+  //   sponsored: payer=leaf owner (撮影者)、 fee_payer=スポンサーで分離 (= D 案)
+  //   それ以外: fee_payer 省略 → TP は payer が手数料も払う旧挙動 (= 旧 client 互換)
   const upstreamBody: Record<string, unknown> = {
     offchain_data_url: offchainDataUrl,
     payer,
     merkle_tree: merkleTree,
     recent_blockhash: recentBlockhash,
-    fee_payer: feePayer.publicKey.toBase58(),
   };
+  if (feePayer) upstreamBody.fee_payer = feePayer.publicKey.toBase58();
   if (collection) upstreamBody.collection = collection;
 
   let json: { partial_tx?: string };
@@ -127,8 +135,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // TEE が返す tx は tree_creator_or_delegate だけ署名済み。 fee payer slot をスポンサー鍵で署名し、
-  // 完全署名済み tx にして返す (= 端末は broadcast するだけ。 leaf owner の署名は不要)。
+  // 旧 client 互換 (= sponsored 無し): TEE 署名のみの partial_tx をそのまま返す。
+  // client が payer slot を自分の wallet で署名して手数料も払う (= 従来挙動)。
+  if (!feePayer) {
+    return NextResponse.json({ partialTx: json.partial_tx });
+  }
+
+  // sponsored: TEE が返す tx は tree_creator_or_delegate だけ署名済み。 fee payer slot を
+  // スポンサー鍵で署名し、 完全署名済み tx にして返す (= 端末は broadcast するだけ)。
   let signedB64: string;
   try {
     const tx = VersionedTransaction.deserialize(

@@ -16,7 +16,7 @@ import { Buffer } from 'buffer';
 import { Connection, PublicKey, VersionedTransaction } from '@solana/web3.js';
 
 import { SERVER_URL, SOLANA_RPC_URL, SOLANA_NETWORK } from '../../env';
-import { requireCurrentSession } from '../../services/auth/instance';
+import { getAuthProvider, requireCurrentSession } from '../../services/auth/instance';
 import type { EventSink } from '../events';
 import type { TpInput, TpResult } from '../types';
 
@@ -169,7 +169,9 @@ async function fetchPartialMintTx(args: {
   const res = await fetch(`${SERVER_URL}/api/v1/tp-mint-tx`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(args),
+    // sponsored: 手数料スポンサー経路 (= fee payer はサーバが署名、 ユーザーは SOL 不要)。
+    // 旧 client はこのフラグを送らない → サーバは従来の「payer 署名 + payer 負担」 tx を返す。
+    body: JSON.stringify({ ...args, sponsored: true }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -187,6 +189,19 @@ async function broadcastMint(
 ): Promise<{ rootAssetId: string; txSignature: string }> {
   const bytes = Buffer.from(partialTxB64, 'base64');
   const tx = VersionedTransaction.deserialize(new Uint8Array(bytes));
+
+  // 堅牢化: 自分の wallet が tx の必須署名者に入っている時だけ署名する。
+  //   sponsored (= 通常): fee payer はサーバ署名済みで自分は署名者ではない → そのまま broadcast。
+  //   非 sponsored fallback: 自分が payer slot の署名者 → 署名してから broadcast。
+  // (署名者でない鍵で sign() を呼ぶと web3.js が "Cannot sign with non signer key" を投げる)
+  const myKey = requireCurrentSession().pubkey;
+  const requiredSigners = tx.message.staticAccountKeys.slice(
+    0,
+    tx.message.header.numRequiredSignatures,
+  );
+  if (requiredSigners.some((k) => k.equals(myKey))) {
+    await getAuthProvider().signTransaction(tx);
+  }
 
   const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
   const txSignature = await connection.sendRawTransaction(tx.serialize(), {
