@@ -31,20 +31,23 @@ GEN_DUMMY="$REPO_ROOT/tools/gen-dummy-sensors.py"
 
 # ─── 引数 ──────────────────────────────────────────────────────────
 INPUT_MP4="${INPUT_MP4:-/Users/forest/WebCreations/title-protocol/legacy/v0.1.0/tests/fixtures/minimal/test_5s_640x480.mp4}"
-TASK_ID="${TASK_ID:-dishes}"
-ACHIEVEMENT="${ACHIEVEMENT:-85}"
+# 撮影構成 (= clips.recording_config)。 mock は ultra_wide を模擬 (旧 task-id/achievement は廃止)。
+RECORDING_CONFIG="${RECORDING_CONFIG:-ultra_wide}"
 API_BASE="${API_BASE:-https://www.rootlens.io}"
 SOLANA_KEYPAIR="${SOLANA_KEYPAIR:-$REPO_ROOT/keys/dev/solana/deployer.json}"
 SOLANA_RPC_URL="${SOLANA_RPC_URL:-https://api.devnet.solana.com}"
 # env 一本: TP_GATEWAY (or TP_GATEWAY_URL) で gateway を指定する。 固定 IP は焼かない
 # (= EC2 再起動で公開 IP が変わるため)。
 TP_GATEWAY="${TP_GATEWAY:-${TP_GATEWAY_URL:-}}"
-COLLECTION="${COLLECTION:-Dfg52e4aG9zusPedUSMQ7q8kRs3W4QebNCQqJf3GjYBy}"
+# collection は既定なし (= 本番 app と同じ collection 無し mint)。 TP は collection_authority に
+# TEE 署名鍵 (= enclave 再起動ごとに変わる) を渡すので、 固定 collection を付けると
+# InvalidCollectionAuthority で落ちる。 必要な時だけ COLLECTION env で渡す。
+COLLECTION="${COLLECTION:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --input) INPUT_MP4="$2"; shift 2 ;;
-    --task-id) TASK_ID="$2"; shift 2 ;;
+    --recording-config) RECORDING_CONFIG="$2"; shift 2 ;;
     --api-base) API_BASE="$2"; shift 2 ;;
     --merkle-tree) MERKLE_TREE="$2"; shift 2 ;;
     --keypair) SOLANA_KEYPAIR="$2"; shift 2 ;;
@@ -87,6 +90,8 @@ echo ""
 echo "=== Step 2/5: mock-device prod (= R2 + TP /process + cNFT mint + POST /api/clips) ==="
 MOCK_JSON_PATH="$TMP_DIR/mock_device.json"
 set +e
+COLLECTION_ARGS=()
+if [ -n "$COLLECTION" ]; then COLLECTION_ARGS=(--collection "$COLLECTION"); fi
 "$MOCK_DEVICE" \
   --input "$INPUT_MP4" \
   --sensors "$TMP_DIR/sensors.jsonl" \
@@ -98,10 +103,9 @@ set +e
   --solana-rpc-url "$SOLANA_RPC_URL" \
   --tp-gateway "$TP_GATEWAY" \
   --merkle-tree "$MERKLE_TREE" \
-  --collection "$COLLECTION" \
+  "${COLLECTION_ARGS[@]}" \
   --api-base "$API_BASE" \
-  --task-id "$TASK_ID" \
-  --achievement "$ACHIEVEMENT" \
+  --recording-config "$RECORDING_CONFIG" \
   --quiet >"$MOCK_JSON_PATH"
 MOCK_EXIT=$?
 set -e
@@ -149,8 +153,14 @@ while true; do
     PREV_STEP="$STEP"
   fi
   if [ "$STATE" = "ready" ]; then
-    SCORE=$(echo "$STATUS" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['clip']['qualityScore'])")
-    echo "  ok: state=ready, qualityScore=$SCORE"
+    # 品質は多軸ベクトル (= 合成 qualityScore は廃止)。 summary + duration も新スキーマで入る。
+    echo "$STATUS" | python3 -c "
+import json, sys
+c = json.load(sys.stdin)['clip']
+axes = ((c.get('qualityVector') or {}).get('axes') or {})
+ax = ' '.join(f'{k}={v[\"score\"]}' for k, v in axes.items())
+print(f'  ok: state=ready durationMs={c.get(\"durationMs\")} axes: {ax}')
+print(f'      summary: {(c.get(\"summary\") or \"\")[:100]}')"
     BREAKDOWN=$(echo "$STATUS" | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['clip']['qualityBreakdown'], indent=2))")
     echo "  qualityBreakdown:"
     echo "$BREAKDOWN" | sed 's/^/    /'
