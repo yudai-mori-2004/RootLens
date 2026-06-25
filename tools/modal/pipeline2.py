@@ -49,27 +49,14 @@ def _csv(s: str, default: list[str]) -> list[str]:
     return items or list(default)
 
 
-@app.function(
-    cpu=2.0,
-    memory=2048,
-    timeout=900,
-    secrets=[
-        modal.Secret.from_name("r2-creds"),
-        modal.Secret.from_name("anthropic-api-key"),
-        modal.Secret.from_name("gemini-api-key"),
-    ],
-)
-@modal.fastapi_endpoint(method="POST")
-def process(signature_hash: str, preprocess: str = "", score: str = "", labeler: str = ""):
-    """Pipeline 2 本体。
+def _process_impl(signature_hash: str, preprocess: str = "", score: str = "", labeler: str = ""):
+    """Pipeline 2 本体。 webhook と RPC で共通利用。
 
-    Args (query string):
+    Args:
       signature_hash : R2 raw/<hash>/ のクリップ
       preprocess     : 走らせる前処理名の csv (既定 = labeling)
-      score          : 走らせる採点軸名の csv (既定 = video_technical,motion_content,label_quality)
+      score          : 走らせる採点軸名の csv (既定 = 全 default 軸、 "none" で scoring 完全 skip)
       labeler        : labeling 前処理が使う Labeler 名 (既定 = gemini-video-dense)
-
-    Returns: {signature_hash, preprocessed:[...], scores:{name:{axis,score,breakdown}}}
     """
     import boto3  # type: ignore
 
@@ -91,7 +78,9 @@ def process(signature_hash: str, preprocess: str = "", score: str = "", labeler:
     )
 
     pre_names = _csv(preprocess, DEFAULT_PREPROCESSORS)
-    score_names = _csv(score, DEFAULT_SCORERS)
+    # score="none" は scoring を完全スキップする sentinel (= labeling だけ欲しい時用)。
+    skip_scoring = (score or "").strip().lower() == "none"
+    score_names = [] if skip_scoring else _csv(score, DEFAULT_SCORERS)
     print(f"[pipeline2] {signature_hash} preprocess={pre_names} score={score_names} "
           f"(avail pre={available_preprocessors()} score={available_scorers()})", flush=True)
 
@@ -111,13 +100,46 @@ def process(signature_hash: str, preprocess: str = "", score: str = "", labeler:
         scores[name] = {"axis": axis.axis, "score": axis.score, "method": axis.method, "breakdown": axis.breakdown}
         print(f"[pipeline2] score {name}: {axis.score}/100 ({time.time()-t:.1f}s)", flush=True)
 
-    # ─── 出力: 合計なしの軸ベクトルを processed/ に書き出し + 返す ───
-    doc = {"signature_hash": signature_hash, "axes": scores, "preprocessed": preprocessed}
-    ctx.put_processed_text("quality_scores.json", json.dumps(doc, ensure_ascii=False, indent=2), "application/json")
+    # ─── 出力: scoring 実施時のみ quality_scores.json を書く。 skip 時は preprocess artifact のみ ───
+    if score_names:
+        doc = {"signature_hash": signature_hash, "axes": scores, "preprocessed": preprocessed}
+        ctx.put_processed_text("quality_scores.json", json.dumps(doc, ensure_ascii=False, indent=2), "application/json")
 
     print(f"[pipeline2] done {signature_hash} axes={ {k: v['score'] for k, v in scores.items()} } "
           f"elapsed={time.time()-t0:.1f}s", flush=True)
     return {"signature_hash": signature_hash, "preprocessed": preprocessed, "scores": scores}
+
+
+@app.function(
+    cpu=2.0,
+    memory=2048,
+    timeout=7200,
+    secrets=[
+        modal.Secret.from_name("r2-creds"),
+        modal.Secret.from_name("anthropic-api-key"),
+        modal.Secret.from_name("gemini-api-key"),
+    ],
+)
+@modal.fastapi_endpoint(method="POST")
+def process(signature_hash: str, preprocess: str = "", score: str = "", labeler: str = ""):
+    """Web endpoint (= POST /process?signature_hash=...&score=none&...)。 同期 150 秒で 303 redirect する
+    Modal 仕様により curl からは扱いにくい。 一括バッチは下の `process_rpc` を `.remote()` で叩く。"""
+    return _process_impl(signature_hash, preprocess, score, labeler)
+
+
+@app.function(
+    cpu=2.0,
+    memory=2048,
+    timeout=7200,
+    secrets=[
+        modal.Secret.from_name("r2-creds"),
+        modal.Secret.from_name("anthropic-api-key"),
+        modal.Secret.from_name("gemini-api-key"),
+    ],
+)
+def process_rpc(signature_hash: str, preprocess: str = "", score: str = "", labeler: str = ""):
+    """RPC 経路 (= modal SDK の `.remote()` で叩く)。 ロジックは webhook と完全同一。"""
+    return _process_impl(signature_hash, preprocess, score, labeler)
 
 
 @app.local_entrypoint()

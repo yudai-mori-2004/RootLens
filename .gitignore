@@ -93,3 +93,12 @@ web/public/lp/sample/dataset/
 # iOS build artifacts (large, never commit)
 *.ipa
 app/build-*.ipa
+
+# ローカル復旧バケットダンプ (生映像。 絶対 git に入れない)
+recovered/
+labelreview/
+tmp_transcode/
+/sample/
+
+# hyphenbox 渡し用 zip (= 26 GB、 R2 で配布)
+rootlens-sample-*.zip

@@ -152,19 +152,9 @@ def _extract_hand_frame(rgb_bgr) -> dict:
 
 # ─── Modal function (HTTP endpoint) ────────────────────────────────────
 
-@app.function(
-    gpu="A10G",
-    memory=16384,
-    timeout=1800,
-    secrets=[modal.Secret.from_name("r2-creds")],
-)
-@modal.fastapi_endpoint(method="POST")
-def wilor(signature_hash: str):
-    """
-    Pipeline 3 entry point。 signature_hash を受け取り、 raw/<signature_hash>/rgb.mp4 を WiLoR に
-    通して processed/<signature_hash>/wilor.jsonl を書き出す。 出力リンクを返す純粋関数。
-
-    冪等性: processed/<signature_hash>/wilor.jsonl が既にあれば再計算せず cached を返す。
+def _wilor_impl(signature_hash: str):
+    """Pipeline 3 のロジック本体。 web endpoint と RPC 経路で共通利用。
+    webhook デコレータ付き関数は `.remote()` 不可なので、 ロジックを切り出して両方から呼ぶ。
     """
     import boto3
 
@@ -280,6 +270,32 @@ def wilor(signature_hash: str):
         "outputKey": output_key,
         "cached": False,
     }
+
+
+# ─── 公開 endpoint (webhook + RPC) ─────────────────────────────────────
+
+@app.function(
+    gpu="A10G",
+    memory=16384,
+    timeout=43200,
+    secrets=[modal.Secret.from_name("r2-creds")],
+)
+@modal.fastapi_endpoint(method="POST")
+def wilor(signature_hash: str):
+    """Web endpoint (= POST /wilor?signature_hash=...)。 同期 150 秒で 303 redirect する Modal の
+    仕様により、 長尺は curl から扱いにくい。 一括バッチは下の `wilor_rpc` を `.remote()` で呼ぶ。"""
+    return _wilor_impl(signature_hash)
+
+
+@app.function(
+    gpu="A10G",
+    memory=16384,
+    timeout=43200,
+    secrets=[modal.Secret.from_name("r2-creds")],
+)
+def wilor_rpc(signature_hash: str):
+    """RPC 経路 (= modal SDK の `.remote()` で叩く)。 ロジックは webhook と完全同一。"""
+    return _wilor_impl(signature_hash)
 
 
 # ─── ローカル動作確認 ──────────────────────────────────────────────────
