@@ -19,7 +19,7 @@ import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
 /// 層1要約 (= アップロード同意画面) の版。 文言を変えたら必ず上げる。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-04.2';
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-04.4';
 
 /// アップロード同意のスコープ (= tester-consent §4: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;

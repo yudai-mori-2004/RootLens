@@ -1,9 +1,8 @@
 // アップロードフロー (= マイビデオのカードタップで開く 2 段構成)。
 //
 //   Step 1 同意 (consent):
-//     tester-consent §2 の層1要約 (アップロード適合版) + 3 チェック + 全文リンク。
-//     「同意して進む」 で consent-log-spec 準拠の同意イベントをサーバに記録し (= 証跡)、
-//     成功したときだけ Step 2 へ進む。 文言を変えたら services/consent.ts の
+//     規約の要約 + 同意チェック 1 つ + 全文リンク。 「同意して進む」 で同意イベントを
+//     サーバに記録し、 成功したときだけ Step 2 へ進む。 文言を変えたら services/consent.ts の
 //     UPLOAD_CONSENT_SUMMARY_VERSION を必ず上げる。
 //   Step 2 確認 (preview):
 //     ローカル録画 mp4 をその場で再生して中身を確認 → 「アップロードする」。
@@ -35,7 +34,7 @@ interface Props {
   visible: boolean;
   clip: Clip | null;
   onClose: () => void;
-  /// 「アップロードする」 (= 署名 → R2 → 登録 を開始)。 error クリップの再試行も同じ。
+  /** 「アップロードする」。 署名 → R2 → 登録 を開始する (再試行も同じ)。 */
   onUpload: (clip: Clip) => void;
   onRemove: (clip: Clip) => void;
 }
