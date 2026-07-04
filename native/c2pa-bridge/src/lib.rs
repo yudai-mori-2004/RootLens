@@ -11,7 +11,7 @@ use std::os::raw::c_char;
 
 // v0.1.3 Pipeline 1 (= iOS device-side C2PA D1/D2 + content_id 抽出)。
 // pipeline1.rs の関数群は mock-device と同一の出力を作る。
-mod pipeline1;
+pub mod pipeline1;
 mod pipeline1_jumbf;
 
 

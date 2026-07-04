@@ -1,26 +1,26 @@
 // Pipeline 1 (= iOS デバイス側 C2PA 処理) の Rust 実装。
 //
-// `tools/mock-device/src/{c2pa_sign,content_id}.rs` を 1 つにまとめて、
-// C FFI として iOS の C2paBridgeModule から呼べる形にしたもの。 mock-device と完全
-// 同一の出力 (= byte-deterministic) を作るのが目的。
-//
 // FFI 関数:
+//   - pipeline1_sign_d1_remote(input_mp4, output_mp4,
+//                              sign_service_url,
+//                              account_pubkey)            → i32 (0=ok)
+//     本番経路 (= リモート署名)。 ハッシュ計算 + manifest 組み立てはローカル、 COSE 署名
+//     バイト列 (数 KB) だけを RootLens サーバ (/api/v1/c2pa-sign) に送って署名を得る。
+//     秘密鍵はサーバにのみ存在する (= バイナリから鍵を抜けない)。
 //   - pipeline1_sign_d1(input_mp4, output_mp4)            → i32 (0=ok)
-//   - pipeline1_sign_d2(blurred_mp4, parent_d1_mp4,
-//                       output_mp4, faces_blurred)        → i32 (0=ok)
+//     dev fixture 鍵によるローカル署名 (= オフラインテスト / mock 用に残置)。
+//   - pipeline1_sign_d2(...)                              → i32 (0=ok) (= v0.1.4 未使用、 残置)
 //   - pipeline1_content_id(input_mp4) -> *mut c_char
 //                                       ("sha256:<hex>" / NULL on error)
-//
-// 鍵 / cert は mock-device と同じ dev fixture (= Title Protocol test EE + Test CA)
-// を include_bytes! でバンドル。 production は Secure Enclave callback signer に
-// 差し替える前提だが、 v0.1.3 ではこの dev fixture で十分。
 
 use std::ffi::{CStr, CString};
 use std::fs::{File, OpenOptions};
 use std::io::Cursor;
 use std::os::raw::c_char;
 use std::path::Path;
+use std::time::Duration;
 
+use base64::Engine as _;
 use sha2::{Digest, Sha256};
 
 use crate::pipeline1_jumbf as jumbf;
@@ -28,6 +28,9 @@ use crate::pipeline1_jumbf as jumbf;
 const CERTS_PEM: &[u8] = include_bytes!("../fixtures/chain.pem");
 const KEY_PEM: &[u8] = include_bytes!("../fixtures/ee.key");
 const MIME_MP4: &str = "video/mp4";
+
+/// リモート署名の HTTP タイムアウト。 署名対象は数 KB なので通常 1 RTT で返る。
+const SIGN_HTTP_TIMEOUT: Duration = Duration::from_secs(60);
 
 fn build_d1_manifest(title: &str) -> serde_json::Value {
     serde_json::json!({
@@ -100,7 +103,77 @@ fn make_signer() -> Result<Box<dyn c2pa::Signer + Send + Sync>, String> {
         .map_err(|e| format!("Failed to create ed25519 signer: {e}"))
 }
 
-fn sign_d1_impl(input_mp4: &Path, output_mp4: &Path) -> Result<(), String> {
+// ─── リモート署名 (= RootLens サーバの組織鍵で COSE 署名) ──────────────────
+
+fn sign_http_agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
+        .timeout_global(Some(SIGN_HTTP_TIMEOUT))
+        .build()
+        .into()
+}
+
+/// GET {service_url} → { alg, certsPem } を取り、 署名 callback が POST {service_url} に
+/// { dataB64 } を投げて { signatureB64 } (= Ed25519 raw 64 byte) を得る CallbackSigner を作る。
+fn make_remote_signer(
+    service_url: &str,
+    account_pubkey: &str,
+) -> Result<c2pa::CallbackSigner, String> {
+    let agent = sign_http_agent();
+
+    // 公開証明書チェーン (= x5chain に埋める) をサーバから取得。
+    let mut resp = agent
+        .get(service_url)
+        .call()
+        .map_err(|e| format!("GET {service_url}: {e}"))?;
+    let info: serde_json::Value = resp
+        .body_mut()
+        .read_json()
+        .map_err(|e| format!("sign service cert response parse: {e}"))?;
+    let certs_pem = info
+        .get("certsPem")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "sign service response missing certsPem".to_string())?
+        .to_owned();
+    let alg = info.get("alg").and_then(|v| v.as_str()).unwrap_or("ed25519");
+    if alg != "ed25519" {
+        return Err(format!("unsupported sign service alg: {alg}"));
+    }
+
+    let url = service_url.to_owned();
+    let pubkey = account_pubkey.to_owned();
+    let callback = move |_ctx: *const (), data: &[u8]| -> std::result::Result<Vec<u8>, c2pa::Error> {
+        let data_b64 = base64::engine::general_purpose::STANDARD.encode(data);
+        let mut resp = sign_http_agent()
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .header("X-Account-Pubkey", &pubkey)
+            .send_json(serde_json::json!({ "dataB64": data_b64 }))
+            .map_err(|e| c2pa::Error::OtherError(format!("remote sign POST: {e}").into()))?;
+        let body: serde_json::Value = resp
+            .body_mut()
+            .read_json()
+            .map_err(|e| c2pa::Error::OtherError(format!("remote sign response parse: {e}").into()))?;
+        let sig_b64 = body
+            .get("signatureB64")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| c2pa::Error::OtherError("remote sign response missing signatureB64".into()))?;
+        base64::engine::general_purpose::STANDARD
+            .decode(sig_b64)
+            .map_err(|e| c2pa::Error::OtherError(format!("signature base64 decode: {e}").into()))
+    };
+
+    Ok(c2pa::CallbackSigner::new(
+        callback,
+        c2pa::SigningAlg::Ed25519,
+        certs_pem,
+    ))
+}
+
+fn sign_d1_with(
+    input_mp4: &Path,
+    output_mp4: &Path,
+    signer: &dyn c2pa::Signer,
+) -> Result<(), String> {
     let title = output_mp4
         .file_name()
         .and_then(|s| s.to_str())
@@ -110,7 +183,6 @@ fn sign_d1_impl(input_mp4: &Path, output_mp4: &Path) -> Result<(), String> {
     let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
         .with_definition(&manifest_json)
         .map_err(|e| format!("Builder::with_definition (D1) failed: {e}"))?;
-    let signer = make_signer()?;
 
     let mut src = File::open(input_mp4)
         .map_err(|e| format!("open input {}: {e}", input_mp4.display()))?;
@@ -123,10 +195,25 @@ fn sign_d1_impl(input_mp4: &Path, output_mp4: &Path) -> Result<(), String> {
         .map_err(|e| format!("create output {}: {e}", output_mp4.display()))?;
 
     builder
-        .sign(signer.as_ref(), MIME_MP4, &mut src, &mut dest)
+        .sign(signer, MIME_MP4, &mut src, &mut dest)
         .map_err(|e| format!("D1 sign failed: {e}"))?;
 
     Ok(())
+}
+
+fn sign_d1_impl(input_mp4: &Path, output_mp4: &Path) -> Result<(), String> {
+    let signer = make_signer()?;
+    sign_d1_with(input_mp4, output_mp4, signer.as_ref())
+}
+
+fn sign_d1_remote_impl(
+    input_mp4: &Path,
+    output_mp4: &Path,
+    service_url: &str,
+    account_pubkey: &str,
+) -> Result<(), String> {
+    let signer = make_remote_signer(service_url, account_pubkey)?;
+    sign_d1_with(input_mp4, output_mp4, &signer)
 }
 
 fn sign_d2_impl(
@@ -203,17 +290,68 @@ fn content_id_impl(input_path: &Path) -> Result<String, String> {
 
 // ─── C FFI exports ─────────────────────────────────────────────────────
 
-unsafe fn cstr_to_path<'a>(ptr: *const c_char) -> Result<&'a Path, String> {
+unsafe fn cstr_to_str<'a>(ptr: *const c_char) -> Result<&'a str, String> {
     if ptr.is_null() {
-        return Err("null path pointer".to_string());
+        return Err("null string pointer".to_string());
     }
-    let s = CStr::from_ptr(ptr)
+    CStr::from_ptr(ptr)
         .to_str()
-        .map_err(|e| format!("non-UTF8 path: {e}"))?;
-    Ok(Path::new(s))
+        .map_err(|e| format!("non-UTF8 string: {e}"))
 }
 
-/// D1 sign FFI. 0 = success, non-zero = failure.
+unsafe fn cstr_to_path<'a>(ptr: *const c_char) -> Result<&'a Path, String> {
+    cstr_to_str(ptr).map(Path::new)
+}
+
+/// D1 リモート署名 FFI (= 本番経路)。 0 = success, non-zero = failure.
+/// sign_service_url: RootLens の署名 endpoint (= GET で証明書、 POST で署名)。
+/// account_pubkey: X-Account-Pubkey header に載せる認可用のアカウント公開鍵 (base58)。
+#[no_mangle]
+pub unsafe extern "C" fn pipeline1_sign_d1_remote(
+    input_mp4: *const c_char,
+    output_mp4: *const c_char,
+    sign_service_url: *const c_char,
+    account_pubkey: *const c_char,
+) -> i32 {
+    let input = match cstr_to_path(input_mp4) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[pipeline1_sign_d1_remote] {e}");
+            return -1;
+        }
+    };
+    let output = match cstr_to_path(output_mp4) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[pipeline1_sign_d1_remote] {e}");
+            return -1;
+        }
+    };
+    let url = match cstr_to_str(sign_service_url) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[pipeline1_sign_d1_remote] {e}");
+            return -1;
+        }
+    };
+    let pubkey = match cstr_to_str(account_pubkey) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("[pipeline1_sign_d1_remote] {e}");
+            return -1;
+        }
+    };
+    match sign_d1_remote_impl(input, output, url, pubkey) {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("[pipeline1_sign_d1_remote] {e}");
+            -2
+        }
+    }
+}
+
+/// D1 sign FFI (= dev fixture 鍵によるローカル署名。 オフラインテスト / mock 用)。
+/// 0 = success, non-zero = failure.
 #[no_mangle]
 pub unsafe extern "C" fn pipeline1_sign_d1(
     input_mp4: *const c_char,

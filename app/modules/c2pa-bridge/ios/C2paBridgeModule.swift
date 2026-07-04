@@ -446,17 +446,19 @@ public class C2paBridgeModule: Module {
 
     // ─── v0.1.3 Pipeline 1: mock-device 互換 D1/D2/content_id ────────────
 
-    /// D1 署名 (= c2pa.actions.v2 [c2pa.created])。 戻り値は output_mp4 のパス。
-    AsyncFunction("signD1") { (inputMp4: String, outputMp4: String, promise: Promise) in
+    /// D1 リモート署名 (= 本番経路)。 ハッシュ計算 + manifest 組み立てはローカル、 COSE 署名は
+    /// signServiceUrl (= RootLens /api/v1/c2pa-sign) の組織鍵で行う。 戻り値は output_mp4 のパス。
+    AsyncFunction("signD1") {
+      (inputMp4: String, outputMp4: String, signServiceUrl: String, accountPubkey: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         let inputPath = Self.stripFileScheme(inputMp4)
         let outputPath = Self.stripFileScheme(outputMp4)
-        NSLog("[C2paBridge] signD1: \(inputPath) → \(outputPath)")
-        let rc = pipeline1_sign_d1(inputPath, outputPath)
+        NSLog("[C2paBridge] signD1 (remote): \(inputPath) → \(outputPath) via \(signServiceUrl)")
+        let rc = pipeline1_sign_d1_remote(inputPath, outputPath, signServiceUrl, accountPubkey)
         if rc == 0 {
           promise.resolve(outputPath)
         } else {
-          promise.reject("SIGN_D1_ERROR", "pipeline1_sign_d1 failed: rc=\(rc)")
+          promise.reject("SIGN_D1_ERROR", "pipeline1_sign_d1_remote failed: rc=\(rc)")
         }
       }
     }

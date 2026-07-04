@@ -1,11 +1,12 @@
 // Pipeline 1 step: C2PA D1 署名 (DATA_SPECS §2.3)。
 //
-//   1. C2PA D1 署名      生 MP4 → c2pa.actions.v2 [c2pa.created]
+//   1. C2PA D1 リモート署名   生 MP4 → c2pa.actions.v2 [c2pa.created]
+//      (= ハッシュ計算はローカル、 COSE 署名だけサーバ /api/v1/c2pa-sign の組織鍵。 Adobe 方式)
 //   2. signature_hash 抽出   SHA-256(D1 active manifest signature)
 //
 // 出力 signedMp4Uri は R2 に rgb.mp4 として上げる本体 (= blur 無しの本当の raw)。
+// 署名は「アップロードする」 押下後に走るのでオンライン前提で良い (= 直後に R2 PUT もする)。
 //
-// v0.1.4 では blur / D2 は行わない (= 後段ワーカーで再配線予定)。
 // 中間ファイルは workDir に作り、 呼び出し側が登録後に cleanup する責務 (= cleanupTmpDir)。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
@@ -13,9 +14,19 @@
 
 import * as FileSystem from 'expo-file-system';
 
+import { SERVER_URL } from '../../env';
+import { getCurrentSession } from '../../services/auth/instance';
 import { signD1, computeSignatureHash } from '../../native/c2paBridge';
 import type { EventSink } from '../events';
 import type { SignInput, SignResult } from '../types';
+
+const SIGN_SERVICE_URL = `${SERVER_URL}/api/v1/c2pa-sign`;
+
+function accountPubkeyOrThrow(): string {
+  const session = getCurrentSession();
+  if (!session) throw new Error('未認証: session がありません (= AuthGate を通っていない)');
+  return session.pubkey;
+}
 
 /** sign step 用の一時作業 dir を作る。 返値を cleanupTmpDir に渡して片付ける。 */
 export async function makeSignTmpDir(): Promise<string> {
@@ -49,10 +60,10 @@ export async function signRecording(
   workDir: string,
   sink: EventSink,
 ): Promise<SignResult> {
-  // ─── D1 署名 ──────────────────────────────────────────────────────
-  sink({ step: 'sign-d1', level: 'info', message: 'C2PA D1 署名 (生 MP4)' });
+  // ─── D1 リモート署名 ──────────────────────────────────────────────
+  sink({ step: 'sign-d1', level: 'info', message: 'C2PA D1 署名 (リモート署名 = サーバ組織鍵)' });
   const signedMp4Uri = signedUriIn(workDir);
-  await signD1(rawMp4Uri, signedMp4Uri);
+  await signD1(rawMp4Uri, signedMp4Uri, SIGN_SERVICE_URL, accountPubkeyOrThrow());
   sink({ step: 'sign-d1', level: 'success', message: 'D1 署名完了' });
 
   // ─── signature_hash 抽出 ──────────────────────────────────────────

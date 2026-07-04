@@ -32,6 +32,8 @@ v0.1.4 (簡素化スプリント)
   08. deblockchain-cleanup      🔄 新 wallet/Solana/mint/staking/license 残骸の全撤去。 識別子は
                                     「アカウント公開鍵」 (X-Account-Pubkey)、 network 撤去、
                                     Buyer/Privy/web3.js 削除、 文言の現実合わせ (onb slide2 = blur 撤回)
+  09. remote-signing            🔄 新 C2PA リモート署名 (= Adobe 方式)。 ハッシュはローカル、 COSE 署名
+                                    だけサーバ組織鍵 (/api/v1/c2pa-sign)。 鍵がバイナリから消える
 ```
 
 凡例: ✅ = 完了、 🔄 = 進行中 / 未着手、 新 = 新規追加。

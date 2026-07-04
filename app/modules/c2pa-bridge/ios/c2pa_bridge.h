@@ -60,10 +60,23 @@ char *c2pa_get_version(void);
 /** c2pa_free_stringで返された文字列を解放する */
 void c2pa_free_string(char *s);
 
-/* ─── v0.1.3 Pipeline 1 (= mock-device 互換 D1/D2/content_id) ──────────── */
+/* ─── Pipeline 1 (= D1 署名 / content_id) ─────────────────────────────── */
 
 /**
- * D1 署名: 生 MP4 → c2pa.actions.v2 = [c2pa.created] の C2PA manifest 付き MP4。
+ * D1 リモート署名 (= 本番経路): ハッシュ計算 + manifest 組み立てはローカル、 COSE 署名
+ * バイト列だけを sign_service_url (RootLens /api/v1/c2pa-sign) に送って署名を得る。
+ * account_pubkey は X-Account-Pubkey header に載る (= 認可)。
+ * 戻り値: 0 = 成功, それ以外 = 失敗。
+ */
+int32_t pipeline1_sign_d1_remote(
+    const char *input_mp4,
+    const char *output_mp4,
+    const char *sign_service_url,
+    const char *account_pubkey
+);
+
+/**
+ * D1 署名 (= dev fixture 鍵によるローカル署名。 オフラインテスト / mock 用)。
  * 戻り値: 0 = 成功, それ以外 = 失敗。
  */
 int32_t pipeline1_sign_d1(const char *input_mp4, const char *output_mp4);

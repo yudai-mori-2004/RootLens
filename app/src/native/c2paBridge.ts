@@ -57,9 +57,8 @@ interface C2paBridgeInterface {
   applyMasks(imagePath: string, masks: MaskRect[]): Promise<string>;
   processVideo(inputPath: string, optionsJson: string): Promise<string>;
   getVersion(): Promise<string>;
-  // §4.4 TEE鍵管理
-  // v0.1.3 Pipeline 1 (= mock-device 互換 D1/D2/signature_hash)
-  signD1(inputMp4: string, outputMp4: string): Promise<string>;
+  // Pipeline 1 (= D1 リモート署名 / signature_hash)
+  signD1(inputMp4: string, outputMp4: string, signServiceUrl: string, accountPubkey: string): Promise<string>;
   signD2(blurredMp4: string, parentD1Mp4: string, outputMp4: string, facesBlurred: number, blurAssertionJson: string): Promise<string>;
   computeContentId(inputMp4: string): Promise<string>;
 }
@@ -153,14 +152,21 @@ export async function getVersion(): Promise<string> {
   return C2paBridge.getVersion();
 }
 
-// ─── v0.1.3 Pipeline 1 ──────────────────────────────────────────────────
-// mock-device の C2PA 2 段署名 + signature_hash 抽出を iOS 上で再現する。
-// DATA_SPECS §2.4 / §1.1 を参照。
+// ─── Pipeline 1 ─────────────────────────────────────────────────────────
+// D1 署名 + signature_hash 抽出 (DATA_SPECS §2.3 / §1.1)。
 
-/// D1 署名: 生 MP4 → c2pa.actions.v2 [c2pa.created] の C2PA manifest 付き MP4 を出力。
-export async function signD1(inputMp4: string, outputMp4: string): Promise<string> {
+/// D1 リモート署名: 生 MP4 → c2pa.actions.v2 [c2pa.created] の C2PA manifest 付き MP4 を出力。
+/// ハッシュ計算 + manifest 組み立ては端末ローカル、 COSE 署名バイト列 (数 KB) だけを
+/// signServiceUrl (= RootLens /api/v1/c2pa-sign) に送って組織鍵の署名を得る (= Adobe 方式)。
+/// 秘密鍵はサーバにのみ存在し、 アプリバイナリには入らない。
+export async function signD1(
+  inputMp4: string,
+  outputMp4: string,
+  signServiceUrl: string,
+  accountPubkey: string,
+): Promise<string> {
   if (!C2paBridge) throw new Error('C2paBridge native module not available');
-  return C2paBridge.signD1(inputMp4, outputMp4);
+  return C2paBridge.signD1(inputMp4, outputMp4, signServiceUrl, accountPubkey);
 }
 
 /// D2 署名: ぼかし済 MP4 と親 D1 MP4 を渡し、 ingredient parentOf で D1 を参照する
