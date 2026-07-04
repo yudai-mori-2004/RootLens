@@ -46,7 +46,7 @@
 
 - [x] `web/workflow/process-clip.ts` + `web/workflow/` 削除
 - [x] `web/lib/modal.ts` 削除（呼び出し元なし）
-- [ ] Modal app stop（= 手動。 実際の deploy 名は `rootlens-pipeline2` + `rootlens-wilor` の 2 本:
-      `modal app stop rootlens-pipeline2 && modal app stop rootlens-wilor`）
+- [x] Modal app stop（2026-07-04。 実際の deploy は `rootlens-pipeline2` + `rootlens-wilor` の 2 本、
+      どちらも stopped を実測確認）
 - [x] tools/modal/ ソース残置（v0.1.5 で再利用）
 - [x] tsc green

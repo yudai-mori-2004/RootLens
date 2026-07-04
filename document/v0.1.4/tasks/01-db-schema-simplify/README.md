@@ -41,6 +41,8 @@ clips テーブルから v0.1.4 で撤去する列（mint / TP / Pipeline 2 / st
 ## 進捗
 
 - [x] `0001_v0_1_4_simplify.sql` 作成
-- [ ] migration 本番適用（= 手動、 Supabase SQL Editor で `0001_v0_1_4_simplify.sql` を流す）
+- [x] migration 本番適用（2026-07-04、 `node scripts/apply_migrations.mjs 0001_v0_1_4_simplify.sql`。
+      58 行すべて state='uploaded' に remap、 削除列なし、 index は pkey + wallet + signature_hash
+      + wallet_sig_network の 4 本を実測確認）
 - [x] `web/db/schema.ts` 更新（v0.1.4 列のみ + clips_state_idx 撤去）
 - [x] tsc green 確認

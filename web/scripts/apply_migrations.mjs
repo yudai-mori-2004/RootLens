@@ -27,7 +27,9 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const sql = postgres(process.env.DATABASE_URL, { prepare: false });
+// max: 1 = 単一接続。 migration SQL 内の BEGIN/COMMIT を postgres-js が許すのはこのモードだけ
+// (= 複数接続 pool だと文がバラけてトランザクションが壊れるため UNSAFE_TRANSACTION で拒否される)。
+const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
 
 const migrationDir = join(repoServerRoot, "drizzle");
 const only = process.argv[2];

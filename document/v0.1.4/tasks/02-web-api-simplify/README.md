@@ -57,4 +57,6 @@
 - [x] raw-uploads（files set はそのまま 5 種、 signed-json は元々無し）
 - [x] mapper / api-types 整理（ClipDto / CreateClipRequest 簡素化）
 - [x] tsc green
-- [ ] deploy（= main push 後 Vercel auto deploy）
+- [x] deploy（2026-07-04 main push → Vercel auto deploy。 finalize が 404、 GET /api/clips が
+      新 ClipDto (= v0.1.4 フィールドのみ) を返すことを本番で実測確認。 POST の 201 確認は
+      task 06 の実機 E2E で行う）
