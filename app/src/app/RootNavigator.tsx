@@ -7,10 +7,7 @@ import { useAuth } from '../services/auth';
 
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
-// 2026-05-27 大方針転換: 旧 CaptureModeScreen (= dialogue + VLM gate + ARKit) を
-// CalibrationCaptureScreen (= キャリブレーション + ジェスチャー + wide-capture) に差替。
-// 旧 file は段階削除 task で rm 予定、 今は import を切替えるだけ。
-import { CalibrationCaptureScreen } from '../screens/CalibrationCaptureScreen';
+import { CaptureScreen } from '../screens/CaptureScreen';
 import { OnboardingScreen, isOnboardingCompleted } from '../screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -70,7 +67,7 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen
         name="CaptureMode"
-        component={CalibrationCaptureScreen}
+        component={CaptureScreen}
         // 撮影画面だけ横向き固定。 react-native-screens がネイティブで強制する (= expo-screen-orientation
         // の lockAsync は react-native-screens に上書きされ効かないため、 こちらが正攻法)。
         // ⚠ 映像が上下逆なら 'landscape_right' → 'landscape_left' に。

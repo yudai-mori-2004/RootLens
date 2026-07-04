@@ -4,10 +4,9 @@
 // AsyncStorage に保存し、 起動時に hydrate する。 AsyncStorage は react-native 依存なので
 // Layer 1 (dataflow) には入れず、 この Layer 2 アダプタに分離する (= dataflow の純粋性維持)。
 //
-// 仕様 (= 旧 clipPipeline 踏襲):
-//   - uploading / processing の永続化は、 アプリ kill でタイマーが切れるため、
+// 仕様:
+//   - uploading の永続化は、 アプリ kill でタイマーが切れるため、
 //     起動時に error 扱い (= 「アプリ再起動中に中断されました」) にする。
-//   - staked クリップは保存しない (= owner の cNFT として on-chain / DAS から hydrate される)。
 //   - 保存キーは旧 clipPipeline と同じ (= 既存ユーザのローカルクリップをそのまま引き継ぐ)。
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,8 +30,6 @@ async function hydrate(): Promise<void> {
       if (c.state === 'uploading') {
         return { ...c, state: 'error' as const, errorMessage: 'アプリ再起動中に中断されました' };
       }
-      // processing (= 登録済み、 Pipeline 2 はサーバ側で進行) は error にしない。
-      // CollectionScreen が起動時に signature_hash で最新状態を引いて更新する。
       return c;
     });
     dataflowStore.getState().replaceClips(sanitized);
@@ -44,14 +41,14 @@ async function hydrate(): Promise<void> {
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let lastClips: Record<string, Clip> | null = null;
 
-/** clips の変化を AsyncStorage に書き出す (= staked 除外、 軽くデバウンス)。 */
+/** clips の変化を AsyncStorage に書き出す (= 軽くデバウンス)。 */
 function schedulePersist(clips: Record<string, Clip>): void {
   if (clips === lastClips) return;
   lastClips = clips;
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    const arr = clipList(clips).filter((c) => c.state !== 'staked');
+    const arr = clipList(clips);
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(arr)).catch(() => {});
   }, PERSIST_DEBOUNCE_MS);
 }

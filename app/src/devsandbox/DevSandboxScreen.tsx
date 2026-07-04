@@ -28,10 +28,6 @@ import {
   teeToConsole,
   enqueueRecording,
   advanceClip,
-  fetchClipStatusByHash,
-  resolveServerClipId,
-  triggerPipeline3,
-  fetchPipeline3Status,
   selectCurrentClip,
   type DataflowEvent,
   type EventLevel,
@@ -243,59 +239,6 @@ export const DevSandboxScreen: React.FC = () => {
     });
   }, [runAction]);
 
-  // Pipeline 2 状態更新 = signature_hash で最新状態を 1 回引いて反映する (= 観測のみ)。
-  const onCheckPipeline2 = useCallback(() => {
-    runAction('Pipeline 2 状態更新', async () => {
-      const c = selectCurrentClip(dataflowStore.getState());
-      if (!c?.signatureHash) {
-        sink({ step: 'sandbox', level: 'error', message: 'signature_hash 未確定 (= まだぼかし署名前)' });
-        return;
-      }
-      const st = await fetchClipStatusByHash(c.signatureHash, walletPubkeyOrThrow());
-      if (st) {
-        dataflowStore.getState().applyServerStatus(c.id, st);
-        sink({ step: 'sandbox', level: 'success', message: `状態更新: ${st.state} axes=${st.qualityVector ? Object.keys(st.qualityVector.axes).length : 0}` });
-      } else {
-        sink({ step: 'sandbox', level: 'warn', message: 'サーバにクリップが見つかりません (= 未登録)' });
-      }
-    });
-  }, [runAction]);
-
-  // Pipeline 3 (サーバ側: WiLoR 手ポーズ推定) を手動トリガーする。 signature_hash → server id 解決して叩く。
-  const onRunPipeline3 = useCallback(() => {
-    runAction('Pipeline 3 実行', async () => {
-      const c = selectCurrentClip(dataflowStore.getState());
-      if (!c?.signatureHash) {
-        sink({ step: 'sandbox', level: 'error', message: 'signature_hash 未確定。 先に登録まで通してください' });
-        return;
-      }
-      const wallet = walletPubkeyOrThrow();
-      const serverId = await resolveServerClipId(c.signatureHash, wallet);
-      if (!serverId) {
-        sink({ step: 'sandbox', level: 'error', message: 'server clip 未登録 (= 先に Pipeline 実行で登録)' });
-        return;
-      }
-      await triggerPipeline3(serverId, wallet, sink);
-    });
-  }, [runAction]);
-
-  const onCheckPipeline3 = useCallback(() => {
-    runAction('Pipeline 3 結果確認', async () => {
-      const c = selectCurrentClip(dataflowStore.getState());
-      if (!c?.signatureHash) {
-        sink({ step: 'sandbox', level: 'error', message: 'signature_hash 未確定' });
-        return;
-      }
-      const wallet = walletPubkeyOrThrow();
-      const serverId = await resolveServerClipId(c.signatureHash, wallet);
-      if (!serverId) {
-        sink({ step: 'sandbox', level: 'error', message: 'server clip 未登録' });
-        return;
-      }
-      await fetchPipeline3Status(serverId, wallet, sink);
-    });
-  }, [runAction]);
-
   // ─── render ───────────────────────────────────────────────────────
 
   const canRecord = available === true && recording === 'session-active';
@@ -377,11 +320,11 @@ export const DevSandboxScreen: React.FC = () => {
       <View style={styles.statusBar}>
         <StatusRow label="clipId" value={clip?.id} />
         <StatusRow label="signature_hash" value={clip?.signatureHash} mono />
-        <StatusRow label="rootAssetId" value={clip?.rootAssetId} mono />
+        <StatusRow label="stage" value={clip?.stage} />
         <StatusRow
-          label="server state"
+          label="state"
           value={clip?.state}
-          extra={clip?.qualityScore != null ? `score ${clip.qualityScore}/100` : undefined}
+          extra={clip?.uploadProgress != null ? `progress ${Math.round((clip.uploadProgress ?? 0) * 100)}%` : undefined}
         />
       </View>
 
@@ -394,24 +337,15 @@ export const DevSandboxScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* ボタン群 (= 上から下が処理フロー順: 録画 → P1 → P2 → P3) */}
+      {/* ボタン群 (= 上から下が処理フロー順: 録画 → 送信) */}
       <View style={[styles.buttons, { paddingBottom: insets.bottom + 8 }]}>
         <View style={styles.row}>
           <SandboxButton label="録画開始" onPress={onStartRecording} disabled={!canRecord || !!busy} />
           <SandboxButton label="録画停止" onPress={onStopRecording} disabled={!canStop || !!busy} />
         </View>
-        {/* P1 (端末): 署名→アップロード→TP→登録。 完了でサーバ P2 が自動起動する */}
+        {/* 送信 (= 署名 → R2 アップ → /api/clips 登録)。 v0.1.4 は後段ワーカー無し。 */}
         <View style={styles.row}>
-          <SandboxButton label="Pipeline 実行 (署名→UP→TP→登録→P2)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
-        </View>
-        {/* P2 (サーバ自動): スコアリング。 送信ボタンは無い (= P1 登録で起動)、 結果をポーリング */}
-        <View style={styles.row}>
-          <SandboxButton label="Pipeline 2 結果確認" onPress={onCheckPipeline2} disabled={!hasClip || !!busy} />
-        </View>
-        {/* P3 (サーバ手動): WiLoR。 P2 ready 後に手動トリガー */}
-        <View style={styles.row}>
-          <SandboxButton label="Pipeline 3 実行" onPress={onRunPipeline3} disabled={!hasClip || !!busy} />
-          <SandboxButton label="Pipeline 3 結果確認" onPress={onCheckPipeline3} disabled={!hasClip || !!busy} />
+          <SandboxButton label="送信 (署名 → アップロード → 登録)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
         </View>
         <View style={styles.row}>
           <SandboxButton label="ログクリア" onPress={() => dataflowStore.getState().clearEvents()} disabled={!!busy} subtle />

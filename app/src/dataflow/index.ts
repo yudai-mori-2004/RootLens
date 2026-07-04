@@ -8,21 +8,13 @@
 // 型
 export type {
   Clip,
-  ClipReward,
   ClipState,
   Pipeline1Stage,
-  ProcessingStep,
-  QualityBreakdown,
-  Layer1Score,
-  Layer2Score,
-  Layer3Score,
   ServerClipStatus,
   SignInput,
   SignResult,
   UploadInput,
   UploadResult,
-  TpInput,
-  TpResult,
   RegisterInput,
   RegisterResult,
 } from './types';
@@ -53,29 +45,15 @@ export {
 // 個別 step
 export {
   signClip,
+  signRecording,
   makeSignTmpDir,
   cleanupTmpDir,
-  captureSign,
-  blurSign,
+  signedUriIn,
   uploadToR2,
-  registerWithTitleProtocol,
   registerClip,
-  fetchClipStatus,
-  fetchClipStatusByHash,
-  fetchAllClips,
-  pollPipeline2,
-  triggerPipeline3,
-  fetchPipeline3Status,
-  stakeClip,
-  resolveServerClipId,
 } from './steps';
-export type { PollOptions, Pipeline3TriggerResult } from './steps';
 
-// orchestrator (= 純粋 Pipeline 1: upload → TP/mint → register + finalize)
-export { runPipeline1 } from './orchestrator';
-export type { Pipeline1Input, Pipeline1Result } from './orchestrator';
-
-// 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → 署名段 → 登録 → Pipeline 2)
+// 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → D1 → アップ + 登録)
 export { enqueueRecording, advanceClip, discardClip } from './pipeline';
 
 // store

@@ -84,13 +84,10 @@ export const TP_GATEWAY_URL = readOptional('EXPO_PUBLIC_TP_GATEWAY_ENDPOINT') ??
 // ─── Solana onchain config ──────────────────────────────────────────────
 // RootLens 運営側のオンチェーン pubkey 群。 必須。
 
-export const COSIGN_AUTHORITY = readRequired('EXPO_PUBLIC_COSIGN_AUTHORITY');
-
-// Bubblegum cNFT 発行先 merkle tree (= Pipeline 1 step 6 で必要)。
-// dev では tests/license-nft/create-smoke-tree.ts で作った public tree を指定。
-export const MERKLE_TREE = readRequired('EXPO_PUBLIC_MERKLE_TREE');
-
-// cNFT collection (省略時 collection なしで mint。 public tree なら不要)。
+// v0.1.4: 後段 (TP / mint) は dataflow から外したので optional に降格。
+// 値は EAS env に残っていても無視される。 v0.1.5 で後段ワーカーが復活する時に再利用する。
+export const COSIGN_AUTHORITY = readOptional('EXPO_PUBLIC_COSIGN_AUTHORITY') ?? '';
+export const MERKLE_TREE = readOptional('EXPO_PUBLIC_MERKLE_TREE') ?? '';
 export const MERKLE_COLLECTION = readOptional('EXPO_PUBLIC_MERKLE_COLLECTION');
 
 // ─── Debug only ─────────────────────────────────────────────────────────
