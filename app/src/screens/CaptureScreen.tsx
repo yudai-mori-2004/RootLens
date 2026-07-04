@@ -93,9 +93,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CaptureMode'>;
 type CaptureState =
   | { kind: 'announcing' }                                 // 取り付け案内 TTS 中 (= 「ヘッドセットに取り付けて」)
   | { kind: 'next_task_announcing' }                       // 撮影完了後の次タスク提案 TTS 中
-  // 装着待ち。 端末が動かされている間は黙って待ち、 静止 + 装着らしい角度になったら姿勢案内へ。
-  // stillSince: 静止し続けている開始時刻 (0=動作中)。 lastPitch: 静止判定用の直前俯角。
-  | { kind: 'mounting'; stillSince: number; lastPitch: number | null }
+  // 装着待ち。 端末が動かされている間は黙って待ち、 「取り付けの動きを観測 → 静止 + 装着らしい
+  // 角度」 で姿勢案内へ (追跡は mountTrackRef、 判定は ticker)。
+  | { kind: 'mounting' }
   | { kind: 'posture_announcing' }                         // 姿勢案内 TTS 中 (= 証明写真のポーズ)
   // IMU 誘導中 (= パーキングセンサー式)。 方向は音声で言わず、 目標角をまたいだ瞬間の
   // 音 + 振動だけで探させる。 stableSince: 許容内に入り続けている開始時刻 (0=範囲外)。
@@ -134,10 +134,17 @@ const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り�
 // 交差ティック (= 目標角をまたいだ瞬間の音 + 振動) の連射抑制。 目標付近で行き来すると
 // 頻繁にまたぐが、 それ自体が「ここが目標」 のフィードバックなので軽い間引きだけにする。
 const AIM_CROSS_MIN_INTERVAL_MS = 180;
-// 装着待ちの静止判定: 俯角の変化がこの範囲に STILL_MS 収まり、 かつ装着らしい角度なら装着完了。
-const MOUNT_STILL_DELTA_DEG = 2;
+// 装着待ちの判定。 静止は「tick 間の角速度」 で見る (= 装着した頭の自然な揺れ・呼吸は通し、
+// 手で扱っている大きな動きだけ弾く。 絶対角のアンカー比較だと頭の微動で永遠に通らない)。
+// さらに「取り付けの動きを一度は観測した後」 でないと進まない (= 手に持ったまま静止しても
+// 即通過しない)。 既に装着済みで開いた場合のために MOUNT_TIMEOUT_MS で解除する。
+const MOUNT_STILL_DELTA_DEG = 2;      // 1 tick (100ms) あたりの角度変化がこれ超 = 扱い中
 const MOUNT_STILL_MS = 2000;
+const MOUNT_MOTION_MIN_MS = 1000;     // 取り付けの動きと見なす累計時間
+const MOUNT_TIMEOUT_MS = 8000;
 const MOUNT_WORN_PITCH_RANGE = { min: -30, max: 70 } as const; // 机に平置き (≈90°) を除外
+// 照準誘導中に激しい動き (= 読めない加速度) が続いたら装着し直しと見なして装着待ちへ戻す。
+const AIM_REMOUNT_NULL_MS = 1200;
 
 // ─── 音声ガイド ───────────────────────────────────────────────────────
 //
@@ -250,10 +257,18 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 交差ティック用: 直前の誤差 (符号反転 = 目標角をまたいだ) と直近ティック時刻。
   const aimPrevErrRef = useRef<number | null>(null);
   const aimLastCrossTsRef = useRef(0);
+  // 照準誘導中の「装着し直し」 検知 (= 読めない加速度が続いた開始時刻)。
+  const aimNullSinceRef = useRef(0);
+  // 装着待ちの追跡 (= ref で持ち、 遷移の瞬間だけ setState する。 10Hz の再描画を避ける)。
+  const mountTrackRef = useRef({ enteredTs: 0, lastPitch: null as number | null, motionMs: 0, stillSince: 0 });
   useEffect(() => {
     if (state.kind === 'aim_adjust') {
       aimPrevErrRef.current = null;
       aimLastCrossTsRef.current = 0;
+      aimNullSinceRef.current = 0;
+    }
+    if (state.kind === 'mounting') {
+      mountTrackRef.current = { enteredTs: Date.now(), lastPitch: null, motionMs: 0, stillSince: 0 };
     }
   }, [state.kind]);
   // 「今の voiced state が待っている発話の seq」 (0 = まだ発行前 / 音声ゲート無し)。
@@ -523,7 +538,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     switch (cur.kind) {
       case 'announcing': {
         // 取り付け案内を言い終わったら装着待ちへ。
-        if (speechDone()) setState({ kind: 'mounting', stillSince: 0, lastPitch: null });
+        if (speechDone()) setState({ kind: 'mounting' });
         return;
       }
       case 'next_task_announcing': {
@@ -541,25 +556,29 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           setState({ kind: 'aim_confirmed' });
           return;
         }
+        const track = mountTrackRef.current;
         const pitch = reading.pitchDownDeg;
-        if (pitch == null) {
-          // 大きく動かしている最中 (= 取り付け作業中)。 黙って待つ。
-          if (cur.stillSince !== 0) setState({ ...cur, stillSince: 0, lastPitch: null });
-          return;
-        }
-        const moved = cur.lastPitch == null || Math.abs(pitch - cur.lastPitch) > MOUNT_STILL_DELTA_DEG;
-        if (moved) {
-          setState({ ...cur, stillSince: 0, lastPitch: pitch });
+        // 動いているか = 読めない加速度 (激しい動き) or tick 間の角度変化が大きい。
+        const inMotion =
+          pitch == null || track.lastPitch == null ||
+          Math.abs(pitch - track.lastPitch) > MOUNT_STILL_DELTA_DEG;
+        track.lastPitch = pitch;
+        if (inMotion) {
+          track.motionMs += 100; // ≒ ticker 周期
+          track.stillSince = 0;
           return;
         }
         const wornRange = pitch >= MOUNT_WORN_PITCH_RANGE.min && pitch <= MOUNT_WORN_PITCH_RANGE.max;
-        if (!wornRange) return; // 静止しているが装着角度ではない (= 机置き等)。 黙って待つ
-        const since = cur.stillSince || now;
-        if (now - since >= MOUNT_STILL_MS) {
+        if (!wornRange) {
+          track.stillSince = 0; // 静止しているが装着角度ではない (= 机置き等)。 黙って待つ
+          return;
+        }
+        if (track.stillSince === 0) track.stillSince = now;
+        // 取り付けの動きを一度は見ているか、 既装着でタイムアウトしたか。
+        const handled = track.motionMs >= MOUNT_MOTION_MIN_MS || now - track.enteredTs >= MOUNT_TIMEOUT_MS;
+        if (handled && now - track.stillSince >= MOUNT_STILL_MS) {
           awaitedSpeechSeqRef.current = 0;
           setState({ kind: 'posture_announcing' });
-        } else if (since !== cur.stillSince) {
-          setState({ ...cur, stillSince: since, lastPitch: pitch });
         }
         return;
       }
@@ -580,7 +599,14 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           return;
         }
         const pitch = reading.pitchDownDeg;
-        if (pitch == null) return; // 動かしている最中 / 未計測
+        if (pitch == null) {
+          // 読めない加速度が続く = ヘッドセットを外して扱っている。 装着待ちへ戻す。
+          const since = aimNullSinceRef.current || now;
+          aimNullSinceRef.current = since;
+          if (now - since >= AIM_REMOUNT_NULL_MS) setState({ kind: 'mounting' });
+          return;
+        }
+        aimNullSinceRef.current = 0;
         const err = pitch - aimTargetPitchDownDeg(); // 正 = 下向きすぎ
 
         // 交差ティック: 目標角をまたいだ瞬間に音 + 振動 (= どっちに傾けるかは言わず、 探させる)。
@@ -1030,8 +1056,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
               {hud.text}
             </Text>
           </View>
-          {/* 照準誘導中の俯角読み出し (= 装着前のセットアップや介助者向け。 装着者は音声で足りる) */}
-          {state.kind === 'aim_adjust' && hudPitchDeg != null ? (
+          {/* 照準誘導・装着待ち中の俯角読み出し (= セットアップや介助者向け。 装着者は音声で足りる) */}
+          {(state.kind === 'aim_adjust' || state.kind === 'mounting') && hudPitchDeg != null ? (
             <Text style={styles.hudReadout}>
               {t('capture.hud.aimReadout', {
                 current: String(hudPitchDeg),
