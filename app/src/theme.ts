@@ -107,6 +107,7 @@ export const fonts = {
   serifRegular: 'Fraunces_400Regular',
   serifMedium: 'Fraunces_500Medium',
   serifSemibold: 'Fraunces_600SemiBold',
+  serifBold: 'Fraunces_700Bold',
 
   // Inter: body, UI chrome, secondary labels. Loaded via @expo-google-fonts/inter.
   sansRegular: 'Inter_400Regular',

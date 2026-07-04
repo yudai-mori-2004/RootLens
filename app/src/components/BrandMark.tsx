@@ -1,37 +1,35 @@
-// RootLens ブランドマーク (= 同心円 + 十字ティックのレンズグリフ + ワードマーク)。
+// RootLens ブランドマーク (= アプリ実ロゴの二重 R + Fraunces の太いワードマーク)。
 // ログイン画面とマイビデオの扉カラムで共用する。
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { colors, fonts } from '../theme';
 
 export const BrandMark: React.FC<{ size?: number; withWordmark?: boolean }> = ({
-  size = 22,
+  size = 30,
   withWordmark = true,
 }) => (
   <View style={styles.row}>
-    <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
-      <Circle cx={14} cy={14} r={13} stroke={colors.ink} strokeWidth={1.4} />
-      <Circle cx={14} cy={14} r={6.5} stroke={colors.ink} strokeWidth={1.4} />
-      <Path
-        d="M14 1v6.5M14 20.5V27M1 14h6.5M20.5 14H27"
-        stroke={colors.ink}
-        strokeWidth={1.4}
-        strokeLinecap="round"
-      />
-    </Svg>
-    {withWordmark ? <Text style={styles.wordmark}>ROOTLENS</Text> : null}
+    <Image
+      source={require('../../assets/icon.png')}
+      style={{ width: size, height: size, borderRadius: size * 0.24 }}
+      resizeMode="cover"
+    />
+    {withWordmark ? (
+      <Text style={[styles.wordmark, { fontSize: size * 0.6 }]} numberOfLines={1}>
+        RootLens
+      </Text>
+    ) : null}
   </View>
 );
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   wordmark: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 11,
-    letterSpacing: 2.2,
+    fontFamily: fonts.serifBold,
+    letterSpacing: -0.3,
     color: colors.ink,
+    flexShrink: 0,
   },
 });

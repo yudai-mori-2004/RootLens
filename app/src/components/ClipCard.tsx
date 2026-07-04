@@ -12,18 +12,14 @@ import {
 import Svg, { Circle, Polygon } from 'react-native-svg';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import { getRecordingConfig, type Clip } from '../dataflow';
-import { clipTitle } from '../domain/clipLabels';
 import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
-// v0.1.4 クリップカード (= マイビデオ = アップロード待ち一覧)。
+// v0.1.4 クリップカード (= マイビデオの横一列スクロール用)。
 //
-// 写真主体の縦型カード: 16:9 サムネの上に状態チップ、 下に題字 + メタ 1 行。
-//   recorded:  タップでプレビューポップ (= 同意 → アップロード)
-//   uploading: サムネ下端に進捗バー + チップに % (タップ不可)
-//   error:     danger チップ + エラー文 + 「削除 / もう一度」
-//
-// uploaded はそもそも一覧に出さない (= CollectionScreen が filter)。
+// ボタンは持たない: 16:9 サムネ + 左上に状態チップ + 右下に尺タグ、 その下に日付と撮影時刻。
+// タップでプレビューポップが開き、 動画を確認 → 同意チェック → アップロード / 削除は全部そちらで行う。
+// uploading 中のみタップ不可 (= サムネ下端に進捗バー)。
 
 /** デザイン検証用モックの型 (= CollectionScreen の DESIGN_PREVIEW から渡る)。 */
 export interface DesignMock {
@@ -33,14 +29,14 @@ export interface DesignMock {
 
 interface Props {
   clip: Clip;
+  /// カード幅 (= 横一列レイアウトなので親が決める)
+  width: number;
   /// モック用サムネ上書き (= 実クリップでは undefined、 ローカル mp4 から生成)
   previewSource?: ImageSourcePropType;
   onOpen?: (clip: Clip) => void;
-  onRemove?: (clip: Clip) => void;
-  onRetry?: (clip: Clip) => void;
 }
 
-export const ClipCard: React.FC<Props> = ({ clip, previewSource, onOpen, onRemove, onRetry }) => {
+export const ClipCard: React.FC<Props> = ({ clip, width, previewSource, onOpen }) => {
   const t = useT();
   const isError = clip.state === 'error';
   const isUploading = clip.state === 'uploading';
@@ -53,13 +49,12 @@ export const ClipCard: React.FC<Props> = ({ clip, previewSource, onOpen, onRemov
     <Pressable
       onPress={() => !isUploading && onOpen?.(clip)}
       disabled={isUploading}
-      style={({ pressed }) => [styles.card, pressed && !isUploading && styles.cardPressed]}
+      style={({ pressed }) => [{ width }, pressed && !isUploading && styles.pressed]}
     >
-      {/* ── サムネ ── */}
-      <View style={styles.thumbWrap}>
+      {/* ── サムネ (= カード本体) ── */}
+      <View style={styles.thumbFrame}>
         <ClipThumb clip={clip} previewSource={previewSource} dimmed={isUploading} />
 
-        {/* 状態チップ (= 左上) */}
         {isError ? (
           <View style={[styles.chip, styles.chipDanger]}>
             <Text style={styles.chipTextLight}>{t('clip.errorEyebrow')}</Text>
@@ -72,39 +67,22 @@ export const ClipCard: React.FC<Props> = ({ clip, previewSource, onOpen, onRemov
           </View>
         ) : null}
 
-        {/* 尺 (= 右下、 動画アプリの文法) */}
         {dur ? (
           <View style={styles.durationTag}>
             <Text style={styles.durationText}>{dur}</Text>
           </View>
         ) : null}
 
-        {/* アップロード進捗 (= サムネ下端) */}
         {isUploading ? <ProgressEdge progress={progress} /> : null}
       </View>
 
-      {/* ── 本文 ── */}
-      <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={1}>{clipTitle(clip)}</Text>
-        {isError ? (
-          <>
-            <Text style={styles.errorText} numberOfLines={2}>
-              {clip.errorMessage ?? t('clip.errorDefault')}
-            </Text>
-            <View style={styles.actionRow}>
-              <Pressable onPress={() => onRetry?.(clip)} style={({ pressed }) => [styles.retryBtn, pressed && styles.btnPressed]} hitSlop={6}>
-                <Text style={styles.retryLabel}>{t('clip.tryAgain')}</Text>
-              </Pressable>
-              <Pressable onPress={() => onRemove?.(clip)} style={({ pressed }) => [styles.deleteBtn, pressed && styles.btnPressed]} hitSlop={6}>
-                <Text style={styles.deleteLabel}>{t('common.delete')}</Text>
-              </Pressable>
-            </View>
-          </>
-        ) : (
-          <Text style={styles.meta} numberOfLines={1}>
-            {clip.recordingConfigId ? configLabel(clip.recordingConfigId) : ''}
-          </Text>
-        )}
+      {/* ── サムネ下: 日付 + 撮影時刻 ── */}
+      <View style={styles.caption}>
+        <Text style={styles.captionDate}>{formatCardDate(clip.createdAt)}</Text>
+        <Text style={styles.captionTime}>
+          {formatCardTime(clip.createdAt)}
+          {clip.recordingConfigId ? `  ·  ${configLabel(clip.recordingConfigId)}` : ''}
+        </Text>
       </View>
     </Pressable>
   );
@@ -152,9 +130,9 @@ const ClipThumb: React.FC<{
         <Image source={source} style={[styles.thumbImage, dimmed && styles.thumbDimmed]} resizeMode="cover" />
       ) : (
         <View style={styles.thumbFallback}>
-          <Svg width={26} height={26} viewBox="0 0 26 26" fill="none">
-            <Circle cx={13} cy={13} r={12} stroke={colors.textFaint} strokeWidth={1.2} />
-            <Polygon points="10.5,8.5 18,13 10.5,17.5" fill={colors.textFaint} />
+          <Svg width={28} height={28} viewBox="0 0 28 28" fill="none">
+            <Circle cx={14} cy={14} r={13} stroke={colors.textFaint} strokeWidth={1.2} />
+            <Polygon points="11,9 19.5,14 11,19" fill={colors.textFaint} />
           </Svg>
         </View>
       )}
@@ -198,17 +176,14 @@ const ProgressEdge: React.FC<{ progress: number }> = ({ progress }) => {
 
 // ─── helpers ───────────────────────────────────────────────────────────
 
-const formatTimestamp = (ts: number): string => {
+export function formatCardDate(ts: number): string {
   const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
-  const d = new Date(ts);
-  if (isSameDay(d, new Date())) {
-    return d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
-  }
-  return d.toLocaleDateString(tag, { month: 'short', day: 'numeric' });
-};
+  return new Date(ts).toLocaleDateString(tag, { month: 'long', day: 'numeric' });
+}
 
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+export function formatCardTime(ts: number): string {
+  const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
+  return new Date(ts).toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatDuration(ms: number | null | undefined): string | null {
@@ -219,7 +194,7 @@ export function formatDuration(ms: number | null | undefined): string | null {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function configLabel(id: string): string {
+export function configLabel(id: string): string {
   if (id === 'ultra_wide') return '超広角';
   if (id === 'arkit') return 'ARKit';
   return id;
@@ -228,21 +203,20 @@ function configLabel(id: string): string {
 // ─── styles ────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.card,
+  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+
+  thumbFrame: {
+    position: 'relative',
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
+    backgroundColor: colors.paperDeep,
     ...shadows.card,
   },
-  cardPressed: { transform: [{ scale: 0.985 }] },
-
-  thumbWrap: { position: 'relative' },
   thumb: {
     width: '100%',
     aspectRatio: 16 / 9,
-    backgroundColor: colors.paperDeep,
   },
   thumbImage: { width: '100%', height: '100%' },
   thumbDimmed: { opacity: 0.55 },
@@ -290,35 +264,21 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: 3, backgroundColor: colors.emerald },
 
-  body: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: 3,
+  caption: {
+    paddingTop: spacing.sm + 2,
+    paddingHorizontal: 2,
+    gap: 1,
   },
-  title: {
+  captionDate: {
     fontFamily: fonts.serifMedium,
-    fontSize: 15.5,
-    lineHeight: 20,
-    color: colors.ink,
+    fontSize: 16,
+    lineHeight: 21,
     letterSpacing: -0.2,
+    color: colors.ink,
   },
-  meta: { ...typography.caption, fontSize: 11.5, color: colors.textMute },
-
-  errorText: {
+  captionTime: {
     ...typography.caption,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: colors.danger,
+    fontSize: 12,
+    color: colors.textMute,
   },
-  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: 6 },
-  retryBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radii.full,
-    backgroundColor: colors.ink,
-  },
-  retryLabel: { fontFamily: fonts.sansSemibold, fontSize: 11, color: colors.paper },
-  deleteBtn: { paddingHorizontal: 10, paddingVertical: 6 },
-  deleteLabel: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textMute },
-  btnPressed: { opacity: 0.6 },
 });

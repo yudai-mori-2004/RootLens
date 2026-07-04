@@ -1,17 +1,17 @@
 // マイビデオ画面 (v0.1.4) — 撮影済み・アップロード待ちクリップの一覧 + 撮影時間の記録。
 //
 // 横持ち前提の「誌面」 レイアウト:
-//   左 = 固定の扉カラム (日付 / あいさつ / RootLens ロゴ + ミッション文 / 合計撮影時間)
-//   右 = アップロード待ちがあれば 写真主体のカードグリッド、
-//        なければ 撮影時間の記録パネル (= 大きな合計時間 + 直近 7 日のバー)。
-//        「待ちが無い」 ことをわざわざ伝えない (= 記録を見せる方が前向き)。
+//   左 = 固定の扉カラム (ロゴ / 日付 / ミッション文 / 合計撮影時間)
+//   右 = アップロード待ちがあれば 横一列の写真カード (= 横スクロール、 ボタン無し。
+//        タップ → プレビューポップで確認 → 同意チェック → アップロード / 削除)、
+//        なければ 撮影時間の記録パネル (= 大きな合計時間 + 2026/6 まで遡れる日別バー)。
 //
 // 合計撮影時間 = サーバの uploaded 済み durationMs 合算 (= GET /api/clips、 AsyncStorage に
 // キャッシュしてオフラインでも即表示) + ローカルのアップロード待ち分。
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -28,7 +28,7 @@ import {
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
 import { getCurrentSession } from '../services/auth/instance';
-import { useT, getLocale, type TranslationKey } from '../i18n';
+import { useT, getLocale } from '../i18n';
 import { colors, fonts, spacing, typography } from '../theme';
 
 // ─── デザイン検証用モック (= __DEV__ のみ。 store / 永続化を汚さず表示だけ) ──
@@ -70,15 +70,6 @@ const MOCKS: DesignMock[] = DESIGN_PREVIEW
 
 // デザイン検証用の記録モック (= 空状態の記録パネルにバーを立てる)。
 const MOCK_STATS = DESIGN_PREVIEW;
-
-function greetingKeyForNow(): TranslationKey {
-  const h = new Date().getHours();
-  if (h < 5) return 'portfolio.greetingNight';
-  if (h < 11) return 'portfolio.greetingMorning';
-  if (h < 17) return 'portfolio.greetingDay';
-  if (h < 23) return 'portfolio.greetingEvening';
-  return 'portfolio.greetingNight';
-}
 
 function todayLabel(): string {
   const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
@@ -192,6 +183,18 @@ export const CollectionScreen: React.FC = () => {
   );
   const totalMs = (MOCK_STATS ? 11_460_000 : uploaded.totalMs) + pendingMs;
 
+  // 日別グラフ用: サーバ uploaded 分にローカル待ち分も足す (= 撮った日の記録として見せる)
+  const mergedDaily = useMemo(() => {
+    const d: Record<string, number> = { ...uploaded.daily };
+    for (const r of rows) {
+      const ms = r.clip.durationMs ?? 0;
+      if (ms <= 0) continue;
+      const k = dayKey(r.clip.createdAt);
+      d[k] = (d[k] ?? 0) + ms;
+    }
+    return d;
+  }, [uploaded.daily, rows]);
+
   const [previewTarget, setPreviewTarget] = useState<Clip | null>(null);
   const onOpen = useCallback((clip: Clip) => setPreviewTarget(clip), []);
   const onClose = useCallback(() => setPreviewTarget(null), []);
@@ -203,19 +206,17 @@ export const CollectionScreen: React.FC = () => {
     setPreviewTarget(null);
     void discardClip(clip.id);
   }, []);
-  const onRetry = useCallback((clip: Clip) => { void advanceClip(clip.id, storeEventSink); }, []);
 
   return (
     <View style={[styles.root, { paddingLeft: insets.left }]}>
       {/* ── 左: 扉カラム ── */}
       <View style={styles.aside}>
-        <View>
+        <View style={styles.asideHead}>
+          <BrandMark size={30} />
           <Text style={styles.date}>{todayLabel()}</Text>
-          <Text style={styles.greeting}>{t(greetingKeyForNow())}</Text>
         </View>
 
         <View style={styles.asideFoot}>
-          <BrandMark size={18} />
           <Text style={styles.mission}>{t('portfolio.mission')}</Text>
           {rows.length > 0 ? (
             <>
@@ -227,31 +228,27 @@ export const CollectionScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* ── 右: 待ちがあればカードグリッド、 なければ記録パネル ── */}
+      {/* ── 右: 待ちがあれば横一列カード、 なければ記録パネル ── */}
       {rows.length === 0 ? (
-        <RecordPanel totalMs={totalMs} daily={uploaded.daily} />
+        <RecordPanel totalMs={totalMs} daily={mergedDaily} />
       ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(item) => item.clip.id}
-          numColumns={2}
-          columnWrapperStyle={styles.column}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={8}
-          windowSize={11}
-          renderItem={({ item }) => (
-            <View style={styles.itemWrap}>
+        <View style={styles.rowArea}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.rowList}
+          >
+            {rows.map((item) => (
               <ClipCard
+                key={item.clip.id}
                 clip={item.clip}
+                width={CARD_WIDTH}
                 previewSource={item.thumb}
                 onOpen={onOpen}
-                onRemove={onRemove}
-                onRetry={onRetry}
               />
-            </View>
-          )}
-        />
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       <ClipPreviewModal
@@ -268,23 +265,28 @@ export const CollectionScreen: React.FC = () => {
 // ─── 撮影時間の記録パネル (= アップロード待ちが無いときの右面) ──────────────
 
 const DAY_MS = 86_400_000;
+/** 記録の起点 (= これより前は遡らない)。 */
+const RECORD_EPOCH = new Date(2026, 5, 1).getTime(); // 2026-06-01
 
 const RecordPanel: React.FC<{ totalMs: number; daily: Record<string, number> }> = ({
   totalMs, daily,
 }) => {
   const t = useT();
+  const scrollRef = React.useRef<ScrollView>(null);
 
-  // 直近 7 日 (= 今日を右端に)。 デザイン検証時はモックの山を立てる。
+  // 2026-06-01 から今日までの全日 (= 右端が今日)。 デザイン検証時はモックの山を立てる。
   const days = useMemo(() => {
-    const out: { key: string; label: string; ms: number }[] = [];
-    const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
-    for (let i = 6; i >= 0; i -= 1) {
-      const d = new Date(Date.now() - i * DAY_MS);
-      const k = dayKey(d.getTime());
-      const mockMs = MOCK_STATS ? [22, 48, 0, 65, 31, 74, 12][6 - i] * 60_000 : 0;
+    const out: { key: string; dayNum: number; monthLabel: string | null; ms: number }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let ts = RECORD_EPOCH; ts <= today.getTime(); ts += DAY_MS) {
+      const d = new Date(ts);
+      const k = dayKey(ts);
+      const mockMs = MOCK_STATS ? ((d.getDate() * 7 + d.getMonth() * 3) % 9 === 0 ? 0 : ((d.getDate() * 13) % 70) * 60_000) : 0;
       out.push({
         key: k,
-        label: d.toLocaleDateString(tag, { weekday: 'narrow' }),
+        dayNum: d.getDate(),
+        monthLabel: d.getDate() === 1 || ts === RECORD_EPOCH ? `${d.getMonth() + 1}月` : null,
         ms: (daily[k] ?? 0) + mockMs,
       });
     }
@@ -299,23 +301,31 @@ const RecordPanel: React.FC<{ totalMs: number; daily: Record<string, number> }> 
       <Text style={styles.recordLabel}>{t('portfolio.totalTime')}</Text>
       <Text style={styles.recordTotal}>{formatTotal(totalMs)}</Text>
 
-      {/* 直近 7 日のバー */}
-      <Text style={styles.chartLabel}>{t('portfolio.last7days')}</Text>
-      <View style={styles.chart}>
+      {/* 日別バー (= 横スクロールで 2026/6 まで遡れる。 初期位置は右端 = 今日) */}
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chartScroll}
+        contentContainerStyle={styles.chart}
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
+      >
         {days.map((d) => (
           <View key={d.key} style={styles.chartCol}>
             <View style={styles.chartTrack}>
               <View
                 style={[
                   styles.chartBar,
-                  { height: `${Math.max(d.ms > 0 ? 8 : 0, Math.round((d.ms / maxMs) * 100))}%` },
+                  { height: `${Math.max(d.ms > 0 ? 6 : 0, Math.round((d.ms / maxMs) * 100))}%` },
                 ]}
               />
             </View>
-            <Text style={styles.chartDay}>{d.label}</Text>
+            <Text style={[styles.chartDay, d.monthLabel ? styles.chartMonth : null]} numberOfLines={1}>
+              {d.monthLabel ?? (d.dayNum % 5 === 0 ? String(d.dayNum) : '·')}
+            </Text>
           </View>
         ))}
-      </View>
+      </ScrollView>
 
       {!hasAny ? <Text style={styles.recordInvite}>{t('portfolio.recordInvite')}</Text> : null}
     </View>
@@ -323,6 +333,7 @@ const RecordPanel: React.FC<{ totalMs: number; daily: Record<string, number> }> 
 };
 
 const ASIDE_WIDTH = 236;
+const CARD_WIDTH = 300;
 
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row', backgroundColor: colors.paper },
@@ -335,17 +346,10 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: colors.border,
   },
+  asideHead: { gap: spacing.md },
   date: {
     ...typography.labelSmall,
     color: colors.textMute,
-    marginBottom: spacing.md,
-  },
-  greeting: {
-    fontFamily: fonts.serifLight,
-    fontSize: 34,
-    lineHeight: 40,
-    letterSpacing: -0.5,
-    color: colors.ink,
   },
 
   asideFoot: { gap: spacing.sm },
@@ -372,13 +376,14 @@ const styles = StyleSheet.create({
     color: colors.textMute,
   },
 
-  list: {
+
+  // ── 横一列カード ──
+  rowArea: { flex: 1, justifyContent: 'center' },
+  rowList: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
+    gap: spacing.xl,
+    alignItems: 'center',
   },
-  column: { gap: spacing.lg },
-  itemWrap: { flex: 1, marginBottom: spacing.lg },
 
   // ── 記録パネル ──
   record: {
@@ -399,19 +404,17 @@ const styles = StyleSheet.create({
     letterSpacing: -1.5,
     color: colors.ink,
   },
-  chartLabel: {
-    ...typography.labelSmall,
-    color: colors.textFaint,
+  chartScroll: {
     marginTop: spacing.xxl,
+    maxHeight: 150,
   },
   chart: {
-    flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: spacing.md,
-    marginTop: spacing.md,
-    height: 110,
+    gap: 7,
+    height: 150,
+    paddingRight: spacing.sm,
   },
-  chartCol: { flex: 1, alignItems: 'center', gap: 6, height: '100%' },
+  chartCol: { width: 22, alignItems: 'center', gap: 6, height: '100%' },
   chartTrack: {
     flex: 1,
     width: '100%',
@@ -421,12 +424,13 @@ const styles = StyleSheet.create({
   },
   chartBar: {
     width: '100%',
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
     backgroundColor: colors.emerald,
     opacity: 0.85,
   },
-  chartDay: { ...typography.labelSmall, color: colors.textFaint },
+  chartDay: { ...typography.labelSmall, fontSize: 9, color: colors.textFaint },
+  chartMonth: { color: colors.textMute },
 
   recordInvite: {
     ...typography.body,

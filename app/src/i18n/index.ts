@@ -158,6 +158,10 @@ const ja = {
 
   // ── アップロード確認ポップ (= マイビデオのカードタップ) ──
   'upload.confirmTitle': 'アップロード前の確認',
+  'upload.consentCheck': 'うつってはいけないものが映っていないことを、 確認しました',
+  'upload.deleteTitle': 'この動画を削除しますか？',
+  'upload.deleteMessage': '削除すると、 元に戻すことはできません。',
+  'upload.deleteConfirm': '削除する',
   'upload.confirmHint': 'うつってはいけないものがないか、 確認してからアップロードしてください。',
   'upload.action': 'アップロードする',
 
@@ -202,13 +206,8 @@ const ja = {
 
   // ── マイビデオ (= 旧 Collection / ポートフォリオ。 主婦向けに平易語) ──
   // 温かい挨拶 (= 家事感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
-  'portfolio.greetingMorning': 'おはようございます',
-  'portfolio.greetingDay': 'こんにちは',
-  'portfolio.greetingEvening': 'こんばんは',
-  'portfolio.greetingNight': 'おつかれさまです',
   'portfolio.mission': 'ロボットが世界を学び、 くらしの手伝いができるようになるために。 あなたの毎日の作業風景が、 いちばんの教科書になります。',
   'portfolio.totalTime': 'これまでの撮影時間',
-  'portfolio.last7days': '直近 7 日',
   'portfolio.recordInvite': '右の丸いボタンから、 きょうの家事を撮ってみましょう。',
 } as const;
 
@@ -311,6 +310,10 @@ const en: Record<TranslationKey, string> = {
 
   // ── Upload confirmation pop (= tap a card in My Videos) ──
   'upload.confirmTitle': 'Check before upload',
+  'upload.consentCheck': 'I checked that nothing private is visible in this video',
+  'upload.deleteTitle': 'Delete this video?',
+  'upload.deleteMessage': 'This cannot be undone.',
+  'upload.deleteConfirm': 'Delete',
   'upload.confirmHint': 'Please check that nothing private is visible, then upload.',
   'upload.action': 'Upload',
 
@@ -354,13 +357,8 @@ const en: Record<TranslationKey, string> = {
   'tab.captureA11y': 'Start capture mode',
 
   // ── My Videos (= former Collection / Portfolio。 plain language) ──
-  'portfolio.greetingMorning': 'Good morning',
-  'portfolio.greetingDay': 'Good afternoon',
-  'portfolio.greetingEvening': 'Good evening',
-  'portfolio.greetingNight': 'Working late?',
   'portfolio.mission': 'So robots can learn the world and lend a hand at home. Your everyday housework is their best textbook.',
   'portfolio.totalTime': 'Total time captured',
-  'portfolio.last7days': 'Last 7 days',
   'portfolio.recordInvite': 'Tap the round button on the right and capture today’s chores.',
 };
 
