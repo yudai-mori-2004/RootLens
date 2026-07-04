@@ -32,7 +32,6 @@ root-lens/
 │   ├── gen-dummy-sensors.py
 │   └── smoke-test.sh   end-to-end smoke (= mock-device → R2 → /api/clips → Pipeline 2 → Pipeline 3)
 │
-├── certs/              dev PKI (= Root CA + ICA + server leaf + 生成スクリプト)
 ├── keys/               ローカル秘密鍵 (= .gitignore 済)
 └── document/           仕様 + 過去仕様
     └── v0.1.3/         current spec + tasks/

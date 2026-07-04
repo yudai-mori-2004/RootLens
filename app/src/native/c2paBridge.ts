@@ -40,20 +40,6 @@ export interface VideoProcessOptions {
   endMs?: number;
 }
 
-// 仕様書 §4.4 証明書発行フロー — デバイス認証情報
-export interface DeviceCredentials {
-  csr: string; // Base64 DER
-  platform: 'android' | 'ios';
-  attestation?: {
-    // Android Key Attestation
-    key_attestation_chain?: string[];  // DER Base64配列
-    play_integrity_token?: string;
-    // iOS App Attest
-    app_attest_object?: string;
-    app_attest_key_id?: string;
-  };
-}
-
 /**
  * C2PA Custom Assertion (v0.1.1)。
  *  - label: assertion ラベル (例: "io.rootlens.capture.ios.core_motion.gyro")
@@ -72,12 +58,6 @@ interface C2paBridgeInterface {
   processVideo(inputPath: string, optionsJson: string): Promise<string>;
   getVersion(): Promise<string>;
   // §4.4 TEE鍵管理
-  generateDeviceCredentials(): Promise<DeviceCredentials>;
-  storeDeviceCertificate(deviceCertBase64: string, intermediateCaCertBase64: string, rootCaCertBase64: string): Promise<boolean>;
-  hasDeviceCertificate(): Promise<boolean>;
-  getDeviceCertificateExpiry(): Promise<string | null>;
-  verifyStoredCertChain(): Promise<boolean>;
-  clearStoredCertificates(): Promise<void>;
   // v0.1.3 Pipeline 1 (= mock-device 互換 D1/D2/signature_hash)
   signD1(inputMp4: string, outputMp4: string): Promise<string>;
   signD2(blurredMp4: string, parentD1Mp4: string, outputMp4: string, facesBlurred: number, blurAssertionJson: string): Promise<string>;
@@ -171,77 +151,6 @@ export async function getVersion(): Promise<string> {
     return 'not available';
   }
   return C2paBridge.getVersion();
-}
-
-// --- TEE鍵管理 (§4.4, §4.6) ---
-
-/**
- * TEE内でEC P-256鍵を生成し、CSR + Platform Attestationを返す
- * 仕様書 §4.4.1 証明書発行フロー
- */
-export async function generateDeviceCredentials(): Promise<DeviceCredentials> {
-  if (!C2paBridge) {
-    throw new Error(`C2paBridge native module is not available on ${Platform.OS}`);
-  }
-  return C2paBridge.generateDeviceCredentials();
-}
-
-/**
- * サーバーから返却されたDevice Certificate + Intermediate CA + Root CA Certificateを保存
- * 仕様書 §4.4.1 ステップ7 (3-layer PKI: Root CA → Intermediate CA → Device)
- */
-export async function storeDeviceCertificate(
-  deviceCertBase64: string,
-  intermediateCaCertBase64: string,
-  rootCaCertBase64: string,
-): Promise<boolean> {
-  if (!C2paBridge) {
-    throw new Error(`C2paBridge native module is not available on ${Platform.OS}`);
-  }
-  return C2paBridge.storeDeviceCertificate(deviceCertBase64, intermediateCaCertBase64, rootCaCertBase64);
-}
-
-/**
- * Device Certificateが存在するか確認
- */
-export async function hasDeviceCertificate(): Promise<boolean> {
-  if (!C2paBridge) {
-    return false;
-  }
-  return C2paBridge.hasDeviceCertificate();
-}
-
-/**
- * Device Certificateの有効期限を返す（ISO 8601文字列 or null）
- * 証明書更新判定用
- */
-export async function getDeviceCertificateExpiry(): Promise<string | null> {
-  if (!C2paBridge) {
-    return null;
-  }
-  return C2paBridge.getDeviceCertificateExpiry();
-}
-
-/**
- * 保存済み証明書チェーンの整合性を検証
- * Device CertがIntermediate CAで署名されているか確認する。
- * PKIローテーション（ICA再生成）を検出するための軽量チェック。
- */
-export async function verifyStoredCertChain(): Promise<boolean> {
-  if (!C2paBridge) {
-    return false;
-  }
-  return C2paBridge.verifyStoredCertChain();
-}
-
-/**
- * 保存済み証明書を全削除（re-provisioning前に使用）
- */
-export async function clearStoredCertificates(): Promise<void> {
-  if (!C2paBridge) {
-    return;
-  }
-  return C2paBridge.clearStoredCertificates();
 }
 
 // ─── v0.1.3 Pipeline 1 ──────────────────────────────────────────────────

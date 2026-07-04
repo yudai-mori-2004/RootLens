@@ -68,13 +68,6 @@ const ja = {
   'common.close': '閉じる',
   'common.back': '戻る',
 
-  // ── App (起動 / デバイス証明書ゲート) ──
-  'app.deviceCertificate': 'デバイス証明書',
-  'app.checking': '確認中…',
-  'app.provisioning': '取得中…',
-  'app.setupFailed': 'セットアップに失敗しました',
-  'app.unknownError': '原因不明のエラー',
-  'app.retry': '再試行',
 
   // ── Settings ──
   'settings.title': '設定',
@@ -238,12 +231,6 @@ const en: Record<TranslationKey, string> = {
   'common.back': 'Back',
 
   // ── App (startup / device certificate gate) ──
-  'app.deviceCertificate': 'Device certificate',
-  'app.checking': 'Checking…',
-  'app.provisioning': 'Provisioning…',
-  'app.setupFailed': 'Setup failed',
-  'app.unknownError': 'Unknown error',
-  'app.retry': 'Retry',
 
   // ── Settings ──
   'settings.title': 'Settings',

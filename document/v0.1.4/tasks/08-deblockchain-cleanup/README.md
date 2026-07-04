@@ -60,10 +60,33 @@ v0.1.4 の実像 (= カメラ計測 + C2PA 署名 + 手動アップロード) �
   その依存 lib (data / server/page-store / verify)。 LP の扱いは仕様書練り直しの時に再判断。
 - 残現役 API: clips / raw-uploads / device-certificate / crl / delete-account。
 
-### 7. 未処理 (= 仕様書ゼロベース練り直しの時に)
+### 7. デバイス証明書サブシステムも削除 (= 2026-07-04 追加判断)
+
+調査の結果、 **プロビジョニングされたデバイス証明書は C2PA 署名に使われていなかった**:
+`signD1` は Rust FFI `pipeline1_sign_d1(input, output)` を鍵引数なしで呼び、 署名鍵は
+crate に焼き込まれた固定証明書 (`native/c2pa-bridge/fixtures/chain.pem` + `ee.key`、
+= "Title Protocol Test EE")。 Rust コメントいわく「production は Secure Enclave callback
+signer に (予定)」 のまま未実装。 つまり CertGate (TEE 鍵 → App Attest → CSR → サーバ CA
+→ CRL) は署名経路につながっていない並行配管で、 初回起動をサーバ依存でブロックする
+コストだけ払っていた。 削除しても署名は 1 bit も変わらない。
+
+- 削除 (app): App.tsx の CertGate (= 起動が速くなり圏外でも起動可)、
+  useCertificateProvisioning、 c2paBridge の証明書系 wrapper 6 本 + DeviceCredentials 型、
+  config の device-certificate URL、 i18n app.* キー
+- 削除 (web): device-certificate / crl route、 lib/server の ca / attestation-ios /
+  attestation-android / cert-store / crl / crypto / crypto-kms / vlm-gate / rate-limit
+  (= 全部この経路の専用品) + tests
+- 削除: certs/ (dev PKI 生成一式。 Rust テスト用の app/dev-certs/ PEM は残置)
+- **native (Swift/Rust) は触らない**: 未使用関数が残るだけで無害。 次に native を触る時に掃除
+- 将来ハードウェア実証つき来歴が要る時は、 Secure Enclave callback signer 設計で正しく再導入
+  (= 証明書を配って UserDefaults に置くのではなく、 TEE 鍵で直接 COSE 署名する)
+
+### 8. 未処理 (= 仕様書ゼロベース練り直しの時に)
 
 - DB 列 (wallet_pubkey / network) の改名・削除 migration。
 - LP の why-blockchain / プロフィール / 共有ページの扱い。
+- native (Swift/Rust) の未使用 TEE / 証明書関数の掃除 + 署名鍵の正式設計
+  (= 今は焼き込みテスト証明書。 実運用の来歴信頼性はここで決まる)。
 
 ## 成功基準
 
