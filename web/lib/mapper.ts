@@ -1,5 +1,5 @@
 import type { Clip } from "@/db/schema";
-import type { ClipDto, ClipState, RecordingConfig, SolanaNetwork } from "@/shared/api-types";
+import type { ClipDto, ClipState, RecordingConfig } from "@/shared/api-types";
 
 // DB row → API DTO 変換。 client が見るのはこれだけ。
 // v0.1.4: presigned preview URL の発行は不要 (= ClipDto から previewVideoUrl 撤去、 端末プレビューは
@@ -17,7 +17,6 @@ export function clipToDto(row: Clip): ClipDto {
     deviceModel: row.deviceModel,
 
     signatureHash: row.signatureHash,
-    network: (row.network as SolanaNetwork) ?? "devnet",
 
     errorMessage: row.errorMessage,
   };

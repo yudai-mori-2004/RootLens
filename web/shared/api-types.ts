@@ -5,10 +5,6 @@
 // 3 値のみ。 v0.1.3 の processing / ready / staked は撤去 (= 後段ワーカー未配線)。
 export type ClipState = "uploading" | "uploaded" | "error";
 
-// ─── Solana ネットワーク ──────────────────
-// v0.1.4 では mint しないので「記録のみ」。 v0.1.5 で後段ワーカーが mint する時の宛先として残す。
-export type SolanaNetwork = "devnet" | "mainnet";
-
 // ─── 撮影構成 (= DATA_SPECS §2.2) ────────────────────────────────
 export type RecordingConfig = "ultra_wide" | "arkit";
 
@@ -27,7 +23,6 @@ export interface ClipDto {
 
   // ── 識別 ──
   signatureHash: string;
-  network: SolanaNetwork;
 
   /// アップロード失敗時のメッセージ (= error 状態時のみ非 null)
   errorMessage: string | null;
@@ -37,7 +32,7 @@ export interface ClipDto {
 
 /// POST /api/clips
 /// 端末で C2PA D1 署名 + R2 アップロードを終えてから呼ぶ。
-/// 重複排除キーは (wallet, signatureHash, network)、 既存行があれば idempotent に返す。
+/// 重複排除キーは (account, signatureHash)、 既存行があれば idempotent に返す。
 export interface CreateClipRequest {
   /// 端末で確定した signature_hash (= C2PA D1 アクティブマニフェスト署名の SHA-256 hex)
   signatureHash: string;
@@ -45,8 +40,6 @@ export interface CreateClipRequest {
   contentSize: number;
   /// 採用された撮影構成 (= 'ultra_wide' | 'arkit')
   recordingConfig: RecordingConfig;
-  /// Solana ネットワーク (= 重複排除キーの一部)。 省略時は server が devnet 扱い。
-  network?: SolanaNetwork;
   /// 録画尺 (ms)。 端末が record stop−start から算出。
   durationMs?: number;
   /// 撮影端末の機種 (= "iPhone15,2" 等)。

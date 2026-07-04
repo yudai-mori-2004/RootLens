@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
-import { requireWalletPubkey } from "@/lib/auth";
+import { requireAccountPubkey } from "@/lib/auth";
 import { clipToDto } from "@/lib/mapper";
 import type { DeleteClipResponse } from "@/shared/api-types";
 
@@ -12,9 +12,9 @@ interface Ctx {
 
 // GET /api/clips/:id ─ 単件取得
 export async function GET(req: Request, ctx: Ctx) {
-  let walletPubkey: string;
+  let accountPubkey: string;
   try {
-    walletPubkey = requireWalletPubkey(req);
+    accountPubkey = requireAccountPubkey(req);
   } catch (r) {
     return r as Response;
   }
@@ -23,7 +23,7 @@ export async function GET(req: Request, ctx: Ctx) {
   const rows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, id), eq(clips.walletPubkey, walletPubkey)))
+    .where(and(eq(clips.id, id), eq(clips.walletPubkey, accountPubkey)))
     .limit(1);
   if (rows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -34,9 +34,9 @@ export async function GET(req: Request, ctx: Ctx) {
 
 // DELETE /api/clips/:id ─ 撮影者がクリップを破棄する。 R2 オブジェクトは別 worker で GC する。
 export async function DELETE(req: Request, ctx: Ctx) {
-  let walletPubkey: string;
+  let accountPubkey: string;
   try {
-    walletPubkey = requireWalletPubkey(req);
+    accountPubkey = requireAccountPubkey(req);
   } catch (r) {
     return r as Response;
   }
@@ -45,7 +45,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const rows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, id), eq(clips.walletPubkey, walletPubkey)))
+    .where(and(eq(clips.id, id), eq(clips.walletPubkey, accountPubkey)))
     .limit(1);
   if (rows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
