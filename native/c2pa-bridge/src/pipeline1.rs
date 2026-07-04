@@ -18,6 +18,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Cursor;
 use std::os::raw::c_char;
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -31,6 +32,23 @@ const MIME_MP4: &str = "video/mp4";
 
 /// リモート署名の HTTP タイムアウト。 署名対象は数 KB なので通常 1 RTT で返る。
 const SIGN_HTTP_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// 直近の失敗理由。 FFI は数値しか返せないので、 呼び出し側 (Swift) が
+/// pipeline1_last_error() で人間可読なメッセージを取り出してエラー表示に載せる。
+static LAST_ERROR: Mutex<String> = Mutex::new(String::new());
+
+fn set_last_error(msg: &str) {
+    if let Ok(mut g) = LAST_ERROR.lock() {
+        *g = msg.to_string();
+    }
+}
+
+/// 直近のエラーメッセージを C 文字列で返す (空 = エラーなし)。 c2pa_free_string で解放する。
+#[no_mangle]
+pub unsafe extern "C" fn pipeline1_last_error() -> *mut c_char {
+    let msg = LAST_ERROR.lock().map(|g| g.clone()).unwrap_or_default();
+    CString::new(msg).map(|c| c.into_raw()).unwrap_or(std::ptr::null_mut())
+}
 
 fn build_d1_manifest(title: &str) -> serde_json::Value {
     serde_json::json!({
@@ -345,6 +363,7 @@ pub unsafe extern "C" fn pipeline1_sign_d1_remote(
         Ok(()) => 0,
         Err(e) => {
             eprintln!("[pipeline1_sign_d1_remote] {e}");
+            set_last_error(&e);
             -2
         }
     }
@@ -375,6 +394,7 @@ pub unsafe extern "C" fn pipeline1_sign_d1(
         Ok(()) => 0,
         Err(e) => {
             eprintln!("[pipeline1_sign_d1] {e}");
+            set_last_error(&e);
             -2
         }
     }

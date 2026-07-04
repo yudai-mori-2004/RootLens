@@ -458,7 +458,12 @@ public class C2paBridgeModule: Module {
         if rc == 0 {
           promise.resolve(outputPath)
         } else {
-          promise.reject("SIGN_D1_ERROR", "pipeline1_sign_d1_remote failed: rc=\(rc)")
+          var detail = ""
+          if let err = pipeline1_last_error() {
+            detail = String(cString: err)
+            c2pa_free_string(err)
+          }
+          promise.reject("SIGN_D1_ERROR", "sign failed (rc=\(rc)): \(detail)")
         }
       }
     }

@@ -63,6 +63,11 @@ void c2pa_free_string(char *s);
 /* ─── Pipeline 1 (= D1 署名 / content_id) ─────────────────────────────── */
 
 /**
+ * 直近の pipeline1_* 失敗理由 (人間可読)。 c2pa_free_string で解放。 空文字 = エラーなし。
+ */
+char *pipeline1_last_error(void);
+
+/**
  * D1 リモート署名 (= 本番経路): ハッシュ計算 + manifest 組み立てはローカル、 COSE 署名
  * バイト列だけを sign_service_url (RootLens /api/v1/c2pa-sign) に送って署名を得る。
  * account_pubkey は X-Account-Pubkey header に載る (= 認可)。
