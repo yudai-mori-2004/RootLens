@@ -1,0 +1,47 @@
+// GET /api/clips/:id/media — 撮影者本人の履歴再生用 presigned GET URL。
+//
+// アップロード済みクリップの rgb.mp4 は端末から消えている (= 容量) ので、 マイビデオの
+// 履歴ポップは R2 から直接ストリーミング再生する。 バケットは撮影構成で決まる
+// (ultra_wide → raw / arkit → raw-arkit)。 所有チェックは (id, account) の一致。
+
+import { NextResponse } from "next/server";
+import { eq, and } from "drizzle-orm";
+import { db } from "@/db/client";
+import { clips } from "@/db/schema";
+import { requireAccountPubkey } from "@/lib/auth";
+import { presignRawGet, rawBucketFor, signedMp4Key } from "@/lib/r2";
+import type { RecordingConfigId } from "@/lib/r2-keys";
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  let accountPubkey: string;
+  try {
+    accountPubkey = requireAccountPubkey(req);
+  } catch (r) {
+    return r as Response;
+  }
+  const { id } = await params;
+
+  const rows = await db
+    .select()
+    .from(clips)
+    .where(and(eq(clips.id, id), eq(clips.walletPubkey, accountPubkey)))
+    .limit(1);
+  if (rows.length === 0) {
+    return NextResponse.json({ error: "clip not found" }, { status: 404 });
+  }
+  const clip = rows[0];
+
+  const expiresInSec = 3600;
+  const url = await presignRawGet(
+    signedMp4Key(clip.signatureHash),
+    rawBucketFor((clip.recordingConfig ?? "ultra_wide") as RecordingConfigId),
+    expiresInSec,
+  );
+  return NextResponse.json({
+    url,
+    expiresAt: new Date(Date.now() + expiresInSec * 1000).toISOString(),
+  });
+}

@@ -85,9 +85,14 @@ export interface RawSessionUploadResponse {
   expiresAt: string;
 }
 
-/// 任意のキーに対する raw バケット GET 事前署名 URL (= 撮影者プレビュー / デバッグ用)。
-export async function presignRawGet(key: string, expiresInSec = 3600): Promise<string> {
-  const cmd = new GetObjectCommand({ Bucket: BUCKET_RAW, Key: key });
+/// 任意のキーに対する raw GET 事前署名 URL (= 撮影者の履歴再生 / デバッグ用)。
+/// バケットは構成依存 (= rawBucketFor) なので呼び出し側が渡す。 省略時は ultra_wide 側。
+export async function presignRawGet(
+  key: string,
+  bucket: string = BUCKET_RAW,
+  expiresInSec = 3600,
+): Promise<string> {
+  const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
   return await getSignedUrl(r2, cmd, { expiresIn: expiresInSec });
 }
 

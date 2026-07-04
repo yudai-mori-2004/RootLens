@@ -20,3 +20,16 @@ export async function fetchMyClips(accountPubkey: string): Promise<ServerClipSta
   const { clips } = (await res.json()) as { clips: ServerClipStatus[] };
   return clips;
 }
+
+/** 履歴再生用: クリップの rgb.mp4 presigned GET URL を取得する (= R2 からストリーミング再生)。 */
+export async function fetchClipMediaUrl(clipId: string, accountPubkey: string): Promise<string> {
+  const res = await fetch(`${SERVER_URL}/api/clips/${clipId}/media`, {
+    headers: { 'X-Account-Pubkey': accountPubkey },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`GET /api/clips/:id/media ${res.status}: ${text.slice(0, 200)}`);
+  }
+  const { url } = (await res.json()) as { url: string };
+  return url;
+}

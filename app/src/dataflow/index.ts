@@ -52,6 +52,7 @@ export {
   uploadToR2,
   registerClip,
   fetchMyClips,
+  fetchClipMediaUrl,
   persistClipThumbnail,
   thumbPath,
   listThumbHashes,

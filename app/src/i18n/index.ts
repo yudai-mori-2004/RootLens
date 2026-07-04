@@ -158,6 +158,11 @@ const ja = {
 
   // ── アップロード確認ポップ (= マイビデオのカードタップ) ──
   'upload.confirmTitle': 'アップロード前の確認',
+  'history.duration': '長さ',
+  'history.config': '撮影モード',
+  'history.size': '容量',
+  'history.device': '撮影した端末',
+  'history.videoUnavailable': '動画を読み込めませんでした。 電波の良いところでもう一度お試しください。',
   'upload.consentCheck': 'うつってはいけないものが映っていないことを、 確認しました',
   'upload.deleteTitle': 'この動画を削除しますか？',
   'upload.deleteMessage': '削除すると、 元に戻すことはできません。',
@@ -208,8 +213,9 @@ const ja = {
   // 温かい挨拶 (= 家事感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
   'portfolio.mission': 'ロボットが世界を学び、 くらしの手伝いができるようになるために。 あなたの毎日の作業風景が、 いちばんの教科書になります。',
   'portfolio.totalTime': 'これまでの撮影時間',
-  'portfolio.uploadedLabel': 'アップロード済み',
-  'portfolio.dailyLabel': '日ごとの撮影時間',
+  'portfolio.uploadedLabel': '履歴',
+  'portfolio.dailyLabel': '毎日の記録',
+  'portfolio.pendingNotice': 'データの確認と同意が必要です。',
   'portfolio.recordInvite': '右の丸いボタンから、 きょうの家事を撮ってみましょう。',
 } as const;
 
@@ -312,6 +318,11 @@ const en: Record<TranslationKey, string> = {
 
   // ── Upload confirmation pop (= tap a card in My Videos) ──
   'upload.confirmTitle': 'Check before upload',
+  'history.duration': 'Length',
+  'history.config': 'Capture mode',
+  'history.size': 'Size',
+  'history.device': 'Device',
+  'history.videoUnavailable': 'Could not load the video. Please try again with a better connection.',
   'upload.consentCheck': 'I checked that nothing private is visible in this video',
   'upload.deleteTitle': 'Delete this video?',
   'upload.deleteMessage': 'This cannot be undone.',
@@ -361,8 +372,9 @@ const en: Record<TranslationKey, string> = {
   // ── My Videos (= former Collection / Portfolio。 plain language) ──
   'portfolio.mission': 'So robots can learn the world and lend a hand at home. Your everyday housework is their best textbook.',
   'portfolio.totalTime': 'Total time captured',
-  'portfolio.uploadedLabel': 'Uploaded',
-  'portfolio.dailyLabel': 'Daily capture time',
+  'portfolio.uploadedLabel': 'History',
+  'portfolio.dailyLabel': 'Daily record',
+  'portfolio.pendingNotice': 'These videos need your review and consent.',
   'portfolio.recordInvite': 'Tap the round button on the right and capture today’s chores.',
 };
 

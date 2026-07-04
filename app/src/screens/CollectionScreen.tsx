@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Image,
   type ImageSourcePropType,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,6 +27,7 @@ import Svg, { Circle, Polygon } from 'react-native-svg';
 import { BrandMark } from '../components/BrandMark';
 import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
+import { HistoryDetailModal } from '../components/HistoryDetailModal';
 import {
   storeEventSink, advanceClip, discardClip, fetchMyClips, thumbPath, listThumbHashes,
   type Clip, type ServerClipStatus,
@@ -107,10 +109,19 @@ function formatTotal(ms: number): string {
   return `${m}分`;
 }
 
+function formatGraphDate(key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
+  return new Date(y, m - 1, d).toLocaleDateString(tag, { month: 'long', day: 'numeric' });
+}
+
 function historyDateLabel(iso: string | undefined): string {
   if (!iso) return '';
   const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
-  return new Date(iso).toLocaleDateString(tag, { month: 'short', day: 'numeric' });
+  const d = new Date(iso);
+  const date = d.toLocaleDateString(tag, { month: 'short', day: 'numeric' });
+  const time = d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
 }
 
 // ─── サーバのクリップ一覧 (= 履歴 + 統計の元データ) ─────────────────────
@@ -230,6 +241,9 @@ export const CollectionScreen: React.FC = () => {
   }, [serverClips, rows]);
 
   const [previewTarget, setPreviewTarget] = useState<Clip | null>(null);
+  const [historyTarget, setHistoryTarget] = useState<{ clip: ServerClipStatus; source?: ImageSourcePropType } | null>(null);
+  // グラフで選択中の日 (= バーtap)。 履歴の該当日タイルもハイライトされる。
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const onOpen = useCallback((clip: Clip) => setPreviewTarget(clip), []);
   const onClose = useCallback(() => setPreviewTarget(null), []);
   const onUpload = useCallback((clip: Clip) => {
@@ -269,18 +283,22 @@ export const CollectionScreen: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.historyRow}
             >
-              {history.map(({ clip, source }) => (
-                <HistoryTile
-                  key={clip.id}
-                  clip={clip}
-                  source={
-                    source ??
-                    (clip.signatureHash && thumbHashes.has(clip.signatureHash)
-                      ? { uri: thumbPath(clip.signatureHash) }
-                      : undefined)
-                  }
-                />
-              ))}
+              {history.map(({ clip, source }) => {
+                const resolved =
+                  source ??
+                  (clip.signatureHash && thumbHashes.has(clip.signatureHash)
+                    ? { uri: thumbPath(clip.signatureHash) }
+                    : undefined);
+                return (
+                  <HistoryTile
+                    key={clip.id}
+                    clip={clip}
+                    source={resolved}
+                    selected={selectedDay != null && clip.createdAt != null && dayKey(clip.createdAt) === selectedDay}
+                    onPress={() => setHistoryTarget({ clip, source: resolved })}
+                  />
+                );
+              })}
             </ScrollView>
           </View>
         ) : null}
@@ -288,7 +306,7 @@ export const CollectionScreen: React.FC = () => {
         <View style={styles.bottomBlock}>
           {rows.length > 0 ? (
             <View style={styles.pendingBlock}>
-              <Text style={styles.sectionLabel}>{t('clip.recorded')}</Text>
+              <Text style={styles.pendingNotice}>{t('portfolio.pendingNotice')}</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -306,7 +324,7 @@ export const CollectionScreen: React.FC = () => {
               </ScrollView>
             </View>
           ) : (
-            <GraphPanel daily={mergedDaily} totalMs={totalMs} />
+            <GraphPanel daily={mergedDaily} totalMs={totalMs} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
           )}
         </View>
       </View>
@@ -318,17 +336,26 @@ export const CollectionScreen: React.FC = () => {
         onUpload={onUpload}
         onRemove={onRemove}
       />
+      <HistoryDetailModal
+        visible={historyTarget !== null}
+        clip={historyTarget?.clip ?? null}
+        thumbSource={historyTarget?.source}
+        onClose={() => setHistoryTarget(null)}
+      />
     </View>
   );
 };
 
 // ─── 履歴タイル (= 小サムネ + 日付) ─────────────────────────────────────
 
-const HistoryTile: React.FC<{ clip: ServerClipStatus; source?: ImageSourcePropType }> = ({
-  clip, source,
-}) => (
-  <View style={styles.tile}>
-    <View style={styles.tileThumb}>
+const HistoryTile: React.FC<{
+  clip: ServerClipStatus;
+  source?: ImageSourcePropType;
+  selected?: boolean;
+  onPress?: () => void;
+}> = ({ clip, source, selected, onPress }) => (
+  <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}>
+    <View style={[styles.tileThumb, selected && styles.tileThumbSelected]}>
       {source ? (
         <Image source={source} style={styles.tileImage} resizeMode="cover" />
       ) : (
@@ -340,17 +367,22 @@ const HistoryTile: React.FC<{ clip: ServerClipStatus; source?: ImageSourcePropTy
         </View>
       )}
     </View>
-    <Text style={styles.tileDate} numberOfLines={1}>{historyDateLabel(clip.createdAt)}</Text>
-  </View>
+    <Text style={[styles.tileDate, selected && styles.tileDateSelected]} numberOfLines={1}>
+      {historyDateLabel(clip.createdAt)}
+    </Text>
+  </Pressable>
 );
 
 // ─── 日別グラフ (= アップロード待ちが無いときの下面。 2026/6 まで遡れる) ────────
 
 const RECORD_EPOCH = new Date(2026, 5, 1).getTime(); // 2026-06-01
 
-const GraphPanel: React.FC<{ daily: Record<string, number>; totalMs: number }> = ({
-  daily, totalMs,
-}) => {
+const GraphPanel: React.FC<{
+  daily: Record<string, number>;
+  totalMs: number;
+  selectedDay: string | null;
+  onSelectDay: (day: string | null) => void;
+}> = ({ daily, totalMs, selectedDay, onSelectDay }) => {
   const t = useT();
   const scrollRef = React.useRef<ScrollView>(null);
 
@@ -374,9 +406,18 @@ const GraphPanel: React.FC<{ daily: Record<string, number>; totalMs: number }> =
 
   const maxMs = Math.max(...days.map((d) => d.ms), 1);
 
+  const selected = selectedDay ? days.find((d) => d.key === selectedDay) ?? null : null;
+
   return (
     <View style={styles.graph}>
-      <Text style={styles.sectionLabel}>{t('portfolio.dailyLabel')}</Text>
+      <View style={styles.graphHeader}>
+        <Text style={[styles.sectionLabel, styles.sectionLabelInline]}>{t('portfolio.dailyLabel')}</Text>
+        {selected ? (
+          <Text style={styles.graphReadout}>
+            {formatGraphDate(selected.key)} · {formatTotal(selected.ms)}
+          </Text>
+        ) : null}
+      </View>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -385,21 +426,37 @@ const GraphPanel: React.FC<{ daily: Record<string, number>; totalMs: number }> =
         contentContainerStyle={styles.chart}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
       >
-        {days.map((d) => (
-          <View key={d.key} style={styles.chartCol}>
-            <View style={styles.chartTrack}>
-              <View
+        {days.map((d) => {
+          const isSelected = d.key === selectedDay;
+          return (
+            <Pressable
+              key={d.key}
+              style={styles.chartCol}
+              onPress={() => onSelectDay(isSelected ? null : d.key)}
+              hitSlop={{ top: 8, bottom: 0, left: 0, right: 0 }}
+            >
+              <View style={styles.chartTrack}>
+                <View
+                  style={[
+                    styles.chartBar,
+                    isSelected && styles.chartBarSelected,
+                    { height: `${Math.max(d.ms > 0 ? 6 : 0, Math.round((d.ms / maxMs) * 100))}%` },
+                  ]}
+                />
+              </View>
+              <Text
                 style={[
-                  styles.chartBar,
-                  { height: `${Math.max(d.ms > 0 ? 6 : 0, Math.round((d.ms / maxMs) * 100))}%` },
+                  styles.chartDay,
+                  d.monthLabel ? styles.chartMonth : null,
+                  isSelected && styles.chartDaySelected,
                 ]}
-              />
-            </View>
-            <Text style={[styles.chartDay, d.monthLabel ? styles.chartMonth : null]} numberOfLines={1}>
-              {d.monthLabel ?? (d.dayNum % 5 === 0 ? String(d.dayNum) : '·')}
-            </Text>
-          </View>
-        ))}
+                numberOfLines={1}
+              >
+                {d.monthLabel ?? (isSelected ? String(d.dayNum) : d.dayNum % 5 === 0 ? String(d.dayNum) : '·')}
+              </Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
       {totalMs === 0 ? <Text style={styles.recordInvite}>{t('portfolio.recordInvite')}</Text> : null}
     </View>
@@ -482,6 +539,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 1,
   },
+  tileDateSelected: { color: colors.emeraldDeep },
+  tilePressed: { opacity: 0.7 },
+  tileThumbSelected: { borderColor: colors.emerald, borderWidth: 2 },
 
   // 下段 (= 待ちリスト or グラフ)
   bottomBlock: { flex: 1 },
@@ -493,6 +553,25 @@ const styles = StyleSheet.create({
   },
 
   graph: { flex: 1, justifyContent: 'flex-end', paddingBottom: spacing.sm },
+  graphHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingRight: spacing.xl,
+  },
+  sectionLabelInline: { marginBottom: spacing.sm },
+  graphReadout: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 13,
+    color: colors.ink,
+  },
+  pendingNotice: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 14.5,
+    color: colors.ink,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
+  },
   chartScroll: { flexGrow: 0 },
   chart: {
     alignItems: 'flex-end',
@@ -517,6 +596,8 @@ const styles = StyleSheet.create({
   },
   chartDay: { ...typography.labelSmall, fontSize: 9, color: colors.textFaint },
   chartMonth: { color: colors.textMute },
+  chartBarSelected: { backgroundColor: colors.ink, opacity: 1 },
+  chartDaySelected: { color: colors.ink },
 
   recordInvite: {
     ...typography.caption,

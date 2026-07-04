@@ -11,5 +11,5 @@ export {
 } from './sign';
 export { uploadToR2 } from './upload';
 export { registerClip } from './register';
-export { fetchMyClips } from './list';
+export { fetchMyClips, fetchClipMediaUrl } from './list';
 export { persistClipThumbnail, thumbPath, listThumbHashes } from './thumbs';
