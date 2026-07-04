@@ -52,6 +52,7 @@ export const LegalDocModal: React.FC<Props> = ({ doc, onClose }) => {
       visible={doc !== null}
       animationType="slide"
       presentationStyle="pageSheet"
+      supportedOrientations={['portrait', 'landscape']}
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
