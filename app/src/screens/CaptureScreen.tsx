@@ -33,7 +33,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient as SvgLinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Camera } from 'expo-camera';
 import * as Device from 'expo-device';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -216,17 +216,6 @@ interface CalibrationBaseline {
 async function saveBaseline(bbox: HandBoundingBox): Promise<void> {
   const data: CalibrationBaseline = { ...bbox, savedAt: Date.now() };
   await AsyncStorage.setItem(STORAGE_BASELINE_KEY, JSON.stringify(data));
-}
-
-// ─── 方向 → ヘッドセット案内文 ──────────────────────────────────────
-
-function headsetGuidance(direction: AdjustDirection): string {
-  switch (direction) {
-    case 'down':  return t('capture.guide.down');
-    case 'up':    return t('capture.guide.up');
-    case 'left':  return t('capture.guide.left');
-    case 'right': return t('capture.guide.right');
-  }
 }
 
 // ─── 画面本体 ─────────────────────────────────────────────────────────
@@ -803,28 +792,29 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // ─── HUD (= 画面下の字幕。 今やることを平易な日本語 1 文で) ────────────
   // 頭部装着中は画面が見えない前提: 音声が主チャネル、 画面は「装着前の準備」 と
   // 「外した瞬間の状態把握」 のためにある。 だからラベルや飾りではなく、 状態そのものを大きく言う。
+  // 字幕は TTS の読み上げ文そのまま (= 音声とスクリーンで説明が一致する)。
   const hud = ((): { text: string; tone: 'normal' | 'accent' | 'dim'; arrow?: AdjustDirection } | null => {
     switch (state.kind) {
       case 'announcing':
       case 'awaiting_palm':
-        return { text: t('capture.hud.intro'), tone: 'normal' };
+        return { text: t('capture.tts.intro'), tone: 'normal' };
       case 'palm_holding':
         return { text: t('capture.hud.detecting'), tone: 'accent' };
       case 'adjust_needed':
-        return { text: headsetGuidance(state.direction), tone: 'accent', arrow: state.direction };
+        return { text: calibAdjustText(state.direction), tone: 'accent', arrow: state.direction };
       case 'calibration_confirmed':
-        return { text: t('capture.hud.confirmed'), tone: 'accent' };
+        return { text: t('capture.tts.confirmed'), tone: 'accent' };
       case 'precapture_countdown':
         return { text: t('capture.hud.countdown'), tone: 'normal' };
       case 'recording':
         return { text: t('capture.hud.recordingHint'), tone: 'dim' };
       case 'stopping':
       case 'stopping_confirm':
-        return { text: t('capture.hud.stopping'), tone: 'accent' };
+        return { text: t('capture.tts.stoppingConfirm'), tone: 'accent' };
       case 'finalizing':
         return { text: t('capture.hud.saving'), tone: 'normal' };
       case 'next_task_announcing':
-        return { text: t('capture.hud.saved'), tone: 'normal' };
+        return { text: `${t('capture.tts.done')} ${t('capture.tts.continue')}`, tone: 'normal' };
     }
   })();
 
@@ -919,12 +909,23 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : null}
 
-      {/* 下部: 指示字幕 (= 今やること 1 文だけ、 遠くから読める大きさ) */}
+      {/* 下部: 指示字幕 (= TTS と同文。 グラデーションスクリムの上に、 遠くから読める大きさ) */}
       {hud ? (
         <View
-          style={[styles.hud, { paddingBottom: safeBottom + 20, paddingLeft: safeLeft + 32, paddingRight: safeRight + 32 }]}
+          style={[styles.hud, { paddingBottom: safeBottom + 22, paddingLeft: safeLeft + 32, paddingRight: safeRight + 32 }]}
           pointerEvents="none"
         >
+          <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none" viewBox="0 0 1 1">
+            <Defs>
+              <SvgLinearGradient id="hudScrim" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#06070A" stopOpacity="0" />
+                <Stop offset="0.45" stopColor="#06070A" stopOpacity="0.5" />
+                <Stop offset="1" stopColor="#06070A" stopOpacity="0.84" />
+              </SvgLinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="1" height="1" fill="url(#hudScrim)" />
+          </Svg>
+          <View style={styles.hudMark} />
           <View style={styles.hudLine}>
             {hud.arrow ? <ArrowGlyph dir={hud.arrow} /> : null}
             <Text
@@ -933,7 +934,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
                 hud.tone === 'accent' && styles.hudTextAccent,
                 hud.tone === 'dim' && styles.hudTextDim,
               ]}
-              numberOfLines={2}
+              numberOfLines={3}
             >
               {hud.text}
             </Text>
@@ -1125,32 +1126,50 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // 下部の指示字幕 (= 映画字幕の文法。 帯は薄く、 文字は大きく)
+  // 下部の指示字幕 (= 映画字幕の文法。 スクリムは SVG グラデーション、 文字は文章向けに整える)
   hud: {
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
-    paddingTop: 18,
-    backgroundColor: 'rgba(11,13,17,0.42)',
+    paddingTop: 52,
     alignItems: 'center',
+  },
+  // フィルムのリーダーマーク (= 字幕の座りを作る琥珀の小さな棒)
+  hudMark: {
+    width: 26,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.emerald,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
   },
   hudLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    maxWidth: 720,
+    gap: 14,
+    maxWidth: 820,
   },
   hudText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 23,
-    lineHeight: 32,
+    fontFamily: fonts.sansSemibold,
+    fontSize: 19.5,
+    lineHeight: 31,
+    letterSpacing: 0.3,
     color: '#FFFFFF',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowColor: 'rgba(0,0,0,0.45)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    textShadowRadius: 5,
   },
   hudTextAccent: { color: colors.emerald },
-  hudTextDim: { color: 'rgba(255,255,255,0.62)', fontSize: 17, lineHeight: 24, fontFamily: fonts.sansMedium },
+  hudTextDim: {
+    color: 'rgba(255,255,255,0.66)',
+    fontSize: 15.5,
+    lineHeight: 24,
+    fontFamily: fonts.sansMedium,
+    letterSpacing: 0.4,
+  },
 
   errCard: {
     backgroundColor: 'rgba(224,85,72,0.94)',

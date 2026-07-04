@@ -126,20 +126,10 @@ const ja = {
 
   // ── Capture flow: 画面下の指示字幕 (= 今やることを平易な 1 文で) ──
   'capture.recordingLabel': '録画中',
-  'capture.hud.intro': '両腕を前に伸ばして、 指先に顔を向けて 3 秒',
-  'capture.hud.detecting': 'そのまま…',
-  'capture.hud.confirmed': '位置が決まりました',
-  'capture.hud.countdown': 'まもなく撮影がはじまります',
-  'capture.hud.recordingHint': '終わりたいときは、 親指を立てたまま 3 秒',
-  'capture.hud.stopping': 'そのまま立て続けると、 終了します',
+  'capture.hud.detecting': 'そのまま、 動かずにお待ちください。',
+  'capture.hud.countdown': 'まもなく撮影がはじまります。',
+  'capture.hud.recordingHint': '終わりたいときは、 親指を立てたままお待ちください。',
   'capture.hud.saving': '保存しています…',
-  'capture.hud.saved': '保存しました。 続けるなら、 もう一度腕を伸ばしてください',
-
-  // ── Capture flow: ヘッドセット向き案内 (= ピル内) ──
-  'capture.guide.up': 'カメラをもう少し上に向けてください',
-  'capture.guide.down': 'カメラをもう少し下に向けてください',
-  'capture.guide.left': 'カメラをもう少し左に向けてください',
-  'capture.guide.right': 'カメラをもう少し右に向けてください',
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
   // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
@@ -295,20 +285,10 @@ const en: Record<TranslationKey, string> = {
 
   // ── Capture flow: bottom instruction caption ──
   'capture.recordingLabel': 'Recording',
-  'capture.hud.intro': 'Stretch your arms out front and face your fingertips for 3s',
-  'capture.hud.detecting': 'Hold still…',
-  'capture.hud.confirmed': 'Position set',
-  'capture.hud.countdown': 'Recording starts in a moment',
-  'capture.hud.recordingHint': 'To finish, hold a thumbs-up for 3 seconds',
-  'capture.hud.stopping': 'Keep holding to finish',
+  'capture.hud.detecting': 'Hold still, please.',
+  'capture.hud.countdown': 'Recording starts in a moment.',
+  'capture.hud.recordingHint': 'To finish, keep holding a thumbs-up.',
   'capture.hud.saving': 'Saving…',
-  'capture.hud.saved': 'Saved. To continue, stretch your arms out again',
-
-  // ── Capture flow: headset guidance ──
-  'capture.guide.up': 'Tilt the camera a little upward',
-  'capture.guide.down': 'Tilt the camera a little downward',
-  'capture.guide.left': 'Turn the camera a little to the left',
-  'capture.guide.right': 'Turn the camera a little to the right',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
   'capture.tts.intro': 'Let’s adjust the camera angle. Stretch both arms straight out in front of you and turn your face toward your fingertips.',
