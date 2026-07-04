@@ -124,18 +124,16 @@ const ja = {
   'capture.recStartFailed': '録画開始失敗',
   'capture.recStopFailed': '録画停止失敗',
 
-  // ── Capture flow: 状態ピル (= 画面上部中央) ──
-  'capture.state.announcing': 'CALIBRATE  ·  案内中…',
-  'capture.state.nextTaskAnnouncing': '撮影完了  ·  案内中…',
-  'capture.state.awaitingPalm': 'CALIBRATE  ·  両腕を前に伸ばして 3 秒',
-  'capture.state.palmHolding': 'CALIBRATE  ·  検出中…',
-  'capture.state.calibratePrefix': 'CALIBRATE',
-  'capture.state.calibrated': 'CALIBRATED  ·  まもなく開始',
-  'capture.state.starting': 'STARTING',
-  'capture.state.recording': 'RECORDING  ·  グッドサインで終了',
-  'capture.state.stopping': 'STOPPING  ·  グッドサイン検出',
-  'capture.state.stoppingConfirm': 'STOPPING  ·  立て続けると終了',
-  'capture.state.finalizing': 'FINALIZING',
+  // ── Capture flow: 画面下の指示字幕 (= 今やることを平易な 1 文で) ──
+  'capture.recordingLabel': '録画中',
+  'capture.hud.intro': '両腕を前に伸ばして、 指先に顔を向けて 3 秒',
+  'capture.hud.detecting': 'そのまま…',
+  'capture.hud.confirmed': '位置が決まりました',
+  'capture.hud.countdown': 'まもなく撮影がはじまります',
+  'capture.hud.recordingHint': '終わりたいときは、 親指を立てたまま 3 秒',
+  'capture.hud.stopping': 'そのまま立て続けると、 終了します',
+  'capture.hud.saving': '保存しています…',
+  'capture.hud.saved': '保存しました。 続けるなら、 もう一度腕を伸ばしてください',
 
   // ── Capture flow: ヘッドセット向き案内 (= ピル内) ──
   'capture.guide.up': 'カメラをもう少し上に向けてください',
@@ -295,18 +293,16 @@ const en: Record<TranslationKey, string> = {
   'capture.recStartFailed': 'Failed to start recording',
   'capture.recStopFailed': 'Failed to stop recording',
 
-  // ── Capture flow: status pill ──
-  'capture.state.announcing': 'CALIBRATE  ·  Get ready…',
-  'capture.state.nextTaskAnnouncing': 'CAPTURE DONE  ·  Nice work…',
-  'capture.state.awaitingPalm': 'CALIBRATE  ·  Arms out front for 3s',
-  'capture.state.palmHolding': 'CALIBRATE  ·  Detecting…',
-  'capture.state.calibratePrefix': 'CALIBRATE',
-  'capture.state.calibrated': 'CALIBRATED  ·  Starting soon',
-  'capture.state.starting': 'STARTING',
-  'capture.state.recording': 'RECORDING  ·  Thumbs-up to finish',
-  'capture.state.stopping': 'STOPPING  ·  Thumbs-up detected',
-  'capture.state.stoppingConfirm': 'STOPPING  ·  Hold to finish',
-  'capture.state.finalizing': 'FINALIZING',
+  // ── Capture flow: bottom instruction caption ──
+  'capture.recordingLabel': 'Recording',
+  'capture.hud.intro': 'Stretch your arms out front and face your fingertips for 3s',
+  'capture.hud.detecting': 'Hold still…',
+  'capture.hud.confirmed': 'Position set',
+  'capture.hud.countdown': 'Recording starts in a moment',
+  'capture.hud.recordingHint': 'To finish, hold a thumbs-up for 3 seconds',
+  'capture.hud.stopping': 'Keep holding to finish',
+  'capture.hud.saving': 'Saving…',
+  'capture.hud.saved': 'Saved. To continue, stretch your arms out again',
 
   // ── Capture flow: headset guidance ──
   'capture.guide.up': 'Tilt the camera a little upward',

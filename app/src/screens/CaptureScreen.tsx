@@ -26,7 +26,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
+  Animated,
   Pressable,
   StyleSheet,
   Text,
@@ -268,6 +268,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const [state, setState] = useState<CaptureState>({ kind: 'announcing' });
   const [error, setError] = useState<string | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
+  // 録画経過秒 (= 右上の読み出し)。 基準は native 録画開始の wall-clock (recordingStartedAtRef)。
+  const [elapsedSec, setElapsedSec] = useState(0);
   // 平滑化済みジェスチャー (= GestureOverlay 表示 + 再描画 trigger)。
   const [currentGesture, setCurrentGesture] = useState<'open_palm' | 'thumbs_up' | null>(null);
 
@@ -698,6 +700,18 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     return () => clearInterval(id);
   }, [state]);
 
+  // 録画経過タイマー (= 0.5s 刻み。 native 録画開始時刻を基準にするので state 遷移で揺れない)
+  useEffect(() => {
+    const k = state.kind;
+    const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
+    if (!active) { setElapsedSec(0); return; }
+    const id = setInterval(() => {
+      const base = recordingStartedAtRef.current;
+      if (base > 0) setElapsedSec(Math.floor((Date.now() - base) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, [state.kind]);
+
   // クリーンアップ (= 録画中なら停止。 session 自体は handoff effect の unmount cleanup が止める)
   useEffect(() => {
     return () => {
@@ -740,7 +754,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   if (permission === 'pending' || available === null) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={colors.emerald} />
         <Text style={styles.body}>{t('capture.preparing')}</Text>
       </View>
     );
@@ -776,6 +790,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 切替可能なのはキャリブレーション待機中のみ (= 録画フロー中は不可)。
   const inCaptureFlow = isRecording || state.kind === 'precapture_countdown' || state.kind === 'finalizing';
   const canSwitchConfig = !switching && !inCaptureFlow;
+  void canSwitchConfig; // スイッチャ UI コメントアウト中も切替ロジックは温存
 
   // プレビューは「実際に稼働中の構成」 の native view を出す (= 切替完了後に swap)。
   const PreviewView =
@@ -784,6 +799,34 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       : activeConfigId === 'ultra_wide'
         ? WideCapturePreviewView
         : null;
+
+  // ─── HUD (= 画面下の字幕。 今やることを平易な日本語 1 文で) ────────────
+  // 頭部装着中は画面が見えない前提: 音声が主チャネル、 画面は「装着前の準備」 と
+  // 「外した瞬間の状態把握」 のためにある。 だからラベルや飾りではなく、 状態そのものを大きく言う。
+  const hud = ((): { text: string; tone: 'normal' | 'accent' | 'dim'; arrow?: AdjustDirection } | null => {
+    switch (state.kind) {
+      case 'announcing':
+      case 'awaiting_palm':
+        return { text: t('capture.hud.intro'), tone: 'normal' };
+      case 'palm_holding':
+        return { text: t('capture.hud.detecting'), tone: 'accent' };
+      case 'adjust_needed':
+        return { text: headsetGuidance(state.direction), tone: 'accent', arrow: state.direction };
+      case 'calibration_confirmed':
+        return { text: t('capture.hud.confirmed'), tone: 'accent' };
+      case 'precapture_countdown':
+        return { text: t('capture.hud.countdown'), tone: 'normal' };
+      case 'recording':
+        return { text: t('capture.hud.recordingHint'), tone: 'dim' };
+      case 'stopping':
+      case 'stopping_confirm':
+        return { text: t('capture.hud.stopping'), tone: 'accent' };
+      case 'finalizing':
+        return { text: t('capture.hud.saving'), tone: 'normal' };
+      case 'next_task_announcing':
+        return { text: t('capture.hud.saved'), tone: 'normal' };
+    }
+  })();
 
   return (
     <View style={styles.root}>
@@ -795,7 +838,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           <PreviewView style={StyleSheet.absoluteFill} />
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.previewPlaceholder]}>
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.emerald} />
             <Text style={styles.body}>
               {switching ? t('capture.switchingConfig', { config: config.id }) : t('capture.previewStarting')}
             </Text>
@@ -807,6 +850,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           </View>
         ) : null}
       </View>
+
+      {/* 録画中の全周枠 (= 遠目でも「録画している」 が一目で分かる、 カメラの文法) */}
+      {isRecording ? <View style={styles.recFrame} pointerEvents="none" /> : null}
 
       {/*
         撮影構成スイッチャ (ultra_wide ⇄ arkit) は当面 arkit 固定運用のため UI を非表示にする
@@ -845,7 +891,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       ) : null}
       */}
 
-      {/* 左上: 戻る */}
+      {/* 左上: 戻る (録画中は緊急停止) */}
       <View style={[styles.chromeTopLeft, { top: safeTop + 12, left: safeLeft + 12 }]}>
         <Pressable
           accessibilityLabel={isRecording ? t('capture.emergencyStop') : t('common.back')}
@@ -864,33 +910,41 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         </Pressable>
       </View>
 
-      {/* 中央上: 状態ピル */}
-      <View
-        style={[styles.chromeTopCenter, { top: safeTop + 12, left: safeLeft + 60, right: safeRight + 60 }]}
-        pointerEvents="none"
-      >
-        <View style={styles.headerPill}>
-          <Text style={styles.headerStatus} numberOfLines={1}>{describeState(state)}</Text>
-        </View>
-      </View>
-
-      {/* 右上: REC indicator */}
+      {/* 右上: 録画中 + 経過時間 (= 機材の読み出し) */}
       {isRecording ? (
-        <View style={[styles.chromeTopRight, { top: safeTop + 12, right: safeRight + 12 }]} pointerEvents="none">
-          <View style={styles.recPill}>
-            <View style={styles.recDot} />
-            <Text style={styles.recLabel}>REC</Text>
+        <View style={[styles.recBadge, { top: safeTop + 12, right: safeRight + 12 }]} pointerEvents="none">
+          <PulsingDot />
+          <Text style={styles.recBadgeLabel}>{t('capture.recordingLabel')}</Text>
+          <Text style={styles.recBadgeTime}>{formatElapsed(elapsedSec)}</Text>
+        </View>
+      ) : null}
+
+      {/* 下部: 指示字幕 (= 今やること 1 文だけ、 遠くから読める大きさ) */}
+      {hud ? (
+        <View
+          style={[styles.hud, { paddingBottom: safeBottom + 20, paddingLeft: safeLeft + 32, paddingRight: safeRight + 32 }]}
+          pointerEvents="none"
+        >
+          <View style={styles.hudLine}>
+            {hud.arrow ? <ArrowGlyph dir={hud.arrow} /> : null}
+            <Text
+              style={[
+                styles.hudText,
+                hud.tone === 'accent' && styles.hudTextAccent,
+                hud.tone === 'dim' && styles.hudTextDim,
+              ]}
+              numberOfLines={2}
+            >
+              {hud.text}
+            </Text>
           </View>
         </View>
       ) : null}
 
-      {/* ジェスチャー可視化 (= 画面中央上に固定 2 個並び、 検出時のみ表示) */}
-      <GestureOverlay gesture={relevantGesture(currentGesture, state.kind)} topInset={safeTop} />
-
-      {/* エラー表示 (= 下中央) */}
+      {/* エラー表示 (= 字幕の上) */}
       {error ? (
         <View
-          style={[styles.chromeBottom, { bottom: safeBottom + 64, left: safeLeft + 16, right: safeRight + 96 }]}
+          style={[styles.chromeBottom, { bottom: safeBottom + 110, left: safeLeft + 16, right: safeRight + 16 }]}
           pointerEvents="none"
         >
           <View style={styles.errCard}>
@@ -902,12 +956,41 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// ─── ジェスチャー可視化 component (= 画面中央上に両手アイコンを並べ、 確定ジェスチャー時のみ表示) ────
+// ─── 小部品 ───────────────────────────────────────────────────────────
 
-const HAND_ICONS = {
-  open_palm: require('../../assets/icons/hand_open_palm.png'),
-  thumbs_up: require('../../assets/icons/hand_thumbs_up.png'),
+/// 録画中ドット (= ゆっくり明滅。 静止画でも赤が残るよう opacity 1 → 0.35)。
+const PulsingDot: React.FC = () => {
+  const anim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 1, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+  return <Animated.View style={[styles.recDot, { opacity: anim }]} />;
 };
+
+/// 方向矢印 (= カメラをどっちに向けるか。 琥珀の大きめグリフ)。
+const ArrowGlyph: React.FC<{ dir: AdjustDirection }> = ({ dir }) => {
+  const rotate = dir === 'up' ? '0deg' : dir === 'right' ? '90deg' : dir === 'down' ? '180deg' : '270deg';
+  return (
+    <View style={{ transform: [{ rotate }] }}>
+      <Svg width={26} height={26} viewBox="0 0 26 26" fill="none">
+        <Path d="M13 21 V6 M6.5 12.5 L13 6 L19.5 12.5" stroke={colors.emerald} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </View>
+  );
+};
+
+function formatElapsed(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s2 = sec % 60;
+  return `${m}:${s2.toString().padStart(2, '0')}`;
+}
 
 // per-hand gesture を 1 フレームのジェスチャーに集約する (= 判定ポリシー = TS 側が持つ本丸)。
 // 非 null の手が全て同じサインなら採用、 null の手は無視 (= 片手の単フレーム検出落ちを吸収して
@@ -925,10 +1008,8 @@ function frameGesture(
   return g;
 }
 
-// 現フェーズで「意味のある」 ジェスチャーだけを通す (= UI 表示 + 確定ビープのゲート)。
-//   キャリブ中    → open_palm のみ (= サムズは無関係)
-//   撮影中        → thumbs_up のみ (= 撮影開始後はパー UI 不要)
-//   それ以外(カウントダウン/finalizing 等) → 非表示
+// 現フェーズで「意味のある」 ジェスチャーだけを通す (= 確定ビープのゲート)。
+//   キャリブ中 → open_palm のみ、 撮影中 → thumbs_up のみ、 それ以外 → なし
 const CALIB_KINDS: CaptureState['kind'][] = [
   'announcing', 'next_task_announcing', 'awaiting_palm', 'palm_holding', 'adjust_needed', 'calibration_confirmed',
 ];
@@ -942,40 +1023,6 @@ function relevantGesture(
   return null;
 }
 
-// ジェスチャー UI は「両手の合議で確定した平滑化ジェスチャー」 にのみ紐づける (= 確定時に両手アイコンを
-// 一緒に出し、 それ以外は非表示)。 平滑化済みなので一瞬の片手落ちでは消えない。
-const GestureOverlay: React.FC<{
-  gesture: 'open_palm' | 'thumbs_up' | null;
-  topInset: number;
-}> = ({ gesture, topInset }) => {
-  if (gesture === null) return null;
-  const src = HAND_ICONS[gesture];
-  return (
-    <View style={[styles.gestureTop, { top: topInset + 64 }]} pointerEvents="none">
-      <Image source={src} style={styles.handIcon} resizeMode="contain" />
-      <Image source={src} style={[styles.handIcon, { transform: [{ scaleX: -1 }] }]} resizeMode="contain" />
-    </View>
-  );
-};
-
-// ─── 状態 → 表示文 ──────────────────────────────────────────────────
-
-function describeState(s: CaptureState): string {
-  switch (s.kind) {
-    case 'announcing':            return t('capture.state.announcing');
-    case 'next_task_announcing':  return t('capture.state.nextTaskAnnouncing');
-    case 'awaiting_palm':         return t('capture.state.awaitingPalm');
-    case 'palm_holding':          return t('capture.state.palmHolding');
-    case 'adjust_needed':         return `${t('capture.state.calibratePrefix')}  ·  ${headsetGuidance(s.direction)}`;
-    case 'calibration_confirmed': return t('capture.state.calibrated');
-    case 'precapture_countdown':  return t('capture.state.starting');
-    case 'recording':             return t('capture.state.recording');
-    case 'stopping':              return t('capture.state.stopping');
-    case 'stopping_confirm':      return t('capture.state.stoppingConfirm');
-    case 'finalizing':            return t('capture.state.finalizing');
-  }
-}
-
 // ─── styles ──────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -983,7 +1030,23 @@ const styles = StyleSheet.create({
   preview: { ...StyleSheet.absoluteFillObject },
   previewPlaceholder: { alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#000' },
 
-  // 撮影構成スイッチャ (= 画面下中央のチップ列)
+  center: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    padding: 24, gap: 12, backgroundColor: colors.paper,
+  },
+  eyebrow: { ...typography.label, color: colors.textMute },
+  body: { ...typography.body, color: colors.textInk, textAlign: 'center', maxWidth: 320 },
+  btn: {
+    marginTop: 12, paddingVertical: 10, paddingHorizontal: 24,
+    borderRadius: 8, backgroundColor: colors.card,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  btnLabel: {
+    color: colors.ink, fontSize: 14,
+    fontFamily: fonts.sansSemibold,
+  },
+
+  // 撮影構成スイッチャ (= コメントアウト中の復活用に温存)
   configSwitcher: {
     position: 'absolute',
     flexDirection: 'row',
@@ -1004,20 +1067,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.0,
   },
   configChipTextSel: { color: '#131519' },
-  center: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    padding: 24, gap: 12, backgroundColor: colors.paper,
-  },
-  eyebrow: { ...typography.label, color: colors.textMute },
-  body: { ...typography.body, color: colors.textInk, textAlign: 'center', maxWidth: 320 },
-  btn: {
-    marginTop: 12, paddingVertical: 10, paddingHorizontal: 24,
-    borderRadius: 8, backgroundColor: colors.ink,
-  },
-  btnLabel: {
-    color: colors.textOnInk, fontSize: 14,
-    fontFamily: fonts.sansSemibold,
-  },
 
   countdownOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -1034,24 +1083,7 @@ const styles = StyleSheet.create({
   },
 
   chromeTopLeft: { position: 'absolute' },
-  chromeTopRight: { position: 'absolute' },
-  chromeTopCenter: { position: 'absolute', alignItems: 'center' },
   chromeBottom: { position: 'absolute', alignItems: 'center' },
-
-  // 画面中央上に並ぶジェスチャーアイコン (= 2 個並び、 検出時のみ表示)
-  gestureTop: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  handIcon: {
-    width: 96,
-    height: 96,
-  },
 
   closeBtn: {
     width: 40, height: 40, borderRadius: 20,
@@ -1062,35 +1094,63 @@ const styles = StyleSheet.create({
   closeBtnRec: { backgroundColor: 'rgba(224,85,72,0.9)' },
   closeBtnPressed: { opacity: 0.7 },
 
-  headerPill: {
+  // 録画中の全周枠
+  recFrame: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3,
+    borderColor: 'rgba(224,85,72,0.85)',
+  },
+
+  // 右上: ● 録画中 0:00
+  recBadge: {
+    position: 'absolute',
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     backgroundColor: 'rgba(11,13,17,0.66)',
-    paddingHorizontal: 14, paddingVertical: 6,
+    paddingHorizontal: 12, paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  headerStatus: {
+  recDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#E05548' },
+  recBadgeLabel: {
     color: 'rgba(255,255,255,0.92)',
     fontFamily: fonts.sansMedium,
-    fontSize: 11,
-    letterSpacing: 1.2,
+    fontSize: 12,
+  },
+  recBadgeTime: {
+    color: 'rgba(255,255,255,0.92)',
+    fontFamily: fonts.mono,
+    fontSize: 12.5,
+    letterSpacing: 0.5,
   },
 
-  recPill: {
+  // 下部の指示字幕 (= 映画字幕の文法。 帯は薄く、 文字は大きく)
+  hud: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    paddingTop: 18,
+    backgroundColor: 'rgba(11,13,17,0.42)',
+    alignItems: 'center',
+  },
+  hudLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(224,85,72,0.95)',
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 999,
+    gap: 12,
+    maxWidth: 720,
   },
-  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
-  recLabel: {
-    color: '#fff',
-    fontFamily: fonts.mono,
-    fontSize: 10.5,
-    letterSpacing: 1.4,
+  hudText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 23,
+    lineHeight: 32,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
+  hudTextAccent: { color: colors.emerald },
+  hudTextDim: { color: 'rgba(255,255,255,0.62)', fontSize: 17, lineHeight: 24, fontFamily: fonts.sansMedium },
 
   errCard: {
     backgroundColor: 'rgba(224,85,72,0.94)',
@@ -1104,7 +1164,3 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
-
-// Suppress unused warning
-void Circle;
-void Path;
