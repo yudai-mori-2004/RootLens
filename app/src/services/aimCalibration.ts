@@ -27,9 +27,9 @@ import type { HandTrackEvent } from '../dataflow';
 export const AIM_PRIOR_PITCH_DOWN_DEG = 28;
 
 /// 誘導の許容幅と、 許容内で安定したとみなすまでの時間。 手でマウントを傾ける精度が ±2〜3° なので
-/// これ以上シビアにしても操作が空回りする。
+/// これ以上シビアにしても操作が空回りする。 保持時間は「目標付近でしばらく放置 → 確定」 の体感。
 export const AIM_TOLERANCE_DEG = 3;
-export const AIM_STABLE_MS = 1200;
+export const AIM_STABLE_MS = 1500;
 
 /// ARKit (iPhone 12 系 ARWorldTracking) の録画フレームは 1920×1440 (4:3 横長)。
 /// wide カメラ 26mm 相当の縦視野 ≈ 53°。 補正ステップは減衰付き反復なので誤差は収束に吸収される。

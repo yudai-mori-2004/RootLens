@@ -97,10 +97,9 @@ type CaptureState =
   // stillSince: 静止し続けている開始時刻 (0=動作中)。 lastPitch: 静止判定用の直前俯角。
   | { kind: 'mounting'; stillSince: number; lastPitch: number | null }
   | { kind: 'posture_announcing' }                         // 姿勢案内 TTS 中 (= 証明写真のポーズ)
-  // IMU 誘導中。 stableSince: 許容内に入り続けている開始時刻 (0=範囲外)。
-  // lastHint*: 直近に発話した誘導の方向・時刻・その時の誤差 (= 方向が変わるか、 間隔が空いて
-  // かつ改善していない時だけ言い直す。 動かしている最中に繰り返し急かさない)。
-  | { kind: 'aim_adjust'; stableSince: number; lastHintTs: number; lastHintDir: 'up' | 'down' | null; lastHintErrAbs: number }
+  // IMU 誘導中 (= パーキングセンサー式)。 方向は音声で言わず、 目標角をまたいだ瞬間の
+  // 音 + 振動だけで探させる。 stableSince: 許容内に入り続けている開始時刻 (0=範囲外)。
+  | { kind: 'aim_adjust'; stableSince: number }
   | { kind: 'aim_confirmed' }                              // 照準確定。 aimOk TTS (= 開始ジェスチャー案内込み)
   | { kind: 'awaiting_palm' }                              // 開始ジェスチャー (open_palm 3 秒) 待ち
   | { kind: 'palm_holding'; startTs: number }              // open_palm を 3 秒 hold 中
@@ -132,10 +131,9 @@ const COUNTDOWN_TICK_MS = 750;
 const HAND_LOST_WARN_MS = 5000;
 const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
 
-// 照準誘導のヒント発話: 同方向の言い直しは「15 秒経過 + 改善していない」 時だけ (= 急かさない)。
-const AIM_HINT_REPEAT_MS = 15000;
-// 前回ヒント時よりこれだけ誤差が縮んでいれば「改善中」 とみなして黙る。
-const AIM_IMPROVE_DEG = 1.5;
+// 交差ティック (= 目標角をまたいだ瞬間の音 + 振動) の連射抑制。 目標付近で行き来すると
+// 頻繁にまたぐが、 それ自体が「ここが目標」 のフィードバックなので軽い間引きだけにする。
+const AIM_CROSS_MIN_INTERVAL_MS = 180;
 // 装着待ちの静止判定: 俯角の変化がこの範囲に STILL_MS 収まり、 かつ装着らしい角度なら装着完了。
 const MOUNT_STILL_DELTA_DEG = 2;
 const MOUNT_STILL_MS = 2000;
@@ -160,6 +158,9 @@ function entryCue(s: CaptureState): { sfx?: SfxName; tts?: string; keep?: boolea
       return { tts: t('capture.tts.intro'), keep: true };
     case 'posture_announcing':
       return { tts: t('capture.tts.posture') };
+    case 'aim_adjust':
+      // 誘導の説明は入場時に 1 回だけ。 以降は交差ティック (音 + 振動) だけで探させる。
+      return { tts: t('capture.tts.aimExplore') };
     // next_task_announcing は二部構成 (お疲れさま → 間 → 続けるなら) なので state→audio effect で個別に積む。
     case 'aim_confirmed':
       // 照準確定。 到達ビープは ticker が即時再生する。 開始ジェスチャーの案内込み。
@@ -246,6 +247,15 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 録画中の手の在圏統計 (= クリップ終了時に目標俯角を更新) と「かけ直し」 監視。
   const aimStatsRef = useRef<SessionAimStats | null>(null);
   const redoMonitorRef = useRef<RedoMonitor | null>(null);
+  // 交差ティック用: 直前の誤差 (符号反転 = 目標角をまたいだ) と直近ティック時刻。
+  const aimPrevErrRef = useRef<number | null>(null);
+  const aimLastCrossTsRef = useRef(0);
+  useEffect(() => {
+    if (state.kind === 'aim_adjust') {
+      aimPrevErrRef.current = null;
+      aimLastCrossTsRef.current = 0;
+    }
+  }, [state.kind]);
   // 「今の voiced state が待っている発話の seq」 (0 = まだ発行前 / 音声ゲート無し)。
   // voiced state へ遷移する瞬間に 0 にし (= 前 state の完了済 seq との誤一致を防ぐ)、
   // state→audio effect が発話を enqueue した seq をここに入れる。 ticker は
@@ -518,7 +528,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       }
       case 'next_task_announcing': {
         // クリップ間は装着済みなので、 装着待ちを飛ばして照準確認へ。
-        if (speechDone()) setState({ kind: 'aim_adjust', stableSince: 0, lastHintTs: 0, lastHintDir: null, lastHintErrAbs: 999 });
+        if (speechDone()) {
+          awaitedSpeechSeqRef.current = 0;
+          setState({ kind: 'aim_adjust', stableSince: 0 });
+        }
         return;
       }
       case 'mounting': {
@@ -552,7 +565,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       }
       case 'posture_announcing': {
         // 姿勢案内を言い終わったら照準誘導へ。
-        if (speechDone()) setState({ kind: 'aim_adjust', stableSince: 0, lastHintTs: 0, lastHintDir: null, lastHintErrAbs: 999 });
+        if (speechDone()) {
+          awaitedSpeechSeqRef.current = 0;
+          setState({ kind: 'aim_adjust', stableSince: 0 });
+        }
         return;
       }
       case 'aim_adjust': {
@@ -566,12 +582,22 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         const pitch = reading.pitchDownDeg;
         if (pitch == null) return; // 動かしている最中 / 未計測
         const err = pitch - aimTargetPitchDownDeg(); // 正 = 下向きすぎ
+
+        // 交差ティック: 目標角をまたいだ瞬間に音 + 振動 (= どっちに傾けるかは言わず、 探させる)。
+        const prevErr = aimPrevErrRef.current;
+        aimPrevErrRef.current = err;
+        if (prevErr != null && err * prevErr < 0 && now - aimLastCrossTsRef.current >= AIM_CROSS_MIN_INTERVAL_MS) {
+          aimLastCrossTsRef.current = now;
+          playSfx('countdown_tick');
+          Vibration.vibrate(60);
+        }
+
         if (Math.abs(err) <= AIM_TOLERANCE_DEG) {
           const since = cur.stableSince || now;
           if (now - since >= AIM_STABLE_MS) {
-            // 到達の合図は音 + 振動 (= 画面が見えない装着者に「今合った」 を即時に伝える)。
+            // 目標付近でしばらく保持 → 確定。 到達音 + 長めの振動で「もう動かさなくていい」 を伝える。
             playSfx('detect_palm');
-            Vibration.vibrate(300);
+            Vibration.vibrate(400);
             awaitedSpeechSeqRef.current = 0;
             setState({ kind: 'aim_confirmed' });
           } else if (since !== cur.stableSince) {
@@ -579,24 +605,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           }
           return;
         }
-        // 範囲外。 言い直すのは (a) 方向が変わった時、 (b) 15 秒経ってなお改善していない時だけ。
-        // 誤差が縮み続けている間は黙る (= 調整中の人を急かさない)。
-        const errAbs = Math.abs(err);
-        const dir: 'up' | 'down' = err > 0 ? 'up' : 'down';
-        const improving = errAbs < cur.lastHintErrAbs - AIM_IMPROVE_DEG;
-        const changedDir = cur.lastHintDir != null && dir !== cur.lastHintDir;
-        const firstHint = cur.lastHintDir == null;
-        const staleHint = now - cur.lastHintTs >= AIM_HINT_REPEAT_MS && !improving;
-        if (firstHint || changedDir || staleHint) {
-          clearAudioQueue();
-          enqueueSpeak(dir === 'down' ? t('capture.tts.aimDown') : t('capture.tts.aimUp'));
-          setState({ kind: 'aim_adjust', stableSince: 0, lastHintTs: now, lastHintDir: dir, lastHintErrAbs: errAbs });
-        } else if (improving) {
-          // 改善の基準点を更新 (= さらに縮まない限り言い直さない)。
-          setState({ ...cur, stableSince: 0, lastHintErrAbs: errAbs });
-        } else if (cur.stableSince !== 0) {
-          setState({ ...cur, stableSince: 0 });
-        }
+        if (cur.stableSince !== 0) setState({ ...cur, stableSince: 0 });
         return;
       }
       case 'aim_confirmed': {
@@ -871,11 +880,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       case 'posture_announcing':
         return { text: t('capture.tts.posture'), tone: 'normal' };
       case 'aim_adjust':
-        // 許容内で安定待ちなら「そのまま」、 範囲外なら直近の誘導文言 (= TTS と同文)。
+        // 許容内で安定待ちなら「そのまま」、 探索中は説明文 (= TTS と同文)。
         if (state.stableSince !== 0) return { text: t('capture.hud.detecting'), tone: 'accent' };
-        if (state.lastHintDir === 'down') return { text: t('capture.tts.aimDown'), tone: 'normal' };
-        if (state.lastHintDir === 'up') return { text: t('capture.tts.aimUp'), tone: 'normal' };
-        return { text: t('capture.tts.posture'), tone: 'normal' };
+        return { text: t('capture.tts.aimExplore'), tone: 'normal' };
       case 'aim_confirmed':
       case 'awaiting_palm':
         return { text: t('capture.tts.aimOk'), tone: state.kind === 'aim_confirmed' ? 'accent' : 'normal' };

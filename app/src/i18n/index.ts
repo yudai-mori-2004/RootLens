@@ -136,8 +136,7 @@ const ja = {
   // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
   'capture.tts.intro': 'これから撮影の準備をします。スマホをヘッドセットに取り付けて、頭に装着してください。',
   'capture.tts.posture': '装着できたら、まっすぐ立って正面を見てください。あごを軽く引いて、そのまま動かずにお待ちください。',
-  'capture.tts.aimDown': 'スマホを少しだけ下に傾けてください。',
-  'capture.tts.aimUp': 'スマホを少しだけ上に傾けてください。',
+  'capture.tts.aimExplore': 'スマホをゆっくり傾けて、音と振動があったところで止めてください。',
   'capture.tts.aimOk': 'ちょうどいい向きになりました。撮影を始めるときは、両手をまっすぐ前に伸ばして、手のひらをカメラに向けたまま、少しお待ちください。',
   'capture.tts.confirmed': 'これより撮影を開始いたします。',
   'capture.tts.done': '撮影が完了いたしました。お疲れさまでした。',
@@ -296,8 +295,7 @@ const en: Record<TranslationKey, string> = {
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
   'capture.tts.intro': 'Let’s get ready to record. Attach the phone to the headset and put it on.',
   'capture.tts.posture': 'Once it’s on, stand up straight and face forward. Tuck your chin slightly and hold still.',
-  'capture.tts.aimDown': 'Tilt the phone down a little.',
-  'capture.tts.aimUp': 'Tilt the phone up a little.',
+  'capture.tts.aimExplore': 'Slowly tilt the phone, and stop where you feel the beep and vibration.',
   'capture.tts.aimOk': 'The camera is aimed just right. When you are ready to record, stretch both hands straight out with your palms toward the camera, and hold.',
   'capture.tts.confirmed': 'We will now begin recording.',
   'capture.tts.done': 'Recording complete. Nice work.',
