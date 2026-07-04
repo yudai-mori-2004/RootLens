@@ -128,8 +128,7 @@ const ja = {
   'capture.recordingLabel': '録画中',
   'capture.hud.detecting': 'そのまま、動かずにお待ちください。',
   'capture.hud.aimReadout': '傾き {current}°(目標 {target}°)',
-  'capture.hud.countdown': 'まもなく撮影がはじまります。',
-  'capture.hud.recordingHint': '終わりたいときは、親指を立てたままお待ちください。',
+  'capture.hud.recordingHint': '終わりたいときは、指を3本、2本、1本の順に立ててください。',
   'capture.hud.saving': '保存しています…',
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
@@ -137,12 +136,10 @@ const ja = {
   'capture.tts.intro': 'これから撮影の準備をします。スマホをヘッドセットに取り付けて、頭に装着してください。',
   'capture.tts.posture': '装着できたら、まっすぐ立って正面を見てください。あごを軽く引いて、そのまま動かずにお待ちください。',
   'capture.tts.aimExplore': 'スマホをゆっくり傾けて、音と振動があったところで止めてください。',
-  'capture.tts.aimOk': 'ちょうどいい向きになりました。撮影を始めるときは、両手をまっすぐ前に伸ばして、手のひらをカメラに向けたまま、少しお待ちください。',
-  'capture.tts.confirmed': 'これより撮影を開始いたします。',
+  'capture.tts.aimOk': 'ちょうどいい向きになりました。撮影を始めるときは、カメラに向かって、指を3本、2本、1本の順に立ててください。',
   'capture.tts.done': '撮影が完了いたしました。お疲れさまでした。',
   'capture.tts.continue': '引き続き撮影される場合は、そのままお待ちください。カメラの向きを確認します。',
   'capture.tts.redoSuggest': '手が画面の下に外れがちです。きりの良いところで一度撮影を終えて、かけ直してください。',
-  'capture.tts.stoppingConfirm': 'そのまま親指を立て続けると、撮影を終了します',
   'capture.tts.handLost': '両手がカメラに映るようにしてください',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
@@ -288,20 +285,17 @@ const en: Record<TranslationKey, string> = {
   'capture.recordingLabel': 'Recording',
   'capture.hud.detecting': 'Hold still, please.',
   'capture.hud.aimReadout': 'Tilt {current}° (target {target}°)',
-  'capture.hud.countdown': 'Recording starts in a moment.',
-  'capture.hud.recordingHint': 'To finish, keep holding a thumbs-up.',
+  'capture.hud.recordingHint': 'To finish, hold up three fingers, then two, then one.',
   'capture.hud.saving': 'Saving…',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
   'capture.tts.intro': 'Let’s get ready to record. Attach the phone to the headset and put it on.',
   'capture.tts.posture': 'Once it’s on, stand up straight and face forward. Tuck your chin slightly and hold still.',
   'capture.tts.aimExplore': 'Slowly tilt the phone, and stop where you feel the beep and vibration.',
-  'capture.tts.aimOk': 'The camera is aimed just right. When you are ready to record, stretch both hands straight out with your palms toward the camera, and hold.',
-  'capture.tts.confirmed': 'We will now begin recording.',
+  'capture.tts.aimOk': 'The camera is aimed just right. To start recording, face the camera and hold up three fingers, then two, then one.',
   'capture.tts.done': 'Recording complete. Nice work.',
   'capture.tts.continue': 'To keep recording, please hold on while we check the camera angle.',
   'capture.tts.redoSuggest': 'Your hands keep slipping below the frame. At a good stopping point, please end this recording and re-seat the headset.',
-  'capture.tts.stoppingConfirm': 'Keep holding your thumbs up to finish recording.',
   'capture.tts.handLost': 'Please keep both hands in view of the camera.',
 
   // ── Upload consent pop (= tap a card in My Videos) ──

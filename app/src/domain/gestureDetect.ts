@@ -1,58 +1,26 @@
-import {
-  HAND_LANDMARK_INDICES as J,
-  type HandLandmark,
-  type HandObservation,
-} from '../native/handPose';
+import { HAND_LANDMARK_INDICES as J } from '../native/handPose';
+
+/** 判定に必要な最小の landmark 形 (= native HandObservation / dataflow WearerHandObservation の両方が満たす)。 */
+export interface CountLandmark { x: number; y: number; confidence: number; }
+export interface CountableHand {
+  landmarks: CountLandmark[];
+  /** 検出信頼度。 native は score、 dataflow は confidence で持つ。 */
+  score?: number;
+  confidence?: number;
+}
 
 // Hand pose 21-joint からのジェスチャー判定。
 //
+// v0.1.4: 録画の開始・終了トリガーは「指を 3 本 → 2 本 → 1 本」 のカウントダウン系列。
+// 静的な 1 ポーズ (パー / サムズアップ) は家事の自然な手と幾何的に衝突して誤検出するが、
+// 「決まった本数を順番に、 各段一定時間保持」 という系列が自然発生する確率は桁で低い。
+// 途中で崩れても何も起きない (= フェイルセーフ) のもポーズ保持型に対する利点。
+//
 // 設計方針:
-//   - 関節角度ベースの極めて素朴な heuristic。学習モデルではない。
-//   - 統合実装フェーズで MediaPipe Gesture Recognizer や独自学習モデルに差し替え可能なよう、
-//     入力 (HandObservation) と出力 (GestureLabel | null) のみを公開する。
-//
-// 対応ジェスチャー:
-//   - "thumbs_up": 親指のみ伸びていて他 4 本が折れている。さらに親指 TIP が wrist より上 (画像 Y 小さい)。
-//   - "open_palm": 5 本全部が伸びている (パー)。
-//
-// チャタリング防止:
-//   - GestureStabilizer が連続 N フレーム同じラベルを出して初めて確定する。
+//   - 関節角度ベースの素朴な heuristic。 学習モデルではない。
+//   - 入力 (CountableHand) と出力 (系列イベント) だけを公開し、 実装は差し替え可能に保つ。
 
-export type GestureLabel = 'thumbs_up' | 'open_palm';
-
-/**
- * 1 frame の単一手の判定結果。安定化前の生 detection。
- */
-export function detectGesture(hand: HandObservation): GestureLabel | null {
-  if (hand.landmarks.length < 21) return null;
-  if (hand.score < 0.5) return null;
-  const lm = hand.landmarks;
-
-  const thumbExt = isThumbExtended(lm);
-  const indexExt = isFingerExtended(lm, 'index');
-  const middleExt = isFingerExtended(lm, 'middle');
-  const ringExt = isFingerExtended(lm, 'ring');
-  const pinkyExt = isFingerExtended(lm, 'pinky');
-
-  const others = [indexExt, middleExt, ringExt, pinkyExt];
-  const allOthersFolded = others.every((e) => !e);
-  const allOthersExtended = others.every((e) => e);
-
-  if (thumbExt && allOthersFolded) {
-    // 親指が wrist より上に来ているか (画像 top-left 原点なので y が小さい = 上)
-    const thumbTip = lm[J.THUMB_TIP];
-    const wrist = lm[J.WRIST];
-    if (thumbTip.y < wrist.y) {
-      return 'thumbs_up';
-    }
-  }
-  if (thumbExt && allOthersExtended) {
-    return 'open_palm';
-  }
-  return null;
-}
-
-// MARK: - Finger extension heuristics
+// MARK: - 指の伸展判定
 
 type FingerName = 'index' | 'middle' | 'ring' | 'pinky';
 
@@ -68,7 +36,7 @@ const FINGER_INDICES: Record<FingerName, { mcp: number; pip: number; dip: number
  * MCP→TIP の距離が MCP→PIP の 1.6 倍以上なら extended、未満なら curled。
  * (折り曲げると TIP が MCP に近づくため距離比で十分検出できる)
  */
-function isFingerExtended(lm: HandLandmark[], finger: FingerName): boolean {
+function isFingerExtended(lm: CountLandmark[], finger: FingerName): boolean {
   const f = FINGER_INDICES[finger];
   const tip = lm[f.tip];
   const pip = lm[f.pip];
@@ -85,7 +53,7 @@ function isFingerExtended(lm: HandLandmark[], finger: FingerName): boolean {
  * 親指は手首-CMC-MCP-IP-TIP の構造が他指と異なるため別判定。
  * CMC→TIP の距離が CMC→MCP の 1.5 倍以上なら extended。
  */
-function isThumbExtended(lm: HandLandmark[]): boolean {
+function isThumbExtended(lm: CountLandmark[]): boolean {
   const tip = lm[J.THUMB_TIP];
   const mcp = lm[J.THUMB_MCP];
   const cmc = lm[J.THUMB_CMC];
@@ -96,52 +64,112 @@ function isThumbExtended(lm: HandLandmark[]): boolean {
   return dTipCmc > 1.5 * dMcpCmc;
 }
 
-function dist2(a: HandLandmark, b: HandLandmark): number {
+function dist2(a: CountLandmark, b: CountLandmark): number {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   // z は iOS で常に 0 のため平面距離で十分
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-// MARK: - Stabilizer (チャタリング防止)
+// MARK: - 指本数カウント
 
 /**
- * 連続 N フレーム同じ label が出て初めて confirm する単純な多数決安定器。
- * 30fps を想定して default windowSize=5 (約 167ms)。
- *
- * 用途: gesture trigger を録画開始/終了に使う場合、瞬間的な誤検出をフィルタする。
+ * 立っている指の本数 (親指込み 0..5)。 判定不能 (信頼度不足) は null。
+ * どの指かは問わない (= 「3 本」 は人により親指込み・薬指込みが分かれるため本数だけ見る)。
  */
-export class GestureStabilizer {
-  private readonly windowSize: number;
-  private buffer: (GestureLabel | null)[] = [];
-  private lastConfirmed: GestureLabel | null = null;
+export function countExtendedFingers(hand: CountableHand): number | null {
+  const quality = hand.score ?? hand.confidence ?? 0;
+  if (hand.landmarks.length < 21 || quality < 0.5) return null;
+  const lm = hand.landmarks;
+  let n = isThumbExtended(lm) ? 1 : 0;
+  for (const f of ['index', 'middle', 'ring', 'pinky'] as const) {
+    if (isFingerExtended(lm, f)) n++;
+  }
+  return n;
+}
 
-  constructor(windowSize = 5) {
-    this.windowSize = windowSize;
+/** frame 内で最も score の高い手の指本数。 手が無ければ null。 */
+export function bestHandFingerCount(hands: CountableHand[]): number | null {
+  let best: CountableHand | null = null;
+  for (const h of hands) {
+    if (!best || (h.score ?? h.confidence ?? 0) > (best.score ?? best.confidence ?? 0)) best = h;
+  }
+  return best ? countExtendedFingers(best) : null;
+}
+
+// MARK: - 3→2→1 カウントダウン系列検出
+
+/// 各段の確定に必要な保持時間と、 段間の制限時間。 保持はサンプル多数決 (下の WINDOW) の上に乗る。
+const STEP_DWELL_MS = 400;
+const STEP_TIMEOUT_MS = 4000;
+/// 多数決ウィンドウ (= 30Hz 入力で ~170ms。 遷移中の中間形状や単フレーム誤読を吸収)。
+const SMOOTH_WINDOW = 5;
+
+export type CountdownEvent = 'step' | 'complete';
+
+/**
+ * 「3 本 → 2 本 → 1 本」 の系列検出器。 push に毎フレームの指本数 (手なし = null) を流すと、
+ * 3・2 の確定で 'step'、 1 の確定 (= 系列完了) で 'complete' を返す。
+ * 期待と違う本数は無視 (= リセットしない。 遷移中のブレで系列が壊れない)。
+ * 進捗が STEP_TIMEOUT_MS 途絶えたら最初からやり直し。
+ */
+export class CountdownSequenceDetector {
+  private window: (number | null)[] = [];
+  private expected = 3;
+  private dwellStart = 0;
+  private lastProgressTs = 0;
+
+  /** 多数決済みの現在本数 (null = 不定)。 */
+  private stableCount(): number | null {
+    if (this.window.length < SMOOTH_WINDOW) return null;
+    const tally = new Map<number, number>();
+    for (const c of this.window) {
+      if (c == null) continue;
+      tally.set(c, (tally.get(c) ?? 0) + 1);
+    }
+    let best: number | null = null;
+    let bestN = 0;
+    for (const [c, n] of tally) {
+      if (n > bestN) { best = c; bestN = n; }
+    }
+    // 過半数を要求 (= ウィンドウ内で優勢でも半分未満なら不定扱い)
+    return bestN > SMOOTH_WINDOW / 2 ? best : null;
   }
 
-  /**
-   * 新しい label を投入し、安定化済み (= 直近 windowSize 連続で同じだった) ラベルを返す。
-   * 確定が変わらない間は同じ値を返す。
-   */
-  push(label: GestureLabel | null): GestureLabel | null {
-    this.buffer.push(label);
-    if (this.buffer.length > this.windowSize) {
-      this.buffer.shift();
+  push(count: number | null, nowMs: number): CountdownEvent | null {
+    this.window.push(count);
+    if (this.window.length > SMOOTH_WINDOW) this.window.shift();
+
+    // 進捗の途絶 (段の途中で放置 / 手を下ろした) は最初から。
+    if (this.lastProgressTs !== 0 && nowMs - this.lastProgressTs > STEP_TIMEOUT_MS) this.resetProgress();
+
+    const stable = this.stableCount();
+    if (stable !== this.expected) {
+      this.dwellStart = 0;
+      return null;
     }
-    if (this.buffer.length < this.windowSize) {
-      return this.lastConfirmed;
+    if (this.dwellStart === 0) this.dwellStart = nowMs;
+    if (nowMs - this.dwellStart < STEP_DWELL_MS) return null;
+
+    // 段確定
+    this.dwellStart = 0;
+    this.lastProgressTs = nowMs;
+    if (this.expected === 1) {
+      this.resetProgress();
+      return 'complete';
     }
-    const first = this.buffer[0];
-    const allSame = this.buffer.every((l) => l === first);
-    if (allSame) {
-      this.lastConfirmed = first;
-    }
-    return this.lastConfirmed;
+    this.expected--;
+    return 'step';
+  }
+
+  private resetProgress(): void {
+    this.expected = 3;
+    this.dwellStart = 0;
+    this.lastProgressTs = 0;
   }
 
   reset(): void {
-    this.buffer = [];
-    this.lastConfirmed = null;
+    this.window = [];
+    this.resetProgress();
   }
 }
