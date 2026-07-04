@@ -14,16 +14,13 @@ import UIKit
 //    session を起動し、 AVCaptureSession と ARSession がカメラ (排他リソース) を奪い合って
 //    FigCaptureSession がクラッシュした。 session 制御を JS 一本に寄せて競合を断つ。
 //
-// アスペクト挙動: ARSCNView は内部で `displayTransform(for:viewportSize:)` を使って camera
-// 映像を view に貼り付ける。 default の挙動だと iPhone 12 のような縦長 / 横長 display で
-// カメラ (4:3) との比率差が letterbox (= 黒い領域) として残る。
+// アスペクト挙動: ARSCNView は自分の viewport を camera 映像で fill (= 比率が違えば crop) する。
+// そこで scnView の frame をカメラ比率ちょうどで view の内側に収める (= aspect-fit / contain)。
+// scnView 自身の比率がカメラと一致するので crop は発生せず、 録画される全画角がそのまま見える。
+// 余白 (= 横長画面に 4:3 なら左右) は黒帯になる。 プレビューで切れて見えると「録画も切れている」
+// ように誤解されるため、 fill ではなく fit を採用 (2026-07-05)。
 //
-// 対策: parent の bounds を超えるサイズで scnView を配置 (= aspect-fill / overscan) し、
-// parent 側で clipsToBounds = true でクリップする。 view aspect とカメラ aspect から
-// scnView の frame を毎レイアウト計算する。
-//
-// カメラ aspect は ARKit が選んでいる videoFormat から取得。 iPhone 12 系は 4:3、
-// iPhone 14 Pro+ で ultra-wide を選んだ場合は別の aspect になる。
+// カメラ aspect は ARKit が選んでいる videoFormat から取得 (= iPhone 12 系 1920x1440 の 4:3)。
 
 final class ArkitCapturePreviewView: ExpoView {
   private let scnView = ARSCNView(frame: .zero)
@@ -41,18 +38,17 @@ final class ArkitCapturePreviewView: ExpoView {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    layoutScnViewAspectFill()
+    layoutScnViewAspectFit()
   }
 
-  // カメラ aspect (= sensor 比率) を display orientation に変換して、 view を aspect-fill するための
+  // カメラ aspect (= sensor 比率) を display orientation に変換して、 view に aspect-fit するための
   // scnView frame を計算する。
   //
   // - sensor 比率: 例えば iPhone 12 ARWorldTracking = 1920×1440 (= 4:3 横長)
   // - display orientation が portrait なら、 camera は 90° 回転して 3:4 縦長として描画される
   // - landscape なら sensor のまま 4:3 横長
-  // 計算した「display 上のカメラ比率」 を view bounds に対して aspect-fill (= 大きい方を超過させて
-  // crop) するように scnView の frame を決める。
-  private func layoutScnViewAspectFill() {
+  // 計算した「display 上のカメラ比率」 のまま view bounds の内側いっぱいに収まる frame を決める。
+  private func layoutScnViewAspectFit() {
     let viewW = bounds.width
     let viewH = bounds.height
     guard viewW > 0, viewH > 0 else { return }
@@ -75,13 +71,13 @@ final class ArkitCapturePreviewView: ExpoView {
     let scnW: CGFloat
     let scnH: CGFloat
     if viewAR > cameraAR {
-      // view の方が camera より wide。 高さを超過させて crop。
-      scnW = viewW
-      scnH = viewW / cameraAR
-    } else {
-      // view の方が camera より tall。 幅を超過させて crop。
+      // view の方が camera より wide。 高さ基準で収めて左右に黒帯。
       scnH = viewH
       scnW = viewH * cameraAR
+    } else {
+      // view の方が camera より tall。 幅基準で収めて上下に黒帯。
+      scnW = viewW
+      scnH = viewW / cameraAR
     }
     scnView.frame = CGRect(x: (viewW - scnW) / 2, y: (viewH - scnH) / 2, width: scnW, height: scnH)
   }

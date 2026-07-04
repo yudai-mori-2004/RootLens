@@ -4,7 +4,8 @@ import UIKit
 
 // AVCaptureSession のプレビュー描画 View。
 // WideCaptureController.shared の session を attach する。
-// landscape 固定の ultra wide preview なので、 videoGravity = .resizeAspectFill で画面いっぱい。
+// landscape 固定の ultra wide preview。 videoGravity = .resizeAspect (= contain) で、
+// 録画される全画角をそのまま見せる (= arkit 側の PreviewView と同じ方針)。
 //
 // 重要: AVCaptureVideoPreviewLayer の connection.videoOrientation を毎 layout で適用する。
 // default は .portrait なので、 landscape 表示時に映像が 90 度ずれる。
@@ -17,7 +18,7 @@ final class WideCapturePreviewView: ExpoView {
 
   required init(appContext: AppContext? = nil) {
     let layer = AVCaptureVideoPreviewLayer()
-    layer.videoGravity = .resizeAspectFill
+    layer.videoGravity = .resizeAspect
     self.previewLayer = layer
     super.init(appContext: appContext)
     self.layer.addSublayer(previewLayer)
