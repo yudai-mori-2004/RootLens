@@ -134,10 +134,11 @@ const ja = {
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
   // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
-  'capture.tts.intro': 'カメラの向きを合わせます。背筋を伸ばして立ち、目の高さにある遠くの一点を見てください。',
-  'capture.tts.aimDown': 'スマホを少しずつ下に傾けてください。',
-  'capture.tts.aimUp': 'スマホを少しずつ上に傾けてください。',
-  'capture.tts.aimOk': 'カメラの向きが合いました。撮影を始めるときは、両腕をまっすぐ前に伸ばして、手のひらをこちらに向けたまま少しお待ちください。',
+  'capture.tts.intro': 'これから撮影の準備をします。スマホをヘッドセットに取り付けて、頭に装着してください。',
+  'capture.tts.posture': '装着できたら、まっすぐ立って正面を見てください。あごを軽く引いて、そのまま動かずにお待ちください。',
+  'capture.tts.aimDown': 'スマホを少しだけ下に傾けてください。',
+  'capture.tts.aimUp': 'スマホを少しだけ上に傾けてください。',
+  'capture.tts.aimOk': 'ちょうどいい向きになりました。撮影を始めるときは、両手をまっすぐ前に伸ばして、手のひらをカメラに向けたまま、少しお待ちください。',
   'capture.tts.confirmed': 'これより撮影を開始いたします。',
   'capture.tts.done': '撮影が完了いたしました。お疲れさまでした。',
   'capture.tts.continue': '引き続き撮影される場合は、そのままお待ちください。カメラの向きを確認します。',
@@ -293,10 +294,11 @@ const en: Record<TranslationKey, string> = {
   'capture.hud.saving': 'Saving…',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
-  'capture.tts.intro': 'Let’s aim the camera. Stand up straight and look at a distant point at eye level.',
-  'capture.tts.aimDown': 'Tilt the phone down a little at a time.',
-  'capture.tts.aimUp': 'Tilt the phone up a little at a time.',
-  'capture.tts.aimOk': 'The camera is aimed. When you are ready to record, stretch both arms straight out with your palms toward the camera, and hold.',
+  'capture.tts.intro': 'Let’s get ready to record. Attach the phone to the headset and put it on.',
+  'capture.tts.posture': 'Once it’s on, stand up straight and face forward. Tuck your chin slightly and hold still.',
+  'capture.tts.aimDown': 'Tilt the phone down a little.',
+  'capture.tts.aimUp': 'Tilt the phone up a little.',
+  'capture.tts.aimOk': 'The camera is aimed just right. When you are ready to record, stretch both hands straight out with your palms toward the camera, and hold.',
   'capture.tts.confirmed': 'We will now begin recording.',
   'capture.tts.done': 'Recording complete. Nice work.',
   'capture.tts.continue': 'To keep recording, please hold on while we check the camera angle.',
