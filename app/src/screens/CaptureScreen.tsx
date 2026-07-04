@@ -13,9 +13,9 @@
 //   1. 照準 (aim_adjust)
 //        - 俯角が目標 ±3° に 1.2 秒収まったら音 + 振動で確定 → 開始ジェスチャーの案内
 //   2. 開始ジェスチャー
-//        - 両腕を伸ばして open_palm を 3 秒 hold → カウントダウン → 録画
+//        - 両手でグー ⇄ チョキを 3 往復 → 完了と同時に録画開始 (= 機械カウントダウン無し)
 //   3. 撮影
-//        - サムズアップ 1 秒 → 停止確認 → 録画停止 → 次タスク提案 → 照準確認に戻る
+//        - 同じグーチョキ 3 往復で録画停止 → 次タスク提案 → 照準確認に戻る
 //        - 両手が 5 秒以上画面から外れたら警告音 + TTS
 //        - 手が下端に外れ続ける (= 照準が上すぎるシグネチャ) なら 1 回だけ「かけ直し」 を提案
 //        - 60 分は native 側で hard cap
@@ -68,7 +68,7 @@ import {
   updateLearnedAim,
   useCameraPitch,
 } from '../services/aimCalibration';
-import { CountdownSequenceDetector, bestHandFingerCount } from '../domain/gestureDetect';
+import { GuChokiDetector } from '../domain/gestureDetect';
 import { t, useT } from '../i18n';
 import { colors, fonts, typography } from '../theme';
 
@@ -101,15 +101,15 @@ type CaptureState =
   // 音 + 振動だけで探させる。 stableSince: 許容内に入り続けている開始時刻 (0=範囲外)。
   | { kind: 'aim_adjust'; stableSince: number }
   | { kind: 'aim_confirmed' }                              // 照準確定。 aimOk TTS (= 開始ジェスチャー案内込み)
-  // 開始ジェスチャー (指 3→2→1) 待ち。 系列検出は subscription が startSeqRef に流す。
+  // 開始ジェスチャー (両手グーチョキ 3 往復) 待ち。 検出は subscription が startSeqRef に流す。
   | { kind: 'awaiting_start' }
-  // 録画中。 終了ジェスチャー (指 3→2→1) は stopSeqRef が検出し、 完了で finalizing へ。
+  // 録画中。 終了ジェスチャー (同じグーチョキ 3 往復) は stopSeqRef が検出し、 完了で finalizing へ。
   | { kind: 'recording'; startTs: number; lastHandSeenTs: number; lastWarnTs: number }
   | { kind: 'finalizing' };
 
-// 開始・終了トリガー = 指のカウントダウン系列 (3 本 → 2 本 → 1 本、 domain/gestureDetect)。
-// 各段の確定でブリップ + 小さな振動を返し、 完了 (= 1 の確定) で即座に録画を開始 / 終了する。
-// ユーザー自身が数えるカウントダウンが儀式とトリガーを兼ねるので、 機械カウントダウンは無い。
+// 開始・終了トリガー = 両手でグー ⇄ チョキを 3 往復 (domain/gestureDetect の GuChokiDetector)。
+// 位相が切り替わるたびにブリップ + 小さな振動を返し、 3 往復目の完了で即座に録画を開始 / 終了する。
+// ユーザーの動作そのものが儀式とトリガーを兼ねるので、 機械カウントダウンは無い。
 const HAND_LOST_WARN_MS = 5000;
 const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
 
@@ -202,9 +202,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // HUD スクリムの実寸 (= SVG は % サイズが効かないので onLayout で測って px 指定する)
   const [hudSize, setHudSize] = useState<{ w: number; h: number } | null>(null);
   const latestHandRef = useRef<HandTrackEvent | null>(null);
-  // 開始 / 終了のカウントダウン系列検出器 (= フェーズ入場時に作り直す)。
-  const startSeqRef = useRef<CountdownSequenceDetector | null>(null);
-  const stopSeqRef = useRef<CountdownSequenceDetector | null>(null);
+  // 開始 / 終了のグーチョキ往復検出器 (= フェーズ入場時に作り直す)。
+  const startSeqRef = useRef<GuChokiDetector | null>(null);
+  const stopSeqRef = useRef<GuChokiDetector | null>(null);
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -238,8 +238,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     if (state.kind === 'mounting') {
       mountTrackRef.current = { enteredTs: Date.now(), lastPitch: null, motionMs: 0, stillSince: 0 };
     }
-    if (state.kind === 'awaiting_start') startSeqRef.current = new CountdownSequenceDetector();
-    if (state.kind === 'recording') stopSeqRef.current = new CountdownSequenceDetector();
+    if (state.kind === 'awaiting_start') startSeqRef.current = new GuChokiDetector();
+    if (state.kind === 'recording') stopSeqRef.current = new GuChokiDetector();
   }, [state.kind]);
   // 「今の voiced state が待っている発話の seq」 (0 = まだ発行前 / 音声ゲート無し)。
   // voiced state へ遷移する瞬間に 0 にし (= 前 state の完了済 seq との誤一致を防ぐ)、
@@ -360,12 +360,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         aimStatsRef.current?.add(e);
         redoMonitorRef.current?.add(e, now);
       }
-      // カウントダウン系列 (= 3→2→1)。 各段の確定でブリップ + 小さな振動、 完了で開始 / 終了。
-      // per-frame で流すが、 setState するのは完了イベントの瞬間だけ (= 再描画ストームなし)。
+      // 開始・終了ジェスチャー (= 両手でグー ⇄ チョキを 3 往復)。 切替のたびにブリップ + 小さな振動、
+      // 完了で開始 / 終了。 per-frame で流すが、 setState するのは完了イベントの瞬間だけ。
       if (k === 'awaiting_start' || k === 'recording') {
-        const count = bestHandFingerCount(e.wearerHands);
         const det = k === 'awaiting_start' ? startSeqRef.current : stopSeqRef.current;
-        const evt = det?.push(count, now) ?? null;
+        const evt = det?.push(e.wearerHands, now) ?? null;
         if (evt === 'step') {
           playSfx('countdown_tick');
           Vibration.vibrate(50);
@@ -611,7 +610,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return;
       }
       case 'awaiting_start':
-        // 開始系列 (3→2→1) は subscription が検出して遷移させる。 ここでは何もしない。
+        // 開始ジェスチャー (グーチョキ 3 往復) は subscription が検出して遷移させる。 ここでは何もしない。
         return;
       case 'recording': {
         if (!e) return;
@@ -632,7 +631,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           void enqueueSfx('warn_hand_lost');
           enqueueSpeak(t('capture.tts.redoSuggest'));
         }
-        // 終了系列 (3→2→1) は subscription が検出して finalizing へ遷移させる。
+        // 終了ジェスチャー (グーチョキ 3 往復) は subscription が検出して finalizing へ遷移させる。
         if (lastHandSeen !== cur.lastHandSeenTs || lastWarn !== cur.lastWarnTs) {
           setState({ ...cur, lastHandSeenTs: lastHandSeen, lastWarnTs: lastWarn });
         }

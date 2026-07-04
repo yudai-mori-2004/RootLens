@@ -11,10 +11,11 @@ export interface CountableHand {
 
 // Hand pose 21-joint からのジェスチャー判定。
 //
-// v0.1.4: 録画の開始・終了トリガーは「指を 3 本 → 2 本 → 1 本」 のカウントダウン系列。
-// 静的な 1 ポーズ (パー / サムズアップ) は家事の自然な手と幾何的に衝突して誤検出するが、
-// 「決まった本数を順番に、 各段一定時間保持」 という系列が自然発生する確率は桁で低い。
-// 途中で崩れても何も起きない (= フェイルセーフ) のもポーズ保持型に対する利点。
+// v0.1.4: 録画の開始・終了トリガーは「両手でグー ⇄ チョキを 3 往復」 (= ダブルクォーテーションの
+// ハンドサインの要領)。 静的な 1 ポーズ (パー / サムズアップ) は家事の自然な手と幾何的に衝突して
+// 誤検出するが、 「両手同時に、 決まった 2 形を往復する」 という時間パターンの自然発生率は桁で低い。
+// グー (0 本) とチョキ (2 本) は指本数判定の中で最も堅い 2 形 (= 薬指・小指の区別に依存しない)。
+// 途中で崩れても何も起きない (= フェイルセーフ)。
 //
 // 設計方針:
 //   - 関節角度ベースの素朴な heuristic。 学習モデルではない。
@@ -97,79 +98,86 @@ export function bestHandFingerCount(hands: CountableHand[]): number | null {
   return best ? countExtendedFingers(best) : null;
 }
 
-// MARK: - 3→2→1 カウントダウン系列検出
+// MARK: - グー ⇄ チョキ往復の検出
 
-/// 各段の確定に必要な保持時間と、 段間の制限時間。 保持はサンプル多数決 (下の WINDOW) の上に乗る。
-const STEP_DWELL_MS = 400;
-const STEP_TIMEOUT_MS = 4000;
-/// 多数決ウィンドウ (= 30Hz 入力で ~170ms。 遷移中の中間形状や単フレーム誤読を吸収)。
-const SMOOTH_WINDOW = 5;
+/// 完了に必要な位相変化の回数 (= グー→チョキ or チョキ→グーで 1)。 6 = 3 往復。
+const REQUIRED_FLIPS = 6;
+/// 位相変化がこれだけ途絶えたら進捗リセット (= 途中でやめた)。
+const FLIP_GAP_TIMEOUT_MS = 1500;
+/// 位相の多数決ウィンドウ (= 30Hz 入力で ~130ms。 両手の切替タイミングの微妙なズレを吸収)。
+const SMOOTH_WINDOW = 4;
 
+type Phase = 'gu' | 'choki';
 export type CountdownEvent = 'step' | 'complete';
 
-/**
- * 「3 本 → 2 本 → 1 本」 の系列検出器。 push に毎フレームの指本数 (手なし = null) を流すと、
- * 3・2 の確定で 'step'、 1 の確定 (= 系列完了) で 'complete' を返す。
- * 期待と違う本数は無視 (= リセットしない。 遷移中のブレで系列が壊れない)。
- * 進捗が STEP_TIMEOUT_MS 途絶えたら最初からやり直し。
- */
-export class CountdownSequenceDetector {
-  private window: (number | null)[] = [];
-  private expected = 3;
-  private dwellStart = 0;
-  private lastProgressTs = 0;
+/** 1 フレームの両手位相。 両手が同じ形のときだけ確定、 それ以外 (片手・遷移中・別の形) は null。 */
+function framePhase(hands: CountableHand[]): Phase | null {
+  if (hands.length < 2) return null;
+  const counts = hands.map(countExtendedFingers);
+  if (counts.some((c) => c == null)) return null;
+  // グーは親指が畳みきれず 1 本に読まれることが多いので 0..1 を許容。 チョキは 2 本ちょうど。
+  if (counts.every((c) => c! <= 1)) return 'gu';
+  if (counts.every((c) => c === 2)) return 'choki';
+  return null;
+}
 
-  /** 多数決済みの現在本数 (null = 不定)。 */
-  private stableCount(): number | null {
+/**
+ * 「両手でグー ⇄ チョキを 3 往復」 の検出器。 push に毎フレームの両手を流すと、
+ * 位相が切り替わるたびに 'step' (= ブリップ用)、 REQUIRED_FLIPS 回目で 'complete' を返す。
+ * 片手しか見えない・別の形・切替の途絶 (FLIP_GAP_TIMEOUT_MS) では進捗が消えるだけで、
+ * 誤って発火することはない。
+ */
+export class GuChokiDetector {
+  private window: (Phase | null)[] = [];
+  private lastPhase: Phase | null = null;
+  private flips = 0;
+  private lastFlipTs = 0;
+
+  /** 多数決済みの現在位相 (null = 不定)。 */
+  private stablePhase(): Phase | null {
     if (this.window.length < SMOOTH_WINDOW) return null;
-    const tally = new Map<number, number>();
-    for (const c of this.window) {
-      if (c == null) continue;
-      tally.set(c, (tally.get(c) ?? 0) + 1);
+    let gu = 0;
+    let choki = 0;
+    for (const p of this.window) {
+      if (p === 'gu') gu++;
+      else if (p === 'choki') choki++;
     }
-    let best: number | null = null;
-    let bestN = 0;
-    for (const [c, n] of tally) {
-      if (n > bestN) { best = c; bestN = n; }
-    }
-    // 過半数を要求 (= ウィンドウ内で優勢でも半分未満なら不定扱い)
-    return bestN > SMOOTH_WINDOW / 2 ? best : null;
+    if (gu > SMOOTH_WINDOW / 2) return 'gu';
+    if (choki > SMOOTH_WINDOW / 2) return 'choki';
+    return null;
   }
 
-  push(count: number | null, nowMs: number): CountdownEvent | null {
-    this.window.push(count);
+  push(hands: CountableHand[], nowMs: number): CountdownEvent | null {
+    this.window.push(framePhase(hands));
     if (this.window.length > SMOOTH_WINDOW) this.window.shift();
 
-    // 進捗の途絶 (段の途中で放置 / 手を下ろした) は最初から。
-    if (this.lastProgressTs !== 0 && nowMs - this.lastProgressTs > STEP_TIMEOUT_MS) this.resetProgress();
+    // 切替の途絶は進捗リセット (= 現在の位相からやり直し)。
+    if (this.flips > 0 && nowMs - this.lastFlipTs > FLIP_GAP_TIMEOUT_MS) this.flips = 0;
 
-    const stable = this.stableCount();
-    if (stable !== this.expected) {
-      this.dwellStart = 0;
+    const phase = this.stablePhase();
+    if (phase == null) return null;
+    if (this.lastPhase == null) {
+      this.lastPhase = phase; // 初期位相はカウントしない
       return null;
     }
-    if (this.dwellStart === 0) this.dwellStart = nowMs;
-    if (nowMs - this.dwellStart < STEP_DWELL_MS) return null;
+    if (phase === this.lastPhase) return null;
 
-    // 段確定
-    this.dwellStart = 0;
-    this.lastProgressTs = nowMs;
-    if (this.expected === 1) {
-      this.resetProgress();
+    // 位相が切り替わった
+    this.lastPhase = phase;
+    this.flips++;
+    this.lastFlipTs = nowMs;
+    if (this.flips >= REQUIRED_FLIPS) {
+      this.flips = 0;
+      this.lastFlipTs = 0;
       return 'complete';
     }
-    this.expected--;
     return 'step';
-  }
-
-  private resetProgress(): void {
-    this.expected = 3;
-    this.dwellStart = 0;
-    this.lastProgressTs = 0;
   }
 
   reset(): void {
     this.window = [];
-    this.resetProgress();
+    this.lastPhase = null;
+    this.flips = 0;
+    this.lastFlipTs = 0;
   }
 }
