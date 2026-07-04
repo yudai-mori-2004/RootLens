@@ -208,6 +208,8 @@ const ja = {
   // 温かい挨拶 (= 家事感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
   'portfolio.mission': 'ロボットが世界を学び、 くらしの手伝いができるようになるために。 あなたの毎日の作業風景が、 いちばんの教科書になります。',
   'portfolio.totalTime': 'これまでの撮影時間',
+  'portfolio.uploadedLabel': 'アップロード済み',
+  'portfolio.dailyLabel': '日ごとの撮影時間',
   'portfolio.recordInvite': '右の丸いボタンから、 きょうの家事を撮ってみましょう。',
 } as const;
 
@@ -359,6 +361,8 @@ const en: Record<TranslationKey, string> = {
   // ── My Videos (= former Collection / Portfolio。 plain language) ──
   'portfolio.mission': 'So robots can learn the world and lend a hand at home. Your everyday housework is their best textbook.',
   'portfolio.totalTime': 'Total time captured',
+  'portfolio.uploadedLabel': 'Uploaded',
+  'portfolio.dailyLabel': 'Daily capture time',
   'portfolio.recordInvite': 'Tap the round button on the right and capture today’s chores.',
 };
 

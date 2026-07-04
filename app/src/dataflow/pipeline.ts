@@ -17,6 +17,7 @@ import type { EventSink, DataflowEventInput } from './events';
 import { getRecordingConfig, type RecordingConfig, type RecordingSession } from './recording-configs';
 import type { Pipeline1Stage } from './types';
 import { signRecording, cleanupTmpDir, signedUriIn } from './steps/sign';
+import { persistClipThumbnail } from './steps/thumbs';
 import { uploadToR2 } from './steps/upload';
 import { registerClip } from './steps/register';
 import { dataflowStore, makeLocalClipId } from './store';
@@ -195,7 +196,8 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
         state: 'uploaded',
         uploadProgress: 1,
       });
-      // 登録完了 = durable な clip dir (raw + 署名中間物 sign/) ごと片付ける。
+      // 履歴用サムネを 1 枚だけ永続化してから、 durable な clip dir を片付ける。
+      await persistClipThumbnail(signedUriIn(workDir), cur.signatureHash);
       await cleanupTmpDir(session.sessionDir);
       return;
     }

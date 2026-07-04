@@ -1,16 +1,19 @@
-// マイビデオ画面 (v0.1.4) — 撮影済み・アップロード待ちクリップの一覧 + 撮影時間の記録。
+// マイビデオ画面 (v0.1.4) — アップロード済み履歴 + アップロード待ち + 撮影時間の記録。
 //
 // 横持ち前提の「誌面」 レイアウト:
-//   左 = 固定の扉カラム (ロゴ / 日付 / ミッション文 / 合計撮影時間)
-//   右 = アップロード待ちがあれば 横一列の写真カード (= 横スクロール、 ボタン無し。
-//        タップ → プレビューポップで確認 → 同意チェック → アップロード / 削除)、
-//        なければ 撮影時間の記録パネル (= 大きな合計時間 + 2026/6 まで遡れる日別バー)。
+//   左 = 扉カラム: ロゴ + 日付 (上) / 合計撮影時間 (中央、 常時) / ミッション文 (下)
+//   右上 = アップロード済み履歴 (= 小サムネの横スクロール。 端末に残したサムネで全部見返せる)
+//   右下 = アップロード待ちがあれば待ちリスト (横一列カード)、 なければ日別グラフ
+//          (= 2026/6 まで横スクロールで遡れる)
 //
 // 合計撮影時間 = サーバの uploaded 済み durationMs 合算 (= GET /api/clips、 AsyncStorage に
 // キャッシュしてオフラインでも即表示) + ローカルのアップロード待ち分。
+// 履歴サムネはアップロード完了時に端末へ永続化した jpg (= dataflow steps/thumbs)。
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Image,
+  type ImageSourcePropType,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,21 +21,23 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Circle, Polygon } from 'react-native-svg';
 
 import { BrandMark } from '../components/BrandMark';
 import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import {
-  storeEventSink, advanceClip, discardClip, fetchMyClips,
+  storeEventSink, advanceClip, discardClip, fetchMyClips, thumbPath, listThumbHashes,
   type Clip, type ServerClipStatus,
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
 import { getCurrentSession } from '../services/auth/instance';
 import { useT, getLocale } from '../i18n';
-import { colors, fonts, spacing, typography } from '../theme';
+import { colors, fonts, radii, spacing, typography } from '../theme';
 
 // ─── デザイン検証用モック (= __DEV__ のみ。 store / 永続化を汚さず表示だけ) ──
 const DESIGN_PREVIEW = __DEV__ && false;
+const MOCK_STATS = DESIGN_PREVIEW;
 
 const MOCKS: DesignMock[] = DESIGN_PREVIEW
   ? [
@@ -58,18 +63,31 @@ const MOCKS: DesignMock[] = DESIGN_PREVIEW
         },
         thumb: require('../../assets/decor/celebration.png'),
       },
-      {
-        clip: {
-          id: 'mock_4', state: 'uploading', createdAt: Date.now() - 2 * 60_000,
-          recordingConfigId: 'ultra_wide', durationMs: 45_000, uploadProgress: 0,
-        },
-        thumb: require('../../assets/decor/earnings-stack.png'),
-      },
     ]
   : [];
 
-// デザイン検証用の記録モック (= 空状態の記録パネルにバーを立てる)。
-const MOCK_STATS = DESIGN_PREVIEW;
+/** 履歴のデザイン検証用モック (= アップロード済みタイル)。 */
+const HISTORY_MOCKS: { clip: ServerClipStatus; source: ImageSourcePropType }[] = DESIGN_PREVIEW
+  ? [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
+      clip: {
+        id: `hmock_${i}`,
+        state: 'uploaded' as const,
+        createdAt: new Date(Date.now() - (i + 1) * 86_400_000 * 1.3).toISOString(),
+        signatureHash: `hmock_${i}`,
+        durationMs: ((i * 97) % 40 + 3) * 60_000,
+      },
+      source: [
+        require('../../assets/decor/home-warm.png'),
+        require('../../assets/decor/step-storage.png'),
+        require('../../assets/decor/celebration.png'),
+        require('../../assets/decor/earnings-stack.png'),
+        require('../../assets/decor/home-banner.png'),
+        require('../../assets/decor/handshake.png'),
+        require('../../assets/decor/auto-sales.png'),
+        require('../../assets/decor/license-cert.png'),
+      ][i % 8],
+    }))
+  : [];
 
 function todayLabel(): string {
   const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
@@ -89,16 +107,55 @@ function formatTotal(ms: number): string {
   return `${m}分`;
 }
 
-// ─── サーバ統計 (= uploaded 済みの撮影時間) ─────────────────────────────
+function historyDateLabel(iso: string | undefined): string {
+  if (!iso) return '';
+  const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
+  return new Date(iso).toLocaleDateString(tag, { month: 'short', day: 'numeric' });
+}
+
+// ─── サーバのクリップ一覧 (= 履歴 + 統計の元データ) ─────────────────────
 // AsyncStorage にキャッシュしてオフラインでも即表示。 バックグラウンドで更新する。
 
-const STATS_CACHE_KEY = '@rootlens/stats/v1';
+const CLIPS_CACHE_KEY = '@rootlens/server-clips/v1';
 
-interface UploadedStats {
-  totalMs: number;
-  /** YYYY-MM-DD → その日に撮影された uploaded 済み合計 (ms) */
-  daily: Record<string, number>;
+function useServerClips(localUploadedCount: number): ServerClipStatus[] {
+  const [clips, setClips] = useState<ServerClipStatus[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CLIPS_CACHE_KEY);
+        if (raw && !cancelled) setClips(JSON.parse(raw) as ServerClipStatus[]);
+      } catch {}
+      try {
+        const session = getCurrentSession();
+        if (!session) return;
+        const fresh = await fetchMyClips(session.pubkey);
+        if (cancelled) return;
+        setClips(fresh);
+        AsyncStorage.setItem(CLIPS_CACHE_KEY, JSON.stringify(fresh)).catch(() => {});
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+    // アップロード完了のタイミングで再取得する
+  }, [localUploadedCount]);
+
+  return clips;
 }
+
+/** 端末に永続化済みのサムネ hash 集合 (= 履歴タイルの画像有無)。 */
+function useThumbIndex(localUploadedCount: number): Set<string> {
+  const [hashes, setHashes] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    listThumbHashes().then((s) => { if (!cancelled) setHashes(s); });
+    return () => { cancelled = true; };
+  }, [localUploadedCount]);
+  return hashes;
+}
+
+const DAY_MS = 86_400_000;
 
 function dayKey(iso: string | number): string {
   const d = new Date(iso);
@@ -106,50 +163,6 @@ function dayKey(iso: string | number): string {
   const m = `${d.getMonth() + 1}`.padStart(2, '0');
   const dd = `${d.getDate()}`.padStart(2, '0');
   return `${y}-${m}-${dd}`;
-}
-
-function statsFromServerClips(clips: ServerClipStatus[]): UploadedStats {
-  const daily: Record<string, number> = {};
-  let totalMs = 0;
-  for (const c of clips) {
-    const ms = c.durationMs ?? 0;
-    if (ms <= 0) continue;
-    totalMs += ms;
-    if (c.createdAt) {
-      const k = dayKey(c.createdAt);
-      daily[k] = (daily[k] ?? 0) + ms;
-    }
-  }
-  return { totalMs, daily };
-}
-
-function useUploadedStats(localUploadedCount: number): UploadedStats {
-  const [stats, setStats] = useState<UploadedStats>({ totalMs: 0, daily: {} });
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      // 1. キャッシュを即反映
-      try {
-        const raw = await AsyncStorage.getItem(STATS_CACHE_KEY);
-        if (raw && !cancelled) setStats(JSON.parse(raw) as UploadedStats);
-      } catch {}
-      // 2. サーバから更新 (= 失敗してもキャッシュ表示のまま)
-      try {
-        const session = getCurrentSession();
-        if (!session) return;
-        const clips = await fetchMyClips(session.pubkey);
-        if (cancelled) return;
-        const fresh = statsFromServerClips(clips);
-        setStats(fresh);
-        AsyncStorage.setItem(STATS_CACHE_KEY, JSON.stringify(fresh)).catch(() => {});
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-    // localUploadedCount が増えた (= アップロード完了した) タイミングでも再取得する
-  }, [localUploadedCount]);
-
-  return stats;
 }
 
 interface Row {
@@ -162,7 +175,7 @@ export const CollectionScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const allClips = useClips();
 
-  // アップロード完了 (= uploaded) は一覧に出さない。 recorded / uploading / error が並ぶ。
+  // アップロード待ち (= recorded / uploading / error)。 uploaded は履歴側に出る。
   const rows = useMemo<Row[]>(() => {
     const real: Row[] = allClips
       .filter((c) => c.state !== 'uploaded')
@@ -175,17 +188,38 @@ export const CollectionScreen: React.FC = () => {
     [allClips],
   );
 
+  const serverClips = useServerClips(localUploadedCount);
+  const thumbHashes = useThumbIndex(localUploadedCount);
+
+  // 履歴 (= uploaded 済み、 新しい順 = サーバ返却順)。 モックは先頭に足す。
+  const history = useMemo(
+    () => [
+      ...HISTORY_MOCKS.map((m) => ({ clip: m.clip, source: m.source as ImageSourcePropType | undefined })),
+      ...serverClips.map((c) => ({ clip: c, source: undefined as ImageSourcePropType | undefined })),
+    ],
+    [serverClips],
+  );
+
   // 合計撮影時間 = サーバ uploaded 分 + ローカル待ち分
-  const uploaded = useUploadedStats(localUploadedCount);
+  const uploadedTotalMs = useMemo(
+    () => serverClips.reduce((sum, c) => sum + (c.durationMs ?? 0), 0),
+    [serverClips],
+  );
   const pendingMs = useMemo(
     () => rows.reduce((sum, r) => sum + (r.clip.durationMs ?? 0), 0),
     [rows],
   );
-  const totalMs = (MOCK_STATS ? 11_460_000 : uploaded.totalMs) + pendingMs;
+  const totalMs = (MOCK_STATS ? 11_460_000 : uploadedTotalMs) + pendingMs;
 
-  // 日別グラフ用: サーバ uploaded 分にローカル待ち分も足す (= 撮った日の記録として見せる)
+  // 日別グラフ用: サーバ uploaded 分にローカル待ち分も足す
   const mergedDaily = useMemo(() => {
-    const d: Record<string, number> = { ...uploaded.daily };
+    const d: Record<string, number> = {};
+    for (const c of serverClips) {
+      const ms = c.durationMs ?? 0;
+      if (ms <= 0 || !c.createdAt) continue;
+      const k = dayKey(c.createdAt);
+      d[k] = (d[k] ?? 0) + ms;
+    }
     for (const r of rows) {
       const ms = r.clip.durationMs ?? 0;
       if (ms <= 0) continue;
@@ -193,7 +227,7 @@ export const CollectionScreen: React.FC = () => {
       d[k] = (d[k] ?? 0) + ms;
     }
     return d;
-  }, [uploaded.daily, rows]);
+  }, [serverClips, rows]);
 
   const [previewTarget, setPreviewTarget] = useState<Clip | null>(null);
   const onOpen = useCallback((clip: Clip) => setPreviewTarget(clip), []);
@@ -216,40 +250,66 @@ export const CollectionScreen: React.FC = () => {
           <Text style={styles.date}>{todayLabel()}</Text>
         </View>
 
-        <View style={styles.asideFoot}>
-          <Text style={styles.mission}>{t('portfolio.mission')}</Text>
-          {rows.length > 0 ? (
-            <>
-              <View style={styles.rule} />
-              <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
-              <Text style={styles.counterLabel}>{t('portfolio.totalTime')}</Text>
-            </>
-          ) : null}
+        {/* 中央: 合計撮影時間 (= 常時表示) */}
+        <View style={styles.counter}>
+          <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
+          <Text style={styles.counterLabel}>{t('portfolio.totalTime')}</Text>
         </View>
+
+        <Text style={styles.mission}>{t('portfolio.mission')}</Text>
       </View>
 
-      {/* ── 右: 待ちがあれば横一列カード、 なければ記録パネル ── */}
-      {rows.length === 0 ? (
-        <RecordPanel totalMs={totalMs} daily={mergedDaily} />
-      ) : (
-        <View style={styles.rowArea}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.rowList}
-          >
-            {rows.map((item) => (
-              <ClipCard
-                key={item.clip.id}
-                clip={item.clip}
-                width={CARD_WIDTH}
-                previewSource={item.thumb}
-                onOpen={onOpen}
-              />
-            ))}
-          </ScrollView>
+      {/* ── 右: 履歴 (上) + 待ち or グラフ (下) ── */}
+      <View style={styles.main}>
+        {history.length > 0 ? (
+          <View>
+            <Text style={styles.sectionLabel}>{t('portfolio.uploadedLabel')}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.historyRow}
+            >
+              {history.map(({ clip, source }) => (
+                <HistoryTile
+                  key={clip.id}
+                  clip={clip}
+                  source={
+                    source ??
+                    (clip.signatureHash && thumbHashes.has(clip.signatureHash)
+                      ? { uri: thumbPath(clip.signatureHash) }
+                      : undefined)
+                  }
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        <View style={styles.bottomBlock}>
+          {rows.length > 0 ? (
+            <View style={styles.pendingBlock}>
+              <Text style={styles.sectionLabel}>{t('clip.recorded')}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.rowList}
+              >
+                {rows.map((item) => (
+                  <ClipCard
+                    key={item.clip.id}
+                    clip={item.clip}
+                    width={CARD_WIDTH}
+                    previewSource={item.thumb}
+                    onOpen={onOpen}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          ) : (
+            <GraphPanel daily={mergedDaily} totalMs={totalMs} />
+          )}
         </View>
-      )}
+      </View>
 
       <ClipPreviewModal
         visible={previewTarget !== null}
@@ -262,19 +322,38 @@ export const CollectionScreen: React.FC = () => {
   );
 };
 
-// ─── 撮影時間の記録パネル (= アップロード待ちが無いときの右面) ──────────────
+// ─── 履歴タイル (= 小サムネ + 日付) ─────────────────────────────────────
 
-const DAY_MS = 86_400_000;
-/** 記録の起点 (= これより前は遡らない)。 */
+const HistoryTile: React.FC<{ clip: ServerClipStatus; source?: ImageSourcePropType }> = ({
+  clip, source,
+}) => (
+  <View style={styles.tile}>
+    <View style={styles.tileThumb}>
+      {source ? (
+        <Image source={source} style={styles.tileImage} resizeMode="cover" />
+      ) : (
+        <View style={styles.tileFallback}>
+          <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+            <Circle cx={9} cy={9} r={8.2} stroke={colors.textFaint} strokeWidth={1.1} />
+            <Polygon points="7,5.6 12.4,9 7,12.4" fill={colors.textFaint} />
+          </Svg>
+        </View>
+      )}
+    </View>
+    <Text style={styles.tileDate} numberOfLines={1}>{historyDateLabel(clip.createdAt)}</Text>
+  </View>
+);
+
+// ─── 日別グラフ (= アップロード待ちが無いときの下面。 2026/6 まで遡れる) ────────
+
 const RECORD_EPOCH = new Date(2026, 5, 1).getTime(); // 2026-06-01
 
-const RecordPanel: React.FC<{ totalMs: number; daily: Record<string, number> }> = ({
-  totalMs, daily,
+const GraphPanel: React.FC<{ daily: Record<string, number>; totalMs: number }> = ({
+  daily, totalMs,
 }) => {
   const t = useT();
   const scrollRef = React.useRef<ScrollView>(null);
 
-  // 2026-06-01 から今日までの全日 (= 右端が今日)。 デザイン検証時はモックの山を立てる。
   const days = useMemo(() => {
     const out: { key: string; dayNum: number; monthLabel: string | null; ms: number }[] = [];
     const today = new Date();
@@ -294,14 +373,10 @@ const RecordPanel: React.FC<{ totalMs: number; daily: Record<string, number> }> 
   }, [daily]);
 
   const maxMs = Math.max(...days.map((d) => d.ms), 1);
-  const hasAny = totalMs > 0;
 
   return (
-    <View style={styles.record}>
-      <Text style={styles.recordLabel}>{t('portfolio.totalTime')}</Text>
-      <Text style={styles.recordTotal}>{formatTotal(totalMs)}</Text>
-
-      {/* 日別バー (= 横スクロールで 2026/6 まで遡れる。 初期位置は右端 = 今日) */}
+    <View style={styles.graph}>
+      <Text style={styles.sectionLabel}>{t('portfolio.dailyLabel')}</Text>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -326,14 +401,13 @@ const RecordPanel: React.FC<{ totalMs: number; daily: Record<string, number> }> 
           </View>
         ))}
       </ScrollView>
-
-      {!hasAny ? <Text style={styles.recordInvite}>{t('portfolio.recordInvite')}</Text> : null}
+      {totalMs === 0 ? <Text style={styles.recordInvite}>{t('portfolio.recordInvite')}</Text> : null}
     </View>
   );
 };
 
 const ASIDE_WIDTH = 236;
-const CARD_WIDTH = 300;
+const CARD_WIDTH = 260;
 
 const styles = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row', backgroundColor: colors.paper },
@@ -351,23 +425,11 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.textMute,
   },
-
-  asideFoot: { gap: spacing.sm },
-  mission: {
-    ...typography.caption,
-    fontSize: 12,
-    lineHeight: 19,
-    color: colors.textBody,
-  },
-  rule: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.sm,
-  },
+  counter: { gap: 2 },
   counterNumber: {
     fontFamily: fonts.serifLight,
-    fontSize: 40,
-    lineHeight: 46,
+    fontSize: 38,
+    lineHeight: 44,
     letterSpacing: -1,
     color: colors.ink,
   },
@@ -375,44 +437,68 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.textMute,
   },
+  mission: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 19,
+    color: colors.textBody,
+  },
 
+  // ── 右面 ──
+  main: {
+    flex: 1,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
+    gap: spacing.lg,
+  },
+  sectionLabel: {
+    ...typography.labelSmall,
+    color: colors.textMute,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.sm,
+  },
 
-  // ── 横一列カード ──
-  rowArea: { flex: 1, justifyContent: 'center' },
+  // 履歴 (= 上段)
+  historyRow: {
+    paddingHorizontal: spacing.xl,
+    gap: spacing.md,
+  },
+  tile: { width: 124 },
+  tileThumb: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    backgroundColor: colors.paperDeep,
+  },
+  tileImage: { width: '100%', height: '100%' },
+  tileFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tileDate: {
+    ...typography.labelSmall,
+    fontSize: 9.5,
+    color: colors.textMute,
+    marginTop: 4,
+    paddingHorizontal: 1,
+  },
+
+  // 下段 (= 待ちリスト or グラフ)
+  bottomBlock: { flex: 1 },
+  pendingBlock: { flex: 1, justifyContent: 'center' },
   rowList: {
     paddingHorizontal: spacing.xl,
-    gap: spacing.xl,
+    gap: spacing.lg,
     alignItems: 'center',
   },
 
-  // ── 記録パネル ──
-  record: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
-    maxWidth: 560,
-  },
-  recordLabel: {
-    ...typography.labelSmall,
-    color: colors.textMute,
-    marginBottom: spacing.sm,
-  },
-  recordTotal: {
-    fontFamily: fonts.serifLight,
-    fontSize: 64,
-    lineHeight: 72,
-    letterSpacing: -1.5,
-    color: colors.ink,
-  },
-  chartScroll: {
-    marginTop: spacing.xxl,
-    maxHeight: 150,
-  },
+  graph: { flex: 1, justifyContent: 'flex-end', paddingBottom: spacing.sm },
+  chartScroll: { flexGrow: 0 },
   chart: {
     alignItems: 'flex-end',
     gap: 7,
     height: 150,
-    paddingRight: spacing.sm,
+    paddingHorizontal: spacing.xl,
   },
   chartCol: { width: 22, alignItems: 'center', gap: 6, height: '100%' },
   chartTrack: {
@@ -433,8 +519,9 @@ const styles = StyleSheet.create({
   chartMonth: { color: colors.textMute },
 
   recordInvite: {
-    ...typography.body,
+    ...typography.caption,
     color: colors.textBody,
-    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.md,
   },
 });
