@@ -46,6 +46,7 @@
     "expo-media-library": "~17.0.6",
     "expo-screen-orientation": "~8.0.4",
     "expo-secure-store": "~14.0.1",
+    "expo-sensors": "~14.0.2",
     "expo-sharing": "~13.0.1",
     "expo-speech": "^55.0.14",
     "expo-status-bar": "~2.0.1",

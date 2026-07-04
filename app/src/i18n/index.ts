@@ -127,20 +127,21 @@ const ja = {
   // ── Capture flow: 画面下の指示字幕 (= 今やることを平易な 1 文で) ──
   'capture.recordingLabel': '録画中',
   'capture.hud.detecting': 'そのまま、動かずにお待ちください。',
+  'capture.hud.aimReadout': '傾き {current}°(目標 {target}°)',
   'capture.hud.countdown': 'まもなく撮影がはじまります。',
   'capture.hud.recordingHint': '終わりたいときは、親指を立てたままお待ちください。',
   'capture.hud.saving': '保存しています…',
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
   // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
-  'capture.tts.intro': 'カメラの画角調整を行います。両腕をまっすぐ前に伸ばして、顔を指先に向けてください。',
-  'capture.tts.confirmed': '位置が確定いたしました。これより撮影を開始いたします。',
+  'capture.tts.intro': 'カメラの向きを合わせます。背筋を伸ばして立ち、目の高さにある遠くの一点を見てください。',
+  'capture.tts.aimDown': 'スマホを少しずつ下に傾けてください。',
+  'capture.tts.aimUp': 'スマホを少しずつ上に傾けてください。',
+  'capture.tts.aimOk': 'カメラの向きが合いました。撮影を始めるときは、両腕をまっすぐ前に伸ばして、手のひらをこちらに向けたまま少しお待ちください。',
+  'capture.tts.confirmed': 'これより撮影を開始いたします。',
   'capture.tts.done': '撮影が完了いたしました。お疲れさまでした。',
-  'capture.tts.continue': '引き続き撮影される場合は、もう一度、両腕を伸ばして指先をご覧ください。',
-  'capture.tts.adjustUp': '手が画面の上に寄っています。カメラを少し上へ向け直し、もう一度指先をご覧ください。',
-  'capture.tts.adjustDown': '手が画面の下に寄っています。カメラを少し下へ向け直し、もう一度指先をご覧ください。',
-  'capture.tts.adjustLeft': '手が画面の左に寄っています。カメラを少し左へ向け直し、もう一度指先をご覧ください。',
-  'capture.tts.adjustRight': '手が画面の右に寄っています。カメラを少し右へ向け直し、もう一度指先をご覧ください。',
+  'capture.tts.continue': '引き続き撮影される場合は、そのままお待ちください。カメラの向きを確認します。',
+  'capture.tts.redoSuggest': '手が画面の下に外れがちです。きりの良いところで一度撮影を終えて、かけ直してください。',
   'capture.tts.stoppingConfirm': 'そのまま親指を立て続けると、撮影を終了します',
   'capture.tts.handLost': '両手がカメラに映るようにしてください',
 
@@ -286,19 +287,20 @@ const en: Record<TranslationKey, string> = {
   // ── Capture flow: bottom instruction caption ──
   'capture.recordingLabel': 'Recording',
   'capture.hud.detecting': 'Hold still, please.',
+  'capture.hud.aimReadout': 'Tilt {current}° (target {target}°)',
   'capture.hud.countdown': 'Recording starts in a moment.',
   'capture.hud.recordingHint': 'To finish, keep holding a thumbs-up.',
   'capture.hud.saving': 'Saving…',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
-  'capture.tts.intro': 'Let’s adjust the camera angle. Stretch both arms straight out in front of you and turn your face toward your fingertips.',
-  'capture.tts.confirmed': 'Your position is confirmed. We will now begin recording.',
+  'capture.tts.intro': 'Let’s aim the camera. Stand up straight and look at a distant point at eye level.',
+  'capture.tts.aimDown': 'Tilt the phone down a little at a time.',
+  'capture.tts.aimUp': 'Tilt the phone up a little at a time.',
+  'capture.tts.aimOk': 'The camera is aimed. When you are ready to record, stretch both arms straight out with your palms toward the camera, and hold.',
+  'capture.tts.confirmed': 'We will now begin recording.',
   'capture.tts.done': 'Recording complete. Nice work.',
-  'capture.tts.continue': 'To record again, stretch your arms out and look at your fingertips again.',
-  'capture.tts.adjustUp': 'Your hands are near the top of the frame. Tilt the camera up a little and look at your fingertips again.',
-  'capture.tts.adjustDown': 'Your hands are near the bottom of the frame. Tilt the camera down a little and look at your fingertips again.',
-  'capture.tts.adjustLeft': 'Your hands are toward the left of the frame. Turn the camera left a little and look at your fingertips again.',
-  'capture.tts.adjustRight': 'Your hands are toward the right of the frame. Turn the camera right a little and look at your fingertips again.',
+  'capture.tts.continue': 'To keep recording, please hold on while we check the camera angle.',
+  'capture.tts.redoSuggest': 'Your hands keep slipping below the frame. At a good stopping point, please end this recording and re-seat the headset.',
   'capture.tts.stoppingConfirm': 'Keep holding your thumbs up to finish recording.',
   'capture.tts.handLost': 'Please keep both hands in view of the camera.',
 

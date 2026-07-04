@@ -303,6 +303,8 @@ PODS:
     - Yoga
   - ExpoSecureStore (14.0.1):
     - ExpoModulesCore
+  - ExpoSensors (14.0.2):
+    - ExpoModulesCore
   - ExpoSharing (13.0.1):
     - ExpoModulesCore
   - ExpoSpeech (55.0.14):
@@ -2285,6 +2287,7 @@ DEPENDENCIES:
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoScreenOrientation (from `../node_modules/expo-screen-orientation/ios`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
+  - ExpoSensors (from `../node_modules/expo-sensors/ios`)
   - ExpoSharing (from `../node_modules/expo-sharing/ios`)
   - ExpoSpeech (from `../node_modules/expo-speech/ios`)
   - ExpoVideoThumbnails (from `../node_modules/expo-video-thumbnails/ios`)
@@ -2439,6 +2442,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-screen-orientation/ios"
   ExpoSecureStore:
     :path: "../node_modules/expo-secure-store/ios"
+  ExpoSensors:
+    :path: "../node_modules/expo-sensors/ios"
   ExpoSharing:
     :path: "../node_modules/expo-sharing/ios"
   ExpoSpeech:
@@ -2636,6 +2641,7 @@ SPEC CHECKSUMS:
   ExpoModulesCore: c25d77625038b1968ea1afefc719862c0d8dd993
   ExpoScreenOrientation: af8b31d3164239a4ef3ea0b32bd63fb65df70d58
   ExpoSecureStore: 9a3665d7161dd1031be386e278bffd623658f316
+  ExpoSensors: 02a52ddab1e3a8a1438258c3d87d1ee5f721743a
   ExpoSharing: 849a5ce9985c22598c16ec027e32969be8062e8e
   ExpoSpeech: afff97450c029ce8a3cf0e2f122423870c756e59
   ExpoVideoThumbnails: 7e9cd967393af9af0f7b0c62a4a00549f1860cab
