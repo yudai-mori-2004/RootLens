@@ -10,6 +10,7 @@
 //   - 保存キーは旧 clipPipeline と同じ (= 既存ユーザのローカルクリップをそのまま引き継ぐ)。
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 
 import { dataflowStore, clipList, type Clip } from '../dataflow';
 
@@ -18,6 +19,29 @@ const PERSIST_DEBOUNCE_MS = 400;
 
 let initialized = false;
 
+// iOS はアプリを再インストールするたびに Data コンテナの UUID が変わる。 絶対パスを
+// そのまま保存すると、 次のインストールで全クリップのファイル参照が無効になる
+// (rc=-2 「No such file or directory」 の原因)。 保存時は Documents 起点の相対パスに
+// 落とし、 復元時に現在の documentDirectory で絶対化する。
+const DOC_MARKER = '/Documents/';
+
+function toRelativePath(uri: string | undefined): string | undefined {
+  if (!uri) return uri;
+  const i = uri.indexOf(DOC_MARKER);
+  return i >= 0 ? uri.slice(i + DOC_MARKER.length) : uri;
+}
+
+function toAbsoluteUri(path: string | undefined): string | undefined {
+  if (!path) return path;
+  const doc = FileSystem.documentDirectory ?? '';
+  if (path.includes('://')) {
+    // 旧形式 (絶対 URI)。 コンテナ UUID が変わっていても Documents 以下の構造は同じなので付け替える。
+    const i = path.indexOf(DOC_MARKER);
+    return i >= 0 ? `${doc}${path.slice(i + DOC_MARKER.length)}` : path;
+  }
+  return `${doc}${path}`;
+}
+
 /** 起動時に保存済みクリップを store へ流し込む (= 1 回だけ)。 */
 async function hydrate(): Promise<void> {
   try {
@@ -25,12 +49,17 @@ async function hydrate(): Promise<void> {
     if (!raw) return;
     const arr = JSON.parse(raw) as Clip[];
     const sanitized = arr.map((c) => {
+      const clip: Clip = {
+        ...c,
+        sessionDir: toAbsoluteUri(c.sessionDir),
+        workDir: toAbsoluteUri(c.workDir),
+      };
       // uploading (= Pipeline 1 が中断) は error にする。 段 (stage) と作業 dir は保持されるので、
       // 「もう一度試す」 で advanceClip が成功済みの段から再開できる。
-      if (c.state === 'uploading') {
-        return { ...c, state: 'error' as const, errorMessage: 'アプリ再起動中に中断されました' };
+      if (clip.state === 'uploading') {
+        return { ...clip, state: 'error' as const, errorMessage: 'アプリ再起動中に中断されました' };
       }
-      return c;
+      return clip;
     });
     dataflowStore.getState().replaceClips(sanitized);
   } catch (e) {
@@ -50,7 +79,13 @@ function schedulePersist(clips: Record<string, Clip>): void {
     persistTimer = null;
     // uploaded = サーバに引き渡し済み (= 一覧から消える + ローカルファイルも掃除済み)。
     // 永続化しないことで再起動後に蘇らない。
-    const arr = clipList(clips).filter((c) => c.state !== 'uploaded');
+    const arr = clipList(clips)
+      .filter((c) => c.state !== 'uploaded')
+      .map((c) => ({
+        ...c,
+        sessionDir: toRelativePath(c.sessionDir),
+        workDir: toRelativePath(c.workDir),
+      }));
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(arr)).catch(() => {});
   }, PERSIST_DEBOUNCE_MS);
 }

@@ -126,8 +126,17 @@ fn make_signer() -> Result<Box<dyn c2pa::Signer + Send + Sync>, String> {
 fn sign_http_agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .timeout_global(Some(SIGN_HTTP_TIMEOUT))
+        // 4xx/5xx を即エラーにせず自前で status を見る。 サーバのエラー本文
+        // ("Invalid account pubkey format" 等) を診断メッセージに残すため。
+        .http_status_as_error(false)
         .build()
         .into()
+}
+
+/// 非 2xx レスポンスを 「status + 本文冒頭」 のエラー文字列にする。
+fn http_error_text(status: u16, body: &str) -> String {
+    let snippet: String = body.chars().take(300).collect();
+    format!("http status {status}: {snippet}")
 }
 
 /// GET {service_url} → { alg, certsPem } を取り、 署名 callback が POST {service_url} に
@@ -143,6 +152,11 @@ fn make_remote_signer(
         .get(service_url)
         .call()
         .map_err(|e| format!("GET {service_url}: {e}"))?;
+    if resp.status().as_u16() >= 300 {
+        let status = resp.status().as_u16();
+        let body = resp.body_mut().read_to_string().unwrap_or_default();
+        return Err(format!("GET {service_url}: {}", http_error_text(status, &body)));
+    }
     let info: serde_json::Value = resp
         .body_mut()
         .read_json()
@@ -167,6 +181,13 @@ fn make_remote_signer(
             .header("X-Account-Pubkey", &pubkey)
             .send_json(serde_json::json!({ "dataB64": data_b64 }))
             .map_err(|e| c2pa::Error::OtherError(format!("remote sign POST: {e}").into()))?;
+        if resp.status().as_u16() >= 300 {
+            let status = resp.status().as_u16();
+            let body = resp.body_mut().read_to_string().unwrap_or_default();
+            return Err(c2pa::Error::OtherError(
+                format!("remote sign POST: {}", http_error_text(status, &body)).into(),
+            ));
+        }
         let body: serde_json::Value = resp
             .body_mut()
             .read_json()
