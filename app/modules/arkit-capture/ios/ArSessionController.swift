@@ -209,14 +209,14 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     try removeIfExists(at: mp4URL)
 
     let writer = try AVAssetWriter(outputURL: mp4URL, fileType: .mp4)
-    // 6 Mbps target (= 60fps 1080p で十分な品質、 5 分動画で ~225 MB)。
+    // 12 Mbps target (= 1920x1440 フルセンサー録画に合わせて増額。 5 分動画で ~450 MB)。
     // サーバ側で再 encode するので深く詰めない。
     let videoSettings: [String: Any] = [
       AVVideoCodecKey: AVVideoCodecType.h264,
       AVVideoWidthKey: sensorW,
       AVVideoHeightKey: sensorH,
       AVVideoCompressionPropertiesKey: [
-        AVVideoAverageBitRateKey: 6_000_000,
+        AVVideoAverageBitRateKey: 12_000_000,
         AVVideoMaxKeyFrameIntervalKey: 60,
         AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
       ],
@@ -847,20 +847,24 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
+    // 1x (wide) カメラの最大画角を選ぶ。
+    //   - ultra-wide は選ばない (= 0.5x は別の撮影構成 ultra_wide が担う)
+    //   - フルセンサー 4:3 を優先 (= 16:9 や 720p は縦を切り出した狭い画角)
+    //   - 同じアスペクトなら画角は同じなので、 最小解像度で十分 (= 1920x1440。 4K はファイルが 4 倍)
+    //   - 同解像度なら高 fps
+    var pool = supported
     if #available(iOS 16.0, *) {
-      let ultras = supported.filter { $0.captureDeviceType == .builtInUltraWideCamera }
-      if let smallUltra = ultras.min(by: { abs($0.imageResolution.height - 720) < abs($1.imageResolution.height - 720) }),
-         abs(smallUltra.imageResolution.height - 720) <= 240 {
-        return smallUltra
-      }
-      if let anyUltra = ultras.first { return anyUltra }
-
-      let normals = supported.filter { $0.captureDeviceType == .builtInWideAngleCamera }
-      if let smallNormal = normals.min(by: { abs($0.imageResolution.height - 720) < abs($1.imageResolution.height - 720) }),
-         abs(smallNormal.imageResolution.height - 720) <= 240 {
-        return smallNormal
-      }
+      let wides = supported.filter { $0.captureDeviceType == .builtInWideAngleCamera }
+      if !wides.isEmpty { pool = wides }
     }
-    return supported.first
+    return pool.min { a, b in
+      let aspectA = a.imageResolution.height / a.imageResolution.width
+      let aspectB = b.imageResolution.height / b.imageResolution.width
+      if abs(aspectA - aspectB) > 0.01 { return aspectA > aspectB }
+      let areaA = a.imageResolution.width * a.imageResolution.height
+      let areaB = b.imageResolution.width * b.imageResolution.height
+      if areaA != areaB { return areaA < areaB }
+      return a.framesPerSecond > b.framesPerSecond
+    }
   }
 }
