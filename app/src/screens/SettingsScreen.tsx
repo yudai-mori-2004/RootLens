@@ -18,7 +18,6 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -39,8 +38,6 @@ export const SettingsScreen: React.FC = () => {
   const locale = useLocale();
   const ownerStr = state.status === 'authenticated' ? state.session.pubkey : null;
   const [signingOut, setSigningOut] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [showHandOverlay, setShowHandOverlay] = useState(true);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
 
@@ -126,6 +123,9 @@ export const SettingsScreen: React.FC = () => {
           <Text style={styles.subtitle}>{t('settings.subtitle')}</Text>
         </View>
 
+        <View style={styles.grid}>
+        <View style={styles.gridCol}>
+
         {/* ── 言語 ── */}
         <Section title={t('settings.section.language')}>
           <SegmentRow
@@ -150,28 +150,21 @@ export const SettingsScreen: React.FC = () => {
           <Row label={t('settings.authProvider')} value={provider.id} />
         </Section>
 
-        {/* ── 通知 ── */}
-        <Section title={t('settings.section.notifications')}>
-          <SwitchRow
-            label={t('settings.pushNotifications')}
-            sublabel={t('settings.pushNotificationsDesc')}
-            value={pushEnabled}
-            onValueChange={setPushEnabled}
-            disabled={true}
-            disabledNote={t('settings.pushNotImplemented')}
+        {/* ── サポート ── */}
+        <Section title={t('settings.section.support')}>
+          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
+          <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
+          <ActionRow
+            label={t('settings.contact')}
+            onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
           />
         </Section>
 
+        </View>
+        <View style={styles.gridCol}>
+
         {/* ── 撮影 ── */}
         <Section title={t('settings.section.capture')}>
-          <SwitchRow
-            label={t('settings.handOverlay')}
-            sublabel={t('settings.handOverlayDesc')}
-            value={showHandOverlay}
-            onValueChange={setShowHandOverlay}
-            disabled={true}
-            disabledNote={t('settings.handOverlaySoon')}
-          />
           <ActionRow
             label={t('settings.recalibrate')}
             onPress={async () => {
@@ -191,16 +184,6 @@ export const SettingsScreen: React.FC = () => {
           <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
         </Section>
 
-        {/* ── サポート ── */}
-        <Section title={t('settings.section.support')}>
-          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
-          <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
-          <ActionRow
-            label={t('settings.contact')}
-            onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
-          />
-        </Section>
-
         {/* ── アプリ情報 ── */}
         <Section title={t('settings.section.appInfo')}>
           <Row label={t('settings.version')} value={version} />
@@ -217,6 +200,9 @@ export const SettingsScreen: React.FC = () => {
             <Row label="ACCOUNT" value={ownerStr ?? '—'} mono />
           </Section>
         ) : null}
+
+        </View>
+        </View>
 
         {/* ── Sign out ── */}
         <Pressable
@@ -288,29 +274,6 @@ const Row: React.FC<{
   return inner;
 };
 
-const SwitchRow: React.FC<{
-  label: string;
-  sublabel?: string;
-  value: boolean;
-  onValueChange: (v: boolean) => void;
-  disabled?: boolean;
-  disabledNote?: string;
-}> = ({ label, sublabel, value, onValueChange, disabled, disabledNote }) => (
-  <View style={[styles.row, styles.switchRow]}>
-    <View style={styles.switchRowText}>
-      <Text style={styles.switchLabel}>{label}</Text>
-      {sublabel ? <Text style={styles.switchSublabel}>{disabled ? (disabledNote ?? sublabel) : sublabel}</Text> : null}
-    </View>
-    <Switch
-      value={value}
-      onValueChange={onValueChange}
-      disabled={disabled}
-      trackColor={{ false: colors.border, true: colors.emerald }}
-      thumbColor={colors.card}
-    />
-  </View>
-);
-
 const ActionRow: React.FC<{ label: string; onPress: () => void; kind?: 'warn' | 'normal' }> = ({
   label, onPress, kind,
 }) => (
@@ -377,10 +340,13 @@ function formatBytes(bytes: number): string {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   scroll: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xl,
     paddingBottom: spacing.xxxl,
     gap: spacing.lg,
+    maxWidth: 980,
+    alignSelf: 'center',
+    width: '100%',
   },
 
   heroBlock: { gap: 4, marginBottom: spacing.md },
@@ -392,6 +358,12 @@ const styles = StyleSheet.create({
   },
   subtitle: { ...typography.caption, color: colors.textMute },
 
+  grid: {
+    flexDirection: 'row',
+    gap: spacing.xl,
+    alignItems: 'flex-start',
+  },
+  gridCol: { flex: 1, gap: spacing.lg },
   section: {},
   sectionTitle: {
     ...typography.label,
@@ -419,13 +391,7 @@ const styles = StyleSheet.create({
   rowValue: { ...typography.body, color: colors.ink, fontSize: 14 },
   rowValueLink: { textDecorationLine: 'underline' },
 
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-  },
-  switchRowText: { flex: 1, gap: 2, paddingRight: spacing.md },
+
   switchLabel: { fontFamily: fonts.sansSemibold, fontSize: 14, color: colors.ink },
   switchSublabel: { ...typography.caption, color: colors.textMute },
 

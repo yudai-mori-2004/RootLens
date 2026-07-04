@@ -1,149 +1,146 @@
-import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+// メインレイアウト (= v0.1.4 横持ち)。
+//
+// 横持ち前提なので、 タブは画面右端の縦レール (= 右手の親指が届く位置)。
+//   マイビデオ (上) / 撮影 (中央、 ヒーロー) / 設定 (下)
+//
+// react-navigation の bottom-tabs は使わない (= 2 画面 + 1 アクションだけなので
+// 自前の row レイアウト + useState が最小)。 撮影は RootStack の CaptureMode を
+// fullscreen modal で push する (= タブ画面ではなく action trigger)。
+
+import React, { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import Svg, { Circle } from 'react-native-svg';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import type { MainTabParamList, RootStackParamList } from './types';
-import { CollectionScreen as HomeScreen } from '../screens/CollectionScreen';
+import type { RootStackParamList } from './types';
+import { CollectionScreen } from '../screens/CollectionScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
-import { HomeIcon, CameraIcon, SettingsIcon } from '../components/TabIcons';
-
-// Camera タブの screen 本体は何も描画しない (= push trigger 専用)。
-// MainTabs は createBottomTabNavigator が screen に component を要求するので、
-// 中身が空の placeholder を渡す。
-const CameraTabPlaceholder: React.FC = () => null;
+import { HomeIcon, SettingsIcon } from '../components/TabIcons';
 import { useT } from '../i18n';
 import { colors, fonts, spacing } from '../theme';
 
-// UI_SPECS_JA §2.1 — 3 タブ構造。
-//
-//   Home (左)     コレクション + ステーキング + 収益 (= 旧 CollectionScreen)
-//   Camera (中央) 撮影モード入口。 タップで対話サブモード起動 (= 暫定: タスク選択 modal)
-//   Settings (右) アカウント / 通知 / 撮影設定 / データ / サポート
-//
-// 中央 Camera タブは visual もコードも他 2 タブと差別化:
-//   • tabBarButton を custom 化してリング状アイコンを大きく描く
-//   • タップで selection ではなく直接 RootStack の TaskBriefing を push
-//     (= 「タブ画面」 は実体ではなく action trigger)
-
-const Tab = createBottomTabNavigator<MainTabParamList>();
-
 type RootNav = NativeStackNavigationProp<RootStackParamList>;
+type TabKey = 'home' | 'settings';
 
-const renderLabel = (focused: boolean, label: string) => (
-  <Text
-    style={[
-      styles.tabLabel,
-      { color: focused ? colors.ink : colors.textMute },
-    ]}
-  >
-    {label}
-  </Text>
-);
-
-const CameraTabButton: React.FC<{ children?: React.ReactNode }> = () => {
-  const rootNav = useNavigation<RootNav>();
-  const t = useT();
-  const open = () => {
-    // RootStack の CaptureMode を fullscreen modal で push (UI_SPECS §2.2)。
-    // タブの Camera screen 自体は dummy で、 描画されない。
-    rootNav.navigate('CaptureMode');
-  };
-  return (
-    <Pressable
-      onPress={open}
-      style={({ pressed }) => [styles.cameraButton, pressed && styles.cameraButtonPressed]}
-      accessibilityRole="button"
-      accessibilityLabel={t('tab.captureA11y')}
-    >
-      <CameraIcon active={false} size={28} />
-    </Pressable>
-  );
-};
+const RAIL_WIDTH = 86;
 
 export const MainTabs: React.FC = () => {
   const t = useT();
+  const insets = useSafeAreaInsets();
+  const rootNav = useNavigation<RootNav>();
+  const [tab, setTab] = useState<TabKey>('home');
+
   return (
-  <Tab.Navigator
-    screenOptions={{
-      headerShown: false,
-      tabBarStyle: styles.tabBar,
-      tabBarItemStyle: styles.tabItem,
-      tabBarShowLabel: true,
-      tabBarLabelPosition: 'below-icon',
-      sceneStyle: { backgroundColor: colors.paper },
-    }}
-  >
-    <Tab.Screen
-      name="Home"
-      component={HomeScreen}
-      options={{
-        tabBarIcon: ({ focused }) => (
-          <View style={styles.iconWrap}>
-            <HomeIcon active={focused} />
-          </View>
-        ),
-        tabBarLabel: ({ focused }) => renderLabel(focused, t('tab.home')),
-      }}
-    />
-    <Tab.Screen
-      name="Camera"
-      component={CameraTabPlaceholder}
-      options={{
-        tabBarButton: (props) => <CameraTabButton {...props} />,
-        tabBarLabel: () => null,
-      }}
-    />
-    <Tab.Screen
-      name="Settings"
-      component={SettingsScreen}
-      options={{
-        tabBarIcon: ({ focused }) => (
-          <View style={styles.iconWrap}>
-            <SettingsIcon active={focused} />
-          </View>
-        ),
-        tabBarLabel: ({ focused }) => renderLabel(focused, t('tab.settings')),
-      }}
-    />
-  </Tab.Navigator>
+    <View style={styles.root}>
+      {/* コンテンツ (= 画面は mount したまま表示切替。 スクロール位置等の state を保つ) */}
+      <View style={styles.content}>
+        <View style={[styles.page, tab !== 'home' && styles.pageHidden]} pointerEvents={tab === 'home' ? 'auto' : 'none'}>
+          <CollectionScreen />
+        </View>
+        <View style={[styles.page, tab !== 'settings' && styles.pageHidden]} pointerEvents={tab === 'settings' ? 'auto' : 'none'}>
+          <SettingsScreen />
+        </View>
+      </View>
+
+      {/* 右レール */}
+      <View style={[styles.rail, { width: RAIL_WIDTH + insets.right, paddingRight: insets.right }]}>
+        <RailItem
+          label={t('tab.home')}
+          active={tab === 'home'}
+          onPress={() => setTab('home')}
+          icon={(active) => <HomeIcon active={active} size={23} />}
+        />
+
+        {/* 撮影 (= ヒーロー)。 ink の円 + シャッターリング */}
+        <Pressable
+          onPress={() => rootNav.navigate('CaptureMode')}
+          accessibilityRole="button"
+          accessibilityLabel={t('tab.captureA11y')}
+          style={({ pressed }) => [styles.shutter, pressed && styles.shutterPressed]}
+        >
+          <Svg width={30} height={30} viewBox="0 0 30 30" fill="none">
+            <Circle cx={15} cy={15} r={12.5} stroke={colors.paper} strokeWidth={1.8} />
+            <Circle cx={15} cy={15} r={5.5} fill={colors.emerald} />
+          </Svg>
+        </Pressable>
+
+        <RailItem
+          label={t('tab.settings')}
+          active={tab === 'settings'}
+          onPress={() => setTab('settings')}
+          icon={(active) => <SettingsIcon active={active} size={23} />}
+        />
+      </View>
+    </View>
   );
 };
 
+const RailItem: React.FC<{
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  icon: (active: boolean) => React.ReactNode;
+}> = ({ label, active, onPress, icon }) => (
+  <Pressable
+    onPress={onPress}
+    accessibilityRole="tab"
+    accessibilityState={{ selected: active }}
+    style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+    hitSlop={10}
+  >
+    <View style={[styles.itemIcon, active && styles.itemIconActive]}>{icon(active)}</View>
+    <Text style={[styles.itemLabel, active && styles.itemLabelActive]}>{label}</Text>
+  </Pressable>
+);
+
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: colors.card,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    height: Platform.OS === 'ios' ? 88 : 70,
-    paddingTop: spacing.sm,
-    paddingBottom: Platform.OS === 'ios' ? spacing.xl : spacing.sm,
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  tabItem: {
-    paddingTop: 4,
-  },
-  iconWrap: {
+  root: { flex: 1, flexDirection: 'row', backgroundColor: colors.paper },
+  content: { flex: 1 },
+  page: { ...StyleSheet.absoluteFillObject },
+  pageHidden: { opacity: 0, zIndex: -1 },
+
+  rail: {
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    backgroundColor: colors.paper,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 2,
+    gap: spacing.xxl,
   },
-  tabLabel: {
+
+  item: { alignItems: 'center', gap: 5 },
+  itemPressed: { opacity: 0.55 },
+  itemIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemIconActive: { backgroundColor: colors.paperDeep },
+  itemLabel: {
     fontFamily: fonts.sansSemibold,
     fontSize: 9.5,
-    letterSpacing: 1.4,
-    marginTop: 2,
+    letterSpacing: 1.6,
     textTransform: 'uppercase',
+    color: colors.textMute,
   },
-  cameraButton: {
-    flex: 1,
+  itemLabelActive: { color: colors.ink },
+
+  shutter: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 6,
+    shadowColor: '#33271A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  cameraButtonPressed: {
-    opacity: 0.7,
-  },
+  shutterPressed: { backgroundColor: colors.inkSoft, transform: [{ scale: 0.96 }] },
 });

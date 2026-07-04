@@ -71,9 +71,8 @@ const ja = {
 
   // ── Settings ──
   'settings.title': '設定',
-  'settings.subtitle': 'RootLens · フィジカル AI 訓練データ市場',
+  'settings.subtitle': 'アカウントとアプリの設定',
   'settings.section.account': 'アカウント',
-  'settings.section.notifications': '通知',
   'settings.section.capture': '撮影',
   'settings.section.data': 'データ',
   'settings.section.support': 'サポート',
@@ -85,13 +84,7 @@ const ja = {
   'settings.unauthenticated': '未認証',
   'settings.authProvider': '認証プロバイダ',
 
-  'settings.pushNotifications': 'プッシュ通知',
-  'settings.pushNotificationsDesc': 'アップロード完了などのお知らせ',
-  'settings.pushNotImplemented': '未実装 (= expo-notifications 統合予定)',
 
-  'settings.handOverlay': 'ハンドトラッキング表示',
-  'settings.handOverlayDesc': 'プレビュー上に手のスケルトンを描画',
-  'settings.handOverlaySoon': '次の更新で有効化',
   'settings.recalibrate': 'キャリブレーション再校正',
 
   'settings.storageUsage': 'ストレージ使用量',
@@ -120,7 +113,7 @@ const ja = {
   // ── Clip card ──
   'clip.recorded': 'アップロード待ち',
   'clip.uploading': 'アップロード中',
-  'clip.errorEyebrow': '処理エラー',
+  'clip.errorEyebrow': 'アップロード失敗',
   'clip.errorDefault': 'サーバ処理が失敗しました。 タップで詳細を確認。',
   'clip.tryAgain': 'もう一度試す',
 
@@ -169,6 +162,7 @@ const ja = {
   'capture.tts.handLost': '両手がカメラに映るようにしてください',
 
   // ── アップロード確認ポップ (= マイビデオのカードタップ) ──
+  'upload.confirmTitle': 'アップロード前の確認',
   'upload.confirmHint': 'うつってはいけないものがないか、 確認してからアップロードしてください。',
   'upload.action': 'アップロードする',
 
@@ -206,7 +200,7 @@ const ja = {
   'login.tos': '続行することで利用規約とプライバシーポリシーに同意したものとみなされます。',
 
   // ── Tab bar ──
-  'tab.home': 'ホーム',
+  'tab.home': 'マイビデオ',
   'tab.settings': '設定',
   'tab.captureA11y': '撮影モードを開始',
 
@@ -218,7 +212,7 @@ const ja = {
   'portfolio.greetingNight': 'おつかれさまです',
   'portfolio.greetingSub': 'おうちの時間が、 少しずつ収入になります',
   'portfolio.emptyTitle': 'アップロード待ちの動画はありません',
-  'portfolio.emptyHint': '中央のカメラボタンから撮影すると、 ここに並びます。 アップロードが終わった動画はここから消えます。',
+  'portfolio.emptyHint': '右の丸いボタンから撮影すると、 ここに並びます。 アップロードが終わった動画は、 ここから消えます。',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
@@ -234,9 +228,8 @@ const en: Record<TranslationKey, string> = {
 
   // ── Settings ──
   'settings.title': 'Settings',
-  'settings.subtitle': 'RootLens · Physical AI training-data marketplace',
+  'settings.subtitle': 'Account & app settings',
   'settings.section.account': 'Account',
-  'settings.section.notifications': 'Notifications',
   'settings.section.capture': 'Capture',
   'settings.section.data': 'Data',
   'settings.section.support': 'Support',
@@ -248,13 +241,7 @@ const en: Record<TranslationKey, string> = {
   'settings.unauthenticated': 'Not signed in',
   'settings.authProvider': 'Auth provider',
 
-  'settings.pushNotifications': 'Push notifications',
-  'settings.pushNotificationsDesc': 'Alerts such as upload completion',
-  'settings.pushNotImplemented': 'Not yet available (expo-notifications)',
 
-  'settings.handOverlay': 'Hand-tracking overlay',
-  'settings.handOverlayDesc': 'Draw the hand skeleton over the preview',
-  'settings.handOverlaySoon': 'Coming in a future update',
   'settings.recalibrate': 'Recalibrate',
 
   'settings.storageUsage': 'Storage used',
@@ -283,7 +270,7 @@ const en: Record<TranslationKey, string> = {
   // ── Clip card ──
   'clip.recorded': 'Waiting to upload',
   'clip.uploading': 'Uploading',
-  'clip.errorEyebrow': 'Processing error',
+  'clip.errorEyebrow': 'Upload failed',
   'clip.errorDefault': 'Server processing failed. Tap for details.',
   'clip.tryAgain': 'Try again',
 
@@ -331,6 +318,7 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.handLost': 'Please keep both hands in view of the camera.',
 
   // ── Upload confirmation pop (= tap a card in My Videos) ──
+  'upload.confirmTitle': 'Check before upload',
   'upload.confirmHint': 'Please check that nothing private is visible, then upload.',
   'upload.action': 'Upload',
 
@@ -368,7 +356,7 @@ const en: Record<TranslationKey, string> = {
   'login.tos': 'By continuing, you agree to the Terms of Service and Privacy Policy.',
 
   // ── Tab bar ──
-  'tab.home': 'Home',
+  'tab.home': 'My videos',
   'tab.settings': 'Settings',
   'tab.captureA11y': 'Start capture mode',
 
@@ -379,7 +367,7 @@ const en: Record<TranslationKey, string> = {
   'portfolio.greetingNight': 'Working late?',
   'portfolio.greetingSub': 'Your time at home, slowly becoming income',
   'portfolio.emptyTitle': 'No videos waiting to upload',
-  'portfolio.emptyHint': 'Videos you capture appear here. Once uploaded, they leave this list.',
+  'portfolio.emptyHint': 'Tap the round button on the right to record. Videos appear here, and leave the list once uploaded.',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { ja, en };

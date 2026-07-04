@@ -1,10 +1,9 @@
-// プレビューポップ (= マイビデオのカードタップで開く、 v0.1.4 UI_SPECS)。
+// プレビューポップ (= マイビデオのカードタップで開く)。
 //
-// ローカル録画 mp4 をその場で再生し、 「うつってはいけないものがないか」 をユーザー自身が確認してから
-// アップロードする (= 同意はアップロードボタンを押す行為そのもの)。
+// ローカル録画 mp4 をその場で再生し、 「うつってはいけないものがないか」 をユーザー自身が
+// 確認してからアップロードする (= 同意はアップロードボタンを押す行為そのもの)。
 //
-// 横持ち前提のレイアウト: 左に動画 (16:9)、 右に説明 + ボタン列。
-// アップロード開始でポップは閉じ、 進捗は一覧のカードに出る (= uploaded でカードごと消える)。
+// 横持ち前提: 左 = 動画 (16:9)、 右 = 確認テキスト + アクション列。
 
 import React from 'react';
 import {
@@ -14,13 +13,14 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Circle, Polygon } from 'react-native-svg';
 import { ResizeMode, Video } from 'expo-av';
 
 import type { Clip } from '../dataflow';
 import { localVideoUri, formatDuration } from './ClipCard';
 import { clipTitle } from '../domain/clipLabels';
 import { useT } from '../i18n';
-import { colors, fonts, radii, spacing, typography } from '../theme';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -40,9 +40,9 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape']}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        {/* カード内タップでは閉じない (= stopPropagation 相当) */}
+        {/* カード内タップでは閉じない */}
         <Pressable style={styles.sheet} onPress={() => {}}>
-          {/* 左: 動画プレビュー */}
+          {/* ── 左: 動画プレビュー ── */}
           <View style={styles.videoWrap}>
             {uri ? (
               <Video
@@ -55,38 +55,41 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
               />
             ) : (
               <View style={styles.videoMissing}>
-                <Text style={styles.videoMissingText}>{t('clip.errorDefault')}</Text>
+                <Svg width={40} height={40} viewBox="0 0 40 40" fill="none">
+                  <Circle cx={20} cy={20} r={18.5} stroke={colors.textFaint} strokeWidth={1.4} />
+                  <Polygon points="16,12.5 28,20 16,27.5" fill={colors.textFaint} />
+                </Svg>
               </View>
             )}
           </View>
 
-          {/* 右: 説明 + アクション */}
+          {/* ── 右: 確認 + アクション ── */}
           <View style={styles.side}>
+            <Text style={styles.eyebrow}>{t('upload.confirmTitle')}</Text>
             <Text style={styles.title} numberOfLines={2}>{clipTitle(clip)}</Text>
             <Text style={styles.meta}>
-              {dur ? `${dur} · ` : ''}{clip.recordingConfigId ?? ''}
+              {dur ? `${dur}` : ''}
+              {dur && clip.recordingConfigId ? '  ·  ' : ''}
+              {clip.recordingConfigId === 'ultra_wide' ? '超広角' : clip.recordingConfigId === 'arkit' ? 'ARKit' : clip.recordingConfigId ?? ''}
             </Text>
+
+            <View style={styles.rule} />
             <Text style={styles.hint}>{t('upload.confirmHint')}</Text>
 
             <View style={styles.spacer} />
 
             <Pressable
               onPress={() => onUpload(clip)}
-              style={({ pressed }) => [styles.uploadBtn, pressed && styles.btnPressed]}
+              style={({ pressed }) => [styles.uploadBtn, pressed && styles.uploadBtnPressed]}
             >
               <Text style={styles.uploadBtnLabel}>{t('upload.action')}</Text>
             </Pressable>
             <View style={styles.subRow}>
-              <Pressable
-                onPress={() => onRemove(clip)}
-                style={({ pressed }) => [styles.subBtn, pressed && styles.btnPressed]}
-              >
+              <Pressable onPress={() => onRemove(clip)} style={({ pressed }) => [styles.subBtn, pressed && styles.btnPressed]} hitSlop={6}>
                 <Text style={styles.subBtnLabelDanger}>{t('common.delete')}</Text>
               </Pressable>
-              <Pressable
-                onPress={onClose}
-                style={({ pressed }) => [styles.subBtn, pressed && styles.btnPressed]}
-              >
+              <View style={styles.subDivider} />
+              <Pressable onPress={onClose} style={({ pressed }) => [styles.subBtn, pressed && styles.btnPressed]} hitSlop={6}>
                 <Text style={styles.subBtnLabel}>{t('common.close')}</Text>
               </Pressable>
             </View>
@@ -100,60 +103,88 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20,16,8,0.55)',
+    backgroundColor: 'rgba(20, 16, 8, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.lg,
+    padding: spacing.xl,
   },
-  // 横持ち: 左 = 動画、 右 = テキスト + ボタン
   sheet: {
     flexDirection: 'row',
     backgroundColor: colors.paper,
     borderRadius: radii.xl,
     overflow: 'hidden',
-    width: '88%',
-    maxWidth: 720,
-    maxHeight: '90%',
+    width: '86%',
+    maxWidth: 760,
+    ...shadows.pop,
   },
   videoWrap: {
-    flex: 3,
-    backgroundColor: '#000',
+    flex: 58,
     aspectRatio: 16 / 9,
-    alignSelf: 'center',
+    backgroundColor: '#10131A',
   },
   video: { width: '100%', height: '100%' },
-  videoMissing: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  videoMissingText: { ...typography.caption, color: '#fff', textAlign: 'center' },
+  videoMissing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   side: {
-    flex: 2,
-    padding: spacing.lg,
-    gap: 6,
+    flex: 42,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    alignSelf: 'stretch',
+  },
+  eyebrow: {
+    ...typography.labelSmall,
+    color: colors.emeraldDeep,
+    marginBottom: spacing.sm,
   },
   title: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 16,
+    fontFamily: fonts.serifMedium,
+    fontSize: 21,
+    lineHeight: 27,
+    letterSpacing: -0.3,
     color: colors.ink,
   },
-  meta: { ...typography.caption, color: colors.textMute },
-  hint: { ...typography.caption, color: colors.textBody, lineHeight: 18, marginTop: 4 },
-  spacer: { flex: 1 },
+  meta: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.textMute,
+    marginTop: 4,
+  },
+  rule: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  hint: {
+    ...typography.caption,
+    lineHeight: 19,
+    color: colors.textBody,
+  },
+  spacer: { flex: 1, minHeight: spacing.lg },
 
   uploadBtn: {
     backgroundColor: colors.emerald,
     borderRadius: radii.full,
-    paddingVertical: 12,
+    paddingVertical: 13,
     alignItems: 'center',
   },
+  uploadBtnPressed: { backgroundColor: colors.emeraldDeep },
   uploadBtnLabel: {
     fontFamily: fonts.sansSemibold,
     fontSize: 14,
-    color: '#fff',
-    letterSpacing: 0.3,
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
   },
-  subRow: { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg, marginTop: 4 },
-  subBtn: { paddingVertical: 8, paddingHorizontal: 12 },
-  subBtnLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textMute },
-  subBtnLabelDanger: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger },
-  btnPressed: { opacity: 0.65 },
+  subRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.lg,
+    marginTop: spacing.md,
+  },
+  subDivider: { width: 1, height: 12, backgroundColor: colors.border },
+  subBtn: { paddingVertical: 6, paddingHorizontal: 8 },
+  subBtnLabel: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.textMute },
+  subBtnLabelDanger: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.danger },
+  btnPressed: { opacity: 0.55 },
 });
