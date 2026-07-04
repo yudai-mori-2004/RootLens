@@ -1,14 +1,13 @@
-// Settings タブ。
+// Settings タブ (= 横持ち、 2 カラム誌面レイアウト)。
 //
-// セクション構成:
-//   • 言語         — ja / en
-//   • アカウント   — アカウント ID (= 端末が持つ鍵の公開鍵)、 サインアウト
-//   • 通知         — push 通知 on/off (= placeholder、 expo-notifications 統合は後で)
-//   • 撮影         — ハンドトラッキング overlay (= placeholder) / キャリブレーションやり直し
-//   • データ       — ストレージ使用量、 キャッシュクリア
-//   • サポート     — お問い合わせ、 利用規約、 プライバシーポリシー
-//   • アプリ情報   — バージョン、 リポジトリ
-//   • DEVELOPER    — サーバ endpoint 等 (= debug provider 時のみ)
+// セクション分類 (= ユーザーの関心単位で 4 + 開発者 1):
+//   左: • アカウント — アカウント ID / サインアウト
+//       • 撮影       — キャリブレーションやり直し
+//       • サポート   — 利用規約 / プライバシーポリシー / お問い合わせ
+//   右: • アプリ     — 表示言語 / ストレージ使用量 / キャッシュクリア / バージョン
+//       • 開発者向け — SERVER / ACCOUNT / AUTH PROVIDER / GitHub (= debug provider 時のみ)
+//
+// 行は Section が hairline で区切る (= 各行が罫線を持たない。 二重線を作らない)。
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -21,6 +20,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -124,100 +124,79 @@ export const SettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.grid}>
-        <View style={styles.gridCol}>
+          {/* ── 左カラム ── */}
+          <View style={styles.gridCol}>
+            <Section title={t('settings.section.account')}>
+              <Row
+                label={t('settings.accountId')}
+                value={ownerStr ? shortBase58(ownerStr) : t('settings.unauthenticated')}
+                mono
+              />
+              <ActionRow
+                label={signingOut ? t('settings.signingOut') : t('settings.signOut')}
+                onPress={onLogout}
+                kind="danger"
+                disabled={signingOut || state.status !== 'authenticated'}
+              />
+            </Section>
 
-        {/* ── 言語 ── */}
-        <Section title={t('settings.section.language')}>
-          <SegmentRow
-            label={t('settings.languageLabel')}
-            sublabel={t('settings.languageDesc')}
-            value={locale}
-            options={[
-              { value: 'ja', label: t('settings.languageJa') },
-              { value: 'en', label: t('settings.languageEn') },
-            ]}
-            onChange={(v) => setLocale(v as Locale)}
-          />
-        </Section>
+            <Section title={t('settings.section.capture')}>
+              <ActionRow
+                label={t('settings.recalibrate')}
+                onPress={async () => {
+                  try {
+                    await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
+                  } catch {}
+                }}
+              />
+            </Section>
 
-        {/* ── アカウント ── */}
-        <Section title={t('settings.section.account')}>
-          <Row
-            label={t('settings.accountId')}
-            value={ownerStr ? shortBase58(ownerStr) : t('settings.unauthenticated')}
-            mono
-          />
-          <Row label={t('settings.authProvider')} value={provider.id} />
-        </Section>
+            <Section title={t('settings.section.support')}>
+              <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
+              <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
+              <ActionRow
+                label={t('settings.contact')}
+                onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
+              />
+            </Section>
+          </View>
 
-        {/* ── サポート ── */}
-        <Section title={t('settings.section.support')}>
-          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
-          <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
-          <ActionRow
-            label={t('settings.contact')}
-            onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
-          />
-        </Section>
+          {/* ── 右カラム ── */}
+          <View style={styles.gridCol}>
+            <Section title={t('settings.section.app')}>
+              <SegmentRow
+                label={t('settings.languageLabel')}
+                value={locale}
+                options={[
+                  { value: 'ja', label: t('settings.languageJa') },
+                  { value: 'en', label: t('settings.languageEn') },
+                ]}
+                onChange={(v) => setLocale(v as Locale)}
+              />
+              <Row
+                label={t('settings.storageUsage')}
+                value={cacheSize === null ? t('settings.calculating') : formatBytes(cacheSize)}
+              />
+              <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
+              <Row label={t('settings.version')} value={version} />
+            </Section>
 
-        </View>
-        <View style={styles.gridCol}>
-
-        {/* ── 撮影 ── */}
-        <Section title={t('settings.section.capture')}>
-          <ActionRow
-            label={t('settings.recalibrate')}
-            onPress={async () => {
-              try {
-                await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
-              } catch {}
-            }}
-          />
-        </Section>
-
-        {/* ── データ ── */}
-        <Section title={t('settings.section.data')}>
-          <Row
-            label={t('settings.storageUsage')}
-            value={cacheSize === null ? t('settings.calculating') : formatBytes(cacheSize)}
-          />
-          <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
-        </Section>
-
-        {/* ── アプリ情報 ── */}
-        <Section title={t('settings.section.appInfo')}>
-          <Row label={t('settings.version')} value={version} />
-          <ActionRow
-            label={t('settings.githubRepo')}
-            onPress={() => Linking.openURL('https://github.com/yudai-mori-2004/root-lens').catch(() => {})}
-          />
-        </Section>
-
-        {/* ── DEVELOPER (= debug provider 時のみ表示) ── */}
-        {provider.id === 'debug' ? (
-          <Section title={t('settings.section.developer')} tone="muted">
-            <Row label="SERVER" value={config.serverUrl} mono onPress={() => Linking.openURL(config.serverUrl)} />
-            <Row label="ACCOUNT" value={ownerStr ?? '—'} mono />
-          </Section>
-        ) : null}
-
-        </View>
+            {/* ── 開発者向け (= debug provider 時のみ表示) ── */}
+            {provider.id === 'debug' ? (
+              <Section title={t('settings.section.developer')} tone="muted">
+                <Row label="SERVER" value={config.serverUrl} mono onPress={() => Linking.openURL(config.serverUrl)} />
+                <Row label="ACCOUNT" value={ownerStr ?? '—'} mono />
+                <Row label="AUTH PROVIDER" value={provider.id} mono />
+                <ActionRow
+                  label="GitHub"
+                  onPress={() => Linking.openURL('https://github.com/yudai-mori-2004/root-lens').catch(() => {})}
+                />
+              </Section>
+            ) : null}
+          </View>
         </View>
 
-        {/* ── Sign out ── */}
-        <Pressable
-          onPress={onLogout}
-          disabled={signingOut || state.status !== 'authenticated'}
-          style={({ pressed }) => [
-            styles.signOutBtn,
-            pressed && styles.signOutBtnPressed,
-            (signingOut || state.status !== 'authenticated') && styles.signOutBtnDisabled,
-          ]}
-        >
-          <Text style={styles.signOutLabel}>{signingOut ? t('settings.signingOut') : t('settings.signOut')}</Text>
-        </Pressable>
-
-        <Text style={styles.footnote}>v{version} · {provider.id}</Text>
+        <Text style={styles.footnote}>RootLens v{version}</Text>
       </ScrollView>
 
       <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
@@ -226,39 +205,40 @@ export const SettingsScreen: React.FC = () => {
 };
 
 // ─── building blocks ────────────────────────────────────────────────────
+// Section が行間の hairline を一元管理する (= 行コンポーネントは罫線を持たない)。
 
 const Section: React.FC<{ title: string; tone?: 'normal' | 'muted'; children: React.ReactNode }> = ({
   title, tone, children,
-}) => (
-  <View style={styles.section}>
-    <Text style={[styles.sectionTitle, tone === 'muted' && { color: colors.textFaint }]}>{title}</Text>
-    <View style={styles.sectionCard}>{children}</View>
-  </View>
-);
+}) => {
+  const items = React.Children.toArray(children).filter(Boolean);
+  return (
+    <View>
+      <Text style={[styles.sectionTitle, tone === 'muted' && { color: colors.textFaint }]}>{title}</Text>
+      <View style={styles.sectionCard}>
+        {items.map((child, i) => (
+          <React.Fragment key={i}>
+            {i > 0 ? <View style={styles.divider} /> : null}
+            {child}
+          </React.Fragment>
+        ))}
+      </View>
+    </View>
+  );
+};
 
 const Row: React.FC<{
   label: string;
   value: string;
-  tone?: 'ok' | 'warn' | 'mute';
   mono?: boolean;
   onPress?: () => void;
-}> = ({ label, value, tone, mono, onPress }) => {
-  const valueColor =
-    tone === 'ok' ? colors.emeraldDeep :
-    tone === 'warn' ? colors.warn :
-    tone === 'mute' ? colors.textMute :
-    colors.ink;
+}> = ({ label, value, mono, onPress }) => {
   const inner = (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
       <Text
-        style={[
-          styles.rowValue,
-          mono && { fontFamily: fonts.mono, fontSize: 12 },
-          { color: valueColor },
-          onPress && styles.rowValueLink,
-        ]}
-        numberOfLines={2}
+        style={[styles.rowValue, mono && styles.rowValueMono, onPress && styles.rowValueLink]}
+        numberOfLines={1}
+        ellipsizeMode="middle"
       >
         {value}
       </Text>
@@ -274,29 +254,43 @@ const Row: React.FC<{
   return inner;
 };
 
-const ActionRow: React.FC<{ label: string; onPress: () => void; kind?: 'warn' | 'normal' }> = ({
-  label, onPress, kind,
-}) => (
-  <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-    <Text style={[styles.actionRowLabel, kind === 'warn' && { color: colors.warn }]}>{label}</Text>
-    <Text style={[styles.actionRowChevron, kind === 'warn' && { color: colors.warn }]}>›</Text>
-  </Pressable>
+const Chevron: React.FC<{ color: string }> = ({ color }) => (
+  <Svg width={14} height={14} viewBox="0 0 14 14" fill="none">
+    <Path d="M5 3.5 L9 7 L5 10.5" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
 );
 
-/// セグメント切替 (= 言語選択など離散的な 2-4 値)。
-/// iOS の UISegmentedControl 相当を Editorial Fintech 色で再現。
+const ActionRow: React.FC<{
+  label: string;
+  onPress: () => void;
+  kind?: 'warn' | 'danger' | 'normal';
+  disabled?: boolean;
+}> = ({ label, onPress, kind, disabled }) => {
+  const color =
+    kind === 'warn' ? colors.warn :
+    kind === 'danger' ? colors.danger :
+    colors.ink;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [styles.actionRow, pressed && styles.rowPressed, disabled && styles.rowDisabled]}
+    >
+      <Text style={[styles.actionRowLabel, { color }]}>{label}</Text>
+      <Chevron color={kind ? color : colors.textFaint} />
+    </Pressable>
+  );
+};
+
+/// 1 行に収まるコンパクトなセグメント切替 (= ラベル左、 セグメント右)。
 const SegmentRow: React.FC<{
   label: string;
-  sublabel?: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (v: string) => void;
-}> = ({ label, sublabel, value, options, onChange }) => (
-  <View style={[styles.row, styles.segmentRow]}>
-    <View style={styles.segmentRowText}>
-      <Text style={styles.switchLabel}>{label}</Text>
-      {sublabel ? <Text style={styles.switchSublabel}>{sublabel}</Text> : null}
-    </View>
+}> = ({ label, value, options, onChange }) => (
+  <View style={styles.segmentRow}>
+    <Text style={styles.rowLabelInline}>{label}</Text>
     <View style={styles.segmentControl}>
       {options.map((opt) => {
         const active = opt.value === value;
@@ -342,18 +336,18 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.xl,
     maxWidth: 980,
     alignSelf: 'center',
     width: '100%',
   },
 
-  heroBlock: { gap: 4, marginBottom: spacing.md },
+  heroBlock: { gap: 2 },
   title: {
     fontFamily: fonts.serifLight,
-    fontSize: 44,
-    letterSpacing: -0.8,
+    fontSize: 38,
+    letterSpacing: -0.6,
     color: colors.ink,
   },
   subtitle: { ...typography.caption, color: colors.textMute },
@@ -363,10 +357,10 @@ const styles = StyleSheet.create({
     gap: spacing.xl,
     alignItems: 'flex-start',
   },
-  gridCol: { flex: 1, gap: spacing.lg },
-  section: {},
+  gridCol: { flex: 1, gap: spacing.xl },
+
   sectionTitle: {
-    ...typography.label,
+    ...typography.labelSmall,
     color: colors.textMute,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.xs,
@@ -378,41 +372,57 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     overflow: 'hidden',
   },
+  divider: { height: 1, backgroundColor: colors.borderLight, marginLeft: spacing.lg },
 
   row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: 4,
+    paddingVertical: 14,
   },
   rowPressed: { backgroundColor: colors.paperDeep },
-  rowLabel: { ...typography.labelSmall, color: colors.textMute },
-  rowValue: { ...typography.body, color: colors.ink, fontSize: 14 },
+  rowDisabled: { opacity: 0.45 },
+  rowLabel: { ...typography.captionMedium, color: colors.textBody },
+  rowLabelInline: { ...typography.captionMedium, color: colors.textBody },
+  rowValue: {
+    ...typography.caption,
+    color: colors.textMute,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  rowValueMono: { fontFamily: fonts.mono, fontSize: 12 },
   rowValueLink: { textDecorationLine: 'underline' },
 
-
-  switchLabel: { fontFamily: fonts.sansSemibold, fontSize: 14, color: colors.ink },
-  switchSublabel: { ...typography.caption, color: colors.textMute },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 14,
+  },
+  actionRowLabel: { ...typography.captionMedium },
 
   segmentRow: {
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
   },
-  segmentRowText: { gap: 2, marginBottom: 4 },
   segmentControl: {
     flexDirection: 'row',
     backgroundColor: colors.paperDeep,
     borderRadius: radii.md,
-    padding: 3,
+    padding: 2.5,
     borderWidth: 1,
     borderColor: colors.border,
   },
   segmentBtn: {
-    flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radii.sm,
@@ -428,55 +438,19 @@ const styles = StyleSheet.create({
   segmentBtnPressed: { opacity: 0.6 },
   segmentLabel: {
     fontFamily: fonts.sansMedium,
-    fontSize: 13,
+    fontSize: 12.5,
     color: colors.textMute,
-    letterSpacing: 0.2,
   },
   segmentLabelActive: {
     color: colors.ink,
     fontFamily: fonts.sansSemibold,
   },
 
-  actionRowLabel: {
-    flex: 1,
-    fontFamily: fonts.sansMedium,
-    fontSize: 14,
-    color: colors.ink,
-  },
-  actionRowChevron: {
-    position: 'absolute',
-    right: spacing.lg,
-    top: '50%',
-    marginTop: -10,
-    fontSize: 20,
-    color: colors.textMute,
-  },
-
-  signOutBtn: {
-    marginTop: spacing.md,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  signOutBtnPressed: { backgroundColor: colors.paperDeep },
-  signOutBtnDisabled: { opacity: 0.4 },
-  signOutLabel: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 12,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    color: colors.danger,
-  },
-
   footnote: {
     ...typography.caption,
     color: colors.textFaint,
     textAlign: 'center',
-    paddingTop: spacing.lg,
     fontFamily: fonts.mono,
+    fontSize: 11,
   },
 });

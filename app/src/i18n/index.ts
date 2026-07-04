@@ -73,19 +73,16 @@ const ja = {
   'settings.title': '設定',
   'settings.subtitle': 'アカウントとアプリの設定',
   'settings.section.account': 'アカウント',
+  'settings.section.app': 'アプリ',
   'settings.section.capture': '撮影',
-  'settings.section.data': 'データ',
   'settings.section.support': 'サポート',
-  'settings.section.appInfo': 'アプリ情報',
   'settings.section.developer': 'デベロッパー',
-  'settings.section.language': '言語',
 
   'settings.accountId': 'アカウント ID',
   'settings.unauthenticated': '未認証',
-  'settings.authProvider': '認証プロバイダ',
 
 
-  'settings.recalibrate': 'キャリブレーション再校正',
+  'settings.recalibrate': 'カメラの位置合わせをやり直す',
 
   'settings.storageUsage': 'ストレージ使用量',
   'settings.calculating': '計算中…',
@@ -98,10 +95,8 @@ const ja = {
   'settings.contact': 'お問い合わせ',
 
   'settings.version': 'バージョン',
-  'settings.githubRepo': 'GitHub リポジトリ',
 
   'settings.languageLabel': '表示言語',
-  'settings.languageDesc': 'アプリ全体の表示言語と音声案内',
   'settings.languageJa': '日本語',
   'settings.languageEn': 'English',
 
@@ -193,6 +188,7 @@ const ja = {
   'login.heroBAccent': 'AI',
   'login.heroBSuffix': ' から稼ぐ。',
   'login.lede': '端末を装着したまま家事を記録。 動画は撮影した端末の署名つきで保存され、 あなたが確認してからアップロードされます。',
+  'login.accountEyebrow': 'アカウント',
   'login.debugAccount': 'デバッグアカウント · 自動生成',
   'login.providerNote': '端末の中に鍵を作って、 あなたの動画の持ち主であることを証明します。',
   'login.signInFailed': 'サインイン失敗',
@@ -230,19 +226,16 @@ const en: Record<TranslationKey, string> = {
   'settings.title': 'Settings',
   'settings.subtitle': 'Account & app settings',
   'settings.section.account': 'Account',
+  'settings.section.app': 'App',
   'settings.section.capture': 'Capture',
-  'settings.section.data': 'Data',
   'settings.section.support': 'Support',
-  'settings.section.appInfo': 'About',
   'settings.section.developer': 'Developer',
-  'settings.section.language': 'Language',
 
   'settings.accountId': 'Account ID',
   'settings.unauthenticated': 'Not signed in',
-  'settings.authProvider': 'Auth provider',
 
 
-  'settings.recalibrate': 'Recalibrate',
+  'settings.recalibrate': 'Redo camera alignment',
 
   'settings.storageUsage': 'Storage used',
   'settings.calculating': 'Calculating…',
@@ -255,10 +248,8 @@ const en: Record<TranslationKey, string> = {
   'settings.contact': 'Contact',
 
   'settings.version': 'Version',
-  'settings.githubRepo': 'GitHub repository',
 
   'settings.languageLabel': 'Display language',
-  'settings.languageDesc': 'App display language and voice guidance',
   'settings.languageJa': '日本語',
   'settings.languageEn': 'English',
 
@@ -349,6 +340,7 @@ const en: Record<TranslationKey, string> = {
   'login.heroBAccent': 'AI labs.',
   'login.heroBSuffix': '',
   'login.lede': 'Record household tasks while wearing the phone. Each video is saved with your device’s signature, and nothing uploads until you review it.',
+  'login.accountEyebrow': 'Account',
   'login.debugAccount': 'Debug account · auto-generated',
   'login.providerNote': 'A key is created on your device to prove your videos belong to you.',
   'login.signInFailed': 'Sign-in failed',

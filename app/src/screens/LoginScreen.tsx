@@ -72,7 +72,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         </Text>
 
         <View style={styles.providerCard}>
-          <Text style={styles.providerEyebrow}>{t('settings.authProvider')}</Text>
+          <Text style={styles.providerEyebrow}>{t('login.accountEyebrow')}</Text>
           <Text style={styles.providerValue}>{providerLabel}</Text>
           <Text style={styles.providerNote}>
             {t('login.providerNote')}
