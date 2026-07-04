@@ -91,9 +91,12 @@ const HISTORY_MOCKS: { clip: ServerClipStatus; source: ImageSourcePropType }[] =
     }))
   : [];
 
-function todayLabel(): string {
+function todayLabel(nowMs: number): string {
   const tag = getLocale() === 'en' ? 'en-US' : 'ja-JP';
-  return new Date().toLocaleDateString(tag, { month: 'long', day: 'numeric', weekday: 'long' });
+  const d = new Date(nowMs);
+  const date = d.toLocaleDateString(tag, { month: 'long', day: 'numeric', weekday: 'long' });
+  const time = d.toLocaleTimeString(tag, { hour: '2-digit', minute: '2-digit' });
+  return `${date} ${time}`;
 }
 
 /** 合計時間の人向け表記 (= 1 時間未満は分のみ)。 */
@@ -186,6 +189,13 @@ export const CollectionScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const allClips = useClips();
 
+  // 扉カラムの時計 (= 30 秒ごとに更新)
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   // アップロード待ち (= recorded / uploading / error)。 uploaded は履歴側に出る。
   const rows = useMemo<Row[]>(() => {
     const real: Row[] = allClips
@@ -201,6 +211,7 @@ export const CollectionScreen: React.FC = () => {
 
   const serverClips = useServerClips(localUploadedCount);
   const thumbHashes = useThumbIndex(localUploadedCount);
+  const historyScrollRef = React.useRef<ScrollView>(null);
 
   // 履歴 (= uploaded 済み、 新しい順 = サーバ返却順)。 モックは先頭に足す。
   const history = useMemo(
@@ -244,6 +255,16 @@ export const CollectionScreen: React.FC = () => {
   const [historyTarget, setHistoryTarget] = useState<{ clip: ServerClipStatus; source?: ImageSourcePropType } | null>(null);
   // グラフで選択中の日 (= バーtap)。 履歴の該当日タイルもハイライトされる。
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  // 選択日が変わったら、 履歴ストリップを該当日の最初のタイルまで滑らかにスクロールする
+  useEffect(() => {
+    if (!selectedDay) return;
+    const index = history.findIndex(
+      (h) => h.clip.createdAt != null && dayKey(h.clip.createdAt) === selectedDay,
+    );
+    if (index < 0) return;
+    historyScrollRef.current?.scrollTo({ x: index * HISTORY_TILE_PITCH, animated: true });
+  }, [selectedDay, history]);
   const onOpen = useCallback((clip: Clip) => setPreviewTarget(clip), []);
   const onClose = useCallback(() => setPreviewTarget(null), []);
   const onUpload = useCallback((clip: Clip) => {
@@ -261,7 +282,7 @@ export const CollectionScreen: React.FC = () => {
       <View style={styles.aside}>
         <View style={styles.asideHead}>
           <BrandMark size={30} />
-          <Text style={styles.date}>{todayLabel()}</Text>
+          <Text style={styles.date}>{todayLabel(nowMs)}</Text>
         </View>
 
         {/* 中央: 合計撮影時間 (= 常時表示) */}
@@ -279,6 +300,7 @@ export const CollectionScreen: React.FC = () => {
           <View>
             <Text style={styles.sectionLabel}>{t('portfolio.uploadedLabel')}</Text>
             <ScrollView
+              ref={historyScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.historyRow}
@@ -464,6 +486,7 @@ const GraphPanel: React.FC<{
 };
 
 const ASIDE_WIDTH = 236;
+const HISTORY_TILE_PITCH = 124 + 12; // tile width + historyRow gap
 const CARD_WIDTH = 260;
 
 const styles = StyleSheet.create({

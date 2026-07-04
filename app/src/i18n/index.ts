@@ -211,8 +211,8 @@ const ja = {
 
   // ── マイビデオ (= 旧 Collection / ポートフォリオ。 主婦向けに平易語) ──
   // 温かい挨拶 (= 家事感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
-  'portfolio.mission': 'ロボットが世界を学び、 くらしの手伝いができるようになるために。 あなたの毎日の作業風景が、 いちばんの教科書になります。',
-  'portfolio.totalTime': 'これまでの撮影時間',
+  'portfolio.mission': 'ロボットが世界を学び、 くらしを支えるパートナーになる。 その未来を実現するために、 あなたの毎日の作業風景が必要です。',
+  'portfolio.totalTime': '総撮影時間',
   'portfolio.uploadedLabel': '履歴',
   'portfolio.dailyLabel': '毎日の記録',
   'portfolio.pendingNotice': 'データの確認と同意が必要です。',
@@ -370,8 +370,8 @@ const en: Record<TranslationKey, string> = {
   'tab.captureA11y': 'Start capture mode',
 
   // ── My Videos (= former Collection / Portfolio。 plain language) ──
-  'portfolio.mission': 'So robots can learn the world and lend a hand at home. Your everyday housework is their best textbook.',
-  'portfolio.totalTime': 'Total time captured',
+  'portfolio.mission': 'Robots will learn the world and become partners in daily life. To make that future real, we need the scenes of your everyday housework.',
+  'portfolio.totalTime': 'Total capture time',
   'portfolio.uploadedLabel': 'History',
   'portfolio.dailyLabel': 'Daily record',
   'portfolio.pendingNotice': 'These videos need your review and consent.',
