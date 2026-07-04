@@ -1,20 +1,17 @@
 // Auth 抽象インターフェース。
 //
-// 目的: アプリ本体は具体的な認証実装 (Privy, Web3Auth, passkey, debug など) を
-// 知らずに、ウォレット pubkey と Solana 署名能力だけ要求できるようにする。
-// 将来 Privy などへ差し替えるときは AuthProvider の別実装を渡すだけで済む。
+// 目的: アプリ本体は具体的な認証実装 (debug / passkey / OIDC など) を知らずに、
+// 「アカウント公開鍵 (= 端末が持つ Ed25519 鍵の base58)」 だけ要求できるようにする。
+// アカウント公開鍵はクリップ所有者の識別子として X-Account-Pubkey header でサーバに渡る。
 //
-// 現状 (= v0.1.3 Phase F の開始時点) は DebugAuthProvider 一択。
-// Privy 等の本格認証は別タスクで追加する。
-
-import type { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+// 現状は DebugAuthProvider 一択 (= 端末ローカルに鍵を生成して保持)。
 
 export type AuthStatus = 'loading' | 'unauthenticated' | 'authenticated';
 
 export interface AuthSession {
-  /** Solana wallet pubkey (base58)。 X-Wallet-Pubkey header や on-chain owner として使う。 */
-  pubkey: PublicKey;
-  /** 認証実装の識別子 (= debug / privy / web3auth など)。 デバッグ表示や分岐に使う。 */
+  /** アカウント公開鍵 (= Ed25519、 base58)。 クリップ所有者の識別子。 */
+  pubkey: string;
+  /** 認証実装の識別子 (= debug / ...)。 デバッグ表示や分岐に使う。 */
   providerId: string;
 }
 
@@ -39,12 +36,6 @@ export interface AuthProvider {
   /** ログイン (= 認証フロー起動)。 完了で status=authenticated になる。 */
   login(): Promise<void>;
 
-  /** ログアウト。 永続化された wallet も消す実装と消さない実装がある。 */
+  /** ログアウト。 永続化された鍵も消す実装と消さない実装がある。 */
   logout(): Promise<void>;
-
-  /** authenticated 時のみ呼び出し可。 Solana tx を payer wallet で署名する。 */
-  signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T>;
-
-  /** authenticated 時のみ呼び出し可。 任意の bytes を ed25519 署名する (= TP register 等)。 */
-  signMessage(message: Uint8Array): Promise<Uint8Array>;
 }

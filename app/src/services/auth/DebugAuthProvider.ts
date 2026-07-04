@@ -1,31 +1,37 @@
 // Debug 用 auth 実装。
 //
-// SecureStore に keypair (= 64 byte base58) を 1 つだけ保持し、 起動時に復元する。
-// 初回起動でキーが無ければ自動生成して保存する。 同じ端末では同じ wallet が使われ続ける
-// ので、 cNFT mint / staking 等を繰り返しテストできる。
+// SecureStore に Ed25519 鍵 (= 64 byte base58 = seed 32 + pubkey 32) を 1 つだけ保持し、
+// 起動時に復元する。 初回起動でキーが無ければ自動生成して保存する。 同じ端末では同じ
+// アカウントが使われ続ける (= クリップ所有者の識別子が安定する)。
 //
-// 環境変数 `EXPO_PUBLIC_DEBUG_WALLET_BASE58` (= 64 byte base58 secret) があれば、
-// SecureStore より優先してそれを使う。 共有 wallet で smoke する場合に使う。
+// 環境変数 `EXPO_PUBLIC_DEBUG_ACCOUNT_BASE58` (= 64 byte base58 secret) があれば、
+// SecureStore より優先してそれを使う。 共有アカウントで smoke する場合に使う。
 //
 // `login()` / `logout()` は即座に解決する (= 認証 UI 無し)。 logout は SecureStore を
-// クリアして次回起動で新規 wallet を生成させる。
+// クリアして次回起動で新規アカウントを生成させる。
 
 import * as SecureStore from 'expo-secure-store';
-import { Keypair, type Transaction, type VersionedTransaction } from '@solana/web3.js';
 import { ed25519 } from '@noble/curves/ed25519';
 import bs58 from 'bs58';
 
 import type { AuthProvider, AuthState } from './types';
-import { DEBUG_WALLET_BASE58 } from '../../env';
+import { DEBUG_ACCOUNT_BASE58 } from '../../env';
 
-const STORAGE_KEY = 'rootlens.debug_wallet.v1';
+const STORAGE_KEY = 'rootlens.debug_wallet.v1'; // 旧キー名を踏襲 (= 既存端末の鍵を引き継ぐ)
 const PROVIDER_ID = 'debug';
+
+interface AccountKey {
+  /** Ed25519 seed (32 bytes) */
+  seed: Uint8Array;
+  /** 公開鍵 base58 */
+  pubkeyBase58: string;
+}
 
 export class DebugAuthProvider implements AuthProvider {
   readonly id = PROVIDER_ID;
 
   private state: AuthState = { status: 'loading' };
-  private keypair: Keypair | null = null;
+  private key: AccountKey | null = null;
   private listeners = new Set<(s: AuthState) => void>();
 
   getState(): AuthState {
@@ -39,24 +45,21 @@ export class DebugAuthProvider implements AuthProvider {
 
   async initialize(): Promise<void> {
     try {
-      if (DEBUG_WALLET_BASE58) {
-        this.keypair = loadKeypairFromB58(DEBUG_WALLET_BASE58);
-        await SecureStore.setItemAsync(STORAGE_KEY, DEBUG_WALLET_BASE58);
+      if (DEBUG_ACCOUNT_BASE58) {
+        this.key = loadKeyFromB58(DEBUG_ACCOUNT_BASE58);
+        await SecureStore.setItemAsync(STORAGE_KEY, DEBUG_ACCOUNT_BASE58);
       } else {
         const stored = await SecureStore.getItemAsync(STORAGE_KEY);
         if (stored) {
-          this.keypair = loadKeypairFromB58(stored);
+          this.key = loadKeyFromB58(stored);
         } else {
-          this.keypair = Keypair.generate();
-          await SecureStore.setItemAsync(
-            STORAGE_KEY,
-            bs58.encode(this.keypair.secretKey),
-          );
+          this.key = generateKey();
+          await SecureStore.setItemAsync(STORAGE_KEY, encodeKeyToB58(this.key));
         }
       }
       this.setState({
         status: 'authenticated',
-        session: { pubkey: this.keypair.publicKey, providerId: PROVIDER_ID },
+        session: { pubkey: this.key.pubkeyBase58, providerId: PROVIDER_ID },
       });
     } catch (err) {
       console.error('[DebugAuthProvider] initialize failed', err);
@@ -71,35 +74,8 @@ export class DebugAuthProvider implements AuthProvider {
 
   async logout(): Promise<void> {
     await SecureStore.deleteItemAsync(STORAGE_KEY);
-    this.keypair = null;
+    this.key = null;
     this.setState({ status: 'unauthenticated' });
-  }
-
-  async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
-    const kp = this.requireKeypair();
-    if ('version' in tx) {
-      const versioned = tx as VersionedTransaction;
-      versioned.sign([kp]);
-      return versioned as T;
-    } else {
-      const legacy = tx as Transaction;
-      legacy.partialSign(kp);
-      return legacy as T;
-    }
-  }
-
-  async signMessage(message: Uint8Array): Promise<Uint8Array> {
-    const kp = this.requireKeypair();
-    // Solana の Keypair.secretKey は 64 byte (= seed 32 + pubkey 32)。
-    // @noble/curves の ed25519.sign は seed 32 byte (= private key) を取る。
-    return ed25519.sign(message, kp.secretKey.slice(0, 32));
-  }
-
-  private requireKeypair(): Keypair {
-    if (!this.keypair) {
-      throw new Error('DebugAuthProvider: not authenticated (call initialize first)');
-    }
-    return this.keypair;
   }
 
   private setState(state: AuthState) {
@@ -108,10 +84,30 @@ export class DebugAuthProvider implements AuthProvider {
   }
 }
 
-function loadKeypairFromB58(b58: string): Keypair {
+function generateKey(): AccountKey {
+  const seed = new Uint8Array(32);
+  crypto.getRandomValues(seed);
+  return { seed, pubkeyBase58: bs58.encode(ed25519.getPublicKey(seed)) };
+}
+
+/** 64 byte (= seed 32 + pubkey 32) base58 を復元。 pubkey は seed から再導出して整合を検証する。 */
+function loadKeyFromB58(b58: string): AccountKey {
   const decoded = bs58.decode(b58);
   if (decoded.length !== 64) {
-    throw new Error(`debug wallet must be 64 bytes, got ${decoded.length}`);
+    throw new Error(`debug account key must be 64 bytes, got ${decoded.length}`);
   }
-  return Keypair.fromSecretKey(decoded);
+  const seed = decoded.slice(0, 32);
+  const pub = ed25519.getPublicKey(seed);
+  const storedPub = decoded.slice(32);
+  for (let i = 0; i < 32; i += 1) {
+    if (pub[i] !== storedPub[i]) throw new Error('debug account key corrupt (pubkey mismatch)');
+  }
+  return { seed, pubkeyBase58: bs58.encode(pub) };
+}
+
+function encodeKeyToB58(key: AccountKey): string {
+  const out = new Uint8Array(64);
+  out.set(key.seed, 0);
+  out.set(bs58.decode(key.pubkeyBase58), 32);
+  return bs58.encode(out);
 }

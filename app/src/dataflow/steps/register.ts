@@ -1,10 +1,11 @@
 // Pipeline 1 step: サーバ登録 (DATA_SPECS §2.5)。
 //
-// v0.1.4: POST /api/clips でクリップ行を作るだけ。 finalize / TP /process / mint は無い。
+// v0.1.4: POST /api/clips でクリップ行を作るだけ。 R2 アップロード完了後に呼ぶので
+// サーバ側では state='uploaded' で登録される。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
-import { SERVER_URL, SOLANA_NETWORK } from '../../env';
+import { SERVER_URL } from '../../env';
 import type { EventSink } from '../events';
 import type { RegisterInput, RegisterResult } from '../types';
 
@@ -17,12 +18,11 @@ export async function registerClip(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Wallet-Pubkey': input.walletPubkey,
+      'X-Account-Pubkey': input.accountPubkey,
     },
     body: JSON.stringify({
       signatureHash: input.signatureHash,
       contentSize: input.contentSize,
-      network: SOLANA_NETWORK,
       recordingConfig: input.recordingConfig,
       ...(input.durationMs != null ? { durationMs: input.durationMs } : {}),
       ...(input.deviceModel ? { deviceModel: input.deviceModel } : {}),

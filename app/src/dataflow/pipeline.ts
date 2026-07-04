@@ -7,7 +7,7 @@
 //   登録済 (registered) → (端末側はここまで)
 //
 // 冪等性: 'signed' 以降は同じ signature_hash を使い回す (= 再署名しない)。 サーバ側の重複排除
-// (= (wallet, signature_hash, network)) が効いて二重 clip 行を防ぐ。
+// (= (account, signature_hash)) が効いて二重 clip 行を防ぐ。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
@@ -22,10 +22,10 @@ import { registerClip } from './steps/register';
 import { dataflowStore, makeLocalClipId } from './store';
 import { getCurrentSession } from '../services/auth/instance';
 
-function getWalletPubkey(): string {
+function getAccountPubkey(): string {
   const session = getCurrentSession();
-  if (!session) throw new Error('未認証: wallet session がありません (= AuthGate を通っていない)');
-  return session.pubkey.toBase58();
+  if (!session) throw new Error('未認証: session がありません (= AuthGate を通っていない)');
+  return session.pubkey;
 }
 
 function errMsg(e: unknown): string {
@@ -178,12 +178,11 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
         progressSink,
       );
 
-      const walletPubkey = getWalletPubkey();
       await registerClip(
         {
           signatureHash: cur.signatureHash,
           contentSize: cur.contentSize ?? 0,
-          walletPubkey,
+          accountPubkey: getAccountPubkey(),
           recordingConfig: config.id,
           durationMs: cur.durationMs ?? null,
           deviceModel: cur.deviceModel ?? null,

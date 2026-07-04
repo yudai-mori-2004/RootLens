@@ -4,7 +4,6 @@
 // vanilla store なので React に依存しない (= React 外の step / orchestrator からも触れる)。
 // React 側は UI 層の hooks (src/clips/hooks.ts) が useStore(dataflowStore, selector) で購読する。
 //
-// v0.1.4: クリップ型 / state 機械を簡素化 (= quality / mint / staking 系を撤去)。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない (zustand/vanilla は React 非依存)。
 

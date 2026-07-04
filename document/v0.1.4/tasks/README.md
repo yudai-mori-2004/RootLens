@@ -29,6 +29,9 @@ v0.1.4 (簡素化スプリント)
   07. manual-upload-landscape   🔄 新 ジェスチャーキャリブ復活 + 手動アップロード (マイビデオ = 待ち一覧
                                     + プレビューポップで同意 → アップロード) + 全画面 landscape
                                     + arkit 専用バケット (rootlens-raw-arkit) 分離
+  08. deblockchain-cleanup      🔄 新 wallet/Solana/mint/staking/license 残骸の全撤去。 識別子は
+                                    「アカウント公開鍵」 (X-Account-Pubkey)、 network 撤去、
+                                    Buyer/Privy/web3.js 削除、 文言の現実合わせ (onb slide2 = blur 撤回)
 ```
 
 凡例: ✅ = 完了、 🔄 = 進行中 / 未着手、 新 = 新規追加。

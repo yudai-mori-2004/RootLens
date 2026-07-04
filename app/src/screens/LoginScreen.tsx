@@ -1,10 +1,8 @@
-// Login screen。 認証 provider (= debug / Privy / ...) の login() を起動する。
+// Login screen。 認証 provider の login() を起動する。
 //
-// DebugAuthProvider の場合は SecureStore から keypair を復元 / 生成するだけなので、
-// 「Continue」 押下で即 authenticated になる。 Privy 等を入れた時は web flow を
-// provider.login() の中で開く想定。
-//
-// UI_SPECS_JA §9 のオンボーディング (KYC, ToS, チュートリアル) は task 16 で実装。
+// DebugAuthProvider の場合は SecureStore からアカウント鍵を復元 / 生成するだけなので、
+// 「サインイン」 押下で即 authenticated になる。 本格認証を入れる時は provider.login() の中で
+// 認証フローを開く想定。
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -50,7 +48,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const providerLabel = provider.id === 'debug' ? t('login.debugWallet') : provider.id;
+  const providerLabel = provider.id === 'debug' ? t('login.debugAccount') : provider.id;
 
   return (
     <SafeAreaView style={styles.root}>

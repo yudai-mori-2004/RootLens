@@ -1,8 +1,7 @@
 // dataflow 層の正規型定義 (= Layer 1 の Source of Truth)。
 //
-// v0.1.4: 「カメラ計測 + raw アップロード入口」 への簡素化版。 後段 (blur / Pipeline 2/3 / mint /
-// staking / scoring) は dataflow から外したので、 関連型は撤去済み (= 復活させる時は v0.1.5 で
-// 別ファイル / 別 schema として再導入)。
+// v0.1.4: 「カメラ計測 + raw アップロード入口」。 後段処理 (= 加工 / 採点 / 販売) はサーバ側の
+// 別ワーカーとして将来配線する予定で、 この層はアップロードまでしか知らない。
 //
 // ⚠ このファイルは Layer 1 (dataflow)。react / react-native を import してはならない。
 
@@ -97,7 +96,8 @@ export interface UploadResult {
 export interface RegisterInput {
   signatureHash: string;
   contentSize: number;
-  walletPubkey: string;
+  /** クリップ所有者のアカウント公開鍵 (= Ed25519 base58)。 */
+  accountPubkey: string;
   /** 撮影構成 (= 'ultra_wide' | 'arkit')。 */
   recordingConfig: string;
   /** 録画尺 (ms)。 取れなければ省略。 */

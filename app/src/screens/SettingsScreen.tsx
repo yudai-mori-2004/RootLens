@@ -1,13 +1,14 @@
-// Settings タブ (UI_SPECS_JA §7)。
+// Settings タブ。
 //
 // セクション構成:
-//   • アカウント   — wallet pubkey、 KYC 状態、 サインアウト
+//   • 言語         — ja / en
+//   • アカウント   — アカウント ID (= 端末が持つ鍵の公開鍵)、 サインアウト
 //   • 通知         — push 通知 on/off (= placeholder、 expo-notifications 統合は後で)
-//   • 撮影         — BGM トラック / ハンドトラッキング overlay (= placeholder)
+//   • 撮影         — ハンドトラッキング overlay (= placeholder) / キャリブレーションやり直し
 //   • データ       — ストレージ使用量、 キャッシュクリア
 //   • サポート     — お問い合わせ、 利用規約、 プライバシーポリシー
 //   • アプリ情報   — バージョン、 リポジトリ
-//   • DEVELOPER    — ネットワーク / サーバ endpoint 等 (= debug provider 時のみ)
+//   • DEVELOPER    — サーバ endpoint 等 (= debug provider 時のみ)
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -26,11 +27,8 @@ import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { config } from '../config';
-import { COSIGN_AUTHORITY, SOLANA_RPC_URL } from '../env';
 import { useAuth } from '../services/auth';
 import { useT, useLocale, setLocale, type Locale } from '../i18n';
-// 2026-05-27 方針転換: 音声入力 (= voicePref / voiceAgent / sherpa-onnx) は撤去対象。
-// UI からは外す、 module の rm は段階削除 task #6 で。
 import { colors, fonts, radii, spacing, typography } from '../theme';
 import { LegalDocModal } from '../components/LegalDocModal';
 import type { LegalDocKey } from '../content/legalDocs.generated';
@@ -39,7 +37,7 @@ export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
   const t = useT();
   const locale = useLocale();
-  const ownerStr = state.status === 'authenticated' ? state.session.pubkey.toBase58() : null;
+  const ownerStr = state.status === 'authenticated' ? state.session.pubkey : null;
   const [signingOut, setSigningOut] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [showHandOverlay, setShowHandOverlay] = useState(true);
@@ -145,17 +143,11 @@ export const SettingsScreen: React.FC = () => {
         {/* ── アカウント ── */}
         <Section title={t('settings.section.account')}>
           <Row
-            label={t('settings.wallet')}
+            label={t('settings.accountId')}
             value={ownerStr ? shortBase58(ownerStr) : t('settings.unauthenticated')}
             mono
-            onPress={
-              ownerStr
-                ? () => Linking.openURL(`https://solscan.io/account/${ownerStr}?cluster=devnet`)
-                : undefined
-            }
           />
           <Row label={t('settings.authProvider')} value={provider.id} />
-          <Row label={t('settings.kycStatus')} value={t('settings.kycPending')} tone="mute" />
         </Section>
 
         {/* ── 通知 ── */}
@@ -188,7 +180,6 @@ export const SettingsScreen: React.FC = () => {
               } catch {}
             }}
           />
-          <Row label={t('settings.bgmTrack')} value="ambient-01 (default)" tone="mute" />
         </Section>
 
         {/* ── データ ── */}
@@ -213,7 +204,6 @@ export const SettingsScreen: React.FC = () => {
         {/* ── アプリ情報 ── */}
         <Section title={t('settings.section.appInfo')}>
           <Row label={t('settings.version')} value={version} />
-          <Row label={t('settings.build')} value="devnet · debug" tone="mute" />
           <ActionRow
             label={t('settings.githubRepo')}
             onPress={() => Linking.openURL('https://github.com/yudai-mori-2004/root-lens').catch(() => {})}
@@ -223,12 +213,8 @@ export const SettingsScreen: React.FC = () => {
         {/* ── DEVELOPER (= debug provider 時のみ表示) ── */}
         {provider.id === 'debug' ? (
           <Section title={t('settings.section.developer')} tone="muted">
-            <Row label="CLUSTER" value="devnet" tone="ok" />
-            <Row label="SOLANA RPC" value={SOLANA_RPC_URL} mono />
-            <Row label="COSIGN AUTHORITY" value={shortBase58(COSIGN_AUTHORITY)} mono />
             <Row label="SERVER" value={config.serverUrl} mono onPress={() => Linking.openURL(config.serverUrl)} />
-            <Row label="VLM GATE" value={config.vlmGateUrl} mono />
-            <Row label="TP PROXY" value={`${config.serverUrl}/api/v1/tp-proxy/*`} mono />
+            <Row label="ACCOUNT" value={ownerStr ?? '—'} mono />
           </Section>
         ) : null}
 

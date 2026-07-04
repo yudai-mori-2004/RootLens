@@ -4,7 +4,7 @@
 // 非 React コードはここの module 関数経由でアクセスする。 両者は同じ
 // instance を共有しているので、 状態の整合性は AuthProvider が担保する。
 //
-// 差し替えは `setAuthProvider()` で行う (= テスト or Privy 等への移行)。
+// 差し替えは `setAuthProvider()` で行う (= テスト or 本格認証への移行)。
 
 import type { AuthProvider, AuthSession } from './types';
 import { DebugAuthProvider } from './DebugAuthProvider';
@@ -28,7 +28,7 @@ export function getCurrentSession(): AuthSession | null {
   return state.status === 'authenticated' ? state.session : null;
 }
 
-/** authenticated を必須とする呼び出し用 (= clip pipeline / staking 等)。 */
+/** authenticated を必須とする呼び出し用 (= clip pipeline 等)。 */
 export function requireCurrentSession(): AuthSession {
   const session = getCurrentSession();
   if (!session) {

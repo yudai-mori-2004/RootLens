@@ -35,16 +35,8 @@ import {
 } from '../dataflow';
 import { WideCapturePreviewView } from '../native/wideCapture';
 import { ArkitCapturePreviewView } from '../native/arkitCapture';
-import { getCurrentSession } from '../services/auth/instance';
-
 // console にもミラーする sink (= Metro ログでも追える)
 const sink = teeToConsole(storeEventSink, 'sandbox');
-
-function walletPubkeyOrThrow(): string {
-  const session = getCurrentSession();
-  if (!session) throw new Error('未認証: wallet session がありません (AuthGate を通っていない)');
-  return session.pubkey.toBase58();
-}
 
 function errMsg(e: unknown): string {
   if (e instanceof Error) return e.message;
