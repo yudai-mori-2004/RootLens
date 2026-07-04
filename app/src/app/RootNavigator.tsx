@@ -51,7 +51,8 @@ export const RootNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       initialRouteName={initialRoute}
-      screenOptions={{ ...navigationHeaderOptions, orientation: 'portrait' }}
+      // v0.1.4: アプリ全体を横持ち (landscape) ベースにする (= 常に landscape 動画を撮る前提の UI)。
+      screenOptions={{ ...navigationHeaderOptions, orientation: 'landscape' }}
     >
       <Stack.Screen name="Onboarding" options={{ headerShown: false }}>
         {({ navigation }) => (
@@ -68,11 +69,9 @@ export const RootNavigator: React.FC = () => {
       <Stack.Screen
         name="CaptureMode"
         component={CaptureScreen}
-        // 撮影画面だけ横向き固定。 react-native-screens がネイティブで強制する (= expo-screen-orientation
-        // の lockAsync は react-native-screens に上書きされ効かないため、 こちらが正攻法)。
+        // 撮影画面は landscape_right に固定 (= native カメラ frame の向きと一致させる)。
+        // 他画面は landscape (左右どちらも可)。 react-native-screens がネイティブで強制する。
         // ⚠ 映像が上下逆なら 'landscape_right' → 'landscape_left' に。
-        // animation:'none' = 退場アニメと向き変更が競合して「横のまま戻って 0.5s 後に縦」 とフラッシュ
-        // するのを防ぐ (= アニメを切ると向きが即座に切り替わる。 既知の rns 挙動への定番回避)。
         options={{
           headerShown: false,
           presentation: 'fullScreenModal',

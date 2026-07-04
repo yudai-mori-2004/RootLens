@@ -1,17 +1,16 @@
-// マイビデオ画面 (v0.1.4) — 撮影者の保有クリップ一覧。
+// マイビデオ画面 (v0.1.4) — 撮影済み・アップロード待ちクリップの一覧。
 //
-// v0.1.4 はラベリング / 採点 / staking / 販売を持たない (= 後段ワーカー未配線)。
-// なので「アップロード状況だけのフラット一覧」 + 温かい家事感のあるヘッダ (= 家事フリマ風)。
+// 役割: 「撮影されて、 まだアップロードされていない」 データが並ぶ。 カードタップで
+// プレビューポップ (= ClipPreviewModal) が開き、 中身に問題がないことを確認して
+// 「アップロードする」 を押す。 アップロードが完了したカードは一覧から消える。
 //
-// データはローカル AsyncStorage に積んだクリップを useClips() で読み、 必要に応じて
-// サーバの GET /api/clips とマージする (= マージは v0.1.5 で後段が動き始めたら強化)。
+// 横持ち (landscape) 前提: 2 カラムのカードグリッド + コンパクトな温かいヘッダ。
+// データはローカル dataflow store が真実 (= uploaded はサーバへ引き渡し済みなので表示しない)。
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
-  RefreshControl,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -20,6 +19,7 @@ import {
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { ClipCard } from '../components/ClipCard';
+import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import { storeEventSink, advanceClip, discardClip, type Clip } from '../dataflow';
 import { useClips } from '../clips/hooks';
 import { useT, type TranslationKey } from '../i18n';
@@ -36,27 +36,33 @@ function greetingKeyForNow(): TranslationKey {
 
 export const CollectionScreen: React.FC = () => {
   const t = useT();
-  const clips = useClips();
-  const [refreshing, setRefreshing] = useState(false);
+  const allClips = useClips();
+  // アップロード完了 (= uploaded) は一覧に出さない。 それ以外 (recorded / uploading / error) が並ぶ。
+  const clips = useMemo(() => allClips.filter((c) => c.state !== 'uploaded'), [allClips]);
 
-  const onRemove = useCallback((clip: Clip) => { void discardClip(clip.id); }, []);
-  const onRetry = useCallback((clip: Clip) => { void advanceClip(clip.id, storeEventSink); }, []);
+  const [previewTarget, setPreviewTarget] = useState<Clip | null>(null);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    // v0.1.4: サーバ pull は省略 (= ローカルが真実)。
-    // 後段ワーカーが動き始めたら GET /api/clips とマージする。
-    await new Promise((r) => setTimeout(r, 300));
-    setRefreshing(false);
+  const onOpen = useCallback((clip: Clip) => setPreviewTarget(clip), []);
+  const onClose = useCallback(() => setPreviewTarget(null), []);
+  const onUpload = useCallback((clip: Clip) => {
+    setPreviewTarget(null);
+    // 署名 → R2 → 登録。 進捗は一覧のカード (uploading) に出て、 uploaded で消える。
+    void advanceClip(clip.id, storeEventSink);
   }, []);
+  const onRemove = useCallback((clip: Clip) => {
+    setPreviewTarget(null);
+    void discardClip(clip.id);
+  }, []);
+  const onRetry = useCallback((clip: Clip) => { void advanceClip(clip.id, storeEventSink); }, []);
 
   return (
     <SafeAreaView style={styles.root}>
       <FlatList
         data={clips}
         keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.column}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.ink} />}
         initialNumToRender={8}
         windowSize={11}
         removeClippedSubviews
@@ -77,10 +83,18 @@ export const CollectionScreen: React.FC = () => {
         }
         renderItem={({ item }) => (
           <View style={styles.itemWrap}>
-            <ClipCard clip={item} onRemove={onRemove} onRetry={onRetry} />
+            <ClipCard clip={item} onOpen={onOpen} onRemove={onRemove} onRetry={onRetry} />
           </View>
         )}
         ListEmptyComponent={<EmptyState />}
+      />
+
+      <ClipPreviewModal
+        visible={previewTarget !== null}
+        clip={previewTarget}
+        onClose={onClose}
+        onUpload={onUpload}
+        onRemove={onRemove}
       />
     </SafeAreaView>
   );
@@ -103,25 +117,31 @@ const EmptyState: React.FC = () => {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, paddingTop: spacing.sm },
+  column: { gap: spacing.md },
 
-  header: { gap: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md },
+  // 横持ち: バナーは低め (= 縦スペースを食わない)。 温かさは画像 + あいさつで維持。
+  header: { paddingTop: spacing.sm, paddingBottom: spacing.md },
   banner: {
-    height: 172,
+    height: 96,
     borderRadius: radii.xl,
     overflow: 'hidden',
     backgroundColor: '#F6E9C6',
   },
   bannerImg: { width: '100%', height: '100%' },
-  bannerText: { position: 'absolute', top: spacing.lg, left: spacing.lg, right: '42%', gap: 2 },
-  greeting: { fontFamily: fonts.serifMedium, fontSize: 28, letterSpacing: -0.4, color: colors.ink },
-  greetingSub: { ...typography.caption, color: colors.inkMute, lineHeight: 18 },
+  bannerText: {
+    position: 'absolute',
+    top: 0, bottom: 0,
+    left: spacing.lg,
+    justifyContent: 'center',
+    right: '50%',
+    gap: 2,
+  },
+  greeting: { fontFamily: fonts.serifMedium, fontSize: 22, letterSpacing: -0.4, color: colors.ink },
+  greetingSub: { ...typography.caption, color: colors.inkMute },
 
-  itemWrap: { marginBottom: spacing.md },
+  itemWrap: { flex: 1, marginBottom: spacing.md },
 
   empty: { paddingTop: spacing.xxl, paddingHorizontal: spacing.lg, alignItems: 'center', gap: spacing.sm },
   emptyTitle: { ...typography.label, color: colors.textMute, marginTop: spacing.sm },
-  emptyHint: { ...typography.body, color: colors.textBody, textAlign: 'center', maxWidth: 280 },
+  emptyHint: { ...typography.body, color: colors.textBody, textAlign: 'center', maxWidth: 380 },
 });
-
-// 未使用 import を抑止
-void ActivityIndicator;

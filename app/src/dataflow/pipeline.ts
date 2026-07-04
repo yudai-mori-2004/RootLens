@@ -54,8 +54,9 @@ function stepProgress(step: string): number | null {
 }
 
 /**
- * 撮影完了時にクリップを起こす (= stage 'unsigned' で local id 採番、 作業 dir 作成)。
- * 以降は advanceClip で前進させる。 返値は local clip id。
+ * 撮影完了時にクリップを起こす (= state 'recorded' + stage 'unsigned' で local id 採番)。
+ * v0.1.4: ここでは自動アップロードしない。 ユーザーが一覧 (マイビデオ) でプレビューを確認し
+ * 「アップロード」 を押した時に advanceClip が 署名 → R2 → 登録 を進める。
  */
 export async function enqueueRecording(input: {
   config: RecordingConfig;
@@ -72,7 +73,7 @@ export async function enqueueRecording(input: {
   const store = dataflowStore.getState();
   store.upsertClip({
     id: localId,
-    state: 'uploading',
+    state: 'recorded',
     createdAt: Date.now(),
     recordingConfigId: input.config.id,
     durationMs: input.durationMs ?? null,
@@ -80,7 +81,6 @@ export async function enqueueRecording(input: {
     sessionDir: input.session.sessionDir,
     stage: 'unsigned',
     workDir,
-    uploadProgress: 0,
   });
   store.setCurrentClipId(localId);
   return localId;
@@ -120,7 +120,7 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
   const workDir = initial.workDir;
 
   dataflowStore.getState().setCurrentClipId(clipId);
-  dataflowStore.getState().patchClip(clipId, { state: 'uploading', errorMessage: null });
+  dataflowStore.getState().patchClip(clipId, { state: 'uploading', errorMessage: null, uploadProgress: 0 });
 
   const targetIdRef = { id: clipId };
   const progressSink: EventSink = (e: DataflowEventInput) => {
@@ -173,7 +173,10 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
           throw new Error(`required output file missing: ${spec.name}`);
         }
       }
-      await uploadToR2({ signatureHash: cur.signatureHash, files }, progressSink);
+      await uploadToR2(
+        { signatureHash: cur.signatureHash, recordingConfig: config.id, files },
+        progressSink,
+      );
 
       const walletPubkey = getWalletPubkey();
       await registerClip(

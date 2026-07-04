@@ -41,14 +41,16 @@ async function hydrate(): Promise<void> {
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let lastClips: Record<string, Clip> | null = null;
 
-/** clips の変化を AsyncStorage に書き出す (= 軽くデバウンス)。 */
+/** clips の変化を AsyncStorage に書き出す (= uploaded は保存しない、 軽くデバウンス)。 */
 function schedulePersist(clips: Record<string, Clip>): void {
   if (clips === lastClips) return;
   lastClips = clips;
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     persistTimer = null;
-    const arr = clipList(clips);
+    // uploaded = サーバに引き渡し済み (= 一覧から消える + ローカルファイルも掃除済み)。
+    // 永続化しないことで再起動後に蘇らない。
+    const arr = clipList(clips).filter((c) => c.state !== 'uploaded');
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(arr)).catch(() => {});
   }, PERSIST_DEBOUNCE_MS);
 }

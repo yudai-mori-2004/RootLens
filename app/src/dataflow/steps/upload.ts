@@ -1,8 +1,8 @@
-// Pipeline 1 step: R2 アップロード (DATA_SPECS §2.5)。
+// Pipeline 1 step: R2 アップロード (DATA_SPECS §2.4)。
 //
-// signature_hash ごとに presigned PUT URL を /api/v1/raw-uploads から取得し、
+// signature_hash + 撮影構成を /api/v1/raw-uploads に投げて presigned PUT URL を取得し、
 // 撮影構成が出力したファイル群を raw/<signature_hash>/ に並列 PUT する。
-// ぼかし済みデータのみアップロードする (= 生データは上げない)。
+// アップロード先バケットは構成でサーバが決める (= ultra_wide → raw、 arkit → raw-arkit)。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
@@ -19,13 +19,17 @@ interface PresignedFile {
 }
 interface PresignResponse {
   files: Record<string, PresignedFile>;
+  bucket?: string;
 }
 
-async function requestPresignedUrls(signatureHash: string): Promise<PresignResponse> {
+async function requestPresignedUrls(
+  signatureHash: string,
+  recordingConfig: string,
+): Promise<PresignResponse> {
   const res = await fetch(`${SERVER_URL}/api/v1/raw-uploads`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signatureHash }),
+    body: JSON.stringify({ signatureHash, recordingConfig }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -39,14 +43,14 @@ async function requestPresignedUrls(signatureHash: string): Promise<PresignRespo
  * presigned に存在しない名前のファイルが渡された場合は fail-loud (= 構成と server contract のズレ検出)。
  */
 export async function uploadToR2(input: UploadInput, sink: EventSink): Promise<UploadResult> {
-  sink({ step: 'r2-upload', level: 'info', message: 'presigned URL を取得' });
-  const presigned = await requestPresignedUrls(input.signatureHash);
+  sink({ step: 'r2-upload', level: 'info', message: `presigned URL を取得 (構成 ${input.recordingConfig})` });
+  const presigned = await requestPresignedUrls(input.signatureHash, input.recordingConfig);
 
   const names = Object.keys(input.files);
   sink({
     step: 'r2-upload',
     level: 'info',
-    message: `${names.length} ファイルを並列 PUT: ${names.join(', ')}`,
+    message: `${names.length} ファイルを並列 PUT${presigned.bucket ? ` → ${presigned.bucket}` : ''}: ${names.join(', ')}`,
   });
 
   const uploadedKeys = await Promise.all(

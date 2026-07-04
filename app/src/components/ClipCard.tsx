@@ -2,52 +2,94 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import Svg, { Circle, Line, Path, Polygon } from 'react-native-svg';
-import type { Clip } from '../dataflow';
+import Svg, { Circle, Line, Polygon } from 'react-native-svg';
+import * as VideoThumbnails from 'expo-video-thumbnails';
+import { getRecordingConfig, type Clip } from '../dataflow';
 import { clipTitle } from '../domain/clipLabels';
 import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
-// v0.1.4 クリップカード。 3 状態のみ:
-//   uploading: 進捗バー + キャンセル
-//   uploaded:  「アップロード済み」 + 日時
-//   error:     エラー文言 + 「再試行」 「削除」
+// v0.1.4 クリップカード (= マイビデオ = アップロード待ち一覧)。
+//
+//   recorded:  サムネ + 撮影日時 + 尺 + 構成。 タップでプレビューポップ (= 同意 → アップロード)
+//   uploading: 進捗バー (タップ不可)
+//   error:     エラー文言 + 「もう一度試す」 「削除」
+//
+// uploaded はそもそも一覧に出さない (= CollectionScreen が filter)。
 
 interface Props {
   clip: Clip;
+  /// recorded / error 行のタップでプレビューポップを開く。
+  onOpen?: (clip: Clip) => void;
   onRemove?: (clip: Clip) => void;
   onRetry?: (clip: Clip) => void;
 }
 
-export const ClipCard: React.FC<Props> = ({ clip, onRemove, onRetry }) => {
+export const ClipCard: React.FC<Props> = ({ clip, onOpen, onRemove, onRetry }) => {
   switch (clip.state) {
+    case 'recorded':
+      return <RecordedCard clip={clip} onOpen={onOpen} />;
     case 'uploading':
-      return <UploadingCard clip={clip} onRemove={onRemove} />;
-    case 'uploaded':
-      return <UploadedCard clip={clip} />;
+      return <UploadingCard clip={clip} />;
     case 'error':
-      return <ErrorCard clip={clip} onRemove={onRemove} onRetry={onRetry} />;
+      return <ErrorCard clip={clip} onOpen={onOpen} onRemove={onRemove} onRetry={onRetry} />;
+    case 'uploaded':
+      return null; // 一覧に出さない (= 保険。 通常は CollectionScreen が filter 済み)
   }
 };
 
-// ─── 共通要素 ──────────────────────────────────────────────────────────
+// ─── サムネイル (= ローカル録画 mp4 から 1 フレーム生成、 モジュールキャッシュ) ───────
 
-const ClipThumb: React.FC<{ muted?: boolean }> = ({ muted }) => (
-  <View style={[styles.thumb, muted && styles.thumbMuted]}>
-    <Svg width={22} height={22} viewBox="0 0 22 22" fill="none">
-      <Circle cx={11} cy={11} r={10} stroke={colors.textFaint} strokeWidth={1.2} />
-      <Polygon points="9,7.5 15,11 9,14.5" fill={colors.textFaint} />
-    </Svg>
-  </View>
-);
+const thumbCache = new Map<string, string>();
+
+/** クリップのローカル録画 mp4 URI (= 撮影構成の primary video)。 無ければ null。 */
+export function localVideoUri(clip: Clip): string | null {
+  if (!clip.sessionDir || !clip.recordingConfigId) return null;
+  const config = getRecordingConfig(clip.recordingConfigId);
+  if (!config) return null;
+  try {
+    return config.primaryVideoUri({ sessionDir: clip.sessionDir });
+  } catch {
+    return null;
+  }
+}
+
+const ClipThumb: React.FC<{ clip: Clip; muted?: boolean }> = ({ clip, muted }) => {
+  const uri = localVideoUri(clip);
+  const key = clip.id;
+  const [thumb, setThumb] = useState<string | null>(thumbCache.get(key) ?? null);
+
+  useEffect(() => {
+    if (!uri || thumbCache.has(key)) return;
+    let cancelled = false;
+    VideoThumbnails.getThumbnailAsync(uri, { time: 800, quality: 0.5 })
+      .then((r) => { thumbCache.set(key, r.uri); if (!cancelled) setThumb(r.uri); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [uri, key]);
+
+  return (
+    <View style={[styles.thumb, muted && styles.thumbMuted]}>
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={styles.thumbImage} resizeMode="cover" />
+      ) : (
+        <Svg width={22} height={22} viewBox="0 0 22 22" fill="none">
+          <Circle cx={11} cy={11} r={10} stroke={colors.textFaint} strokeWidth={1.2} />
+          <Polygon points="9,7.5 15,11 9,14.5" fill={colors.textFaint} />
+        </Svg>
+      )}
+    </View>
+  );
+};
 
 const ClipName: React.FC<{ clip: Clip }> = ({ clip }) => (
-  <Text style={styles.cardName} numberOfLines={2}>
+  <Text style={styles.cardName} numberOfLines={1}>
     {clipTitle(clip)}
   </Text>
 );
@@ -66,32 +108,54 @@ function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+export function formatDuration(ms: number | null | undefined): string | null {
+  if (ms == null || ms <= 0) return null;
+  const sec = Math.round(ms / 1000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ─── アップロード待ち (= タップでプレビューポップ) ─────────────────────
+
+const RecordedCard: React.FC<{ clip: Clip; onOpen?: (c: Clip) => void }> = ({ clip, onOpen }) => {
+  const t = useT();
+  const dur = formatDuration(clip.durationMs);
+  return (
+    <Pressable
+      onPress={() => onOpen?.(clip)}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      accessibilityLabel={t('clip.recorded')}
+    >
+      <ClipThumb clip={clip} />
+      <View style={styles.cardMid}>
+        <ClipName clip={clip} />
+        <View style={styles.cardMeta}>
+          <Text style={styles.eyebrowMuted}>{t('clip.recorded')}</Text>
+          <Text style={styles.cardSub}>
+            · {formatTimestamp(clip.createdAt)}
+            {dur ? ` · ${dur}` : ''}
+            {clip.recordingConfigId ? ` · ${clip.recordingConfigId}` : ''}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+};
+
 // ─── アップロード中 ─────────────────────────────────────────────────────
 
-const UploadingCard: React.FC<{ clip: Clip; onRemove?: (c: Clip) => void }> = ({
-  clip, onRemove,
-}) => {
+const UploadingCard: React.FC<{ clip: Clip }> = ({ clip }) => {
   const t = useT();
   const progress = Math.max(0, Math.min(1, clip.uploadProgress ?? 0));
   return (
     <View style={styles.card}>
-      <ClipThumb />
+      <ClipThumb clip={clip} />
       <View style={styles.cardMid}>
         <ClipName clip={clip} />
         <Text style={styles.eyebrowMuted}>{t('clip.uploading')} · {Math.round(progress * 100)}%</Text>
         <IndeterminateOrFill progress={progress} />
       </View>
-      <Pressable
-        onPress={() => onRemove?.(clip)}
-        hitSlop={8}
-        style={({ pressed }) => [styles.cornerBtn, pressed && styles.cornerBtnPressed]}
-        accessibilityLabel={t('common.cancel')}
-      >
-        <Svg width={14} height={14} viewBox="0 0 14 14">
-          <Line x1={3} y1={3} x2={11} y2={11} stroke={colors.textMute} strokeWidth={1.6} strokeLinecap="round" />
-          <Line x1={11} y1={3} x2={3} y2={11} stroke={colors.textMute} strokeWidth={1.6} strokeLinecap="round" />
-        </Svg>
-      </Pressable>
     </View>
   );
 };
@@ -133,34 +197,20 @@ const IndeterminateOrFill: React.FC<{ progress: number }> = ({ progress }) => {
   );
 };
 
-// ─── アップロード済み ──────────────────────────────────────────────────
-
-const UploadedCard: React.FC<{ clip: Clip }> = ({ clip }) => {
-  const t = useT();
-  return (
-    <View style={styles.card}>
-      <ClipThumb />
-      <View style={styles.cardMid}>
-        <ClipName clip={clip} />
-        <View style={styles.cardFoot}>
-          <Text style={styles.eyebrowEmerald}>{t('clip.uploaded')}</Text>
-          <Text style={styles.cardSub}>· {formatTimestamp(clip.createdAt)}</Text>
-        </View>
-      </View>
-    </View>
-  );
-};
-
 // ─── エラー ────────────────────────────────────────────────────────────
 
 const ErrorCard: React.FC<{
   clip: Clip;
+  onOpen?: (c: Clip) => void;
   onRemove?: (c: Clip) => void; onRetry?: (c: Clip) => void;
-}> = ({ clip, onRemove, onRetry }) => {
+}> = ({ clip, onOpen, onRemove, onRetry }) => {
   const t = useT();
   return (
-    <View style={[styles.card, styles.cardMuted]}>
-      <ClipThumb muted />
+    <Pressable
+      onPress={() => onOpen?.(clip)}
+      style={({ pressed }) => [styles.card, styles.cardMuted, pressed && styles.cardPressed]}
+    >
+      <ClipThumb clip={clip} muted />
       <View style={styles.cardMid}>
         <ClipName clip={clip} />
         <Text style={styles.eyebrowDanger}>{t('clip.errorEyebrow')}</Text>
@@ -172,7 +222,7 @@ const ErrorCard: React.FC<{
           <SmallActionBtn label={t('clip.tryAgain')} onPress={() => onRetry?.(clip)} accent />
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -203,11 +253,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadows.card,
   },
+  cardPressed: { backgroundColor: colors.paperDeep },
   cardMuted: { backgroundColor: colors.paperDeep },
 
+  // 横持ち前提: サムネは 16:9 で大きめ (= 動画の中身がわかることが最優先)。
   thumb: {
-    width: 88,
-    aspectRatio: 1,
+    width: 128,
+    aspectRatio: 16 / 9,
     backgroundColor: colors.paperDeep,
     alignItems: 'center',
     justifyContent: 'center',
@@ -218,6 +270,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   thumbMuted: { opacity: 0.55 },
+  thumbImage: { width: '100%', height: '100%' },
 
   cardMid: {
     flex: 1,
@@ -227,16 +280,15 @@ const styles = StyleSheet.create({
   },
   cardName: {
     fontFamily: fonts.sansSemibold,
-    fontSize: 16,
-    lineHeight: 21,
+    fontSize: 15,
+    lineHeight: 20,
     color: colors.ink,
     letterSpacing: -0.1,
   },
-  cardFoot: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, flexWrap: 'wrap' },
   cardSub: { ...typography.caption, color: colors.textMute },
 
-  eyebrowMuted: { ...typography.labelSmall, color: colors.textMute, marginTop: 2 },
-  eyebrowEmerald: { ...typography.labelSmall, color: colors.emeraldDeep },
+  eyebrowMuted: { ...typography.labelSmall, color: colors.textMute },
   eyebrowDanger: { ...typography.labelSmall, color: colors.danger, marginTop: 2 },
 
   progressTrack: {
@@ -257,15 +309,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  cornerBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-    marginRight: spacing.sm,
-    backgroundColor: colors.paperDeep,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  cornerBtnPressed: { backgroundColor: colors.borderLight },
-
   actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: 8 },
   smallBtn: {
     paddingHorizontal: 12, paddingVertical: 6,
@@ -282,3 +325,6 @@ const styles = StyleSheet.create({
   },
   smallBtnLabelAccent: { color: '#fff' },
 });
+
+// Suppress unused warning
+void Line;

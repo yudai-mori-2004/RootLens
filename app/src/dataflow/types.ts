@@ -9,9 +9,10 @@
 // ─── クリップ状態機械 (DATA_SPECS §4) ──────────────────────────────────
 
 export type ClipState =
-  | 'uploading'   // 撮影 → 署名 → R2 PUT → POST /api/clips のいずれかの段で進行中
-  | 'uploaded'    // R2 アップ + サーバ登録 完了
-  | 'error';      // 段のどこかで再試行上限超過
+  | 'recorded'    // 撮影完了、 端末ローカルに保存済み (= まだアップロードしていない。 一覧に並ぶ)
+  | 'uploading'   // ユーザーがアップロードを押した → 署名 → R2 PUT → POST /api/clips 進行中
+  | 'uploaded'    // R2 アップ + サーバ登録 完了 (= 一覧から消える)
+  | 'error';      // 段のどこかで失敗 (= 一覧に残り「もう一度試す」可能)
 
 /**
  * Pipeline 1 (= 端末側) のチェックポイント段。 advanceClip がここを見て前進する。
@@ -82,6 +83,8 @@ export interface SignResult {
 /** upload step: signature_hash の presigned URL を取得し、 ファイル群を R2 に並列 PUT。 */
 export interface UploadInput {
   signatureHash: string;
+  /** 撮影構成 ID。 サーバ側でアップロード先バケット + ファイルマニフェストが決まる (DATA_SPECS §3)。 */
+  recordingConfig: string;
   /** R2 ファイル名 → ローカル file:// URI のマップ (= 撮影構成の outputFiles に対応) */
   files: Record<string, string>;
 }

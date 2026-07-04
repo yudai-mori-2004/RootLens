@@ -149,6 +149,7 @@ const ja = {
   'home.noClipsHint': '中央のカメラボタンから撮影を始めると、 撮影完了後ここに表示されます。',
 
   // ── Clip card ──
+  'clip.recorded': 'アップロード待ち',
   'clip.uploading': 'アップロード中',
   'clip.uploaded': 'アップロード済み',
   'clip.processing': '準備中…',
@@ -218,12 +219,42 @@ const ja = {
   'capture.emergencyStop': '緊急停止',
   'capture.recStartFailed': '録画開始失敗',
   'capture.recStopFailed': '録画停止失敗',
-  'capture.recordStartA11y': '録画を開始',
-  'capture.recordStopA11y': '録画を停止',
-  'capture.stopConfirmTitle': '録画を終了しますか？',
-  'capture.stopConfirmStop': '終了する',
-  'capture.stopConfirmContinue': '続ける',
-  'capture.uploadDone': 'アップロード完了',
+
+  // ── Capture flow: 状態ピル (= 画面上部中央) ──
+  'capture.state.announcing': 'CALIBRATE  ·  案内中…',
+  'capture.state.nextTaskAnnouncing': '撮影完了  ·  案内中…',
+  'capture.state.awaitingPalm': 'CALIBRATE  ·  両手の手のひらを見つめて 3 秒',
+  'capture.state.palmHolding': 'CALIBRATE  ·  検出中…',
+  'capture.state.calibratePrefix': 'CALIBRATE',
+  'capture.state.calibrated': 'CALIBRATED  ·  まもなく開始',
+  'capture.state.starting': 'STARTING',
+  'capture.state.recording': 'RECORDING  ·  グッドサインで終了',
+  'capture.state.stopping': 'STOPPING  ·  グッドサイン検出',
+  'capture.state.stoppingConfirm': 'STOPPING  ·  立て続けると終了',
+  'capture.state.finalizing': 'FINALIZING',
+
+  // ── Capture flow: ヘッドセット向き案内 (= ピル内) ──
+  'capture.guide.up': 'ヘッドセットをもう少し上に向けてください',
+  'capture.guide.down': 'ヘッドセットをもう少し下に向けてください',
+  'capture.guide.left': 'ヘッドセットをもう少し左に向けてください',
+  'capture.guide.right': 'ヘッドセットをもう少し右に向けてください',
+
+  // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
+  // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
+  'capture.tts.intro': 'ヘッドセットの装着角度を合わせます。 ヘッドセットを装着し、 自然な姿勢で、 両手のひらを広げて、 ご自身の手のひらをご覧ください。 そのまま 3 秒ほど、 そっと止めてお待ちください。',
+  'capture.tts.confirmed': '位置が確定いたしました。 これより撮影を開始いたします。',
+  'capture.tts.done': '撮影が完了いたしました。 お疲れさまでした。',
+  'capture.tts.continue': '引き続き撮影される場合は、 もう一度、 ご自身の手のひらをご覧ください。',
+  'capture.tts.adjustUp': '手が画面の上に寄っています。 ヘッドセットを少し上へ向け直し、 もう一度手のひらをご覧ください。',
+  'capture.tts.adjustDown': '手が画面の下に寄っています。 ヘッドセットを少し下へ向け直し、 もう一度手のひらをご覧ください。',
+  'capture.tts.adjustLeft': '手が画面の左に寄っています。 ヘッドセットを少し左へ向け直し、 もう一度手のひらをご覧ください。',
+  'capture.tts.adjustRight': '手が画面の右に寄っています。 ヘッドセットを少し右へ向け直し、 もう一度手のひらをご覧ください。',
+  'capture.tts.stoppingConfirm': 'そのまま親指を立て続けると、 撮影を終了します',
+  'capture.tts.handLost': '両手がカメラに映るようにしてください',
+
+  // ── アップロード確認ポップ (= マイビデオのカードタップ) ──
+  'upload.confirmHint': 'うつってはいけないものがないか、 確認してからアップロードしてください。',
+  'upload.action': 'アップロードする',
 
   // ── Onboarding ──
   'onb.slide1.eyebrow': 'おうちで、 かんたん',
@@ -288,8 +319,8 @@ const ja = {
   'portfolio.sectionAwaitingHint': '準備が終わるまで少しお待ちください',
   'portfolio.sectionApprovalHint': '内容を確認して出品しましょう',
   'portfolio.sectionOnSaleHint': '今 販売している動画です',
-  'portfolio.emptyTitle': 'まだ動画がありません',
-  'portfolio.emptyHint': '中央のカメラボタンから撮影を始めると、 ここに並びます。',
+  'portfolio.emptyTitle': 'アップロード待ちの動画はありません',
+  'portfolio.emptyHint': '中央のカメラボタンから撮影すると、 ここに並びます。 アップロードが終わった動画はここから消えます。',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
@@ -382,6 +413,7 @@ const en: Record<TranslationKey, string> = {
   'home.noClipsHint': 'Start capturing with the center camera button — finished clips appear here.',
 
   // ── Clip card ──
+  'clip.recorded': 'Waiting to upload',
   'clip.uploading': 'Uploading',
   'clip.uploaded': 'Uploaded',
   'clip.processing': 'Preparing…',
@@ -451,12 +483,41 @@ const en: Record<TranslationKey, string> = {
   'capture.emergencyStop': 'Emergency stop',
   'capture.recStartFailed': 'Failed to start recording',
   'capture.recStopFailed': 'Failed to stop recording',
-  'capture.recordStartA11y': 'Start recording',
-  'capture.recordStopA11y': 'Stop recording',
-  'capture.stopConfirmTitle': 'Stop recording?',
-  'capture.stopConfirmStop': 'Stop',
-  'capture.stopConfirmContinue': 'Keep going',
-  'capture.uploadDone': 'Upload complete',
+
+  // ── Capture flow: status pill ──
+  'capture.state.announcing': 'CALIBRATE  ·  Get ready…',
+  'capture.state.nextTaskAnnouncing': 'CAPTURE DONE  ·  Nice work…',
+  'capture.state.awaitingPalm': 'CALIBRATE  ·  Look at your palms for 3s',
+  'capture.state.palmHolding': 'CALIBRATE  ·  Detecting…',
+  'capture.state.calibratePrefix': 'CALIBRATE',
+  'capture.state.calibrated': 'CALIBRATED  ·  Starting soon',
+  'capture.state.starting': 'STARTING',
+  'capture.state.recording': 'RECORDING  ·  Thumbs-up to finish',
+  'capture.state.stopping': 'STOPPING  ·  Thumbs-up detected',
+  'capture.state.stoppingConfirm': 'STOPPING  ·  Hold to finish',
+  'capture.state.finalizing': 'FINALIZING',
+
+  // ── Capture flow: headset guidance ──
+  'capture.guide.up': 'Tilt the headset a little upward',
+  'capture.guide.down': 'Tilt the headset a little downward',
+  'capture.guide.left': 'Turn the headset a little to the left',
+  'capture.guide.right': 'Turn the headset a little to the right',
+
+  // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
+  'capture.tts.intro': 'Let’s align your headset. Put it on, relax, open both palms, and look at them. Hold still for about three seconds.',
+  'capture.tts.confirmed': 'Your position is confirmed. We will now begin recording.',
+  'capture.tts.done': 'Recording complete. Nice work.',
+  'capture.tts.continue': 'To record again, just look at your palms again.',
+  'capture.tts.adjustUp': 'Your hands are near the top of the frame. Tilt the headset up a little and look at your palms again.',
+  'capture.tts.adjustDown': 'Your hands are near the bottom of the frame. Tilt the headset down a little and look at your palms again.',
+  'capture.tts.adjustLeft': 'Your hands are toward the left of the frame. Turn the headset left a little and look at your palms again.',
+  'capture.tts.adjustRight': 'Your hands are toward the right of the frame. Turn the headset right a little and look at your palms again.',
+  'capture.tts.stoppingConfirm': 'Keep holding your thumbs up to finish recording.',
+  'capture.tts.handLost': 'Please keep both hands in view of the camera.',
+
+  // ── Upload confirmation pop (= tap a card in My Videos) ──
+  'upload.confirmHint': 'Please check that nothing private is visible, then upload.',
+  'upload.action': 'Upload',
 
   // ── Onboarding ──
   'onb.slide1.eyebrow': 'Easy, at home',
@@ -520,8 +581,8 @@ const en: Record<TranslationKey, string> = {
   'portfolio.sectionAwaitingHint': 'Hang tight while these get ready',
   'portfolio.sectionApprovalHint': 'Review and list them for sale',
   'portfolio.sectionOnSaleHint': 'These are on sale now',
-  'portfolio.emptyTitle': 'No videos yet',
-  'portfolio.emptyHint': 'Start capturing with the center camera button — your videos appear here.',
+  'portfolio.emptyTitle': 'No videos waiting to upload',
+  'portfolio.emptyHint': 'Videos you capture appear here. Once uploaded, they leave this list.',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { ja, en };
