@@ -259,6 +259,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   // 録画経過秒 (= 右上の読み出し)。 基準は native 録画開始の wall-clock (recordingStartedAtRef)。
   const [elapsedSec, setElapsedSec] = useState(0);
+  // HUD スクリムの実寸 (= SVG は % サイズが効かないので onLayout で測って px 指定する)
+  const [hudSize, setHudSize] = useState<{ w: number; h: number } | null>(null);
   // 平滑化済みジェスチャー (= GestureOverlay 表示 + 再描画 trigger)。
   const [currentGesture, setCurrentGesture] = useState<'open_palm' | 'thumbs_up' | null>(null);
 
@@ -801,7 +803,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       case 'palm_holding':
         return { text: t('capture.hud.detecting'), tone: 'accent' };
       case 'adjust_needed':
-        return { text: calibAdjustText(state.direction), tone: 'accent', arrow: state.direction };
+        return { text: calibAdjustText(state.direction), tone: 'normal', arrow: state.direction };
       case 'calibration_confirmed':
         return { text: t('capture.tts.confirmed'), tone: 'accent' };
       case 'precapture_countdown':
@@ -914,20 +916,25 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         <View
           style={[styles.hud, { paddingBottom: safeBottom + 22, paddingLeft: safeLeft + 32, paddingRight: safeRight + 32 }]}
           pointerEvents="none"
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout;
+            setHudSize((cur) => (cur && cur.w === width && cur.h === height ? cur : { w: width, h: height }));
+          }}
         >
-          <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none" viewBox="0 0 1 1">
-            <Defs>
-              <SvgLinearGradient id="hudScrim" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#06070A" stopOpacity="0" />
-                <Stop offset="0.45" stopColor="#06070A" stopOpacity="0.5" />
-                <Stop offset="1" stopColor="#06070A" stopOpacity="0.84" />
-              </SvgLinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="1" height="1" fill="url(#hudScrim)" />
-          </Svg>
-          <View style={styles.hudMark} />
+          {hudSize ? (
+            <Svg width={hudSize.w} height={hudSize.h} style={StyleSheet.absoluteFill} preserveAspectRatio="none" viewBox="0 0 1 1">
+              <Defs>
+                <SvgLinearGradient id="hudScrim" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor="#06070A" stopOpacity="0" />
+                  <Stop offset="0.45" stopColor="#06070A" stopOpacity="0.58" />
+                  <Stop offset="1" stopColor="#06070A" stopOpacity="0.9" />
+                </SvgLinearGradient>
+              </Defs>
+              <Rect x="0" y="0" width="1" height="1" fill="url(#hudScrim)" />
+            </Svg>
+          ) : null}
+          {hud.arrow ? <ArrowGlyph dir={hud.arrow} /> : <View style={styles.hudMark} />}
           <View style={styles.hudLine}>
-            {hud.arrow ? <ArrowGlyph dir={hud.arrow} /> : null}
             <Text
               style={[
                 styles.hudText,
@@ -979,9 +986,9 @@ const PulsingDot: React.FC = () => {
 const ArrowGlyph: React.FC<{ dir: AdjustDirection }> = ({ dir }) => {
   const rotate = dir === 'up' ? '0deg' : dir === 'right' ? '90deg' : dir === 'down' ? '180deg' : '270deg';
   return (
-    <View style={{ transform: [{ rotate }] }}>
-      <Svg width={26} height={26} viewBox="0 0 26 26" fill="none">
-        <Path d="M13 21 V6 M6.5 12.5 L13 6 L19.5 12.5" stroke={colors.emerald} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+    <View style={{ transform: [{ rotate }], marginBottom: 8 }}>
+      <Svg width={30} height={30} viewBox="0 0 26 26" fill="none">
+        <Path d="M13 21 V6 M6.5 12.5 L13 6 L19.5 12.5" stroke={colors.emerald} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
       </Svg>
     </View>
   );
