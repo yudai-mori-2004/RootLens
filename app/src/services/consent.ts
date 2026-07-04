@@ -19,7 +19,7 @@ import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
 /// 層1要約 (= アップロード同意画面) の版。 文言を変えたら必ず上げる。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-04.1';
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-04.2';
 
 /// アップロード同意のスコープ (= tester-consent §4: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;
@@ -31,16 +31,13 @@ const SUMMARY_KEYS = [
   'upload.consentBullet1',
   'upload.consentBullet2',
   'upload.consentBullet3',
-  'upload.consentCheckAge',
-  'upload.consentCheckNoThirdParty',
-  'upload.consentCheckTerms',
+  'upload.consentCheckAll',
   'upload.consentProceed',
 ] as const;
 
+/// 1 チェック統合版 (= チェック文言が 18歳以上・第三者なし・正本同意の 3 表明を全部含む)。
 export interface UploadConsentChecks {
-  age18_and_location_right: boolean;
-  no_third_party: boolean;
-  agree_terms: boolean;
+  combined_consent: boolean;
 }
 
 /**

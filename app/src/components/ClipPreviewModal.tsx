@@ -41,9 +41,7 @@ interface Props {
 }
 
 const INITIAL_CHECKS: UploadConsentChecks = {
-  age18_and_location_right: false,
-  no_third_party: false,
-  agree_terms: false,
+  combined_consent: false,
 };
 
 export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUpload, onRemove }) => {
@@ -65,7 +63,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
   if (!clip) return null;
   const uri = localVideoUri(clip);
   const dur = formatDuration(clip.durationMs);
-  const allChecked = checks.age18_and_location_right && checks.no_third_party && checks.agree_terms;
+  const allChecked = checks.combined_consent;
 
   const toggle = (key: keyof UploadConsentChecks) =>
     setChecks((c) => ({ ...c, [key]: !c[key] }));
@@ -133,19 +131,9 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
               {/* ── Step 1 右: チェック + アクション ── */}
               <View style={styles.consentRight}>
                 <CheckRow
-                  checked={checks.age18_and_location_right}
-                  label={t('upload.consentCheckAge')}
-                  onPress={() => toggle('age18_and_location_right')}
-                />
-                <CheckRow
-                  checked={checks.no_third_party}
-                  label={t('upload.consentCheckNoThirdParty')}
-                  onPress={() => toggle('no_third_party')}
-                />
-                <CheckRow
-                  checked={checks.agree_terms}
-                  label={t('upload.consentCheckTerms')}
-                  onPress={() => toggle('agree_terms')}
+                  checked={checks.combined_consent}
+                  label={t('upload.consentCheckAll')}
+                  onPress={() => toggle('combined_consent')}
                 />
 
                 <View style={styles.spacer} />

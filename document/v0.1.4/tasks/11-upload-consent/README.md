@@ -13,9 +13,9 @@
   → Step 1 同意フォーム
       左: 層1 要約 (tester-consent §2 のアップロード適合版、 非拘束の旨を明示)
           + 「利用条件を読む (全文)」 → LegalDocModal (= 層2 正本。 同意は正本全文に成立)
-      右: 3 チェック (§2 準拠、 per-clip 適合):
-          ① 18 歳以上 + 撮影場所の権利  ② この動画に第三者・子どもが映っていない
-          ③ 正本全文を読み同意 (社外提供・販売、 越境含む)
+      右: 統合 1 チェック (= 2026-07-04 ユーザー判断で 3 → 1 に簡素化。 チェック文言が
+          「18 歳以上 + 撮影場所の権利 / 第三者・子ども不在 / 正本全文への同意 (社外提供・
+          販売、 越境含む)」 の 3 表明を全部含む。 checkboxResults は { combined_consent })
       「同意して進む」 = 全チェック時のみ活性。 押下で同意イベントを
       POST /api/v1/consents に記録し、 **成功したときだけ** Step 2 へ
   → Step 2 動画確認
@@ -33,7 +33,7 @@
     summaryHash = 表示 locale の要約文言 (i18n キー列を表示順連結) の SHA-256
     ⚠ **要約の文言 (upload.consent* キー) を変えたら SUMMARY_VERSION を必ず上げる**
   - scopes = collection / ai_training_use / license_sale / cross_border
-  - checkboxResults = { age18_and_location_right, no_third_party, agree_terms }
+  - checkboxResults = { combined_consent } (= 統合 1 チェック。 文言が 3 表明を含む)
   - locale / consentMethod='clickwrap' / appVersion / device / context (クリップ相関)
 
 ## 実装メモ

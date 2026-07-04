@@ -145,7 +145,7 @@ const ja = {
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
   // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
-  'capture.tts.intro': 'ヘッドセットの装着角度を合わせます。 ヘッドセットを装着し、 自然な姿勢で、 両手のひらを広げて、 ご自身の手のひらをご覧ください。 そのまま 3 秒ほど、 そっと止めてお待ちください。',
+  'capture.tts.intro': 'カメラの画角調整を行います。 両腕をまっすぐ前に伸ばして、 指先を見つめてください。',
   'capture.tts.confirmed': '位置が確定いたしました。 これより撮影を開始いたします。',
   'capture.tts.done': '撮影が完了いたしました。 お疲れさまでした。',
   'capture.tts.continue': '引き続き撮影される場合は、 もう一度、 ご自身の手のひらをご覧ください。',
@@ -162,9 +162,7 @@ const ja = {
   'upload.consentBullet1': 'この動画 (映像と音声) は、 AI やお家のロボットを賢くするための学習に使われ、 そのために社外の会社へ提供・販売されることがあります (日本国外の会社を含みます)。',
   'upload.consentBullet2': '提供する前に顔などは自動でぼかされますが、 それで完全に分からなくなるとは限りません。',
   'upload.consentBullet3': '学習に使われる前のデータは削除できます。 すでに学習に使われたデータは、 その後の新しい学習からは外せますが、 過去の学習はやり直せません。',
-  'upload.consentCheckAge': '私は 18 歳以上で、 この場所で撮影する権利があります',
-  'upload.consentCheckNoThirdParty': 'この動画に、 自分以外の人や子どもは映っていません',
-  'upload.consentCheckTerms': 'テスター利用条件 (全文) を読み、 同意します (社外への提供・販売、 日本国外への提供を含む)',
+  'upload.consentCheckAll': '私は 18 歳以上でこの場所で撮影する権利があり、 この動画に自分以外の人や子どもは映っていません。 テスター利用条件 (全文) を読み、 同意します (社外への提供・販売、 日本国外への提供を含む)。',
   'upload.consentReadFull': '利用条件を読む (全文)',
   'upload.consentProceed': '同意して進む',
   'upload.consentSending': '同意を記録しています…',
@@ -317,7 +315,7 @@ const en: Record<TranslationKey, string> = {
   'capture.guide.right': 'Turn the headset a little to the right',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
-  'capture.tts.intro': 'Let’s align your headset. Put it on, relax, open both palms, and look at them. Hold still for about three seconds.',
+  'capture.tts.intro': 'Let’s adjust the camera angle. Stretch both arms straight out in front of you and look at your fingertips.',
   'capture.tts.confirmed': 'Your position is confirmed. We will now begin recording.',
   'capture.tts.done': 'Recording complete. Nice work.',
   'capture.tts.continue': 'To record again, just look at your palms again.',
@@ -334,9 +332,7 @@ const en: Record<TranslationKey, string> = {
   'upload.consentBullet1': 'This video (image and sound) will be used to train AI and home robots, and for that purpose it may be provided or sold to outside companies, including companies outside Japan.',
   'upload.consentBullet2': 'Faces are blurred automatically before the data is provided, but this does not guarantee you cannot be recognized.',
   'upload.consentBullet3': 'Data can be deleted before it is used for training. Data already used can be excluded from future training, but past training cannot be undone.',
-  'upload.consentCheckAge': 'I am 18 or older and have the right to record in this place',
-  'upload.consentCheckNoThirdParty': 'No one other than me — and no children — appears in this video',
-  'upload.consentCheckTerms': 'I have read and agree to the full Tester Terms (including provision and sale to outside companies, including outside Japan)',
+  'upload.consentCheckAll': 'I am 18 or older and have the right to record in this place, no one other than me — and no children — appears in this video, and I have read and agree to the full Tester Terms (including provision and sale to outside companies, including outside Japan).',
   'upload.consentReadFull': 'Read the full terms',
   'upload.consentProceed': 'Agree and continue',
   'upload.consentSending': 'Recording your consent…',
