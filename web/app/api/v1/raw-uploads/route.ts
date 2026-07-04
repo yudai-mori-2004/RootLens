@@ -23,6 +23,9 @@ const CONTENT_ID_RE = /^[0-9a-f]{64}$/;
 
 const RequestSchema = z.object({
   signatureHash: z.string().regex(CONTENT_ID_RE, "signatureHash must be 64-char lowercase hex (SHA-256)"),
+  // 撮影構成 → アップロード先バケット + ファイルマニフェストが決まる (DATA_SPECS §3)。
+  // 旧クライアント互換のため省略時は ultra_wide。
+  recordingConfig: z.enum(["ultra_wide", "arkit"]).default("ultra_wide"),
 });
 
 export async function POST(req: NextRequest) {
@@ -42,7 +45,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const presigned = await presignRawSessionUploads({ signatureHash: parsed.data.signatureHash });
+    const presigned = await presignRawSessionUploads({
+      signatureHash: parsed.data.signatureHash,
+      recordingConfig: parsed.data.recordingConfig,
+    });
     return NextResponse.json(presigned);
   } catch (e: unknown) {
     console.error("[raw-uploads] presign failed:", e);

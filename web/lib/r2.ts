@@ -3,14 +3,17 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   signedMp4Key,
   rawSessionFileKey,
+  RAW_SESSION_MANIFEST,
+  type RecordingConfigId,
   type RawSessionFilename,
 } from "./r2-keys";
 
 // Cloudflare R2 (= S3 互換) アクセス。
 //
-// v0.1.4: 端末は raw バケットに PUT (= presigned)、 撮影者プレビューは raw GET (= presigned)。
+// v0.1.4: バケットは撮影構成ごとに分離 (DATA_SPECS §3):
+//   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw)
+//   arkit      → R2_BUCKET_RAW_ARKIT  (= 既定 rootlens-raw-arkit、 env で上書き)
 // processed バケットは v0.1.4 では使わない (= 後段ワーカー未配線、 v0.1.5 で復活)。
-// R2_BUCKET_PROCESSED env はあれば使う、 なくても起動失敗にしない。
 
 if (!process.env.R2_ACCOUNT_ID) {
   throw new Error("R2_ACCOUNT_ID is not set.");
@@ -32,6 +35,12 @@ const r2 = new S3Client({
 });
 
 const BUCKET_RAW = process.env.R2_BUCKET_RAW;
+const BUCKET_RAW_ARKIT = process.env.R2_BUCKET_RAW_ARKIT ?? "rootlens-raw-arkit";
+
+/// 撮影構成 → アップロード先バケット。
+export function rawBucketFor(config: RecordingConfigId): string {
+  return config === "arkit" ? BUCKET_RAW_ARKIT : BUCKET_RAW;
+}
 
 // key / prefix 命名関数は lib/r2-keys.ts に分離。 互換性のためここから再エクスポート。
 export { signedMp4Key };
@@ -39,46 +48,40 @@ export { signedMp4Key };
 // ─── presigned URLs ────────────────────────────────────────────────────
 
 /// クリップ 1 件の撮影構成ファイル分の PUT presigned URL を一括発行 (DATA_SPECS §2.4)。
-/// 全構成のファイルを presign し、 端末はその構成で実際に生成したものだけ PUT する
-/// (= 超広角: rgb + realtime_handpose + metadata、 ARKit: + imu.jsonl、 LiDAR 機: + depth.tar)。
+/// 構成マニフェスト (RAW_SESSION_MANIFEST) のファイルだけを、 構成対応バケットに presign する。
+/// optional なファイル (= depth.tar 等) も presign には含め、 端末は実際に生成したものだけ PUT する。
 export async function presignRawSessionUploads(opts: {
   signatureHash: string;
+  recordingConfig: RecordingConfigId;
   expiresInSec?: number;
 }): Promise<RawSessionUploadResponse> {
   const expiresIn = opts.expiresInSec ?? 3600;
-  const filenames: RawSessionFilename[] = [
-    "rgb.mp4",
-    "realtime_handpose.jsonl",
-    "metadata.json",
-    "imu.jsonl",
-    "depth.tar",
-  ];
-  const contentTypes: Record<RawSessionFilename, string> = {
-    "rgb.mp4": "video/mp4",
-    "realtime_handpose.jsonl": "application/x-ndjson",
-    "metadata.json": "application/json",
-    "imu.jsonl": "application/x-ndjson",
-    "depth.tar": "application/x-tar",
-  };
-  const files: RawSessionUploadResponse["files"] = {} as RawSessionUploadResponse["files"];
-  for (const filename of filenames) {
+  const bucket = rawBucketFor(opts.recordingConfig);
+  const manifest = RAW_SESSION_MANIFEST[opts.recordingConfig];
+  const files: RawSessionUploadResponse["files"] = {};
+  for (const { filename, contentType } of manifest) {
     const key = rawSessionFileKey(opts.signatureHash, filename);
     const cmd = new PutObjectCommand({
-      Bucket: BUCKET_RAW,
+      Bucket: bucket,
       Key: key,
-      ContentType: contentTypes[filename],
+      ContentType: contentType,
     });
     const url = await getSignedUrl(r2, cmd, { expiresIn });
-    files[filename] = { url, key, contentType: contentTypes[filename] };
+    files[filename] = { url, key, contentType };
   }
-  return { files, expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() };
+  return {
+    files,
+    bucket,
+    expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+  };
 }
 
 export interface RawSessionUploadResponse {
-  files: Record<
-    RawSessionFilename,
-    { url: string; key: string; contentType: string }
+  files: Partial<
+    Record<RawSessionFilename, { url: string; key: string; contentType: string }>
   >;
+  /// presign したバケット名 (= デバッグ表示用)。
+  bucket: string;
   expiresAt: string;
 }
 
@@ -88,4 +91,4 @@ export async function presignRawGet(key: string, expiresInSec = 3600): Promise<s
   return await getSignedUrl(r2, cmd, { expiresIn: expiresInSec });
 }
 
-export { r2, BUCKET_RAW };
+export { r2, BUCKET_RAW, BUCKET_RAW_ARKIT };

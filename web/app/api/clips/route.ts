@@ -4,7 +4,6 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
 import { requireWalletPubkey } from "@/lib/auth";
-import { presignRawSessionUploads } from "@/lib/r2";
 import { clipToDto, clipsToDtos } from "@/lib/mapper";
 import { makeClipId } from "@/lib/clipId";
 import type {
@@ -94,24 +93,19 @@ export async function POST(req: Request) {
     )
     .limit(1);
   if (existing.length > 0) {
-    const presigned = await presignRawSessionUploads({ signatureHash: parsed.data.signatureHash });
-    const body: CreateClipResponse = {
-      clip: clipToDto(existing[0]),
-      upload: presigned,
-    };
+    const body: CreateClipResponse = { clip: clipToDto(existing[0]) };
     return NextResponse.json(body);
   }
 
-  // 新規作成
+  // 新規作成。 端末は R2 アップロード完了後にのみ登録する (= presign は /api/v1/raw-uploads の役目)
+  // ので、 登録行はその時点で uploaded。
   const id = makeClipId(parsed.data.signatureHash);
-  const presigned = await presignRawSessionUploads({ signatureHash: parsed.data.signatureHash });
-
   const [inserted] = await db
     .insert(clips)
     .values({
       id,
       walletPubkey,
-      state: "uploading",
+      state: "uploaded",
       signatureHash: parsed.data.signatureHash,
       network,
       recordingConfig: parsed.data.recordingConfig,
@@ -121,9 +115,6 @@ export async function POST(req: Request) {
     })
     .returning();
 
-  const body: CreateClipResponse = {
-    clip: clipToDto(inserted),
-    upload: presigned,
-  };
+  const body: CreateClipResponse = { clip: clipToDto(inserted) };
   return NextResponse.json(body, { status: 201 });
 }

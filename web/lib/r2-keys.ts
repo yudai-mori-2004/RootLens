@@ -1,27 +1,48 @@
-// R2 オブジェクトキー / プレフィックスの命名関数。 AWS SDK 依存ゼロ (= 純粋な文字列関数)。
+// R2 オブジェクトキー / プレフィックス / 撮影構成マニフェストの命名関数。
+// AWS SDK 依存ゼロ (= 純粋な文字列関数)。
 //
-// v0.1.4: 後段 (blur / Pipeline 2 / Pipeline 3) を切り離したので、 raw/ プレフィックス系のみ。
-// processed/ 系は使わない (= v0.1.5 で後段ワーカーを再配線する時に別ファイル / 別 schema で再導入)。
+// v0.1.4: バケットは撮影構成ごとに分離する (DATA_SPECS §3):
+//   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw、 超広角 RGB の raw)
+//   arkit      → R2_BUCKET_RAW_ARKIT  (= depth / IMU / 6DoF ポーズ等 ARKit 由来 raw)
+// key prefix はどちらのバケットでも raw/<signature_hash>/ で対称。
 
 // ─── raw (= 端末アップロード) ───────────────────────────────────────────
 
-/// クリップ 1 件の raw プレフィックス。 端末アップロードのファイル群がこの配下に並ぶ:
-///   raw/<signature_hash>/rgb.mp4                  ← C2PA D1 署名済 + blur 無し (= 本当の raw)
-///   raw/<signature_hash>/realtime_handpose.jsonl  ← 手ランドマーク
-///   raw/<signature_hash>/metadata.json            ← 機種 / OS / カメラスペック / 構成 ID 等の静的情報
-///   raw/<signature_hash>/imu.jsonl                ← ARKit 構成のみ
-///   raw/<signature_hash>/depth.tar                ← ARKit + LiDAR (Pro) のみ optional
+/// クリップ 1 件の raw プレフィックス。 端末アップロードのファイル群がこの配下に並ぶ。
 export function rawSessionPrefix(signatureHash: string): string {
   return `raw/${signatureHash}/`;
 }
+
+/// 撮影構成 ID (= app/src/dataflow/recording-configs/ と 1:1)。
+export type RecordingConfigId = "ultra_wide" | "arkit";
 
 /// 撮影構成が出力するファイル名 (DATA_SPECS §2.2)。 構成が増えたら固有ファイルを足す。
 export type RawSessionFilename =
   | "rgb.mp4"
   | "realtime_handpose.jsonl"
   | "metadata.json"
-  | "imu.jsonl"           // ARKit 構成のみ実際にアップロードされる
+  | "imu.jsonl"           // ARKit 構成のみ
   | "depth.tar";          // ARKit + LiDAR (Pro) のみ optional
+
+/// 構成ごとのアップロードファイルマニフェスト (= 端末の config.outputFiles と対応する server 側 contract)。
+/// 端末は presign に無い名前をアップロードしようとすると fail-loud する (= ズレ検出)。
+export const RAW_SESSION_MANIFEST: Record<
+  RecordingConfigId,
+  { filename: RawSessionFilename; contentType: string }[]
+> = {
+  ultra_wide: [
+    { filename: "rgb.mp4", contentType: "video/mp4" },
+    { filename: "realtime_handpose.jsonl", contentType: "application/x-ndjson" },
+    { filename: "metadata.json", contentType: "application/json" },
+  ],
+  arkit: [
+    { filename: "rgb.mp4", contentType: "video/mp4" },
+    { filename: "realtime_handpose.jsonl", contentType: "application/x-ndjson" },
+    { filename: "imu.jsonl", contentType: "application/x-ndjson" },
+    { filename: "metadata.json", contentType: "application/json" },
+    { filename: "depth.tar", contentType: "application/x-tar" },
+  ],
+};
 
 export function rawSessionFileKey(signatureHash: string, filename: RawSessionFilename): string {
   return `${rawSessionPrefix(signatureHash)}${filename}`;

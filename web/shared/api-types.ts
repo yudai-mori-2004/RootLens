@@ -53,8 +53,10 @@ export interface CreateClipRequest {
   deviceModel?: string;
 }
 
-/// 撮影構成が並走出力するファイル分の presigned PUT URL (DATA_SPECS §2.4)。
-/// v0.1.4 では blur しないので signed-json は無く、 5 ファイル (うち imu/depth は構成依存) のみ。
+/// POST /api/v1/raw-uploads (DATA_SPECS §2.4)
+/// 撮影構成が並走出力するファイル分の presigned PUT URL。 構成でバケット + ファイル集合が決まる:
+///   ultra_wide → rootlens-raw        (rgb.mp4 / realtime_handpose.jsonl / metadata.json)
+///   arkit      → rootlens-raw-arkit  (+ imu.jsonl / depth.tar)
 export type RawSessionFilename =
   | "rgb.mp4"
   | "realtime_handpose.jsonl"
@@ -62,14 +64,20 @@ export type RawSessionFilename =
   | "imu.jsonl"
   | "depth.tar";
 
+export interface RawUploadsRequest {
+  signatureHash: string;
+  recordingConfig: RecordingConfig;
+}
+
 export interface RawSessionUploadResponse {
-  files: Record<RawSessionFilename, { url: string; key: string; contentType: string }>;
+  files: Partial<Record<RawSessionFilename, { url: string; key: string; contentType: string }>>;
+  /// presign したバケット名 (= デバッグ表示用)。
+  bucket: string;
   expiresAt: string; // ISO 8601
 }
 
 export interface CreateClipResponse {
   clip: ClipDto;
-  upload: RawSessionUploadResponse;
 }
 
 /// GET /api/clips
