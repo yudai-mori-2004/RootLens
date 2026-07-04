@@ -57,6 +57,20 @@ UI 全体を横持ち (landscape) ベースにし、 arkit 構成の raw は専�
 端末は R2 アップロード完了後にのみ登録するので、 insert は `state='uploaded'`。
 presign を返す機能は削除 (= presign は /api/v1/raw-uploads の役目)。
 
+### 6. C2PA D1 署名は残す (= 2026-07-04 再確認)
+
+「C2PA のせいで録画が終了できない / クラッシュする」 リスクを検討した結果、 **残す** と確定。
+
+- 録画停止時に C2PA コードには一切触れない (= stopRecording + enqueueRecording のみ)。
+  署名が走るのは「アップロードする」 押下後で、 その時点で raw mp4 は Documents 配下に確定済み。
+  署名中に Rust が panic してアプリごと落ちても録画データは失われず、 再起動 → 再試行できる
+  (= v0.1.3 の「停止直後に自動で署名+blur+D2」 が不安の源で、 それは手動アップロード化で解消済み)。
+- 残コスト: 長尺クリップの署名時間 (= ファイル全体 hash + 書き換え) + 一時ディスク 2 倍、
+  EAS ビルドの Rust 複雑性。 いずれも許容。
+- プロダクト理由: 撮影来歴は後から遡って付けられない。 収集期間中のデータに来歴を残すことが本体価値。
+- したがって native/c2pa-bridge / certs/ は現役継続。 crates/ (license-cli) + programs/ (Anchor) は
+  v0.1.4 では未使用だが v0.1.5 の mint 再配線で使うためリポに残置 (= アプリビルドには入らない)。
+
 ## 読むべきファイル
 
 - `app/src/screens/CaptureScreen.tsx` (ジェスチャー撮影、 旧 CalibrationCaptureScreen 復元 + 保存のみ)
