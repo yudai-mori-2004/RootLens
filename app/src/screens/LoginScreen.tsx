@@ -17,6 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import type { RootStackParamList } from '../app/types';
+import { BrandMark } from '../components/BrandMark';
 import { useAuth } from '../services/auth';
 import { useT } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
@@ -54,8 +55,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     <SafeAreaView style={styles.root}>
       <View style={styles.body}>
         <View style={styles.markRow}>
-          <Mark />
-          <Text style={styles.markText}>ROOTLENS</Text>
+          <BrandMark size={28} />
         </View>
 
         <View style={styles.heroBlock}>
@@ -111,14 +111,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const Mark: React.FC = () => (
-  <Svg width={28} height={28} viewBox="0 0 28 28" fill="none">
-    <Circle cx={14} cy={14} r={13} stroke={colors.ink} strokeWidth={1.4} />
-    <Circle cx={14} cy={14} r={6.5} stroke={colors.ink} strokeWidth={1.4} />
-    <Path d="M14 1v6.5M14 20.5V27M1 14h6.5M20.5 14H27" stroke={colors.ink} strokeWidth={1.4} strokeLinecap="round" />
-  </Svg>
-);
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper, justifyContent: 'space-between' },
   body: { padding: spacing.xl, gap: spacing.lg },
@@ -128,12 +120,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.lg,
-  },
-  markText: {
-    fontFamily: fonts.sansSemibold,
-    fontSize: 12,
-    letterSpacing: 2.4,
-    color: colors.ink,
   },
 
   heroBlock: {

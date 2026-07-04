@@ -206,9 +206,10 @@ const ja = {
   'portfolio.greetingDay': 'こんにちは',
   'portfolio.greetingEvening': 'こんばんは',
   'portfolio.greetingNight': 'おつかれさまです',
-  'portfolio.greetingSub': 'おうちの時間が、 少しずつ収入になります',
-  'portfolio.emptyTitle': 'アップロード待ちの動画はありません',
-  'portfolio.emptyHint': '右の丸いボタンから撮影すると、 ここに並びます。 アップロードが終わった動画は、 ここから消えます。',
+  'portfolio.mission': 'ロボットが世界を学び、 くらしの手伝いができるようになるために。 あなたの毎日の作業風景が、 いちばんの教科書になります。',
+  'portfolio.totalTime': 'これまでの撮影時間',
+  'portfolio.last7days': '直近 7 日',
+  'portfolio.recordInvite': '右の丸いボタンから、 きょうの家事を撮ってみましょう。',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
@@ -357,9 +358,10 @@ const en: Record<TranslationKey, string> = {
   'portfolio.greetingDay': 'Good afternoon',
   'portfolio.greetingEvening': 'Good evening',
   'portfolio.greetingNight': 'Working late?',
-  'portfolio.greetingSub': 'Your time at home, slowly becoming income',
-  'portfolio.emptyTitle': 'No videos waiting to upload',
-  'portfolio.emptyHint': 'Tap the round button on the right to record. Videos appear here, and leave the list once uploaded.',
+  'portfolio.mission': 'So robots can learn the world and lend a hand at home. Your everyday housework is their best textbook.',
+  'portfolio.totalTime': 'Total time captured',
+  'portfolio.last7days': 'Last 7 days',
+  'portfolio.recordInvite': 'Tap the round button on the right and capture today’s chores.',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { ja, en };

@@ -11,3 +11,4 @@ export {
 } from './sign';
 export { uploadToR2 } from './upload';
 export { registerClip } from './register';
+export { fetchMyClips } from './list';
