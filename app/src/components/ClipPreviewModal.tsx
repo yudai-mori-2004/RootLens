@@ -158,15 +158,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.paper,
     borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: 'hidden',
     width: '88%',
     maxWidth: 780,
     ...shadows.pop,
   },
+  // aspectRatio は付けない: side の高さにストレッチし、 動画は CONTAIN で箱内 letterbox する
+  // (= 動画の下に sheet 背景の隙間ができない。 余白は箱と同色の黒)
   videoWrap: {
     flex: 56,
-    aspectRatio: 16 / 9,
-    backgroundColor: '#10131A',
+    alignSelf: 'stretch',
+    backgroundColor: '#0B0D11',
   },
   video: { width: '100%', height: '100%' },
   videoMissing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -176,6 +180,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.xl,
     alignSelf: 'stretch',
+    minHeight: 300,
   },
   eyebrow: {
     ...typography.labelSmall,

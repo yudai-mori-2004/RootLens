@@ -14,7 +14,6 @@ import {
   Alert,
   Linking,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,6 +21,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -35,6 +35,7 @@ import type { LegalDocKey } from '../content/legalDocs.generated';
 export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
   const t = useT();
+  const insets = useSafeAreaInsets();
   const locale = useLocale();
   const ownerStr = state.status === 'authenticated' ? state.session.pubkey : null;
   const [signingOut, setSigningOut] = useState(false);
@@ -116,91 +117,86 @@ export const SettingsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroBlock}>
+    <View style={[styles.root, { paddingLeft: insets.left }]}>
+      {/* ── 左: 扉カラム (= マイビデオと対称) ── */}
+      <View style={styles.aside}>
+        <View style={styles.asideHead}>
           <Text style={styles.title}>{t('settings.title')}</Text>
           <Text style={styles.subtitle}>{t('settings.subtitle')}</Text>
         </View>
-
-        <View style={styles.grid}>
-          {/* ── 左カラム ── */}
-          <View style={styles.gridCol}>
-            <Section title={t('settings.section.account')}>
-              <Row
-                label={t('settings.accountId')}
-                value={ownerStr ? shortBase58(ownerStr) : t('settings.unauthenticated')}
-                mono
-              />
-              <ActionRow
-                label={signingOut ? t('settings.signingOut') : t('settings.signOut')}
-                onPress={onLogout}
-                kind="danger"
-                disabled={signingOut || state.status !== 'authenticated'}
-              />
-            </Section>
-
-            <Section title={t('settings.section.capture')}>
-              <ActionRow
-                label={t('settings.recalibrate')}
-                onPress={async () => {
-                  try {
-                    await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
-                  } catch {}
-                }}
-              />
-            </Section>
-
-            <Section title={t('settings.section.support')}>
-              <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
-              <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
-              <ActionRow
-                label={t('settings.contact')}
-                onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
-              />
-            </Section>
-          </View>
-
-          {/* ── 右カラム ── */}
-          <View style={styles.gridCol}>
-            <Section title={t('settings.section.app')}>
-              <SegmentRow
-                label={t('settings.languageLabel')}
-                value={locale}
-                options={[
-                  { value: 'ja', label: t('settings.languageJa') },
-                  { value: 'en', label: t('settings.languageEn') },
-                ]}
-                onChange={(v) => setLocale(v as Locale)}
-              />
-              <Row
-                label={t('settings.storageUsage')}
-                value={cacheSize === null ? t('settings.calculating') : formatBytes(cacheSize)}
-              />
-              <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
-              <Row label={t('settings.version')} value={version} />
-            </Section>
-
-            {/* ── 開発者向け (= debug provider 時のみ表示) ── */}
-            {provider.id === 'debug' ? (
-              <Section title={t('settings.section.developer')} tone="muted">
-                <Row label="SERVER" value={config.serverUrl} mono onPress={() => Linking.openURL(config.serverUrl)} />
-                <Row label="ACCOUNT" value={ownerStr ?? '—'} mono />
-                <Row label="AUTH PROVIDER" value={provider.id} mono />
-                <ActionRow
-                  label="GitHub"
-                  onPress={() => Linking.openURL('https://github.com/yudai-mori-2004/root-lens').catch(() => {})}
-                />
-              </Section>
-            ) : null}
-          </View>
-        </View>
-
         <Text style={styles.footnote}>RootLens v{version}</Text>
+      </View>
+
+      {/* ── 右: 設定リスト (= 一列) ── */}
+      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <Section title={t('settings.section.account')}>
+          <Row
+            label={t('settings.accountId')}
+            value={ownerStr ? shortBase58(ownerStr) : t('settings.unauthenticated')}
+            mono
+          />
+          <ActionRow
+            label={signingOut ? t('settings.signingOut') : t('settings.signOut')}
+            onPress={onLogout}
+            kind="danger"
+            disabled={signingOut || state.status !== 'authenticated'}
+          />
+        </Section>
+
+        <Section title={t('settings.section.capture')}>
+          <ActionRow
+            label={t('settings.recalibrate')}
+            onPress={async () => {
+              try {
+                await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
+              } catch {}
+            }}
+          />
+        </Section>
+
+        <Section title={t('settings.section.app')}>
+          <SegmentRow
+            label={t('settings.languageLabel')}
+            value={locale}
+            options={[
+              { value: 'ja', label: t('settings.languageJa') },
+              { value: 'en', label: t('settings.languageEn') },
+            ]}
+            onChange={(v) => setLocale(v as Locale)}
+          />
+          <Row
+            label={t('settings.storageUsage')}
+            value={cacheSize === null ? t('settings.calculating') : formatBytes(cacheSize)}
+          />
+          <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
+          <Row label={t('settings.version')} value={version} />
+        </Section>
+
+        <Section title={t('settings.section.support')}>
+          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
+          <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
+          <ActionRow
+            label={t('settings.contact')}
+            onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
+          />
+        </Section>
+
+        {/* ── 開発者向け (= debug provider 時のみ表示) ── */}
+        {provider.id === 'debug' ? (
+          <Section title={t('settings.section.developer')} tone="muted">
+            <Row label="SERVER" value={config.serverUrl} mono onPress={() => Linking.openURL(config.serverUrl)} />
+            <Row label="ACCOUNT" value={ownerStr ?? '—'} mono />
+            <Row label="AUTH PROVIDER" value={provider.id} mono />
+            <ActionRow
+              label="GitHub"
+              onPress={() => Linking.openURL('https://github.com/yudai-mori-2004/root-lens').catch(() => {})}
+            />
+          </Section>
+        ) : null}
       </ScrollView>
 
       <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -332,32 +328,32 @@ function formatBytes(bytes: number): string {
 // ─── styles ─────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.paper },
-  scroll: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
-    gap: spacing.xl,
-    maxWidth: 980,
-    alignSelf: 'center',
-    width: '100%',
-  },
+  root: { flex: 1, flexDirection: 'row', backgroundColor: colors.paper },
 
-  heroBlock: { gap: 2 },
+  aside: {
+    width: 236,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    justifyContent: 'space-between',
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+  },
+  asideHead: { gap: 6 },
   title: {
     fontFamily: fonts.serifLight,
-    fontSize: 38,
-    letterSpacing: -0.6,
+    fontSize: 26,
+    letterSpacing: -0.4,
     color: colors.ink,
   },
-  subtitle: { ...typography.caption, color: colors.textMute },
+  subtitle: { ...typography.caption, fontSize: 12, color: colors.textMute },
 
-  grid: {
-    flexDirection: 'row',
+  list: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
     gap: spacing.xl,
-    alignItems: 'flex-start',
+    maxWidth: 560,
+    width: '100%',
   },
-  gridCol: { flex: 1, gap: spacing.xl },
 
   sectionTitle: {
     ...typography.labelSmall,
@@ -402,7 +398,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: 14,
   },
-  actionRowLabel: { ...typography.captionMedium },
+  actionRowLabel: { ...typography.captionMedium, flexShrink: 1 },
 
   segmentRow: {
     flexDirection: 'row',
@@ -449,7 +445,6 @@ const styles = StyleSheet.create({
   footnote: {
     ...typography.caption,
     color: colors.textFaint,
-    textAlign: 'center',
     fontFamily: fonts.mono,
     fontSize: 11,
   },

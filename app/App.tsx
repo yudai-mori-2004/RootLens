@@ -8,18 +8,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
   useFonts,
-  Fraunces_300Light,
-  Fraunces_400Regular,
-  Fraunces_500Medium,
-  Fraunces_600SemiBold,
-  Fraunces_700Bold,
-} from '@expo-google-fonts/fraunces';
+  MPLUS1_300Light,
+  MPLUS1_400Regular,
+  MPLUS1_500Medium,
+  MPLUS1_700Bold,
+  MPLUS1_800ExtraBold,
+} from '@expo-google-fonts/m-plus-1';
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+} from '@expo-google-fonts/jetbrains-mono';
+import { Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 
 import { RootNavigator } from './src/app/RootNavigator';
 import { DevSandboxScreen } from './src/devsandbox/DevSandboxScreen';
@@ -57,15 +56,14 @@ export default function App() {
   }, []);
 
   const [fontsLoaded] = useFonts({
-    Fraunces_300Light,
-    Fraunces_400Regular,
-    Fraunces_500Medium,
-    Fraunces_600SemiBold,
+    MPLUS1_300Light,
+    MPLUS1_400Regular,
+    MPLUS1_500Medium,
+    MPLUS1_700Bold,
+    MPLUS1_800ExtraBold,
+    JetBrainsMono_400Regular,
+    JetBrainsMono_500Medium,
     Fraunces_700Bold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
   });
 
   if (!fontsLoaded || !localeReady) {
@@ -87,7 +85,7 @@ export default function App() {
         ) : (
           <NavigationContainer theme={navTheme}>
             <RootNavigator />
-            <StatusBar style="dark" />
+            <StatusBar style="light" />
           </NavigationContainer>
         )}
       </AuthGate>

@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.emerald,
     opacity: 0.85,
   },
-  chartDay: { ...typography.labelSmall, fontSize: 9, color: colors.textFaint },
+  chartDay: { ...typography.labelSmall, fontSize: 9, letterSpacing: 0.4, color: colors.textFaint },
   chartMonth: { color: colors.textMute },
   chartBarSelected: { backgroundColor: colors.ink, opacity: 1 },
   chartDaySelected: { color: colors.ink },

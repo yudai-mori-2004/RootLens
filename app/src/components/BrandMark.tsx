@@ -27,7 +27,7 @@ export const BrandMark: React.FC<{ size?: number; withWordmark?: boolean }> = ({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   wordmark: {
-    fontFamily: fonts.serifBold,
+    fontFamily: fonts.brand,
     letterSpacing: -0.3,
     color: colors.ink,
     flexShrink: 0,

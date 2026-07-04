@@ -1,14 +1,12 @@
-// RootLens design system — "Editorial Fintech".
+// RootLens design system — "Film Studio" (Dark Cinema).
 //
-// Inspired by the Week 5 pitch illustrations: navy outline + emerald accent on
-// warm cream, with hairline borders and confident typography. Pairs Fraunces
-// (serif display) with Inter (sans body) and Menlo (mono readouts).
+// カメラアプリらしい炭色の闇に、 琥珀のアクセント。 動画サムネイルが一番美しく浮く。
+// 日本語は M PLUS 1、 時刻・尺の読み出しは JetBrains Mono。
 //
 // Aesthetic intent:
-//   • Confident, quiet authority — evokes a Japanese design studio (Karte / SmartHR)
-//     more than a SaaS template
-//   • Generous whitespace, hairline rules, occasional sparks of color for value
-//   • Surfaces feel papery; ink is heavy navy; success / value is forest-emerald
+//   • 撮影スタジオの照明を落とした空気 — 主役は映像、 UI は黒子
+//   • hairline は炭上のわずかな明度差、 アクセントは琥珀 1 色
+//   • 数値 (時刻 / 尺 / 容量) は mono で「機材の読み出し」 感を出す
 
 import { Platform } from 'react-native';
 
@@ -17,65 +15,65 @@ import { Platform } from 'react-native';
 // clean white that floats above it. `inkSoft` is a navy tone for hover/press.
 export const colors = {
   // Surfaces
-  paper: '#F8F4ED',          // dominant warm cream
-  paperDeep: '#F0EBE0',      // deeper paper for inset cards
-  card: '#FFFFFF',           // clean surface that floats above paper
-  ink: '#0E1F44',            // primary navy — the line color in illustrations
-  inkSoft: '#1B2D5A',        // pressed / hover navy
-  inkMute: '#4F5F7E',        // navy at lower priority
-  scrim: 'rgba(14, 31, 68, 0.55)',  // overlay scrim for camera / modal
+  paper: '#131519',          // dominant charcoal (= スタジオの闇)
+  paperDeep: '#1B1E24',      // inset surface
+  card: '#1C2027',           // raised surface
+  ink: '#F0EDE6',            // primary light text (= warm white)
+  inkSoft: '#FFFFFF',
+  inkMute: '#B9BDC6',
+  scrim: 'rgba(6, 7, 9, 0.6)',
 
   // Text
-  textInk: '#0E1F44',
-  textBody: '#1B2D5A',
-  textMute: '#5C6B85',
-  textFaint: '#94A0B5',
-  textOnInk: '#F8F4ED',
+  textInk: '#F0EDE6',
+  textBody: '#C7CAD1',
+  textMute: '#878C98',
+  textFaint: '#565B66',
+  textOnInk: '#131519',
 
-  // Accent — emerald from illustrations
-  emerald: '#1FA679',
-  emeraldDeep: '#157C5A',
-  emeraldSoft: '#E2F4ED',
-  emeraldFaint: '#F0F9F4',
+  // Accent — 琥珀 (= タングステン照明)
+  emerald: '#E8A33D',
+  emeraldDeep: '#C9822A',
+  emeraldSoft: '#33291A',
+  emeraldFaint: '#241F15',
 
-  // Highlight — gold spark from token graphics
+  // Highlight
   gold: '#E8B339',
-  goldSoft: '#FAEFD0',
+  goldSoft: '#332B18',
 
   // Borders / hairlines
-  border: '#E6DFD0',         // warm hairline that fits paper
-  borderInk: '#0E1F44',
-  borderEmerald: '#A5DBC4',
+  border: '#282C35',
+  borderInk: '#F0EDE6',
+  borderEmerald: '#6B5426',
 
-  // Status (kept restrained so they don't fight emerald accent)
-  success: '#1FA679',
-  successSoft: '#E2F4ED',
-  warn: '#B7741A',
-  warnSoft: '#FAE7C4',
-  danger: '#B23A2E',
-  dangerSoft: '#F4DCD7',
-  recording: '#B23A2E',
+  // Status
+  success: '#57B98A',
+  successSoft: '#1D2B24',
+  warn: '#D99A3D',
+  warnSoft: '#2F2718',
+  danger: '#E05548',
+  dangerSoft: '#33201D',
+  recording: '#E05548',
 
   // Legacy aliases (existing screens still reference these — kept until refactor)
-  background: '#F8F4ED',     // = paper
-  surface: '#FFFFFF',        // = card
-  surfaceAlt: '#F0EBE0',     // = paperDeep
-  textPrimary: '#0E1F44',
-  textSecondary: '#5C6B85',
-  textHint: '#94A0B5',
-  textDisabled: '#BDC4D2',
-  borderLight: '#F0EBE0',
-  accent: '#0E1F44',         // primary CTA = ink (was navy)
-  accentLight: '#E2F4ED',    // = emeraldSoft
-  accentDark: '#1B2D5A',     // = inkSoft
-  error: '#B23A2E',          // = danger
-  errorLight: '#F4DCD7',     // = dangerSoft
+  background: '#131519',
+  surface: '#1C2027',
+  surfaceAlt: '#1B1E24',
+  textPrimary: '#F0EDE6',
+  textSecondary: '#878C98',
+  textHint: '#565B66',
+  textDisabled: '#3E434D',
+  borderLight: '#22252D',
+  accent: '#E8A33D',
+  accentLight: '#33291A',
+  accentDark: '#C9822A',
+  error: '#E05548',
+  errorLight: '#33201D',
   black: '#000000',
   white: '#FFFFFF',
-  overlayLight: 'rgba(14,31,68,0.10)',
-  overlayMedium: 'rgba(14,31,68,0.42)',
-  overlayDark: 'rgba(14,31,68,0.65)',
-  overlayCrop: 'rgba(14,31,68,0.55)',
+  overlayLight: 'rgba(240,237,230,0.08)',
+  overlayMedium: 'rgba(6,7,9,0.42)',
+  overlayDark: 'rgba(6,7,9,0.65)',
+  overlayCrop: 'rgba(6,7,9,0.55)',
   overlayWhiteFaint: 'rgba(255,255,255,0.08)',
   overlayWhiteSubtle: 'rgba(255,255,255,0.10)',
   overlayWhite: 'rgba(255,255,255,0.15)',
@@ -85,38 +83,40 @@ export const colors = {
   overlayWhiteHalf: 'rgba(255,255,255,0.50)',
   overlayWhiteFrame: 'rgba(255,255,255,0.70)',
   darkBg: '#000000',
-  darkText: '#F8F4ED',
-  darkTextSecondary: '#AAB6CC',
-  darkTextDisabled: '#5A647A',
+  darkText: '#F0EDE6',
+  darkTextSecondary: '#AAB0BC',
+  darkTextDisabled: '#5A5F6B',
   darkSeparator: 'rgba(255,255,255,0.20)',
-  borderStrong: '#CBC2AE',
-  successLight: '#E2F4ED',
-  statusOk: '#1FA679',
-  statusWarn: '#B7741A',
-  statusError: '#B23A2E',
-  bgInk: '#0E1F44',
-  bgInkSoft: '#1B2D5A',
+  borderStrong: '#3A3F4A',
+  successLight: '#1D2B24',
+  statusOk: '#57B98A',
+  statusWarn: '#D99A3D',
+  statusError: '#E05548',
+  bgInk: '#0B0C0F',
+  bgInkSoft: '#16181D',
 } as const;
 
 // ── Typography ─────────────────────────────────────────────────────────
 // Two display families (Fraunces serif + Inter sans), one mono.
 export const fonts = {
-  // Fraunces (variable serif): used for headings, hero numerals, task names.
-  // Loaded in App.tsx via @expo-google-fonts/fraunces.
-  serifLight: 'Fraunces_300Light',
-  serifRegular: 'Fraunces_400Regular',
-  serifMedium: 'Fraunces_500Medium',
-  serifSemibold: 'Fraunces_600SemiBold',
-  serifBold: 'Fraunces_700Bold',
+  // 表示 (= 見出し / ヒーロー数値)。 M PLUS 1 は日本語を含む。
+  serifLight: 'MPLUS1_300Light',
+  serifRegular: 'MPLUS1_400Regular',
+  serifMedium: 'MPLUS1_500Medium',
+  serifSemibold: 'MPLUS1_700Bold',
+  serifBold: 'MPLUS1_800ExtraBold',
 
-  // Inter: body, UI chrome, secondary labels. Loaded via @expo-google-fonts/inter.
-  sansRegular: 'Inter_400Regular',
-  sansMedium: 'Inter_500Medium',
-  sansSemibold: 'Inter_600SemiBold',
-  sansBold: 'Inter_700Bold',
+  // 本文 / UI
+  sansRegular: 'MPLUS1_400Regular',
+  sansMedium: 'MPLUS1_500Medium',
+  sansSemibold: 'MPLUS1_700Bold',
+  sansBold: 'MPLUS1_800ExtraBold',
 
-  // System monospace for tx hashes, price chips, code-like readouts.
-  mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'Menlo' })!,
+  // 読み出し (= 時刻 / 尺 / hash)
+  mono: 'JetBrainsMono_500Medium',
+
+  // ブランドワードマーク専用 (= RootLens の文字だけ Fraunces)
+  brand: 'Fraunces_700Bold',
 } as const;
 
 export const typography = {
@@ -136,18 +136,18 @@ export const typography = {
   // Labels (caps-track for section headers and chips)
   label: {
     fontFamily: fonts.sansSemibold, fontSize: 11, lineHeight: 14,
-    letterSpacing: 1.4, textTransform: 'uppercase' as const,
+    letterSpacing: 1.0, textTransform: 'uppercase' as const,
   },
   labelSmall: {
     fontFamily: fonts.sansSemibold, fontSize: 10, lineHeight: 14,
-    letterSpacing: 1.6, textTransform: 'uppercase' as const,
+    letterSpacing: 1.1, textTransform: 'uppercase' as const,
   },
   // Mono — readouts, hashes, prices
   mono: { fontFamily: fonts.mono, fontSize: 12, letterSpacing: 0.2 },
   monoLg: { fontFamily: fonts.mono, fontSize: 14, letterSpacing: 0.2 },
   // legacy aliases used by older screens
   heading: { fontFamily: fonts.serifMedium, fontSize: 24, lineHeight: 30, letterSpacing: -0.3 },
-  small: { fontFamily: fonts.sansSemibold, fontSize: 10, lineHeight: 14, letterSpacing: 1.6 },
+  small: { fontFamily: fonts.sansSemibold, fontSize: 10, lineHeight: 14, letterSpacing: 1.1 },
 } as const;
 
 export const spacing = {
@@ -176,11 +176,11 @@ export const radii = {
 export const shadows = {
   // Warm, soft float — cards lifting off warm paper (warm-toned shadow, not cold navy).
   card: {
-    shadowColor: '#33271A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 3,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 4,
   },
   // More pronounced — for modal / popover
   pop: {

@@ -230,8 +230,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radii.sm,
   },
-  chipInk: { backgroundColor: 'rgba(14,31,68,0.88)' },
-  chipDanger: { backgroundColor: 'rgba(178,58,46,0.92)' },
+  chipInk: { backgroundColor: 'rgba(10,12,16,0.85)' },
+  chipDanger: { backgroundColor: 'rgba(200,64,52,0.95)' },
   chipTextLight: {
     fontFamily: fonts.sansSemibold,
     fontSize: 9.5,
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2.5,
     borderRadius: radii.xs,
-    backgroundColor: 'rgba(14,31,68,0.78)',
+    backgroundColor: 'rgba(10,12,16,0.8)',
   },
   durationText: {
     fontFamily: fonts.mono,
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0, right: 0, bottom: 0,
     height: 3,
-    backgroundColor: 'rgba(14,31,68,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     overflow: 'hidden',
   },
   progressFill: { height: 3, backgroundColor: colors.emerald },
