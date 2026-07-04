@@ -20,13 +20,14 @@ import { ResizeMode, Video } from 'expo-av';
 import { fetchClipMediaUrl, type ServerClipStatus } from '../dataflow';
 import { formatCardDate, formatCardTime, formatDuration, configLabel } from './ClipCard';
 import { getCurrentSession } from '../services/auth/instance';
+import { useUploadedClipFrame } from '../services/clipFrames';
 import { useT } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 interface Props {
   visible: boolean;
   clip: ServerClipStatus | null;
-  /// 端末に永続化済みのサムネ (= 動画ロード中のつなぎ表示)
+  /** モック用の差し替えサムネ。 実クリップは内部でフレームを解決する。 */
   thumbSource?: ImageSourcePropType;
   onClose: () => void;
 }
@@ -35,6 +36,12 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
   const t = useT();
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState(false);
+  // 動画ロード中のつなぎ表示。 履歴タイルが同じ key で解決済みならキャッシュから即返る。
+  const frame = useUploadedClipFrame(
+    clip ? clip.signatureHash ?? clip.id : null,
+    clip && !thumbSource ? clip.id : null,
+  );
+  const poster = thumbSource ?? (frame ? { uri: frame } : undefined);
 
   useEffect(() => {
     setMediaUrl(null);
@@ -76,8 +83,8 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
               />
             ) : (
               <View style={styles.videoPlaceholder}>
-                {thumbSource ? (
-                  <Image source={thumbSource} style={styles.videoPoster} resizeMode="cover" />
+                {poster ? (
+                  <Image source={poster} style={styles.videoPoster} resizeMode="cover" />
                 ) : null}
                 <View style={styles.videoOverlay}>
                   {mediaError ? (

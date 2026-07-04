@@ -10,8 +10,8 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Polygon } from 'react-native-svg';
-import * as VideoThumbnails from 'expo-video-thumbnails';
 import { getRecordingConfig, type Clip } from '../dataflow';
+import { useLocalClipFrame } from '../services/clipFrames';
 import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
@@ -90,8 +90,6 @@ export const ClipCard: React.FC<Props> = ({ clip, width, previewSource, onOpen }
 
 // ─── サムネイル (= ローカル録画 mp4 から 1 フレーム生成、 モジュールキャッシュ) ───────
 
-const thumbCache = new Map<string, string>();
-
 /** クリップのローカル録画 mp4 URI (= 撮影構成の primary video)。 無ければ null。 */
 export function localVideoUri(clip: Clip): string | null {
   if (!clip.sessionDir || !clip.recordingConfigId) return null;
@@ -109,19 +107,7 @@ const ClipThumb: React.FC<{
   previewSource?: ImageSourcePropType;
   dimmed?: boolean;
 }> = ({ clip, previewSource, dimmed }) => {
-  const uri = localVideoUri(clip);
-  const key = clip.id;
-  const [thumb, setThumb] = useState<string | null>(thumbCache.get(key) ?? null);
-
-  useEffect(() => {
-    if (!uri || thumbCache.has(key)) return;
-    let cancelled = false;
-    VideoThumbnails.getThumbnailAsync(uri, { time: 800, quality: 0.6 })
-      .then((r) => { thumbCache.set(key, r.uri); if (!cancelled) setThumb(r.uri); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [uri, key]);
-
+  const thumb = useLocalClipFrame(clip.id, localVideoUri(clip));
   const source = previewSource ?? (thumb ? { uri: thumb } : null);
 
   return (

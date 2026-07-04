@@ -53,9 +53,6 @@ export {
   registerClip,
   fetchMyClips,
   fetchClipMediaUrl,
-  persistClipThumbnail,
-  thumbPath,
-  listThumbHashes,
 } from './steps';
 
 // 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → D1 → アップ + 登録)

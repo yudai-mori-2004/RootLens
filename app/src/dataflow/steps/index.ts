@@ -12,4 +12,3 @@ export {
 export { uploadToR2 } from './upload';
 export { registerClip } from './register';
 export { fetchMyClips, fetchClipMediaUrl } from './list';
-export { persistClipThumbnail, thumbPath, listThumbHashes } from './thumbs';

@@ -8,7 +8,7 @@
 //
 // 合計撮影時間 = サーバの uploaded 済み durationMs 合算 (= GET /api/clips、 AsyncStorage に
 // キャッシュしてオフラインでも即表示) + ローカルのアップロード待ち分。
-// 履歴サムネはアップロード完了時に端末へ永続化した jpg (= dataflow steps/thumbs)。
+// 履歴サムネは R2 の mp4 から range リクエストで 1 フレームだけ読む (services/clipFrames)。
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -29,10 +29,11 @@ import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import { HistoryDetailModal } from '../components/HistoryDetailModal';
 import {
-  storeEventSink, advanceClip, discardClip, fetchMyClips, thumbPath, listThumbHashes,
+  storeEventSink, advanceClip, discardClip, fetchMyClips,
   type Clip, type ServerClipStatus,
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
+import { useUploadedClipFrame } from '../services/clipFrames';
 import { getCurrentSession } from '../services/auth/instance';
 import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
@@ -159,15 +160,6 @@ function useServerClips(localUploadedCount: number): ServerClipStatus[] {
 }
 
 /** 端末に永続化済みのサムネ hash 集合 (= 履歴タイルの画像有無)。 */
-function useThumbIndex(localUploadedCount: number): Set<string> {
-  const [hashes, setHashes] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    let cancelled = false;
-    listThumbHashes().then((s) => { if (!cancelled) setHashes(s); });
-    return () => { cancelled = true; };
-  }, [localUploadedCount]);
-  return hashes;
-}
 
 const DAY_MS = 86_400_000;
 
@@ -210,7 +202,6 @@ export const CollectionScreen: React.FC = () => {
   );
 
   const serverClips = useServerClips(localUploadedCount);
-  const thumbHashes = useThumbIndex(localUploadedCount);
   const historyScrollRef = React.useRef<ScrollView>(null);
 
   // 履歴 (= uploaded 済み、 新しい順 = サーバ返却順)。 モックは先頭に足す。
@@ -305,22 +296,15 @@ export const CollectionScreen: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.historyRow}
             >
-              {history.map(({ clip, source }) => {
-                const resolved =
-                  source ??
-                  (clip.signatureHash && thumbHashes.has(clip.signatureHash)
-                    ? { uri: thumbPath(clip.signatureHash) }
-                    : undefined);
-                return (
-                  <HistoryTile
-                    key={clip.id}
-                    clip={clip}
-                    source={resolved}
-                    selected={selectedDay != null && clip.createdAt != null && dayKey(clip.createdAt) === selectedDay}
-                    onPress={() => setHistoryTarget({ clip, source: resolved })}
-                  />
-                );
-              })}
+              {history.map(({ clip, source }) => (
+                <HistoryTile
+                  key={clip.id}
+                  clip={clip}
+                  source={source}
+                  selected={selectedDay != null && clip.createdAt != null && dayKey(clip.createdAt) === selectedDay}
+                  onPress={() => setHistoryTarget({ clip, source })}
+                />
+              ))}
             </ScrollView>
           </View>
         ) : null}
@@ -375,11 +359,15 @@ const HistoryTile: React.FC<{
   source?: ImageSourcePropType;
   selected?: boolean;
   onPress?: () => void;
-}> = ({ clip, source, selected, onPress }) => (
+}> = ({ clip, source, selected, onPress }) => {
+  // サムネは R2 の mp4 から range リクエストで 1 フレームだけ読む (= 端末に動画は置かない)。
+  const frame = useUploadedClipFrame(clip.signatureHash ?? clip.id, source ? null : clip.id);
+  const resolved = source ?? (frame ? { uri: frame } : undefined);
+  return (
   <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}>
     <View style={[styles.tileThumb, selected && styles.tileThumbSelected]}>
-      {source ? (
-        <Image source={source} style={styles.tileImage} resizeMode="cover" />
+      {resolved ? (
+        <Image source={resolved} style={styles.tileImage} resizeMode="cover" />
       ) : (
         <View style={styles.tileFallback}>
           <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
@@ -393,7 +381,8 @@ const HistoryTile: React.FC<{
       {historyDateLabel(clip.createdAt)}
     </Text>
   </Pressable>
-);
+  );
+};
 
 // ─── 日別グラフ (= アップロード待ちが無いときの下面。 2026/6 まで遡れる) ────────
 
