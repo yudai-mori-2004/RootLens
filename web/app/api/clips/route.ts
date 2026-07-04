@@ -15,8 +15,7 @@ import type {
 
 // GET /api/clips
 // 撮影者の所有クリップ一覧を新しい順に返す。
-// optional query: signatureHash + network を渡すと、 その条件で絞り込む
-// (= 端末の mint 前冪等チェックが「同 wallet × 同 hash × 同 network の既存 clip」を引くのに使う)。
+// optional query: signatureHash + network を渡すと絞り込む (= 端末の冪等チェック用)。
 export async function GET(req: Request) {
   let walletPubkey: string;
   try {
@@ -40,28 +39,20 @@ export async function GET(req: Request) {
     .orderBy(desc(clips.createdAt))
     .limit(200);
 
-  const body: ListClipsResponse = { clips: await clipsToDtos(rows) };
+  const body: ListClipsResponse = { clips: clipsToDtos(rows) };
   return NextResponse.json(body);
 }
 
 // POST /api/clips
-// 端末が R2 upload + TP /process + cNFT 発行を終え、 rootAssetId 確定後に呼ぶ。
-// rootAssetId + signedJsonUri は v0.1.3 で必須 (= Pipeline 2 起動の前提条件)。
+// v0.1.4: 端末で C2PA D1 署名 + R2 raw アップロードを終えてから呼ぶ「ただの登録」 endpoint。
+// 重複排除キーは (wallet, signatureHash, network)。 既存行があれば idempotent に返す。
+// rootAssetId / signedJsonUri / TP /process は v0.1.4 では撤去 (= 後段ワーカー未配線)。
 const createSchema = z.object({
-  // signature_hash は SHA-256 hex 64 文字 (= "sha256:" prefix なしの hex 部分のみ受ける)
   signatureHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
   contentSize: z.number().int().positive(),
-  // Solana cNFT asset id (= base58 32-44 文字、 Pipeline 1 末尾で確定済)
-  rootAssetId: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Solana cNFT asset id (base58)"),
-  // R2 signed-json/<signature_hash>.json への URL (= TP /process 応答保存先)
-  signedJsonUri: z.string().url(),
-  // cNFT 発行先ネットワーク (= 重複排除キーの一部)。 省略時は devnet 扱い (legacy)。
+  recordingConfig: z.enum(["ultra_wide", "arkit"]),
   network: z.enum(["devnet", "mainnet"]).optional(),
-  // 撮影構成。 省略時は ultra_wide 扱い (= 端末が送るまでの移行用 fallback)。
-  recordingConfig: z.enum(["ultra_wide", "arkit"]).optional(),
-  // 録画尺 (ms)。 端末申告。 省略時はサーバが Pipeline 2 で算出して埋める。
   durationMs: z.number().int().positive().optional(),
-  // 撮影端末の機種 (= utsname machine)。
   deviceModel: z.string().min(1).max(64).optional(),
 }) satisfies z.ZodType<CreateClipRequest>;
 
@@ -90,8 +81,7 @@ export async function POST(req: Request) {
 
   const network = parsed.data.network ?? "devnet";
 
-  // 重複アップロード排除 (= 同 wallet × 同 signature_hash × 同 network は既存行を返す)。
-  // network を含めるのは、 devnet 発行済みの動画を mainnet で発行し直す経路を塞がないため。
+  // 重複排除 (= 同 wallet × 同 signature_hash × 同 network は既存行を返す)。
   const existing = await db
     .select()
     .from(clips)
@@ -106,7 +96,7 @@ export async function POST(req: Request) {
   if (existing.length > 0) {
     const presigned = await presignRawSessionUploads({ signatureHash: parsed.data.signatureHash });
     const body: CreateClipResponse = {
-      clip: await clipToDto(existing[0]),
+      clip: clipToDto(existing[0]),
       upload: presigned,
     };
     return NextResponse.json(body);
@@ -124,18 +114,15 @@ export async function POST(req: Request) {
       state: "uploading",
       signatureHash: parsed.data.signatureHash,
       network,
-      // 撮影ファクト (= 端末申告)。 recordingConfig は移行用に ultra_wide fallback。
-      recordingConfig: parsed.data.recordingConfig ?? "ultra_wide",
+      recordingConfig: parsed.data.recordingConfig,
       contentSize: parsed.data.contentSize,
       durationMs: parsed.data.durationMs ?? null,
       deviceModel: parsed.data.deviceModel ?? null,
-      rootAssetId: parsed.data.rootAssetId,
-      signedJsonUri: parsed.data.signedJsonUri,
     })
     .returning();
 
   const body: CreateClipResponse = {
-    clip: await clipToDto(inserted),
+    clip: clipToDto(inserted),
     upload: presigned,
   };
   return NextResponse.json(body, { status: 201 });

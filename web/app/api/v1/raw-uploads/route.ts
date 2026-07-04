@@ -1,22 +1,19 @@
 // POST /api/v1/raw-uploads
 //
-// v0.1.3 device-side Pipeline 1 用 presigned PUT URL endpoint。
+// v0.1.4: 端末側 Pipeline 1 用 presigned PUT URL endpoint。
 //
 // 流れ:
-//   1. device が C2PA D1+D2 を済ませて signature_hash を確定
-//   2. このエンドポイントに signatureHash を投げ、 超広角構成ファイル分の presigned PUT を得る
-//   3. R2 (raw/<signature_hash>/{rgb.mp4 + realtime_handpose.jsonl + metadata.json}) に並列 PUT
-//   4. その後 device は TP /process + cNFT mint を経て rootAssetId を確定
-//   5. POST /api/clips で clip 行を作成 (= rootAssetId 必須)
+//   1. device が C2PA D1 署名 (生 mp4 への 1 回のみ) を済ませて signature_hash を確定
+//   2. このエンドポイントに signatureHash を投げ、 撮影構成ファイル分の presigned PUT を得る
+//   3. R2 (raw/<signature_hash>/{rgb.mp4 + realtime_handpose.jsonl + metadata.json + 等}) に並列 PUT
+//   4. POST /api/clips でクリップ行を作成 (= rootAssetId は不要)
 //
 // /api/clips とは別エンドポイントにする理由:
-//   /api/clips は rootAssetId が無いと clip 行が作れないが、 rootAssetId 確定には
-//   TP /process が必要で、 TP /process は R2 にアップ済の MP4 を fetch する。
-//   つまりアップロードが rootAssetId より先に来る必要があり、 別 endpoint が要る。
+//   端末は「アップロード可能か」 だけ先に確認したい (= 容量制限・帯域制限・空きスロット等の事前 reject)。
+//   /api/clips で行を作る前に presign を出せると、 失敗を早く検出できる。
 //
 // auth: 現状 wallet 縛りなし (= 認証 header 不要)。 R2 への直接 PUT は presigned URL の
-// 検証で限定されるので、 endpoint レベルでの追加保護は省略。 将来 spam 対策する時は
-// X-Wallet-Pubkey + rate limit を足す。
+// 検証で限定されるので、 endpoint レベルでの追加保護は省略。
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";

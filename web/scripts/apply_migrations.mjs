@@ -4,10 +4,11 @@
 // generate で吐いた SQL を postgres-js で直接 execute する経路を取る。
 //
 // 使い方:
-//   node scripts/apply_migrations.mjs
+//   node scripts/apply_migrations.mjs                          # 全 migration を順に apply
+//   node scripts/apply_migrations.mjs 0001_v0_1_4_simplify.sql # 指定 1 本だけ apply
 //
 // 冪等性: CREATE TABLE は IF NOT EXISTS を付けていないので、 2 回目は既存 table のため fail する。
-// dev 環境のリセットには Supabase dashboard で table drop してから再実行。
+// 適用済み DB に新 migration を足す時はファイル名指定で 1 本だけ流す。
 
 import { config } from "dotenv";
 import postgres from "postgres";
@@ -29,9 +30,17 @@ if (!process.env.DATABASE_URL) {
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 
 const migrationDir = join(repoServerRoot, "drizzle");
+const only = process.argv[2];
 const files = readdirSync(migrationDir)
   .filter((f) => f.endsWith(".sql"))
+  .filter((f) => !only || f === only)
   .sort();
+
+if (only && files.length === 0) {
+  console.error(`migration not found: ${only}`);
+  await sql.end();
+  process.exit(1);
+}
 
 console.log(`Found ${files.length} migration(s) in ${migrationDir}`);
 

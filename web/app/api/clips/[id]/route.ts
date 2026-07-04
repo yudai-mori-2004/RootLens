@@ -29,10 +29,10 @@ export async function GET(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ clip: await clipToDto(rows[0]) });
+  return NextResponse.json({ clip: clipToDto(rows[0]) });
 }
 
-// DELETE /api/clips/:id ─ ready 以下のクリップを破棄。 staked は 409。
+// DELETE /api/clips/:id ─ 撮影者がクリップを破棄する。 R2 オブジェクトは別 worker で GC する。
 export async function DELETE(req: Request, ctx: Ctx) {
   let walletPubkey: string;
   try {
@@ -51,15 +51,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (rows[0].state === "staked") {
-    return NextResponse.json(
-      { error: "Cannot delete staked clip (License NFT permanence)" },
-      { status: 409 },
-    );
-  }
-
   await db.delete(clips).where(eq(clips.id, id));
-  // R2 上のオブジェクト削除は別 worker (= まとめて GC) で行う。 ここでは DB 行のみ削除。
 
   const body: DeleteClipResponse = { ok: true };
   return NextResponse.json(body);
