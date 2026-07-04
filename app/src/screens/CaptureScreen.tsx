@@ -1,11 +1,10 @@
 // 撮影画面 (= v0.1.4)。 ジェスチャーキャリブレーション → 撮影 → ローカル保存、 の 3 手。
 //
-// 「キャリブレーション」 の意図 (= 重要、 過去の誤解を是正):
-//   ユーザはリラックスした自然な姿勢で、 手元に視線を向ける。 体は動かさない。
-//   その自然な視線状態でカメラ映像内に両手が真ん中に映るように、 ヘッドセットの装着角度を
-//   物理的に微調整してもらう。 シビアに中央 (= ±5%) に来た瞬間が baseline 確定。
-//   中央外なら「ヘッドセットをもう少し ___ に向けてください」 と方向指示 → user が装着角度を
-//   調整 → 再度両手を上に向けて 1 秒キープ → 再判定、 のループ。
+// 「キャリブレーション」 の意図 (= カメラの画角調整):
+//   ユーザは両腕をまっすぐ前に伸ばし、 顔を指先に向ける。 その自然な視線状態でカメラ映像内に
+//   両手が真ん中に映るように、 カメラの向きを物理的に微調整してもらう。 シビアに中央 (= ±5%)
+//   に来た瞬間が baseline 確定。 中央外なら「カメラをもう少し ___ に向けてください」 と方向指示
+//   → user が向きを調整 → もう一度腕を伸ばしてキープ → 再判定、 のループ。
 //
 // 2 layer:
 //   1. キャリブレーション
@@ -809,9 +808,12 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         ) : null}
       </View>
 
-      {/* 撮影構成スイッチャ (ultra_wide ⇄ arkit)。 キャリブレーション待機中のみ操作可。
-          切替処理 (= onSelectConfig + session ハンドオフ effect) はカメラ排他のため
-          「旧 session 完全停止 → 解放待ち → 新 session 起動」 を直列化する (壊しやすいので触らない)。 */}
+      {/*
+        撮影構成スイッチャ (ultra_wide ⇄ arkit) は当面 arkit 固定運用のため UI を非表示にする
+        (= DEFAULT_RECORDING_CONFIG が arkit)。 切替処理 (= onSelectConfig + session ハンドオフ
+        effect: カメラ排他のため「旧 session 完全停止 → 解放待ち → 新 session 起動」 を直列化)
+        はデリケートなのでロジックごと温存し、 ここの UI だけ畳む。 復活時はこのコメントを外す:
+
       {RECORDING_CONFIGS.length > 1 ? (
         <View
           style={[styles.configSwitcher, { bottom: safeBottom + 16, left: safeLeft, right: safeRight }]}
@@ -841,6 +843,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           })}
         </View>
       ) : null}
+      */}
 
       {/* 左上: 戻る */}
       <View style={[styles.chromeTopLeft, { top: safeTop + 12, left: safeLeft + 12 }]}>
@@ -989,18 +992,18 @@ const styles = StyleSheet.create({
   },
   configChip: {
     paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999,
-    backgroundColor: 'rgba(14,31,68,0.65)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(11,13,17,0.66)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  configChipSel: { backgroundColor: 'rgba(16,185,129,0.85)', borderColor: 'rgba(255,255,255,0.3)' },
+  configChipSel: { backgroundColor: 'rgba(232,163,61,0.9)', borderColor: 'rgba(255,255,255,0.25)' },
   configChipDim: { opacity: 0.4 },
   configChipText: {
     color: 'rgba(255,255,255,0.92)',
-    fontFamily: fonts.sansSemibold,
+    fontFamily: fonts.mono,
     fontSize: 11,
     letterSpacing: 1.0,
   },
-  configChipTextSel: { color: '#fff' },
+  configChipTextSel: { color: '#131519' },
   center: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     padding: 24, gap: 12, backgroundColor: colors.paper,
@@ -1022,12 +1025,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   countdownText: {
-    fontFamily: fonts.serifMedium,
-    fontSize: 120,
-    color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.5)',
+    fontFamily: fonts.mono,
+    fontSize: 116,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 12,
+    textShadowRadius: 14,
   },
 
   chromeTopLeft: { position: 'absolute' },
@@ -1052,23 +1055,23 @@ const styles = StyleSheet.create({
 
   closeBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: 'rgba(14,31,68,0.65)',
+    backgroundColor: 'rgba(11,13,17,0.66)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  closeBtnRec: { backgroundColor: 'rgba(220,38,38,0.85)' },
+  closeBtnRec: { backgroundColor: 'rgba(224,85,72,0.9)' },
   closeBtnPressed: { opacity: 0.7 },
 
   headerPill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(14,31,68,0.65)',
+    backgroundColor: 'rgba(11,13,17,0.66)',
     paddingHorizontal: 14, paddingVertical: 6,
     borderRadius: 999,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
   headerStatus: {
     color: 'rgba(255,255,255,0.92)',
-    fontFamily: fonts.sansSemibold,
+    fontFamily: fonts.sansMedium,
     fontSize: 11,
     letterSpacing: 1.2,
   },
@@ -1077,20 +1080,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(220,38,38,0.95)',
+    backgroundColor: 'rgba(224,85,72,0.95)',
     paddingHorizontal: 10, paddingVertical: 5,
     borderRadius: 999,
   },
   recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   recLabel: {
     color: '#fff',
-    fontFamily: fonts.sansSemibold,
-    fontSize: 10,
+    fontFamily: fonts.mono,
+    fontSize: 10.5,
     letterSpacing: 1.4,
   },
 
   errCard: {
-    backgroundColor: 'rgba(220,38,38,0.92)',
+    backgroundColor: 'rgba(224,85,72,0.94)',
     paddingHorizontal: 16, paddingVertical: 10,
     borderRadius: 12,
     maxWidth: 480,

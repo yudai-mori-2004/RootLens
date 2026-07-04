@@ -41,7 +41,8 @@ export const RECORDING_CONFIGS: readonly RecordingConfig[] = Array.from(
 );
 
 /** 既定の撮影構成 (= UI_SPECS §1.5: 超広角固定、 両プラットフォーム共通)。 */
-export const DEFAULT_RECORDING_CONFIG: RecordingConfig = ultraWideConfig;
+// v0.1.4: 深度 + 6DoF が取れる arkit を既定にする (= ultra_wide は温存、 切替 UI は撮影画面でコメントアウト中)。
+export const DEFAULT_RECORDING_CONFIG: RecordingConfig = arkitConfig;
 
 export function getRecordingConfig(id: string): RecordingConfig | undefined {
   return RECORDING_CONFIGS.find((c) => c.id === id);

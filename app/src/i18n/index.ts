@@ -127,7 +127,7 @@ const ja = {
   // ── Capture flow: 状態ピル (= 画面上部中央) ──
   'capture.state.announcing': 'CALIBRATE  ·  案内中…',
   'capture.state.nextTaskAnnouncing': '撮影完了  ·  案内中…',
-  'capture.state.awaitingPalm': 'CALIBRATE  ·  両手の手のひらを見つめて 3 秒',
+  'capture.state.awaitingPalm': 'CALIBRATE  ·  両腕を前に伸ばして 3 秒',
   'capture.state.palmHolding': 'CALIBRATE  ·  検出中…',
   'capture.state.calibratePrefix': 'CALIBRATE',
   'capture.state.calibrated': 'CALIBRATED  ·  まもなく開始',
@@ -138,21 +138,21 @@ const ja = {
   'capture.state.finalizing': 'FINALIZING',
 
   // ── Capture flow: ヘッドセット向き案内 (= ピル内) ──
-  'capture.guide.up': 'ヘッドセットをもう少し上に向けてください',
-  'capture.guide.down': 'ヘッドセットをもう少し下に向けてください',
-  'capture.guide.left': 'ヘッドセットをもう少し左に向けてください',
-  'capture.guide.right': 'ヘッドセットをもう少し右に向けてください',
+  'capture.guide.up': 'カメラをもう少し上に向けてください',
+  'capture.guide.down': 'カメラをもう少し下に向けてください',
+  'capture.guide.left': 'カメラをもう少し左に向けてください',
+  'capture.guide.right': 'カメラをもう少し右に向けてください',
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
   // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
-  'capture.tts.intro': 'カメラの画角調整を行います。 両腕をまっすぐ前に伸ばして、 指先を見つめてください。',
+  'capture.tts.intro': 'カメラの画角調整を行います。 両腕をまっすぐ前に伸ばして、 顔を指先に向けてください。',
   'capture.tts.confirmed': '位置が確定いたしました。 これより撮影を開始いたします。',
   'capture.tts.done': '撮影が完了いたしました。 お疲れさまでした。',
-  'capture.tts.continue': '引き続き撮影される場合は、 もう一度、 ご自身の手のひらをご覧ください。',
-  'capture.tts.adjustUp': '手が画面の上に寄っています。 ヘッドセットを少し上へ向け直し、 もう一度手のひらをご覧ください。',
-  'capture.tts.adjustDown': '手が画面の下に寄っています。 ヘッドセットを少し下へ向け直し、 もう一度手のひらをご覧ください。',
-  'capture.tts.adjustLeft': '手が画面の左に寄っています。 ヘッドセットを少し左へ向け直し、 もう一度手のひらをご覧ください。',
-  'capture.tts.adjustRight': '手が画面の右に寄っています。 ヘッドセットを少し右へ向け直し、 もう一度手のひらをご覧ください。',
+  'capture.tts.continue': '引き続き撮影される場合は、 もう一度、 両腕を伸ばして指先をご覧ください。',
+  'capture.tts.adjustUp': '手が画面の上に寄っています。 カメラを少し上へ向け直し、 もう一度指先をご覧ください。',
+  'capture.tts.adjustDown': '手が画面の下に寄っています。 カメラを少し下へ向け直し、 もう一度指先をご覧ください。',
+  'capture.tts.adjustLeft': '手が画面の左に寄っています。 カメラを少し左へ向け直し、 もう一度指先をご覧ください。',
+  'capture.tts.adjustRight': '手が画面の右に寄っています。 カメラを少し右へ向け直し、 もう一度指先をご覧ください。',
   'capture.tts.stoppingConfirm': 'そのまま親指を立て続けると、 撮影を終了します',
   'capture.tts.handLost': '両手がカメラに映るようにしてください',
 
@@ -298,7 +298,7 @@ const en: Record<TranslationKey, string> = {
   // ── Capture flow: status pill ──
   'capture.state.announcing': 'CALIBRATE  ·  Get ready…',
   'capture.state.nextTaskAnnouncing': 'CAPTURE DONE  ·  Nice work…',
-  'capture.state.awaitingPalm': 'CALIBRATE  ·  Look at your palms for 3s',
+  'capture.state.awaitingPalm': 'CALIBRATE  ·  Arms out front for 3s',
   'capture.state.palmHolding': 'CALIBRATE  ·  Detecting…',
   'capture.state.calibratePrefix': 'CALIBRATE',
   'capture.state.calibrated': 'CALIBRATED  ·  Starting soon',
@@ -309,20 +309,20 @@ const en: Record<TranslationKey, string> = {
   'capture.state.finalizing': 'FINALIZING',
 
   // ── Capture flow: headset guidance ──
-  'capture.guide.up': 'Tilt the headset a little upward',
-  'capture.guide.down': 'Tilt the headset a little downward',
-  'capture.guide.left': 'Turn the headset a little to the left',
-  'capture.guide.right': 'Turn the headset a little to the right',
+  'capture.guide.up': 'Tilt the camera a little upward',
+  'capture.guide.down': 'Tilt the camera a little downward',
+  'capture.guide.left': 'Turn the camera a little to the left',
+  'capture.guide.right': 'Turn the camera a little to the right',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
-  'capture.tts.intro': 'Let’s adjust the camera angle. Stretch both arms straight out in front of you and look at your fingertips.',
+  'capture.tts.intro': 'Let’s adjust the camera angle. Stretch both arms straight out in front of you and turn your face toward your fingertips.',
   'capture.tts.confirmed': 'Your position is confirmed. We will now begin recording.',
   'capture.tts.done': 'Recording complete. Nice work.',
-  'capture.tts.continue': 'To record again, just look at your palms again.',
-  'capture.tts.adjustUp': 'Your hands are near the top of the frame. Tilt the headset up a little and look at your palms again.',
-  'capture.tts.adjustDown': 'Your hands are near the bottom of the frame. Tilt the headset down a little and look at your palms again.',
-  'capture.tts.adjustLeft': 'Your hands are toward the left of the frame. Turn the headset left a little and look at your palms again.',
-  'capture.tts.adjustRight': 'Your hands are toward the right of the frame. Turn the headset right a little and look at your palms again.',
+  'capture.tts.continue': 'To record again, stretch your arms out and look at your fingertips again.',
+  'capture.tts.adjustUp': 'Your hands are near the top of the frame. Tilt the camera up a little and look at your fingertips again.',
+  'capture.tts.adjustDown': 'Your hands are near the bottom of the frame. Tilt the camera down a little and look at your fingertips again.',
+  'capture.tts.adjustLeft': 'Your hands are toward the left of the frame. Turn the camera left a little and look at your fingertips again.',
+  'capture.tts.adjustRight': 'Your hands are toward the right of the frame. Turn the camera right a little and look at your fingertips again.',
   'capture.tts.stoppingConfirm': 'Keep holding your thumbs up to finish recording.',
   'capture.tts.handLost': 'Please keep both hands in view of the camera.',
 
