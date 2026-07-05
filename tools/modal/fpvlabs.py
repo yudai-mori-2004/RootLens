@@ -170,7 +170,81 @@ string state_str
 string reason_str
 {_HEADER_DEP}""",
     "std_msgs/String": "string data",
+    "sensor_msgs/PointCloud2": f"""std_msgs/Header header
+uint32 height
+uint32 width
+sensor_msgs/PointField[] fields
+bool is_bigendian
+uint32 point_step
+uint32 row_step
+uint8[] data
+bool is_dense
+{_HEADER_DEP}
+================================================================================
+MSG: sensor_msgs/PointField
+string name
+uint32 offset
+uint8 datatype
+uint32 count""",
+    # 縮約版 Marker (= stera-sdk の decode_mesh_marker が使う points / colors を含む主要 field のみ)
+    "visualization_msgs/Marker": f"""std_msgs/Header header
+string ns
+int32 id
+int32 type
+int32 action
+geometry_msgs/Pose pose
+geometry_msgs/Vector3 scale
+std_msgs/ColorRGBA color
+geometry_msgs/Point[] points
+std_msgs/ColorRGBA[] colors
+{_HEADER_DEP}
+================================================================================
+MSG: geometry_msgs/Pose
+geometry_msgs/Point position
+geometry_msgs/Quaternion orientation
+================================================================================
+MSG: geometry_msgs/Point
+float64 x
+float64 y
+float64 z
+================================================================================
+MSG: geometry_msgs/Quaternion
+float64 x
+float64 y
+float64 z
+float64 w
+================================================================================
+MSG: geometry_msgs/Vector3
+float64 x
+float64 y
+float64 z
+================================================================================
+MSG: std_msgs/ColorRGBA
+float32 r
+float32 g
+float32 b
+float32 a""",
 }
+
+_XYZ_FIELDS = [
+    {"name": "x", "offset": 0, "datatype": 7, "count": 1},
+    {"name": "y", "offset": 4, "datatype": 7, "count": 1},
+    {"name": "z", "offset": 8, "datatype": 7, "count": 1},
+]
+
+
+def _point_cloud2_msg(ts_ns: int, xyz_f32_bytes: bytes, n: int) -> dict:
+    return {
+        "header": {"stamp": _stamp(ts_ns), "frame_id": "world"},
+        "height": 1,
+        "width": n,
+        "fields": _XYZ_FIELDS,
+        "is_bigendian": False,
+        "point_step": 12,
+        "row_step": 12 * n,
+        "data": xyz_f32_bytes,
+        "is_dense": True,
+    }
 
 TRACKING_STATE_STR = {0: "notAvailable", 1: "limited", 2: "normal"}
 G_TO_MS2 = 9.80665
@@ -259,7 +333,7 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
     blur = FaceBlurrer(model=blur_model)
     blurred_faces_total = 0
 
-    stats = {"rgb": 0, "depth": 0, "pose": 0, "imu": 0, "tracking": 0}
+    stats = {"rgb": 0, "depth": 0, "pose": 0, "imu": 0, "tracking": 0, "point_cloud": 0, "mesh_anchors": 0}
 
     with open(out_path, "wb") as out_f:
         writer = Ros2Writer(out_f)
@@ -421,6 +495,72 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
                     }, ts)
                     stats["depth"] += 1
 
+        last_ts = int(frames_meta[-1]["timestamp_ns"])
+
+        # ── /map/point_cloud (= VIO 特徴点の全期間 union。 id で去重して最終位置を採用) ──
+        pc_path = os.path.join(session_dir, "pointcloud.jsonl")
+        if os.path.exists(pc_path):
+            import base64
+
+            union = {}
+            with open(pc_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    row = json.loads(line)
+                    pts = np.frombuffer(base64.b64decode(row["points_b64"]), dtype="<f4").reshape(-1, 3)
+                    ids = np.frombuffer(base64.b64decode(row["ids_b64"]), dtype="<u8")
+                    for pid, p in zip(ids.tolist(), pts):
+                        union[pid] = (float(p[0]), float(p[1]), float(p[2]))
+            if union:
+                xyz = np.asarray(list(union.values()), dtype="<f4")
+                write("/map/point_cloud", "sensor_msgs/PointCloud2",
+                      _point_cloud2_msg(last_ts, xyz.tobytes(), len(union)), last_ts)
+                stats["point_cloud"] = len(union)
+
+        # ── /map/mesh + /map/mesh_cloud (= ARMeshAnchor。 anchor ごとに TRIANGLE_LIST Marker 1 つ) ──
+        mesh_path = os.path.join(session_dir, "mesh.jsonl")
+        if os.path.exists(mesh_path):
+            import base64
+
+            all_world_verts = []
+            marker_id = 0
+            with open(mesh_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    row = json.loads(line)
+                    verts = np.frombuffer(base64.b64decode(row["vertices_b64"]), dtype="<f4").reshape(-1, 3)
+                    faces = np.frombuffer(base64.b64decode(row["faces_b64"]), dtype="<u4").reshape(-1, 3)
+                    t4 = np.asarray(row["transform"], dtype=np.float64)  # row-major 4x4 (anchor → world)
+                    world = verts @ t4[:3, :3].T + t4[:3, 3]
+                    all_world_verts.append(world.astype("<f4"))
+                    # TRIANGLE_LIST: 頂点を面ごとに展開して points に並べる
+                    tri_pts = world[faces.reshape(-1)]
+                    write("/map/mesh", "visualization_msgs/Marker", {
+                        "header": {"stamp": _stamp(last_ts), "frame_id": "world"},
+                        "ns": "mesh",
+                        "id": marker_id,
+                        "type": 11,   # TRIANGLE_LIST
+                        "action": 0,  # ADD
+                        "pose": {
+                            "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+                            "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+                        },
+                        "scale": {"x": 1.0, "y": 1.0, "z": 1.0},
+                        "color": {"r": 0.8, "g": 0.8, "b": 0.8, "a": 1.0},
+                        "points": [{"x": float(p[0]), "y": float(p[1]), "z": float(p[2])} for p in tri_pts],
+                        "colors": [],
+                    }, last_ts)
+                    marker_id += 1
+            if all_world_verts:
+                merged = np.concatenate(all_world_verts, axis=0)
+                write("/map/mesh_cloud", "sensor_msgs/PointCloud2",
+                      _point_cloud2_msg(last_ts, np.ascontiguousarray(merged).tobytes(), len(merged)), last_ts)
+                stats["mesh_anchors"] = marker_id
+
         writer.finish()
 
     return {
@@ -433,7 +573,7 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
 
 # ─── R2 入出力 (= 決定論的キーへの上書きで冪等) ────────────────────────
 
-SESSION_FILES = ["rgb.mp4", "realtime_handpose.jsonl", "imu.jsonl", "metadata.json", "depth.tar"]
+SESSION_FILES = ["rgb.mp4", "realtime_handpose.jsonl", "imu.jsonl", "metadata.json", "depth.tar", "pointcloud.jsonl", "mesh.jsonl"]
 
 
 def _r2_client():
