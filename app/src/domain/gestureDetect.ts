@@ -1,26 +1,58 @@
-import { HAND_LANDMARK_INDICES as J } from '../native/handPose';
-
-/** 判定に必要な最小の landmark 形 (= native HandObservation / dataflow WearerHandObservation の両方が満たす)。 */
-export interface CountLandmark { x: number; y: number; confidence: number; }
-export interface CountableHand {
-  landmarks: CountLandmark[];
-  /** 検出信頼度。 native は score、 dataflow は confidence で持つ。 */
-  score?: number;
-  confidence?: number;
-}
+import {
+  HAND_LANDMARK_INDICES as J,
+  type HandLandmark,
+  type HandObservation,
+} from '../native/handPose';
 
 // Hand pose 21-joint からのジェスチャー判定。
 //
-// v0.1.4: 録画の開始・終了トリガーは「両手チョキを少しキープ」。 チョキは指を特定して分類する
-// (= 人差し指・中指が伸び、 薬指・小指が畳まれている。 親指は人による癖が大きいので不問)。
-// 「伸びている本数 = 2」 のような本数だけの判定は、 どの 2 本でも通る / 薬指の誤読で落ちる、 の
-// 両方向に誤るため使わない。 伸び・畳みの閾値は分けて、 中間の曖昧な形はチョキ扱いしない。
-//
 // 設計方針:
-//   - 関節角度ベースの素朴な heuristic。 学習モデルではない。
-//   - 入力 (CountableHand) と出力 (キープイベント) だけを公開し、 実装は差し替え可能に保つ。
+//   - 関節角度ベースの極めて素朴な heuristic。学習モデルではない。
+//   - 統合実装フェーズで MediaPipe Gesture Recognizer や独自学習モデルに差し替え可能なよう、
+//     入力 (HandObservation) と出力 (GestureLabel | null) のみを公開する。
+//
+// 対応ジェスチャー:
+//   - "thumbs_up": 親指のみ伸びていて他 4 本が折れている。さらに親指 TIP が wrist より上 (画像 Y 小さい)。
+//   - "open_palm": 5 本全部が伸びている (パー)。
+//
+// チャタリング防止:
+//   - GestureStabilizer が連続 N フレーム同じラベルを出して初めて確定する。
 
-// MARK: - 指の伸展判定
+export type GestureLabel = 'thumbs_up' | 'open_palm';
+
+/**
+ * 1 frame の単一手の判定結果。安定化前の生 detection。
+ */
+export function detectGesture(hand: HandObservation): GestureLabel | null {
+  if (hand.landmarks.length < 21) return null;
+  if (hand.score < 0.5) return null;
+  const lm = hand.landmarks;
+
+  const thumbExt = isThumbExtended(lm);
+  const indexExt = isFingerExtended(lm, 'index');
+  const middleExt = isFingerExtended(lm, 'middle');
+  const ringExt = isFingerExtended(lm, 'ring');
+  const pinkyExt = isFingerExtended(lm, 'pinky');
+
+  const others = [indexExt, middleExt, ringExt, pinkyExt];
+  const allOthersFolded = others.every((e) => !e);
+  const allOthersExtended = others.every((e) => e);
+
+  if (thumbExt && allOthersFolded) {
+    // 親指が wrist より上に来ているか (画像 top-left 原点なので y が小さい = 上)
+    const thumbTip = lm[J.THUMB_TIP];
+    const wrist = lm[J.WRIST];
+    if (thumbTip.y < wrist.y) {
+      return 'thumbs_up';
+    }
+  }
+  if (thumbExt && allOthersExtended) {
+    return 'open_palm';
+  }
+  return null;
+}
+
+// MARK: - Finger extension heuristics
 
 type FingerName = 'index' | 'middle' | 'ring' | 'pinky';
 
@@ -32,102 +64,84 @@ const FINGER_INDICES: Record<FingerName, { mcp: number; pip: number; dip: number
 };
 
 /**
- * 非親指フィンガーの伸展比 (= MCP→TIP 距離 / MCP→PIP 距離)。 伸ばすと ~2、 折ると ~1 未満。
- * landmark の信頼度が足りなければ null (= 判定不能)。
+ * 非親指フィンガーが伸びているか判定。
+ * MCP→TIP の距離が MCP→PIP の 1.6 倍以上なら extended、未満なら curled。
+ * (折り曲げると TIP が MCP に近づくため距離比で十分検出できる)
  */
-function fingerRatio(lm: CountLandmark[], finger: FingerName): number | null {
+function isFingerExtended(lm: HandLandmark[], finger: FingerName): boolean {
   const f = FINGER_INDICES[finger];
   const tip = lm[f.tip];
   const pip = lm[f.pip];
   const mcp = lm[f.mcp];
-  if (tip.confidence < 0.3 || mcp.confidence < 0.3) return null;
+  // confidence が低い landmark は判定不能 → false 寄せ
+  if (tip.confidence < 0.3 || mcp.confidence < 0.3) return false;
+  const dTipMcp = dist2(tip, mcp);
   const dPipMcp = dist2(pip, mcp);
-  if (dPipMcp < 1e-6) return null;
-  return dist2(tip, mcp) / dPipMcp;
+  if (dPipMcp < 1e-6) return false;
+  return dTipMcp > 1.6 * dPipMcp;
 }
 
-/// 伸び / 畳みの閾値は分ける (= 中間の曖昧な形をどちらにも倒さない不感帯)。
-const EXTENDED_MIN_RATIO = 1.5;
-const FOLDED_MAX_RATIO = 1.35;
+/**
+ * 親指は手首-CMC-MCP-IP-TIP の構造が他指と異なるため別判定。
+ * CMC→TIP の距離が CMC→MCP の 1.5 倍以上なら extended。
+ */
+function isThumbExtended(lm: HandLandmark[]): boolean {
+  const tip = lm[J.THUMB_TIP];
+  const mcp = lm[J.THUMB_MCP];
+  const cmc = lm[J.THUMB_CMC];
+  if (tip.confidence < 0.3 || cmc.confidence < 0.3) return false;
+  const dTipCmc = dist2(tip, cmc);
+  const dMcpCmc = dist2(mcp, cmc);
+  if (dMcpCmc < 1e-6) return false;
+  return dTipCmc > 1.5 * dMcpCmc;
+}
 
-function dist2(a: CountLandmark, b: CountLandmark): number {
+function dist2(a: HandLandmark, b: HandLandmark): number {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
   // z は iOS で常に 0 のため平面距離で十分
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-// MARK: - チョキ (ピースサイン) 分類
+// MARK: - Stabilizer (チャタリング防止)
 
 /**
- * チョキか。 人差し指・中指が明確に伸び、 薬指・小指が明確に畳まれていること。
- * 親指は人による癖 (畳む / 添える) が大きいので見ない。 曖昧な中間形は false。
+ * 連続 N フレーム同じ label が出て初めて confirm する単純な多数決安定器。
+ * 30fps を想定して default windowSize=5 (約 167ms)。
+ *
+ * 用途: gesture trigger を録画開始/終了に使う場合、瞬間的な誤検出をフィルタする。
  */
-export function isPeaceSign(hand: CountableHand): boolean {
-  const quality = hand.score ?? hand.confidence ?? 0;
-  if (hand.landmarks.length < 21 || quality < 0.5) return false;
-  const lm = hand.landmarks;
-  const index = fingerRatio(lm, 'index');
-  const middle = fingerRatio(lm, 'middle');
-  const ring = fingerRatio(lm, 'ring');
-  const pinky = fingerRatio(lm, 'pinky');
-  if (index == null || middle == null || ring == null || pinky == null) return false;
-  return (
-    index >= EXTENDED_MIN_RATIO &&
-    middle >= EXTENDED_MIN_RATIO &&
-    ring <= FOLDED_MAX_RATIO &&
-    pinky <= FOLDED_MAX_RATIO
-  );
-}
+export class GestureStabilizer {
+  private readonly windowSize: number;
+  private buffer: (GestureLabel | null)[] = [];
+  private lastConfirmed: GestureLabel | null = null;
 
-// MARK: - 両手チョキのキープ検出
+  constructor(windowSize = 5) {
+    this.windowSize = windowSize;
+  }
 
-/// 位相の多数決ウィンドウ (= 30Hz 入力で ~130ms。 単フレームの誤読と両手のズレを吸収)。
-const SMOOTH_WINDOW = 4;
-
-export type PeaceHoldEvent = 'armed' | 'complete';
-
-/** 1 フレームで「両手ともチョキ」 か。 */
-function frameBothPeace(hands: CountableHand[]): boolean {
-  if (hands.length < 2) return false;
-  return hands.every(isPeaceSign);
-}
-
-/**
- * 「両手チョキを holdMs キープ」 の検出器。 push に毎フレームの両手を流すと、
- * 安定してチョキになった瞬間に 'armed' (= 検出ビープ用)、 保持しきったら 'complete' を返す。
- * 途中で崩れたら黙って最初から (= 誤発火しない)。
- */
-export class PeaceHoldDetector {
-  private window: boolean[] = [];
-  private holdStart = 0;
-
-  constructor(private readonly holdMs: number) {}
-
-  push(hands: CountableHand[], nowMs: number): PeaceHoldEvent | null {
-    this.window.push(frameBothPeace(hands));
-    if (this.window.length > SMOOTH_WINDOW) this.window.shift();
-    if (this.window.length < SMOOTH_WINDOW) return null;
-
-    const stable = this.window.filter(Boolean).length > SMOOTH_WINDOW / 2;
-    if (!stable) {
-      this.holdStart = 0;
-      return null;
+  /**
+   * 新しい label を投入し、安定化済み (= 直近 windowSize 連続で同じだった) ラベルを返す。
+   * 確定が変わらない間は同じ値を返す。
+   */
+  push(label: GestureLabel | null): GestureLabel | null {
+    this.buffer.push(label);
+    if (this.buffer.length > this.windowSize) {
+      this.buffer.shift();
     }
-    if (this.holdStart === 0) {
-      this.holdStart = nowMs;
-      return 'armed';
+    if (this.buffer.length < this.windowSize) {
+      return this.lastConfirmed;
     }
-    if (nowMs - this.holdStart >= this.holdMs) {
-      this.holdStart = 0;
-      this.window = [];
-      return 'complete';
+    const first = this.buffer[0];
+    const allSame = this.buffer.every((l) => l === first);
+    if (allSame) {
+      this.lastConfirmed = first;
     }
-    return null;
+    return this.lastConfirmed;
   }
 
   reset(): void {
-    this.window = [];
-    this.holdStart = 0;
+    this.buffer = [];
+    this.lastConfirmed = null;
   }
 }

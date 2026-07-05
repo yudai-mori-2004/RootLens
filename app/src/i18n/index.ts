@@ -82,7 +82,7 @@ const ja = {
   'settings.unauthenticated': '未認証',
 
 
-  'settings.recalibrate': 'カメラの向きの学習をリセット',
+  'settings.recalibrate': 'カメラの位置合わせをやり直す',
   'settings.capture.resolution': '解像度',
   'settings.capture.res1440': '1440p(最大画角)',
   'settings.capture.autoFocus': 'オートフォーカス',
@@ -141,19 +141,21 @@ const ja = {
   // ── Capture flow: 画面下の指示字幕 (= 今やることを平易な 1 文で) ──
   'capture.recordingLabel': '録画中',
   'capture.hud.detecting': 'そのまま、動かないでください。',
-  'capture.hud.aimReadout': '傾き {current}°(目標 {target}°)',
-  'capture.hud.recordingHint': '終わるときは、両手でチョキをキープしてください。',
+  'capture.hud.countdown': 'まもなく撮影がはじまります。',
+  'capture.hud.recordingHint': '終わるときは、両手で親指を立ててキープしてください。',
   'capture.hud.saving': '保存しています…',
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
-  // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて) は使わない。
-  'capture.tts.intro': 'まず、スマホをヘッドセットに取り付けて、頭に装着してください。',
-  'capture.tts.posture': 'まっすぐ立って、あごを軽く引いて、正面を見てください。そのまま動かないでください。',
-  'capture.tts.aimExplore': 'スマホをゆっくり傾けてください。音が鳴ったら、そこで止めてください。',
-  'capture.tts.aimOk': '向きが合いました。両手でチョキをキープすると、撮影が始まります。',
+  // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて)・「画角」 は使わない。
+  'capture.tts.intro': 'まず、スマホをヘッドセットに取り付けて、頭に装着してください。準備ができたら、両腕をまっすぐ前に伸ばして、手のひらをカメラに向けてください。',
+  'capture.tts.confirmed': '位置が合いました。これより撮影を開始します。',
   'capture.tts.done': '撮影を終了しました。お疲れさまでした。',
-  'capture.tts.continue': '続けるときは、そのままお待ちください。カメラの向きを確認します。',
-  'capture.tts.redoSuggest': '手が画面から外れがちです。一度撮影を終えて、ヘッドセットをかけ直してください。',
+  'capture.tts.continue': '続けるときは、もう一度、両腕を伸ばして手のひらを見せてください。',
+  'capture.tts.adjustUp': '手が画面の上に寄っています。カメラを少し上へ向けて、もう一度手のひらを見せてください。',
+  'capture.tts.adjustDown': '手が画面の下に寄っています。カメラを少し下へ向けて、もう一度手のひらを見せてください。',
+  'capture.tts.adjustLeft': '手が画面の左に寄っています。カメラを少し左へ向けて、もう一度手のひらを見せてください。',
+  'capture.tts.adjustRight': '手が画面の右に寄っています。カメラを少し右へ向けて、もう一度手のひらを見せてください。',
+  'capture.tts.stoppingConfirm': 'そのまま親指を立て続けると、撮影を終了します。',
   'capture.tts.handLost': '両手をカメラに映してください。',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
@@ -248,7 +250,7 @@ const en: Record<TranslationKey, string> = {
   'settings.unauthenticated': 'Not signed in',
 
 
-  'settings.recalibrate': 'Reset camera-aim learning',
+  'settings.recalibrate': 'Redo camera alignment',
   'settings.capture.resolution': 'Resolution',
   'settings.capture.res1440': '1440p (max FOV)',
   'settings.capture.autoFocus': 'Auto focus',
@@ -307,18 +309,20 @@ const en: Record<TranslationKey, string> = {
   // ── Capture flow: bottom instruction caption ──
   'capture.recordingLabel': 'Recording',
   'capture.hud.detecting': 'Hold still.',
-  'capture.hud.aimReadout': 'Tilt {current}° (target {target}°)',
-  'capture.hud.recordingHint': 'To finish, hold a peace sign with both hands.',
+  'capture.hud.countdown': 'Recording starts in a moment.',
+  'capture.hud.recordingHint': 'To finish, hold a thumbs-up with both hands.',
   'capture.hud.saving': 'Saving…',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
-  'capture.tts.intro': 'First, attach the phone to the headset and put it on.',
-  'capture.tts.posture': 'Stand up straight, tuck your chin slightly, and face forward. Hold still.',
-  'capture.tts.aimExplore': 'Slowly tilt the phone. When it beeps, stop there.',
-  'capture.tts.aimOk': 'All set. Hold a peace sign with both hands to start recording.',
+  'capture.tts.intro': 'First, attach the phone to the headset and put it on. When you are ready, stretch both arms straight out and show your palms to the camera.',
+  'capture.tts.confirmed': 'Position confirmed. Recording will now begin.',
   'capture.tts.done': 'Recording finished. Nice work.',
-  'capture.tts.continue': 'To keep going, hold on. Checking the camera angle.',
-  'capture.tts.redoSuggest': 'Your hands keep slipping out of frame. Please end this recording and re-seat the headset.',
+  'capture.tts.continue': 'To keep going, stretch your arms out and show your palms again.',
+  'capture.tts.adjustUp': 'Your hands are near the top of the frame. Tilt the camera up a little and show your palms again.',
+  'capture.tts.adjustDown': 'Your hands are near the bottom of the frame. Tilt the camera down a little and show your palms again.',
+  'capture.tts.adjustLeft': 'Your hands are toward the left. Turn the camera left a little and show your palms again.',
+  'capture.tts.adjustRight': 'Your hands are toward the right. Turn the camera right a little and show your palms again.',
+  'capture.tts.stoppingConfirm': 'Keep holding your thumbs up to finish recording.',
   'capture.tts.handLost': 'Show both hands to the camera.',
 
   // ── Upload consent pop (= tap a card in My Videos) ──

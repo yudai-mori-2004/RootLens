@@ -71,8 +71,9 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape']}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={() => {}}>
-          {/* ── 左: 再生枠 ── */}
-          <View style={styles.videoWrap}>
+          {/* ── 左: 再生枠 (= 黒ステージの中に 4:3 固定枠を中央配置) ── */}
+          <View style={styles.videoPane}>
+            <View style={styles.videoBox}>
             {mediaUrl ? (
               <Video
                 source={{ uri: mediaUrl }}
@@ -95,6 +96,7 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
                 </View>
               </View>
             )}
+            </View>
           </View>
 
           {/* ── 右: 詳細 ── */}
@@ -155,12 +157,17 @@ const styles = StyleSheet.create({
     maxWidth: 780,
     ...shadows.pop,
   },
-  // 4:3 固定 (= 現行録画のアスペクト)。 sheet 幅から寸法が決まるので、 動画の読み込み前後で
-  // ポップの大きさが変わらない。 旧 16:9 クリップは CONTAIN で箱内 letterbox。
-  videoWrap: {
+  // 黒ステージ (= 右カラムの高さいっぱい) の中に 4:3 固定枠を中央配置。 読み込み前後で
+  // ポップの寸法が変わらず、 右カラムが縦に伸びても隙間が地の色にならない。
+  videoPane: {
     flex: 56,
-    aspectRatio: 4 / 3,
+    alignSelf: 'stretch',
     backgroundColor: '#0B0D11',
+    justifyContent: 'center',
+  },
+  videoBox: {
+    width: '100%',
+    aspectRatio: 4 / 3,
   },
   video: { width: '100%', height: '100%' },
   videoPlaceholder: { flex: 1 },

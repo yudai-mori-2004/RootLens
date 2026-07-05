@@ -101,8 +101,10 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* シート内タップでは閉じない */}
         <Pressable style={styles.sheet} onPress={() => {}}>
-          {/* ── 左: 動画プレビュー (= 4:3 固定枠。 読み込み前後で寸法が変わらない) ── */}
-          <View style={styles.videoWrap}>
+          {/* ── 左: 動画プレビュー (= 黒ステージの中に 4:3 固定枠を中央配置。 読み込み前後で
+              寸法が変わらず、 右カラムが縦に伸びても隙間が地の色にならない) ── */}
+          <View style={styles.videoPane}>
+            <View style={styles.videoBox}>
             {uri ? (
               <Video
                 source={{ uri }}
@@ -120,6 +122,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
                 </Svg>
               </View>
             )}
+            </View>
           </View>
 
           {/* ── 右: 同意チェック + アクション ── */}
@@ -244,11 +247,16 @@ const styles = StyleSheet.create({
     ...shadows.pop,
   },
 
-  // 4:3 固定 (= 現行録画のアスペクト)。 sheet 幅から決まるので読み込み前後で寸法が変わらない。
-  videoWrap: {
+  // 黒ステージ (= 右カラムの高さいっぱい) の中に 4:3 固定枠を中央配置。
+  videoPane: {
     flex: 52,
-    aspectRatio: 4 / 3,
+    alignSelf: 'stretch',
     backgroundColor: '#0B0D11',
+    justifyContent: 'center',
+  },
+  videoBox: {
+    width: '100%',
+    aspectRatio: 4 / 3,
   },
   video: { width: '100%', height: '100%' },
   videoMissing: { flex: 1, alignItems: 'center', justifyContent: 'center' },

@@ -1,25 +1,21 @@
-// 撮影画面 (= v0.1.4)。 IMU 照準合わせ → 開始ジェスチャー → 撮影 → ローカル保存。
+// 撮影画面 (= v0.1.4)。 ジェスチャーキャリブレーション → 撮影 → ローカル保存、 の 3 手。
 //
-// 照準合わせ (= services/aimCalibration の設計):
-//   直立して目の高さの遠くを注視した姿勢で、 カメラ軸の俯角 (= 重力基準、 加速度計で読む) が
-//   目標角に入るまで「スマホを少しずつ下に」 と TTS で誘導する。 手検出には頼らない
-//   (= 姿勢の個人差が乗らない、 画面が見えなくても重力は万人共通の基準)。
-//   目標角は事前分布 + 前クリップの手の在圏統計から学習した補正。
+// 「キャリブレーション」 の意図 (= カメラの画角調整):
+//   ユーザは両腕をまっすぐ前に伸ばし、 顔を指先に向ける。 その自然な視線状態でカメラ映像内に
+//   両手が真ん中に映るように、 カメラの向きを物理的に微調整してもらう。 シビアに中央 (= ±5%)
+//   に来た瞬間が baseline 確定。 中央外なら「カメラをもう少し ___ に向けてください」 と方向指示
+//   → user が向きを調整 → もう一度腕を伸ばしてキープ → 再判定、 のループ。
 //
-// 4 layer:
-//   0. 装着 (mounting)
-//        - TTS: 「スマホをヘッドセットに取り付けて、 頭に装着してください」
-//        - 静止 + 装着らしい俯角を検知したら姿勢案内 (= 証明写真のポーズ) へ
-//   1. 照準 (aim_adjust)
-//        - 俯角が目標 ±3° に 1.2 秒収まったら音 + 振動で確定 → 開始ジェスチャーの案内
-//   2. 開始ジェスチャー
-//        - 両手チョキを 1 秒キープ → 完了と同時に録画開始 (= 機械カウントダウン無し)
-//   3. 撮影
-//        - 両手チョキを 1.5 秒キープで録画停止 → 次タスク提案 → 照準確認に戻る
+// 2 layer:
+//   1. キャリブレーション
+//        - TTS: 「手のひらを上向きにして、 そのまま 1 秒キープしてください」
+//        - open_palm を 1 秒 hold → 両手 bbox 中心を計算
+//        - 中央 ±5% 以内 → baseline 保存 + 「ヘッドセット OK、 撮影を開始します」 → カウントダウン
+//        - 外れ → 「ヘッドセットをもう少し ___ に向けてください」 → 手のひら待機に戻る
+//   2. 撮影
+//        - サムズアップ 1 秒 → 3 秒カウントダウン → 録画停止 → 次タスク提案 → キャリブレーションに戻る
 //        - 両手が 5 秒以上画面から外れたら警告音 + TTS
-//        - 手が下端に外れ続ける (= 照準が上すぎるシグネチャ) なら 1 回だけ「かけ直し」 を提案
 //        - 60 分は native 側で hard cap
-//        - 録画中の手の在圏統計を貯め、 終了時に次回の目標俯角へ反映 (= aimCalibration)
 //
 // ⚠ v0.1.4: 録画停止後の自動アップロードは行わない。 クリップは state 'recorded' でローカル一覧
 //    (マイビデオ) に積まれ、 ユーザーがプレビュー確認 → 「アップロード」 した時に advanceClip が
@@ -34,13 +30,13 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  Vibration,
   View,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, Line, LinearGradient as SvgLinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient as SvgLinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Camera } from 'expo-camera';
 import * as Device from 'expo-device';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../app/types';
@@ -58,18 +54,8 @@ import {
 } from '../dataflow';
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
 import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone } from '../services/captureAudio';
-import {
-  AIM_STABLE_MS,
-  AIM_TOLERANCE_DEG,
-  RedoMonitor,
-  SessionAimStats,
-  aimTargetPitchDownDeg,
-  loadLearnedAim,
-  updateLearnedAim,
-  useCameraPitch,
-} from '../services/aimCalibration';
 import { applyCaptureSettingsToNative } from '../services/captureSettings';
-import { PeaceHoldDetector } from '../domain/gestureDetect';
+import { GestureStabilizer } from '../domain/gestureDetect';
 import { t, useT } from '../i18n';
 import { colors, fonts, typography } from '../theme';
 
@@ -92,44 +78,89 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CaptureMode'>;
 // ─── 状態定義 ─────────────────────────────────────────────────────────
 
 type CaptureState =
-  | { kind: 'announcing' }                                 // 取り付け案内 TTS 中 (= 「ヘッドセットに取り付けて」)
+  | { kind: 'announcing' }                                 // 初回案内 TTS 中 (= 「手のひらを 3 秒キープ」)
   | { kind: 'next_task_announcing' }                       // 撮影完了後の次タスク提案 TTS 中
-  // 装着待ち。 端末が動かされている間は黙って待ち、 「取り付けの動きを観測 → 静止 + 装着らしい
-  // 角度」 で姿勢案内へ (追跡は mountTrackRef、 判定は ticker)。
-  | { kind: 'mounting' }
-  | { kind: 'posture_announcing' }                         // 姿勢案内 TTS 中 (= 証明写真のポーズ)
-  // IMU 誘導中 (= パーキングセンサー式)。 方向は音声で言わず、 目標角をまたいだ瞬間の
-  // 音 + 振動だけで探させる。 stableSince: 許容内に入り続けている開始時刻 (0=範囲外)。
-  | { kind: 'aim_adjust'; stableSince: number }
-  | { kind: 'aim_confirmed' }                              // 照準確定。 aimOk TTS (= 開始ジェスチャー案内込み)
-  // 開始ジェスチャー (両手チョキをキープ) 待ち。 検出は subscription が startSeqRef に流す。
-  | { kind: 'awaiting_start' }
-  // 録画中。 終了ジェスチャー (両手チョキを長めにキープ) は stopSeqRef が検出し、 完了で finalizing へ。
-  | { kind: 'recording'; startTs: number; lastHandSeenTs: number; lastWarnTs: number }
+  | { kind: 'awaiting_palm' }                              // 「手のひらを上向きに 3 秒キープ」 待ち
+  | { kind: 'palm_holding'; startTs: number }              // open_palm を 3 秒 hold 中
+  | { kind: 'adjust_needed'; direction: AdjustDirection }  // 中央外。 案内 TTS 完了 (ticker 判定) 後に palm 受付
+  | { kind: 'calibration_confirmed' }                      // キャリブ確定、 効果音 + TTS + 500ms 待機
+  | { kind: 'precapture_countdown'; startTs: number }
+  // armedSince: thumbs-up が連続検出され始めた時刻 (0=未検出)。 ARM デバウンスを state に内包。
+  | { kind: 'recording'; startTs: number; lastHandSeenTs: number; lastWarnTs: number; armedSince: number }
+  // lostSince: thumbs-up が見えなくなった時刻 (0=保持中)。 離脱ヒステリシスを state に内包。
+  | { kind: 'stopping'; startTs: number; lostSince: number }
+  | { kind: 'stopping_confirm'; startTs: number; lostSince: number }
   | { kind: 'finalizing' };
 
-// 開始・終了トリガー = 両手チョキを少しキープ (domain/gestureDetect の PeaceHoldDetector)。
-// チョキ検出の瞬間にブリップ + 小さな振動、 キープしきったら即座に録画を開始 / 終了する。
-// 終了は家事中の偶然のチョキ形を弾くため、 開始より長めのキープを要求する。
-const START_HOLD_MS = 1000;
-const STOP_HOLD_MS = 1500;
+type AdjustDirection = 'up' | 'down' | 'left' | 'right';
+
+// 3 秒キープ (= TTS の言い終わりからカウント開始、 ユーザに余裕を持たせる)
+const PALM_HOLD_MS = 3000;
+// 停止フロー (= 人間目線): 頭部装着・両手で家事中・画面は見ない前提。 thumbs-up が ARM_MS 継続して
+// 「検出」 → 即時音。 検出から HOLD_MS 立て続けると音声「そのまま立て続けると終了します」を流し、
+// 音声を最後まで言い終わった時にまだ立て続けていたら停止確定 (= 固定秒で切らず、 案内を最後まで聞かせる)。
+// ⚠ 停止まで「立て続け」 を要求: 家事中は手が常に動くので、 偶発検出は手が動いた瞬間にキャンセル → 録画継続。
+//    意図的に手を止めて保持した時だけ止まる (= 誤停止で家事映像を失わない)。
+// ⚠ 離脱判定は RELEASE_GRACE_MS のヒステリシス: 単フレームの検出フリッカーで即キャンセル (= 音声プチ切れ)
+//    しないよう、 thumbs-up が連続して消えて初めて離脱とみなす。
+const THUMBS_UP_ARM_MS = 300;
+const THUMBS_UP_HOLD_MS = 1000;
+// 離脱猶予を長めに (= 立て続けている最中の検出フリッカーを吸収。 意図的な離脱はこれより長く手を動かす)。
+const RELEASE_GRACE_MS = 800;
+// 開始カウント: 3,2,1 を COUNTDOWN_TICK_MS 間隔で刻む (= 秒ベースより速いテンポ)。 合計 = 3 * tick。
+const COUNTDOWN_TICKS = 3;
+const COUNTDOWN_TICK_MS = 750;
 const HAND_LOST_WARN_MS = 5000;
 const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
 
-// 交差ティック (= 目標角をまたいだ瞬間の音 + 振動) の連射抑制。 目標付近で行き来すると
-// 頻繁にまたぐが、 それ自体が「ここが目標」 のフィードバックなので軽い間引きだけにする。
-const AIM_CROSS_MIN_INTERVAL_MS = 180;
-// 装着待ちの判定。 静止は「tick 間の角速度」 で見る (= 装着した頭の自然な揺れ・呼吸は通し、
-// 手で扱っている大きな動きだけ弾く。 絶対角のアンカー比較だと頭の微動で永遠に通らない)。
-// さらに「取り付けの動きを一度は観測した後」 でないと進まない (= 手に持ったまま静止しても
-// 即通過しない)。 既に装着済みで開いた場合のために MOUNT_TIMEOUT_MS で解除する。
-const MOUNT_STILL_DELTA_DEG = 2;      // 1 tick (100ms) あたりの角度変化がこれ超 = 扱い中
-const MOUNT_STILL_MS = 2000;
-const MOUNT_MOTION_MIN_MS = 1000;     // 取り付けの動きと見なす累計時間
-const MOUNT_TIMEOUT_MS = 8000;
-const MOUNT_WORN_PITCH_RANGE = { min: -30, max: 70 } as const; // 机に平置き (≈90°) を除外
-// 照準誘導中に激しい動き (= 読めない加速度) が続いたら装着し直しと見なして装着待ちへ戻す。
-const AIM_REMOUNT_NULL_MS = 1200;
+// シビアな中央許容範囲 (= 各軸 ±5%)。 user フィードバック「めっちゃシビアに真ん中である必要がある」
+const CALIBRATION_CENTER_MARGIN = 0.05;
+const LANDMARK_CONF = 0.3;
+
+const STORAGE_BASELINE_KEY = '@rootlens/calibration/baseline/v1';
+
+// ─── 手の bbox 中心計算 ──────────────────────────────────────────────
+
+interface HandBoundingBox {
+  cx: number;  // 0..1
+  cy: number;  // 0..1
+  width: number;
+  height: number;
+}
+
+function computeHandBoundingBox(hands: HandTrackEvent['wearerHands']): HandBoundingBox | null {
+  const visible = hands.filter((h) => h.landmarks.some((l) => l.confidence >= LANDMARK_CONF));
+  if (visible.length < 2) return null;
+  let minX = 1, maxX = 0, minY = 1, maxY = 0;
+  for (const hand of visible) {
+    for (const lm of hand.landmarks) {
+      if (lm.confidence < LANDMARK_CONF) continue;
+      if (lm.x < minX) minX = lm.x;
+      if (lm.x > maxX) maxX = lm.x;
+      if (lm.y < minY) minY = lm.y;
+      if (lm.y > maxY) maxY = lm.y;
+    }
+  }
+  return {
+    cx: (minX + maxX) / 2,
+    cy: (minY + maxY) / 2,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+/// 「ヘッドセットをどっち向きに動かせば手が中央に来るか」 を返す。
+/// 手が画面下なら ヘッドセットも下に向けてもらえば手は中央に来る (= 1 対 1)。
+/// 許容範囲内なら null (= 中央 OK)。
+function computeAdjustDirection(bbox: HandBoundingBox): AdjustDirection | null {
+  const dx = bbox.cx - 0.5;
+  const dy = bbox.cy - 0.5;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  if (absX <= CALIBRATION_CENTER_MARGIN && absY <= CALIBRATION_CENTER_MARGIN) return null;
+  if (absY >= absX) return dy > 0 ? 'down' : 'up';
+  return dx > 0 ? 'right' : 'left';
+}
 
 // ─── 音声ガイド ───────────────────────────────────────────────────────
 //
@@ -137,29 +168,55 @@ const AIM_REMOUNT_NULL_MS = 1200;
 //    状態遷移は音声 callback で駆動しない (= captureAudio の getLastSpeechDone を ticker が読んで判定)。
 //    この方針で「キャンセルした前試行の onDone が新試行で誤発火」 類の競合が原理的に起きない。
 
-// 音声ガイドの文言はトーン = 機内アナウンス調 (= 丁寧・穏やか・誰にでも明確、 砕けすぎない)。
-// i18n 辞書 (capture.tts.*) に locale 別で持つ。 ja は読み間違い回避済 (= 「方」「開いて」 不使用)。
+// キャリブレーション音声ガイドの文言。
+// トーン = 機内アナウンス調 (= 丁寧・穏やか・誰にでも明確、 砕けすぎない)。
+// 文言は i18n 辞書 (capture.tts.*) に locale 別で持つ。 ja は読み間違い回避済 (= 「方」「開いて」 不使用)。
 const NEXT_TASK_PAUSE_MS = 1000;
+function calibAdjustText(d: AdjustDirection): string {
+  switch (d) {
+    case 'up':    return t('capture.tts.adjustUp');
+    case 'down':  return t('capture.tts.adjustDown');
+    case 'left':  return t('capture.tts.adjustLeft');
+    case 'right': return t('capture.tts.adjustRight');
+  }
+}
 
 // 各 state の「入場時に鳴らす cue」。 sfx → tts の順でキューに積まれる。 announcing だけは enter_capture
 // 効果音 (handoff が積む) の後に続けたいので clearAudioQueue しない (= keep)。
-// aim_adjust のヒント発話は方向・間隔の条件付きなので ticker 側で個別に積む (= entryCue ではない)。
 function entryCue(s: CaptureState): { sfx?: SfxName; tts?: string; keep?: boolean } | null {
   switch (s.kind) {
     case 'announcing':
       return { tts: t('capture.tts.intro'), keep: true };
-    case 'posture_announcing':
-      return { tts: t('capture.tts.posture') };
-    case 'aim_adjust':
-      // 誘導の説明は入場時に 1 回だけ。 以降は交差ティック (音 + 振動) だけで探させる。
-      return { tts: t('capture.tts.aimExplore') };
     // next_task_announcing は二部構成 (お疲れさま → 間 → 続けるなら) なので state→audio effect で個別に積む。
-    case 'aim_confirmed':
-      // 照準確定。 到達ビープは ticker が即時再生する。 開始ジェスチャーの案内込み。
-      return { tts: t('capture.tts.aimOk') };
+    case 'adjust_needed':
+      return { tts: calibAdjustText(s.direction) };
+    case 'calibration_confirmed':
+      // 検出ビープ (detect_palm) はジェスチャー確定時に即時再生する専用 effect が鳴らす
+      // (= キュー非経由で不発しない + アイコン表示と同期)。 ここは確定 TTS のみ。
+      return { tts: t('capture.tts.confirmed') };
+    case 'stopping':
+      // 検出ビープ (detect_thumbs_up) は即時再生 effect が鳴らすのでここでは何もしない。
+      return null;
+    case 'stopping_confirm':
+      return { tts: t('capture.tts.stoppingConfirm') };
     default:
       return null;
   }
+}
+
+// ─── キャリブレーション baseline 保存 ─────────────────────────────────
+
+interface CalibrationBaseline {
+  cx: number;
+  cy: number;
+  width: number;
+  height: number;
+  savedAt: number;
+}
+
+async function saveBaseline(bbox: HandBoundingBox): Promise<void> {
+  const data: CalibrationBaseline = { ...bbox, savedAt: Date.now() };
+  await AsyncStorage.setItem(STORAGE_BASELINE_KEY, JSON.stringify(data));
 }
 
 // ─── 画面本体 ─────────────────────────────────────────────────────────
@@ -200,14 +257,19 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 起動直後は announcing から始める (= TTS 「手のひらを上向きに 3 秒キープ」 を最後まで言わせる)
   const [state, setState] = useState<CaptureState>({ kind: 'announcing' });
   const [error, setError] = useState<string | null>(null);
+  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   // 録画経過秒 (= 右上の読み出し)。 基準は native 録画開始の wall-clock (recordingStartedAtRef)。
   const [elapsedSec, setElapsedSec] = useState(0);
   // HUD スクリムの実寸 (= SVG は % サイズが効かないので onLayout で測って px 指定する)
   const [hudSize, setHudSize] = useState<{ w: number; h: number } | null>(null);
+  // 平滑化済みジェスチャー (= GestureOverlay 表示 + 再描画 trigger)。
+  const [currentGesture, setCurrentGesture] = useState<'open_palm' | 'thumbs_up' | null>(null);
+
   const latestHandRef = useRef<HandTrackEvent | null>(null);
-  // 開始 / 終了の両手チョキキープ検出器 (= フェーズ入場時に作り直す)。
-  const startSeqRef = useRef<PeaceHoldDetector | null>(null);
-  const stopSeqRef = useRef<PeaceHoldDetector | null>(null);
+  // 時間方向の平滑化 (= 5/5 実装の GestureStabilizer 相当、 ~167ms)。 単フレームのノイズで
+  // hold が崩れる/ちらつくのを防ぐ。 両手要件は「2 手揃った frame gesture だけを投入」で担保する。
+  const gestureStabilizerRef = useRef(new GestureStabilizer(5));
+  const stableGestureRef = useRef<'open_palm' | 'thumbs_up' | null>(null);
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -215,35 +277,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 録画尺 (= POST /api/clips の durationMs) 算出用に、 native 録画開始の wall-clock を控える。
   const recordingStartedAtRef = useRef(0);
   const sessionDirRef = useRef<string | null>(null);
-
-  // 照準較正: 学習済み補正のロード + 誘導フェーズ中だけ加速度計を回す。
-  useEffect(() => { void loadLearnedAim(); }, []);
-  const aimPhaseActive =
-    state.kind === 'announcing' || state.kind === 'mounting' ||
-    state.kind === 'posture_announcing' || state.kind === 'aim_adjust';
-  const { readingRef: pitchRef, hudPitchDeg } = useCameraPitch(aimPhaseActive);
-  // 録画中の手の在圏統計 (= クリップ終了時に目標俯角を更新) と「かけ直し」 監視。
-  const aimStatsRef = useRef<SessionAimStats | null>(null);
-  const redoMonitorRef = useRef<RedoMonitor | null>(null);
-  // 交差ティック用: 直前の誤差 (符号反転 = 目標角をまたいだ) と直近ティック時刻。
-  const aimPrevErrRef = useRef<number | null>(null);
-  const aimLastCrossTsRef = useRef(0);
-  // 照準誘導中の「装着し直し」 検知 (= 読めない加速度が続いた開始時刻)。
-  const aimNullSinceRef = useRef(0);
-  // 装着待ちの追跡 (= ref で持ち、 遷移の瞬間だけ setState する。 10Hz の再描画を避ける)。
-  const mountTrackRef = useRef({ enteredTs: 0, lastPitch: null as number | null, motionMs: 0, stillSince: 0 });
-  useEffect(() => {
-    if (state.kind === 'aim_adjust') {
-      aimPrevErrRef.current = null;
-      aimLastCrossTsRef.current = 0;
-      aimNullSinceRef.current = 0;
-    }
-    if (state.kind === 'mounting') {
-      mountTrackRef.current = { enteredTs: Date.now(), lastPitch: null, motionMs: 0, stillSince: 0 };
-    }
-    if (state.kind === 'awaiting_start') startSeqRef.current = new PeaceHoldDetector(START_HOLD_MS);
-    if (state.kind === 'recording') stopSeqRef.current = new PeaceHoldDetector(STOP_HOLD_MS);
-  }, [state.kind]);
   // 「今の voiced state が待っている発話の seq」 (0 = まだ発行前 / 音声ゲート無し)。
   // voiced state へ遷移する瞬間に 0 にし (= 前 state の完了済 seq との誤一致を防ぐ)、
   // state→audio effect が発話を enqueue した seq をここに入れる。 ticker は
@@ -356,40 +389,31 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // hand track subscription (= アクティブ構成のストリームを購読、 切替で貼り替え)。
   // ⚠ ここで tickState() を呼ばない: native イベントは ~15-30Hz で来るので、 毎イベント
   //    setState すると再描画ストーム → "Maximum update depth" でクラッシュする。 状態機械は
-  //    下の 100ms ticker が単独で進める。 ここは ref 更新 + 系列イベントの瞬間だけ setState。
+  //    下の 100ms ticker が単独で進める。 ここは ref 更新 + gesture が変わった時だけ再描画。
   useEffect(() => {
+    gestureStabilizerRef.current.reset();
     const subc = config.subscribeHandTrack((e) => {
       latestHandRef.current = e;
-      const now = Date.now();
-      const k = stateRef.current.kind;
-      // 録画中は手の在圏統計 + かけ直し監視に流す (= per-frame、 setState はしない)。
-      if (k === 'recording') {
-        aimStatsRef.current?.add(e);
-        redoMonitorRef.current?.add(e, now);
-      }
-      // 開始・終了ジェスチャー (= 両手チョキをキープ)。 チョキ検出でブリップ + 小さな振動、
-      // キープ完了で開始 / 終了。 per-frame で流すが、 setState するのは完了イベントの瞬間だけ。
-      if (k === 'awaiting_start' || k === 'recording') {
-        const det = k === 'awaiting_start' ? startSeqRef.current : stopSeqRef.current;
-        const evt = det?.push(e.wearerHands, now) ?? null;
-        if (evt === 'armed') {
-          playSfx('countdown_tick');
-          Vibration.vibrate(50);
-        } else if (evt === 'complete') {
-          if (k === 'awaiting_start') {
-            playSfx('countdown_end');
-            Vibration.vibrate(200);
-            setState({ kind: 'recording', startTs: now, lastHandSeenTs: now, lastWarnTs: 0 });
-          } else {
-            Vibration.vibrate(200); // 停止音 (rec_stop) は finalizing effect が鳴らす
-            clearAudioQueue();
-            setState({ kind: 'finalizing' });
-          }
-        }
-      }
+      // 両手揃った時だけ frame gesture を採用 (= 両手要件) し、 時間方向に平滑化する。
+      // ノイズ 1 フレームでは確定が変わらない (= 5 連続同一で確定。 ~167ms @30Hz)。
+      const frameG = e.wearerHandCount >= 2 ? frameGesture(e.wearerHands) : null;
+      const stable = gestureStabilizerRef.current.push(frameG);
+      stableGestureRef.current = stable;
+      setCurrentGesture((prev) => (prev === stable ? prev : stable));
     });
     return () => subc.remove();
   }, [config]);
+
+  // 関連フェーズのジェスチャー (= キャリブ中のパー / 撮影中のサムズ) が立ち上がった瞬間に確定ビープを
+  // 即時再生する。 直列音声キュー (= 状態遷移で clearAudioQueue される) を経由しないので不発しない。
+  // 撮影中の open_palm / キャリブ中の thumbs_up は無関係なので鳴らさない。 音はパー/サムズ共通 (= 好評の音)。
+  const prevShownRef = useRef<'open_palm' | 'thumbs_up' | null>(null);
+  useEffect(() => {
+    const shown = relevantGesture(currentGesture, state.kind);
+    const prev = prevShownRef.current;
+    prevShownRef.current = shown;
+    if (shown && shown !== prev) playSfx('detect_palm');
+  }, [currentGesture, state.kind]);
 
   // state→audio (一方向): state.kind が変わったら、 その state の入場 cue を鳴らす。
   // 状態遷移はしない (= 遷移は ticker が getLastSpeechDone を見て決める)。 TTS を積んだら seq を
@@ -425,8 +449,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     if (state.kind === 'recording' && !recordingStartedRef.current) {
       recordingStartedRef.current = true;  // 同期で即 true、 後続 fire 防止
-      aimStatsRef.current = new SessionAimStats();
-      redoMonitorRef.current = new RedoMonitor();
       (async () => {
         try {
           const session = await config.startRecording(sink);
@@ -436,7 +458,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         } catch (e: any) {
           recordingStartedRef.current = false;
           setError(`${t('capture.recStartFailed')}: ${e?.message ?? e}`);
-          setState({ kind: 'awaiting_start' });
+          setState({ kind: 'awaiting_palm' });
         }
       })();
     }
@@ -468,20 +490,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           recordingStartedRef.current = false;
           sessionDirRef.current = null;
 
-          // このクリップの手の在圏統計から次回の目標俯角を更新 (= 逐次補正)。
-          const stats = aimStatsRef.current;
-          aimStatsRef.current = null;
-          redoMonitorRef.current = null;
-          if (stats) {
-            const applied = updateLearnedAim(stats);
-            if (applied !== 0) {
-              sink({
-                step: 'capture', level: 'info',
-                message: `照準の学習補正を ${applied > 0 ? '+' : ''}${applied.toFixed(1)}° 更新 (次回目標 ${aimTargetPitchDownDeg().toFixed(0)}° 下向き)`,
-              });
-            }
-          }
-
           // 停止音 (= 撮影終了) が鳴り終わってから次タスク提案へ進む (= 音と表示のズレを無くす)。
           await enqueueSfx('rec_stop');
           if (stateRef.current.kind !== 'finalizing') return;
@@ -494,7 +502,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         } catch (e: any) {
           recordingStartedRef.current = false;
           setError(`${t('capture.recStopFailed')}: ${e?.message ?? e}`);
-          setState({ kind: 'awaiting_start' });
+          setState({ kind: 'awaiting_palm' });
         }
       })();
     }
@@ -503,8 +511,12 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 状態遷移処理
   const tickState = useCallback(() => {
     const e = latestHandRef.current;
+    if (!e) return;
     const now = Date.now();
     const cur = stateRef.current;
+    // 平滑化済みジェスチャー (= subscription で stabilizer に通した確定値)。 両手要件 + 時間平滑は
+    // ここに織り込み済みなので、 状態機械は瞬間の wearerHandCount を見ずに gesture だけで判定する。
+    const gesture = stableGestureRef.current;
 
     // 待っている発話 (= awaitedSpeechSeqRef) が「自然に最後まで言い終わった」 か。
     const speechDone = (): boolean => {
@@ -513,114 +525,60 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     };
 
     switch (cur.kind) {
-      case 'announcing': {
-        // 取り付け案内を言い終わったら装着待ちへ。
-        if (speechDone()) setState({ kind: 'mounting' });
-        return;
-      }
+      case 'announcing':
       case 'next_task_announcing': {
-        // クリップ間は装着済みなので、 装着待ちを飛ばして照準確認へ。
-        if (speechDone()) {
-          awaitedSpeechSeqRef.current = 0;
-          setState({ kind: 'aim_adjust', stableSince: 0 });
+        // 案内 TTS を言い終わったら検出開始へ (= ticker が完了 seq を判定。 音声 callback では遷移しない)。
+        if (speechDone()) setState({ kind: 'awaiting_palm' });
+        return;
+      }
+      case 'awaiting_palm': {
+        if (gesture === 'open_palm') {
+          setState({ kind: 'palm_holding', startTs: now });
         }
         return;
       }
-      case 'mounting': {
-        const reading = pitchRef.current;
-        if (!reading.available) {
-          awaitedSpeechSeqRef.current = 0;
-          setState({ kind: 'aim_confirmed' });
+      case 'palm_holding': {
+        if (gesture !== 'open_palm') {
+          setState({ kind: 'awaiting_palm' });
           return;
         }
-        const track = mountTrackRef.current;
-        const pitch = reading.pitchDownDeg;
-        // 動いているか = 読めない加速度 (激しい動き) or tick 間の角度変化が大きい。
-        const inMotion =
-          pitch == null || track.lastPitch == null ||
-          Math.abs(pitch - track.lastPitch) > MOUNT_STILL_DELTA_DEG;
-        track.lastPitch = pitch;
-        if (inMotion) {
-          track.motionMs += 100; // ≒ ticker 周期
-          track.stillSince = 0;
-          return;
-        }
-        const wornRange = pitch >= MOUNT_WORN_PITCH_RANGE.min && pitch <= MOUNT_WORN_PITCH_RANGE.max;
-        if (!wornRange) {
-          track.stillSince = 0; // 静止しているが装着角度ではない (= 机置き等)。 黙って待つ
-          return;
-        }
-        if (track.stillSince === 0) track.stillSince = now;
-        // 取り付けの動きを一度は見ているか、 既装着でタイムアウトしたか。
-        const handled = track.motionMs >= MOUNT_MOTION_MIN_MS || now - track.enteredTs >= MOUNT_TIMEOUT_MS;
-        if (handled && now - track.stillSince >= MOUNT_STILL_MS) {
-          awaitedSpeechSeqRef.current = 0;
-          setState({ kind: 'posture_announcing' });
-        }
-        return;
-      }
-      case 'posture_announcing': {
-        // 姿勢案内を言い終わったら照準誘導へ。
-        if (speechDone()) {
-          awaitedSpeechSeqRef.current = 0;
-          setState({ kind: 'aim_adjust', stableSince: 0 });
-        }
-        return;
-      }
-      case 'aim_adjust': {
-        const reading = pitchRef.current;
-        if (!reading.available) {
-          // 加速度計が使えない端末では誘導をスキップして開始案内へ。
-          awaitedSpeechSeqRef.current = 0;
-          setState({ kind: 'aim_confirmed' });
-          return;
-        }
-        const pitch = reading.pitchDownDeg;
-        if (pitch == null) {
-          // 読めない加速度が続く = ヘッドセットを外して扱っている。 装着待ちへ戻す。
-          const since = aimNullSinceRef.current || now;
-          aimNullSinceRef.current = since;
-          if (now - since >= AIM_REMOUNT_NULL_MS) setState({ kind: 'mounting' });
-          return;
-        }
-        aimNullSinceRef.current = 0;
-        const err = pitch - aimTargetPitchDownDeg(); // 正 = 下向きすぎ
-
-        // 交差ティック: 目標角をまたいだ瞬間に音 + 振動 (= どっちに傾けるかは言わず、 探させる)。
-        const prevErr = aimPrevErrRef.current;
-        aimPrevErrRef.current = err;
-        if (prevErr != null && err * prevErr < 0 && now - aimLastCrossTsRef.current >= AIM_CROSS_MIN_INTERVAL_MS) {
-          aimLastCrossTsRef.current = now;
-          playSfx('countdown_tick');
-          Vibration.vibrate(60);
-        }
-
-        if (Math.abs(err) <= AIM_TOLERANCE_DEG) {
-          const since = cur.stableSince || now;
-          if (now - since >= AIM_STABLE_MS) {
-            // 目標付近でしばらく保持 → 確定。 到達音 + 長めの振動で「もう動かさなくていい」 を伝える。
-            playSfx('detect_palm');
-            Vibration.vibrate(400);
-            awaitedSpeechSeqRef.current = 0;
-            setState({ kind: 'aim_confirmed' });
-          } else if (since !== cur.stableSince) {
-            setState({ ...cur, stableSince: since });
+        if (now - cur.startTs >= PALM_HOLD_MS) {
+          const bbox = computeHandBoundingBox(e.wearerHands);
+          if (!bbox) {
+            setState({ kind: 'awaiting_palm' });
+            return;
           }
-          return;
+          const dir = computeAdjustDirection(bbox);
+          // voiced state へ入る前に sentinel (= 前 state の完了済 seq との誤一致を防ぐ)。 cue 再生は effect。
+          awaitedSpeechSeqRef.current = 0;
+          if (dir === null) {
+            saveBaseline(bbox).catch(() => {});
+            setState({ kind: 'calibration_confirmed' });
+          } else {
+            setState({ kind: 'adjust_needed', direction: dir });
+          }
         }
-        if (cur.stableSince !== 0) setState({ ...cur, stableSince: 0 });
         return;
       }
-      case 'aim_confirmed': {
-        // 照準確定 + 開始ジェスチャー案内を言い終わったら系列待ちへ。
-        if (speechDone()) setState({ kind: 'awaiting_start' });
+      case 'calibration_confirmed': {
+        // 確定音 + TTS を言い終わって 500ms 経ったら開始カウントダウンへ。
+        const done = getLastSpeechDone();
+        if (speechDone() && now - done.at >= 500) {
+          setState({ kind: 'precapture_countdown', startTs: now });
+        }
         return;
       }
-      case 'awaiting_start':
-        // 開始ジェスチャー (両手チョキのキープ) は subscription が検出して遷移させる。 ここでは何もしない。
+      case 'adjust_needed': {
+        // 案内 TTS を言い終わるまで palm 受付しない (= 案内の中断防止)。
+        if (speechDone() && gesture === 'open_palm') {
+          setState({ kind: 'palm_holding', startTs: now });
+        }
+        return;
+      }
+      case 'precapture_countdown':
+        // 開始カウントダウンは専用 timer (countdown driver effect) が駆動。 ここでは何もしない。
         return;
       case 'recording': {
-        if (!e) return;
         const handVisible = e.wearerHandCount >= 1;
         let lastHandSeen = cur.lastHandSeenTs;
         let lastWarn = cur.lastWarnTs;
@@ -632,16 +590,65 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           enqueueSpeak(t('capture.tts.handLost'));
           lastWarn = now;
         }
-        // 手が下端に外れ続ける (= 照準が上すぎるシグネチャ) なら 1 クリップ 1 回だけ「かけ直し」 を提案。
-        // 位置ズレだけなら黙って統計に貯め、 次クリップ開始時の較正に任せる (= 作業を中断させない)。
-        if (redoMonitorRef.current?.shouldSuggestRedo()) {
-          void enqueueSfx('warn_hand_lost');
-          enqueueSpeak(t('capture.tts.redoSuggest'));
+        // thumbs-up を ARM_MS 連続検出で stopping へ (= armedSince を state に内包)。
+        const isThumbsUp = gesture === 'thumbs_up';
+        let armedSince = cur.armedSince;
+        if (isThumbsUp) {
+          if (armedSince === 0) armedSince = now;
+          if (now - armedSince >= THUMBS_UP_ARM_MS) {
+            // stopping の入場効果音 (detect_thumbs_up) は state→audio effect が鳴らす。
+            setState({ kind: 'stopping', startTs: now, lostSince: 0 });
+            return;
+          }
+        } else {
+          armedSince = 0;
         }
-        // 終了ジェスチャー (両手チョキのキープ) は subscription が検出して finalizing へ遷移させる。
-        if (lastHandSeen !== cur.lastHandSeenTs || lastWarn !== cur.lastWarnTs) {
-          setState({ ...cur, lastHandSeenTs: lastHandSeen, lastWarnTs: lastWarn });
+        if (lastHandSeen !== cur.lastHandSeenTs || lastWarn !== cur.lastWarnTs || armedSince !== cur.armedSince) {
+          setState({ ...cur, lastHandSeenTs: lastHandSeen, lastWarnTs: lastWarn, armedSince });
         }
+        return;
+      }
+      case 'stopping': {
+        const thumbsUp = gesture === 'thumbs_up';
+        if (!thumbsUp) {
+          // 離脱ヒステリシス (= 単フレームのフリッカーでは切らない)。 lostSince を state に内包。
+          const lostSince = cur.lostSince === 0 ? now : cur.lostSince;
+          if (now - lostSince >= RELEASE_GRACE_MS) {
+            setState({ kind: 'recording', startTs: cur.startTs, lastHandSeenTs: now, lastWarnTs: 0, armedSince: 0 });
+          } else if (lostSince !== cur.lostSince) {
+            setState({ ...cur, lostSince });
+          }
+          return;
+        }
+        // HOLD_MS 立て続け → stopping_confirm (案内 cue は effect が再生)。 sentinel を立てて入る。
+        if (now - cur.startTs >= THUMBS_UP_HOLD_MS) {
+          awaitedSpeechSeqRef.current = 0;
+          setState({ kind: 'stopping_confirm', startTs: now, lostSince: 0 });
+          return;
+        }
+        if (cur.lostSince !== 0) setState({ ...cur, lostSince: 0 }); // フリッカー復帰
+        return;
+      }
+      case 'stopping_confirm': {
+        const thumbsUp = gesture === 'thumbs_up';
+        if (!thumbsUp) {
+          const lostSince = cur.lostSince === 0 ? now : cur.lostSince;
+          if (now - lostSince >= RELEASE_GRACE_MS) {
+            // 本当に離した → キャンセルして録画継続 (= 案内音声も止める)。
+            clearAudioQueue();
+            setState({ kind: 'recording', startTs: now, lastHandSeenTs: now, lastWarnTs: 0, armedSince: 0 });
+          } else if (lostSince !== cur.lostSince) {
+            setState({ ...cur, lostSince });
+          }
+          return;
+        }
+        // 案内を最後まで言い終わり、 かつ今も立て続けている → 停止確定。 キャンセルされた前試行の発話は
+        // 自然完了扱いにならない (captureAudio) + awaitedSpeechSeqRef は現試行の seq なので、 誤 finalize しない。
+        if (speechDone()) {
+          setState({ kind: 'finalizing' });
+          return;
+        }
+        if (cur.lostSince !== 0) setState({ ...cur, lostSince: 0 }); // フリッカー復帰
         return;
       }
       case 'finalizing':
@@ -650,7 +657,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   // 状態機械の単一ドライバ (= 100ms 周期)。 hand event はここでは駆動せず ref に積むだけなので、
-  // tickState はこの ticker だけが回す (= 再描画は tickState 内の setState のみ)。
+  // tickState はこの ticker だけが回す (= 再描画は tickState 内の setState / countdown / gesture 変化のみ)。
   useEffect(() => {
     const id = setInterval(() => {
       tickState();
@@ -658,9 +665,42 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     return () => clearInterval(id);
   }, [tickState]);
 
+  // 開始カウントダウンの単一ドライバ (= 数字表示・tick 音・終了 → recording 遷移を 1 つの timer で)。
+  // 音と数字を同じ step 判定で同時に出すので、 両者がずれない。
+  useEffect(() => {
+    if (state.kind !== 'precapture_countdown') {
+      setCountdownRemaining(null);
+      return;
+    }
+    const startTs = state.startTs;
+    let lastStep = 0;
+    let ended = false;
+    const update = () => {
+      const elapsed = Date.now() - startTs;
+      if (!ended && elapsed >= COUNTDOWN_TICKS * COUNTDOWN_TICK_MS) {
+        ended = true;
+        setCountdownRemaining(null);
+        playSfx('countdown_end'); // 録画開始の合図 (= 即時再生)
+        setState({ kind: 'recording', startTs: Date.now(), lastHandSeenTs: Date.now(), lastWarnTs: 0, armedSince: 0 });
+        return;
+      }
+      const step = COUNTDOWN_TICKS - Math.floor(elapsed / COUNTDOWN_TICK_MS); // 3 → 2 → 1
+      if (step !== lastStep && step >= 1 && step <= COUNTDOWN_TICKS) {
+        lastStep = step;
+        setCountdownRemaining(step);
+        playSfx('countdown_tick'); // 数字更新と同じ瞬間に鳴らす = 完全同期 (待ち無しの即時再生)
+      }
+    };
+    update();
+    const id = setInterval(update, 50);
+    return () => clearInterval(id);
+  }, [state]);
+
   // 録画経過タイマー (= 0.5s 刻み。 native 録画開始時刻を基準にするので state 遷移で揺れない)
   useEffect(() => {
-    if (state.kind !== 'recording') { setElapsedSec(0); return; }
+    const k = state.kind;
+    const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
+    if (!active) { setElapsedSec(0); return; }
     const id = setInterval(() => {
       const base = recordingStartedAtRef.current;
       if (base > 0) setElapsedSec(Math.floor((Date.now() - base) / 1000));
@@ -693,9 +733,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     if (id === selectedConfigId) return;
     const k = stateRef.current.kind;
     const calibratePhase =
-      k === 'announcing' || k === 'next_task_announcing' || k === 'mounting' ||
-      k === 'posture_announcing' || k === 'aim_adjust' || k === 'aim_confirmed' ||
-      k === 'awaiting_start';
+      k === 'announcing' || k === 'next_task_announcing' || k === 'awaiting_palm' ||
+      k === 'palm_holding' || k === 'adjust_needed' || k === 'calibration_confirmed';
     if (!calibratePhase) return;
     clearAudioQueue(); // 切替で旧構成の案内音声を止める
     setSelectedConfigId(id);
@@ -739,10 +778,13 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const isRecording = state.kind === 'recording';
+  const isRecording =
+    state.kind === 'recording' ||
+    state.kind === 'stopping' ||
+    state.kind === 'stopping_confirm';
 
   // 切替可能なのはキャリブレーション待機中のみ (= 録画フロー中は不可)。
-  const inCaptureFlow = isRecording || state.kind === 'finalizing';
+  const inCaptureFlow = isRecording || state.kind === 'precapture_countdown' || state.kind === 'finalizing';
   const canSwitchConfig = !switching && !inCaptureFlow;
   void canSwitchConfig; // スイッチャ UI コメントアウト中も切替ロジックは温存
 
@@ -758,22 +800,24 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 頭部装着中は画面が見えない前提: 音声が主チャネル、 画面は「装着前の準備」 と
   // 「外した瞬間の状態把握」 のためにある。 だからラベルや飾りではなく、 状態そのものを大きく言う。
   // 字幕は TTS の読み上げ文そのまま (= 音声とスクリーンで説明が一致する)。
-  const hud = ((): { text: string; tone: 'normal' | 'accent' | 'dim' } | null => {
+  const hud = ((): { text: string; tone: 'normal' | 'accent' | 'dim'; arrow?: AdjustDirection } | null => {
     switch (state.kind) {
       case 'announcing':
-      case 'mounting':
+      case 'awaiting_palm':
         return { text: t('capture.tts.intro'), tone: 'normal' };
-      case 'posture_announcing':
-        return { text: t('capture.tts.posture'), tone: 'normal' };
-      case 'aim_adjust':
-        // 許容内で安定待ちなら「そのまま」、 探索中は説明文 (= TTS と同文)。
-        if (state.stableSince !== 0) return { text: t('capture.hud.detecting'), tone: 'accent' };
-        return { text: t('capture.tts.aimExplore'), tone: 'normal' };
-      case 'aim_confirmed':
-      case 'awaiting_start':
-        return { text: t('capture.tts.aimOk'), tone: state.kind === 'aim_confirmed' ? 'accent' : 'normal' };
+      case 'palm_holding':
+        return { text: t('capture.hud.detecting'), tone: 'accent' };
+      case 'adjust_needed':
+        return { text: calibAdjustText(state.direction), tone: 'normal', arrow: state.direction };
+      case 'calibration_confirmed':
+        return { text: t('capture.tts.confirmed'), tone: 'accent' };
+      case 'precapture_countdown':
+        return { text: t('capture.hud.countdown'), tone: 'normal' };
       case 'recording':
         return { text: t('capture.hud.recordingHint'), tone: 'dim' };
+      case 'stopping':
+      case 'stopping_confirm':
+        return { text: t('capture.tts.stoppingConfirm'), tone: 'accent' };
       case 'finalizing':
         return { text: t('capture.hud.saving'), tone: 'normal' };
       case 'next_task_announcing':
@@ -797,6 +841,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
             </Text>
           </View>
         )}
+        {countdownRemaining !== null ? (
+          <View style={styles.countdownOverlay} pointerEvents="none">
+            <Text style={styles.countdownText}>{countdownRemaining}</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* 録画中の全周枠 (= 遠目でも「録画している」 が一目で分かる、 カメラの文法) */}
@@ -889,7 +938,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
               <Rect x="0" y="0" width="1" height="1" fill="url(#hudScrim)" />
             </Svg>
           ) : null}
-          <View style={styles.hudMark} />
+          {hud.arrow ? <ArrowGlyph dir={hud.arrow} /> : <View style={styles.hudMark} />}
           <View style={styles.hudLine}>
             <Text
               style={[
@@ -902,15 +951,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
               {hud.text}
             </Text>
           </View>
-          {/* 照準誘導・装着待ち中の俯角読み出し (= セットアップや介助者向け。 装着者は音声で足りる) */}
-          {(state.kind === 'aim_adjust' || state.kind === 'mounting') && hudPitchDeg != null ? (
-            <Text style={styles.hudReadout}>
-              {t('capture.hud.aimReadout', {
-                current: String(hudPitchDeg),
-                target: String(Math.round(aimTargetPitchDownDeg())),
-              })}
-            </Text>
-          ) : null}
         </View>
       ) : null}
 
@@ -947,10 +987,53 @@ const PulsingDot: React.FC = () => {
   return <Animated.View style={[styles.recDot, { opacity: anim }]} />;
 };
 
+/// 方向矢印 (= カメラをどっちに向けるか。 琥珀の大きめグリフ)。
+const ArrowGlyph: React.FC<{ dir: AdjustDirection }> = ({ dir }) => {
+  const rotate = dir === 'up' ? '0deg' : dir === 'right' ? '90deg' : dir === 'down' ? '180deg' : '270deg';
+  return (
+    <View style={{ transform: [{ rotate }], marginBottom: 8 }}>
+      <Svg width={30} height={30} viewBox="0 0 26 26" fill="none">
+        <Path d="M13 21 V6 M6.5 12.5 L13 6 L19.5 12.5" stroke={colors.emerald} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </View>
+  );
+};
+
 function formatElapsed(sec: number): string {
   const m = Math.floor(sec / 60);
   const s2 = sec % 60;
   return `${m}:${s2.toString().padStart(2, '0')}`;
+}
+
+// per-hand gesture を 1 フレームのジェスチャーに集約する (= 判定ポリシー = TS 側が持つ本丸)。
+// 非 null の手が全て同じサインなら採用、 null の手は無視 (= 片手の単フレーム検出落ちを吸収して
+// チカチカを抑える)、 異なるサインが混在したら不成立 (null)。 両手前提は呼び出し側の
+// wearerHandCount>=2 + ARM/HOLD の継続要求で担保する (= ここでは手の枚数は見ない)。
+function frameGesture(
+  hands: { gesture: 'open_palm' | 'thumbs_up' | null }[],
+): 'open_palm' | 'thumbs_up' | null {
+  let g: 'open_palm' | 'thumbs_up' | null = null;
+  for (const h of hands) {
+    if (h.gesture == null) continue;
+    if (g === null) g = h.gesture;
+    else if (g !== h.gesture) return null;
+  }
+  return g;
+}
+
+// 現フェーズで「意味のある」 ジェスチャーだけを通す (= 確定ビープのゲート)。
+//   キャリブ中 → open_palm のみ、 撮影中 → thumbs_up のみ、 それ以外 → なし
+const CALIB_KINDS: CaptureState['kind'][] = [
+  'announcing', 'next_task_announcing', 'awaiting_palm', 'palm_holding', 'adjust_needed', 'calibration_confirmed',
+];
+const RECORDING_KINDS: CaptureState['kind'][] = ['recording', 'stopping', 'stopping_confirm'];
+function relevantGesture(
+  g: 'open_palm' | 'thumbs_up' | null,
+  kind: CaptureState['kind'],
+): 'open_palm' | 'thumbs_up' | null {
+  if (g === 'open_palm') return CALIB_KINDS.includes(kind) ? 'open_palm' : null;
+  if (g === 'thumbs_up') return RECORDING_KINDS.includes(kind) ? 'thumbs_up' : null;
+  return null;
 }
 
 // ─── styles ──────────────────────────────────────────────────────────
@@ -997,6 +1080,20 @@ const styles = StyleSheet.create({
     letterSpacing: 1.0,
   },
   configChipTextSel: { color: '#131519' },
+
+  countdownOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownText: {
+    fontFamily: fonts.mono,
+    fontSize: 116,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0,0,0,0.55)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 14,
+  },
 
   chromeTopLeft: { position: 'absolute' },
   chromeBottom: { position: 'absolute', alignItems: 'center' },
@@ -1084,17 +1181,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontFamily: fonts.sansMedium,
     letterSpacing: 0.4,
-  },
-  // 照準誘導中の俯角読み出し (= 機材の計器風、 字幕の下に小さく)
-  hudReadout: {
-    marginTop: 8,
-    fontFamily: fonts.mono,
-    fontSize: 13,
-    letterSpacing: 0.6,
-    color: 'rgba(255,255,255,0.72)',
-    textShadowColor: 'rgba(0,0,0,0.45)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
 
   errCard: {

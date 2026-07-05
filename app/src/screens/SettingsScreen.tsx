@@ -256,7 +256,7 @@ export const SettingsScreen: React.FC = () => {
             label={t('settings.recalibrate')}
             onPress={async () => {
               try {
-                await AsyncStorage.removeItem('@rootlens/aim/v1'); // 照準の学習補正をリセット
+                await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
               } catch {}
             }}
           />
