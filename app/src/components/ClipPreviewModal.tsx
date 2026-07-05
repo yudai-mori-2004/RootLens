@@ -1,14 +1,13 @@
-// アップロードフロー (= マイビデオのカードタップで開く 2 段構成)。
+// アップロード同意ポップ (= マイビデオのカードタップで開く単一画面)。
 //
-//   Step 1 同意 (consent):
-//     規約の要約 + 同意チェック 1 つ + 全文リンク。 「同意して進む」 で同意イベントを
-//     サーバに記録し、 成功したときだけ Step 2 へ進む。 文言を変えたら services/consent.ts の
-//     UPLOAD_CONSENT_SUMMARY_VERSION を必ず上げる。
-//   Step 2 確認 (preview):
-//     ローカル録画 mp4 をその場で再生して中身を確認 → 「アップロードする」。
-//     削除は「元に戻せない」 を確認ダイアログで念押ししてから実行。
+// 左に動画プレビュー (= 何に同意するのかを見ながらチェックできる)、 右に個別チェック 3 つと
+// 「同意してアップロード」。 ボタン 1 つで同意イベントの記録 → アップロード開始までを行い、
+// 確認だけの二段目は置かない。 同意の記録が成功するまではアップロードを開始しない
+// (= 証跡なしの同意を作らない)。 文言を変えたら services/consent.ts の
+// UPLOAD_CONSENT_SUMMARY_VERSION を必ず上げる。
 //
-// 横持ち前提。 Step 1 = 左 要約 / 右 チェック + アクション。 Step 2 = 左 動画 / 右 アクション。
+// 動画枠は 4:3 固定 (= 現行の録画アスペクト)。 読み込み前後でポップの寸法が変わらない。
+// 旧 16:9 クリップは枠内 letterbox になる。
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -34,26 +33,26 @@ interface Props {
   visible: boolean;
   clip: Clip | null;
   onClose: () => void;
-  /** 「アップロードする」。 署名 → R2 → 登録 を開始する (再試行も同じ)。 */
+  /** 同意記録の成功後に呼ぶ。 署名 → R2 → 登録 を開始する (再試行も同じ)。 */
   onUpload: (clip: Clip) => void;
   onRemove: (clip: Clip) => void;
 }
 
 const INITIAL_CHECKS: UploadConsentChecks = {
-  combined_consent: false,
+  age_and_right: false,
+  no_third_party: false,
+  terms_agreed: false,
 };
 
 export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUpload, onRemove }) => {
   const t = useT();
-  const [step, setStep] = useState<'consent' | 'preview'>('consent');
   const [checks, setChecks] = useState<UploadConsentChecks>(INITIAL_CHECKS);
   const [sending, setSending] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const [showTerms, setShowTerms] = useState(false);
 
-  // 開くたび / 対象が変わるたびに最初からやり直す (= 動画ごとに同意 + 確認してもらう)
+  // 開くたび / 対象が変わるたびに最初からやり直す (= 動画ごとに同意してもらう)
   useEffect(() => {
-    setStep('consent');
     setChecks(INITIAL_CHECKS);
     setSending(false);
     setConsentError(null);
@@ -62,27 +61,26 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
   if (!clip) return null;
   const uri = localVideoUri(clip);
   const dur = formatDuration(clip.durationMs);
-  const allChecked = checks.combined_consent;
+  const allChecked = checks.age_and_right && checks.no_third_party && checks.terms_agreed;
 
   const toggle = (key: keyof UploadConsentChecks) =>
     setChecks((c) => ({ ...c, [key]: !c[key] }));
 
-  const onProceed = async () => {
+  const onConsentAndUpload = async () => {
     if (!allChecked || sending) return;
     setSending(true);
     setConsentError(null);
     try {
-      // 同意イベントをサーバに記録 (= append-only の証跡)。 成功するまで進まない。
+      // 同意イベントをサーバに記録 (= append-only の証跡)。 成功したときだけアップロードを開始する。
       await recordUploadConsent({
         checks,
         clipLocalId: clip.id,
         clipCreatedAt: clip.createdAt,
         recordingConfig: clip.recordingConfigId,
       });
-      setStep('preview');
+      onUpload(clip); // モーダルは閉じ、 進捗はカード側で見せる
     } catch {
       setConsentError(t('upload.consentError'));
-    } finally {
       setSending(false);
     }
   };
@@ -103,139 +101,105 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* シート内タップでは閉じない */}
         <Pressable style={styles.sheet} onPress={() => {}}>
-          {step === 'consent' ? (
-            <>
-              {/* ── Step 1 左: 層1 要約 ── */}
-              <View style={[styles.consentLeft, styles.consentLeftContent]}>
-                <Text style={styles.eyebrow}>{t('upload.consentTitle')}</Text>
-                <Text style={styles.consentIntro}>{t('upload.consentIntro')}</Text>
-                <View style={styles.bullets}>
-                  {(['upload.consentBullet1', 'upload.consentBullet2', 'upload.consentBullet3'] as const).map((k) => (
-                    <View key={k} style={styles.bulletRow}>
-                      <View style={styles.bulletDot} />
-                      <Text style={styles.bulletText}>{t(k)}</Text>
-                    </View>
-                  ))}
+          {/* ── 左: 動画プレビュー (= 4:3 固定枠。 読み込み前後で寸法が変わらない) ── */}
+          <View style={styles.videoWrap}>
+            {uri ? (
+              <Video
+                source={{ uri }}
+                style={styles.video}
+                resizeMode={ResizeMode.CONTAIN}
+                useNativeControls
+                shouldPlay
+                isLooping
+              />
+            ) : (
+              <View style={styles.videoMissing}>
+                <Svg width={40} height={40} viewBox="0 0 40 40" fill="none">
+                  <Circle cx={20} cy={20} r={18.5} stroke={colors.textFaint} strokeWidth={1.4} />
+                  <Polygon points="16,12.5 28,20 16,27.5" fill={colors.textFaint} />
+                </Svg>
+              </View>
+            )}
+          </View>
+
+          {/* ── 右: 同意チェック + アクション ── */}
+          <View style={styles.side}>
+            <Text style={styles.eyebrow}>{t('upload.consentTitle')}</Text>
+            <Text style={styles.title} numberOfLines={1}>
+              {formatCardDate(clip.createdAt)} {formatCardTime(clip.createdAt)}
+            </Text>
+            <Text style={styles.meta}>
+              {dur ?? ''}
+              {dur && clip.recordingConfigId ? '  ·  ' : ''}
+              {clip.recordingConfigId ? configLabel(clip.recordingConfigId) : ''}
+            </Text>
+
+            {clip.state === 'error' && clip.errorMessage ? (
+              <Text style={styles.errorNote} numberOfLines={2}>{clip.errorMessage}</Text>
+            ) : null}
+
+            <View style={styles.checks}>
+              <CheckRow
+                checked={checks.age_and_right}
+                label={t('upload.consentCheckAge')}
+                onPress={() => toggle('age_and_right')}
+              />
+              <CheckRow
+                checked={checks.no_third_party}
+                label={t('upload.consentCheckNoThirdParty')}
+                onPress={() => toggle('no_third_party')}
+              />
+              <CheckRow
+                checked={checks.terms_agreed}
+                label={t('upload.consentCheckTerms')}
+                onPress={() => toggle('terms_agreed')}
+              />
+            </View>
+
+            <Pressable onPress={() => setShowTerms(true)} style={({ pressed }) => [styles.readFull, pressed && styles.pressedDim]} hitSlop={6}>
+              <Text style={styles.readFullLabel}>{t('upload.consentReadFull')}</Text>
+              <Svg width={12} height={12} viewBox="0 0 12 12">
+                <Path d="M4 2.5 L8 6 L4 9.5" stroke={colors.emerald} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
+            </Pressable>
+
+            <View style={styles.spacer} />
+
+            {consentError ? <Text style={styles.consentErrorText}>{consentError}</Text> : null}
+
+            <Pressable
+              onPress={onConsentAndUpload}
+              disabled={!allChecked || sending}
+              style={({ pressed }) => [
+                styles.primaryBtn,
+                (!allChecked || sending) && styles.primaryBtnDisabled,
+                pressed && allChecked && !sending && styles.primaryBtnPressed,
+              ]}
+            >
+              {sending ? (
+                <View style={styles.btnRow}>
+                  <ActivityIndicator size="small" color={colors.textOnInk} />
+                  <Text style={styles.primaryBtnLabel}>{t('upload.consentSending')}</Text>
                 </View>
-                <Pressable onPress={() => setShowTerms(true)} style={({ pressed }) => [styles.readFull, pressed && styles.pressedDim]} hitSlop={6}>
-                  <Text style={styles.readFullLabel}>{t('upload.consentReadFull')}</Text>
-                  <Svg width={12} height={12} viewBox="0 0 12 12">
-                    <Path d="M4 2.5 L8 6 L4 9.5" stroke={colors.emerald} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                  </Svg>
-                </Pressable>
-              </View>
+              ) : (
+                <Text style={styles.primaryBtnLabel}>{t('upload.consentAndUpload')}</Text>
+              )}
+            </Pressable>
 
-              <View style={styles.consentDivider} />
-
-              {/* ── Step 1 右: チェック + アクション ── */}
-              <View style={styles.consentRight}>
-                <CheckRow
-                  checked={checks.combined_consent}
-                  label={t('upload.consentCheckAll')}
-                  onPress={() => toggle('combined_consent')}
-                />
-
-                <View style={styles.spacer} />
-
-                {consentError ? <Text style={styles.consentErrorText}>{consentError}</Text> : null}
-
-                <Pressable
-                  onPress={onProceed}
-                  disabled={!allChecked || sending}
-                  style={({ pressed }) => [
-                    styles.primaryBtn,
-                    (!allChecked || sending) && styles.primaryBtnDisabled,
-                    pressed && allChecked && !sending && styles.primaryBtnPressed,
-                  ]}
-                >
-                  {sending ? (
-                    <View style={styles.btnRow}>
-                      <ActivityIndicator size="small" color={colors.textOnInk} />
-                      <Text style={styles.primaryBtnLabel}>{t('upload.consentSending')}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.primaryBtnLabel}>{t('upload.consentProceed')}</Text>
-                  )}
-                </Pressable>
-                <Pressable onPress={onClose} style={({ pressed }) => [styles.subBtnCenter, pressed && styles.pressedDim]} hitSlop={6}>
-                  <Text style={styles.subBtnLabel}>{t('common.close')}</Text>
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            <>
-              {/* ── Step 2 左: 動画プレビュー ── */}
-              <View style={styles.videoWrap}>
-                {uri ? (
-                  <Video
-                    source={{ uri }}
-                    style={styles.video}
-                    resizeMode={ResizeMode.CONTAIN}
-                    useNativeControls
-                    shouldPlay
-                    isLooping
-                  />
-                ) : (
-                  <View style={styles.videoMissing}>
-                    <Svg width={40} height={40} viewBox="0 0 40 40" fill="none">
-                      <Circle cx={20} cy={20} r={18.5} stroke={colors.textFaint} strokeWidth={1.4} />
-                      <Polygon points="16,12.5 28,20 16,27.5" fill={colors.textFaint} />
-                    </Svg>
-                  </View>
-                )}
-              </View>
-
-              {/* ── Step 2 右: 確認 + アクション ── */}
-              <View style={styles.side}>
-                <Text style={styles.eyebrow}>{t('upload.confirmTitle')}</Text>
-                <Text style={styles.title} numberOfLines={1}>
-                  {formatCardDate(clip.createdAt)} {formatCardTime(clip.createdAt)}
-                </Text>
-                <Text style={styles.meta}>
-                  {dur ?? ''}
-                  {dur && clip.recordingConfigId ? '  ·  ' : ''}
-                  {clip.recordingConfigId ? configLabel(clip.recordingConfigId) : ''}
-                </Text>
-
-                {clip.state === 'error' && clip.errorMessage ? (
-                  <Text style={styles.errorNote} numberOfLines={2}>{clip.errorMessage}</Text>
-                ) : null}
-
-                <Text style={styles.hint}>{t('upload.confirmHint')}</Text>
-
-                <View style={styles.spacer} />
-
-                {/* 同意済みの証跡表示 */}
-                <View style={styles.consentedRow}>
-                  <Svg width={13} height={13} viewBox="0 0 13 13">
-                    <Path d="M2.5 7 L5.3 9.8 L10.5 3.8" stroke={colors.success} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                  </Svg>
-                  <Text style={styles.consentedLabel}>{t('upload.consentedNote')}</Text>
-                </View>
-
-                <Pressable
-                  onPress={() => onUpload(clip)}
-                  style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-                >
-                  <Text style={styles.primaryBtnLabel}>{t('upload.action')}</Text>
-                </Pressable>
-
-                <View style={styles.subRow}>
-                  <Pressable onPress={onPressDelete} style={({ pressed }) => [styles.subBtn, pressed && styles.pressedDim]} hitSlop={6}>
-                    <Text style={styles.subBtnLabelDanger}>{t('common.delete')}</Text>
-                  </Pressable>
-                  <View style={styles.subDivider} />
-                  <Pressable onPress={onClose} style={({ pressed }) => [styles.subBtn, pressed && styles.pressedDim]} hitSlop={6}>
-                    <Text style={styles.subBtnLabel}>{t('common.close')}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </>
-          )}
+            <View style={styles.subRow}>
+              <Pressable onPress={onPressDelete} style={({ pressed }) => [styles.subBtn, pressed && styles.pressedDim]} hitSlop={6}>
+                <Text style={styles.subBtnLabelDanger}>{t('common.delete')}</Text>
+              </Pressable>
+              <View style={styles.subDivider} />
+              <Pressable onPress={onClose} style={({ pressed }) => [styles.subBtn, pressed && styles.pressedDim]} hitSlop={6}>
+                <Text style={styles.subBtnLabel}>{t('common.close')}</Text>
+              </Pressable>
+            </View>
+          </View>
         </Pressable>
       </Pressable>
 
-      {/* 利用条件 全文 (= 層2 正本。 同意はこの全文に対して成立する) */}
+      {/* 利用規約 全文 (= 同意はこの全文に対して成立する) */}
       <LegalDocModal doc={showTerms ? 'tester-consent' : null} onClose={() => setShowTerms(false)} />
     </Modal>
   );
@@ -243,14 +207,16 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
 
 // ─── チェック行 ─────────────────────────────────────────────────────────
 
-const CheckRow: React.FC<{ checked: boolean; label: string; onPress: () => void }> = ({
-  checked, label, onPress,
-}) => (
+const CheckRow: React.FC<{
+  checked: boolean;
+  label: string;
+  onPress: () => void;
+}> = ({ checked, label, onPress }) => (
   <Pressable onPress={onPress} style={({ pressed }) => [styles.checkRow, pressed && styles.pressedDim]} hitSlop={4}>
     <View style={[styles.checkbox, checked && styles.checkboxOn]}>
       {checked ? (
-        <Svg width={12} height={12} viewBox="0 0 12 12">
-          <Path d="M2 6.2 L4.8 9 L10 3.4" stroke={colors.textOnInk} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <Svg width={12} height={12} viewBox="0 0 13 13">
+          <Path d="M2.5 7 L5.3 9.8 L10.5 3.8" stroke="#131519" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </Svg>
       ) : null}
     </View>
@@ -261,7 +227,7 @@ const CheckRow: React.FC<{ checked: boolean; label: string; onPress: () => void 
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: colors.scrim,
+    backgroundColor: 'rgba(20, 16, 8, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
@@ -273,114 +239,35 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
-    width: '90%',
-    maxWidth: 820,
-    maxHeight: '92%',
+    width: '92%',
+    maxWidth: 860,
     ...shadows.pop,
   },
 
-  // ── Step 1: 同意 ──
-  consentLeft: { flex: 55 },
-  consentLeftContent: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-    gap: spacing.md,
-  },
-  consentIntro: {
-    ...typography.caption,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textMute,
-  },
-  bullets: { gap: spacing.sm + 2, marginTop: 2 },
-  bulletRow: { flexDirection: 'row', gap: spacing.sm + 1, alignItems: 'flex-start' },
-  bulletDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.emerald,
-    marginTop: 6.5,
-  },
-  bulletText: {
-    ...typography.caption,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.textBody,
-    flex: 1,
-  },
-  readFull: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-    alignSelf: 'flex-start',
-    paddingVertical: 4,
-  },
-  readFullLabel: {
-    ...typography.captionMedium,
-    fontSize: 12,
-    color: colors.emerald,
-  },
-  consentDivider: { width: 1, backgroundColor: colors.border },
-  consentRight: {
-    flex: 45,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
-    gap: spacing.md,
-  },
-  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm + 2 },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 1.4,
-    borderColor: colors.textMute,
-    backgroundColor: colors.paperDeep,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  checkboxOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
-  checkLabel: {
-    ...typography.caption,
-    fontSize: 12,
-    lineHeight: 17,
-    color: colors.textBody,
-    flex: 1,
-  },
-  consentErrorText: {
-    ...typography.caption,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: colors.danger,
-  },
-
-  // ── Step 2: 確認 ──
-  // aspectRatio は付けない: side の高さにストレッチし、 動画は CONTAIN で箱内 letterbox する
+  // 4:3 固定 (= 現行録画のアスペクト)。 sheet 幅から決まるので読み込み前後で寸法が変わらない。
   videoWrap: {
-    flex: 56,
-    alignSelf: 'stretch',
+    flex: 52,
+    aspectRatio: 4 / 3,
     backgroundColor: '#0B0D11',
   },
   video: { width: '100%', height: '100%' },
   videoMissing: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   side: {
-    flex: 44,
+    flex: 48,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.lg,
     alignSelf: 'stretch',
-    minHeight: 300,
   },
   eyebrow: {
     ...typography.labelSmall,
-    color: colors.emerald,
-    marginBottom: spacing.sm,
+    color: colors.emeraldDeep,
+    marginBottom: 6,
   },
   title: {
     fontFamily: fonts.serifMedium,
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 18,
+    lineHeight: 24,
     letterSpacing: -0.3,
     color: colors.ink,
   },
@@ -388,63 +275,91 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontSize: 12,
     color: colors.textMute,
-    marginTop: 4,
+    marginTop: 2,
   },
   errorNote: {
     ...typography.caption,
     fontSize: 12,
-    lineHeight: 17,
     color: colors.danger,
-    marginTop: spacing.sm,
+    marginTop: 6,
   },
-  hint: {
+
+  checks: { marginTop: spacing.lg, gap: 10 },
+  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
+  checkLabel: {
     ...typography.caption,
-    fontSize: 12,
+    fontSize: 12.5,
     lineHeight: 18,
     color: colors.textBody,
-    marginTop: spacing.md,
+    flex: 1,
   },
-  spacer: { flex: 1, minHeight: spacing.md },
 
-  consentedRow: {
+  readFull: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: spacing.sm + 2,
+    gap: 4,
+    marginTop: spacing.md,
   },
-  consentedLabel: {
-    ...typography.caption,
-    fontSize: 11.5,
-    color: colors.success,
+  readFullLabel: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 12.5,
+    color: colors.emerald,
   },
 
-  // ── 共有ボタン ──
+  spacer: { flex: 1, minHeight: spacing.sm },
+
+  consentErrorText: {
+    ...typography.caption,
+    fontSize: 12,
+    color: colors.danger,
+    marginBottom: 8,
+  },
+
   primaryBtn: {
-    backgroundColor: colors.emerald,
     borderRadius: radii.full,
-    paddingVertical: 13,
+    backgroundColor: colors.emerald,
+    paddingVertical: 12,
     alignItems: 'center',
   },
-  primaryBtnPressed: { backgroundColor: colors.emeraldDeep },
   primaryBtnDisabled: { opacity: 0.35 },
+  primaryBtnPressed: { opacity: 0.85 },
   primaryBtnLabel: {
     fontFamily: fonts.sansSemibold,
     fontSize: 14,
-    color: colors.textOnInk,
-    letterSpacing: 0.4,
+    color: '#131519',
   },
-  btnRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  btnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+
   subRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.lg,
-    marginTop: spacing.md,
+    justifyContent: 'center',
+    marginTop: 10,
+    gap: 14,
   },
-  subDivider: { width: 1, height: 12, backgroundColor: colors.border },
-  subBtn: { paddingVertical: 6, paddingHorizontal: 8 },
-  subBtnCenter: { paddingVertical: 8, alignSelf: 'center' },
-  subBtnLabel: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.textMute },
-  subBtnLabelDanger: { fontFamily: fonts.sansMedium, fontSize: 12.5, color: colors.danger },
+  subBtn: { paddingVertical: 4, paddingHorizontal: 6 },
+  subDivider: { width: 1, height: 14, backgroundColor: colors.border },
+  subBtnLabel: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 13,
+    color: colors.textMute,
+  },
+  subBtnLabelDanger: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 13,
+    color: colors.danger,
+  },
   pressedDim: { opacity: 0.55 },
 });

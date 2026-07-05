@@ -19,25 +19,27 @@ import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
 /// 層1要約 (= アップロード同意画面) の版。 文言を変えたら必ず上げる。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-04.4';
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-06.1';
 
 /// アップロード同意のスコープ (= tester-consent §4: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;
 
-/// 画面に表示する層1要約を構成する i18n キー (= summaryHash の算出対象。 表示順に固定)。
+/// 画面に表示する層1文言を構成する i18n キー (= summaryHash の算出対象。 表示順に固定)。
+/// 2026-07-06: サマリー段を廃止し、 動画プレビューを見ながら 3 つの個別チェック + 全文リンクで
+/// 同意する単一画面に変更 (= 表示文言はチェック 3 つとボタンラベル)。
 const SUMMARY_KEYS = [
   'upload.consentTitle',
-  'upload.consentIntro',
-  'upload.consentBullet1',
-  'upload.consentBullet2',
-  'upload.consentBullet3',
-  'upload.consentCheckAll',
-  'upload.consentProceed',
+  'upload.consentCheckAge',
+  'upload.consentCheckNoThirdParty',
+  'upload.consentCheckTerms',
+  'upload.consentAndUpload',
 ] as const;
 
-/// 1 チェック統合版 (= チェック文言が 18歳以上・第三者なし・正本同意の 3 表明を全部含む)。
+/// 個別チェック 3 つ (= 18歳以上と撮影権利 / 第三者なし / 正本への同意)。
 export interface UploadConsentChecks {
-  combined_consent: boolean;
+  age_and_right: boolean;
+  no_third_party: boolean;
+  terms_agreed: boolean;
 }
 
 /**

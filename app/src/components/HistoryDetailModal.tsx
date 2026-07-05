@@ -155,11 +155,11 @@ const styles = StyleSheet.create({
     maxWidth: 780,
     ...shadows.pop,
   },
-  // aspectRatio は付けない: side の高さにストレッチし、 動画は CONTAIN で箱内 letterbox する
-  // (= 動画の下に sheet 背景の隙間ができない。 余白は箱と同色の黒)
+  // 4:3 固定 (= 現行録画のアスペクト)。 sheet 幅から寸法が決まるので、 動画の読み込み前後で
+  // ポップの大きさが変わらない。 旧 16:9 クリップは CONTAIN で箱内 letterbox。
   videoWrap: {
     flex: 56,
-    alignSelf: 'stretch',
+    aspectRatio: 4 / 3,
     backgroundColor: '#0B0D11',
   },
   video: { width: '100%', height: '100%' },

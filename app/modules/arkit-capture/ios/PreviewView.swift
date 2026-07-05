@@ -79,6 +79,22 @@ final class ArkitCapturePreviewView: ExpoView {
       scnW = viewW
       scnH = viewW / cameraAR
     }
-    scnView.frame = CGRect(x: (viewW - scnW) / 2, y: (viewH - scnH) / 2, width: scnW, height: scnH)
+    let target = CGRect(x: (viewW - scnW) / 2, y: (viewH - scnH) / 2, width: scnW, height: scnH)
+    // 実際に変わる時だけ frame を触る (= 毎 layout の再設定で描画が揺れない)
+    if !scnView.frame.equalTo(target) {
+      scnView.frame = target
+    }
+
+    // sensor 解像度が未確定 (= session 起動前) の間はデフォルト比で仮組みしているので、
+    // 確定後に一度だけ組み直す (= layoutSubviews は bounds 変化でしか呼ばれないため自前で再試行)。
+    if sensorRes.width == 0, !relayoutScheduled {
+      relayoutScheduled = true
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        self?.relayoutScheduled = false
+        self?.setNeedsLayout()
+      }
+    }
   }
+
+  private var relayoutScheduled = false
 }

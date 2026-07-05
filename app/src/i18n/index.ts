@@ -158,17 +158,13 @@ const ja = {
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
   'upload.consentTitle': 'アップロード前の確認',
-  'upload.consentIntro': '以下は要約です。「同意して進む」を押すと、テスター利用規約(全文)に同意したことになります。',
-  'upload.consentBullet1': 'この動画(音声を含む)はAI・ロボットの学習データとして利用され、日本国外を含む外部の企業に提供・販売されることがあります。',
-  'upload.consentBullet2': '提供前に顔などにぼかし処理を行いますが、完全な匿名化は保証されません。',
-  'upload.consentBullet3': '学習に使用される前のデータは削除できます。学習に使用された後は、以後の学習から除外できますが、過去の学習結果は取り消せません。',
-  'upload.consentCheckAll': '私は18歳以上で、この場所で撮影する権利があります。この動画に撮影者本人以外(子どもを含む)は映っていません。テスター利用規約の全文を読み、上記すべてに同意します。',
+  'upload.consentCheckAge': '私は18歳以上で、この場所で撮影する権利があります。',
+  'upload.consentCheckNoThirdParty': 'この動画に、撮影者本人以外(子どもを含む)は映っていません。',
+  'upload.consentCheckTerms': 'テスター利用規約(全文)に同意します。',
+  'upload.consentAndUpload': '同意してアップロード',
   'upload.consentReadFull': '利用規約の全文を読む',
-  'upload.consentProceed': '同意して進む',
-  'upload.consentSending': '同意を記録しています…',
-  'upload.consentError': '同意を記録できませんでした。通信環境を確認して、もう一度お試しください。',
-  'upload.consentedNote': '同意を記録しました',
-  'upload.confirmTitle': '動画の最終確認',
+  'upload.consentSending': '送信しています…',
+  'upload.consentError': '送信できませんでした。通信環境を確認して、もう一度お試しください。',
   'history.duration': '長さ',
   'history.config': '撮影モード',
   'history.size': '容量',
@@ -177,8 +173,7 @@ const ja = {
   'upload.deleteTitle': 'この動画を削除しますか？',
   'upload.deleteMessage': '削除した動画は元に戻せません。',
   'upload.deleteConfirm': '削除する',
-  'upload.confirmHint': '内容を確認してからアップロードしてください。映ってはいけないものがある場合は、アップロードせずに削除してください。',
-  'upload.action': 'アップロードする',
+
 
   // ── Onboarding ──
   'onb.slide1.eyebrow': 'おうちで、かんたん',
@@ -328,17 +323,13 @@ const en: Record<TranslationKey, string> = {
 
   // ── Upload consent pop (= tap a card in My Videos) ──
   'upload.consentTitle': 'Before you upload',
-  'upload.consentIntro': 'This is a summary. Tapping "Agree and continue" means you agree to the full Tester Terms.',
-  'upload.consentBullet1': 'This video (including audio) will be used as training data for AI and robots, and may be provided or sold to external companies, including outside Japan.',
-  'upload.consentBullet2': 'Faces are blurred before the data is provided, but full anonymization is not guaranteed.',
-  'upload.consentBullet3': 'Data can be deleted before it is used for training. Once used, it can be excluded from future training, but past results cannot be undone.',
-  'upload.consentCheckAll': 'I am 18 or older and have the right to record in this location. No one other than me (including children) appears in this video. I have read the full Tester Terms and agree to all of the above.',
+  'upload.consentCheckAge': 'I am 18 or older and have the right to record in this location.',
+  'upload.consentCheckNoThirdParty': 'No one other than me (including children) appears in this video.',
+  'upload.consentCheckTerms': 'I agree to the full Tester Terms.',
+  'upload.consentAndUpload': 'Agree and upload',
   'upload.consentReadFull': 'Read the full terms',
-  'upload.consentProceed': 'Agree and continue',
-  'upload.consentSending': 'Recording your consent…',
-  'upload.consentError': 'Could not record your consent. Check your connection and try again.',
-  'upload.consentedNote': 'Consent recorded',
-  'upload.confirmTitle': 'Final check',
+  'upload.consentSending': 'Sending…',
+  'upload.consentError': 'Could not send. Check your connection and try again.',
   'history.duration': 'Length',
   'history.config': 'Capture mode',
   'history.size': 'Size',
@@ -347,8 +338,7 @@ const en: Record<TranslationKey, string> = {
   'upload.deleteTitle': 'Delete this video?',
   'upload.deleteMessage': 'This cannot be undone.',
   'upload.deleteConfirm': 'Delete',
-  'upload.confirmHint': 'Review the video before uploading. If anything should not be visible, delete it instead.',
-  'upload.action': 'Upload',
+
 
   // ── Onboarding ──
   'onb.slide1.eyebrow': 'Easy, at home',
