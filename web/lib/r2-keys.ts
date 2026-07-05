@@ -22,7 +22,9 @@ export type RawSessionFilename =
   | "realtime_handpose.jsonl"
   | "metadata.json"
   | "imu.jsonl"           // ARKit 構成のみ
-  | "depth.tar";          // ARKit + LiDAR (Pro) のみ optional
+  | "depth.tar"           // ARKit + LiDAR (Pro) のみ optional
+  | "pointcloud.jsonl"    // ARKit 構成のみ optional (= VIO 特徴点群)
+  | "mesh.jsonl";         // ARKit + LiDAR (Pro) のみ optional (= シーン再構成メッシュ)
 
 /// 構成ごとのアップロードファイルマニフェスト (= 端末の config.outputFiles と対応する server 側 contract)。
 /// 端末は presign に無い名前をアップロードしようとすると fail-loud する (= ズレ検出)。
@@ -41,6 +43,8 @@ export const RAW_SESSION_MANIFEST: Record<
     { filename: "imu.jsonl", contentType: "application/x-ndjson" },
     { filename: "metadata.json", contentType: "application/json" },
     { filename: "depth.tar", contentType: "application/x-tar" },
+    { filename: "pointcloud.jsonl", contentType: "application/x-ndjson" },
+    { filename: "mesh.jsonl", contentType: "application/x-ndjson" },
   ],
 };
 
