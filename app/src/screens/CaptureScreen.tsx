@@ -53,8 +53,9 @@ import {
   type HandTrackEvent,
 } from '../dataflow';
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
-import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone } from '../services/captureAudio';
+import { enqueueSfx, enqueueSpeak, clearAudioQueue, getLastSpeechDone } from '../services/captureAudio';
 import { applyCaptureSettingsToNative } from '../services/captureSettings';
+import { useCameraPitch } from '../services/devicePitch';
 import { GestureStabilizer } from '../domain/gestureDetect';
 import { t, useT } from '../i18n';
 import { colors, fonts, typography } from '../theme';
@@ -78,9 +79,13 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CaptureMode'>;
 // ─── 状態定義 ─────────────────────────────────────────────────────────
 
 type CaptureState =
-  | { kind: 'announcing' }                                 // 初回案内 TTS 中 (= 「手のひらを 3 秒キープ」)
+  | { kind: 'announcing' }                                 // 取り付け案内 TTS 中 (= 「ヘッドセットに取り付けて」)
   | { kind: 'next_task_announcing' }                       // 撮影完了後の次タスク提案 TTS 中
-  | { kind: 'awaiting_palm' }                              // 「手のひらを上向きに 3 秒キープ」 待ち
+  // 装着待ち。 端末が動かされている間は黙って待ち、 「取り付けの動きを観測 → 静止 + 装着らしい
+  // 角度」 で次の案内へ (追跡は mountTrackRef、 判定は ticker)。
+  | { kind: 'mounting' }
+  | { kind: 'palm_prompt' }                                // 装着完了 → パー案内 TTS 中
+  | { kind: 'awaiting_palm' }                              // 両手パー待ち
   | { kind: 'palm_holding'; startTs: number }              // open_palm を 3 秒 hold 中
   | { kind: 'adjust_needed'; direction: AdjustDirection }  // 中央外。 案内 TTS 完了 (ticker 判定) 後に palm 受付
   | { kind: 'calibration_confirmed' }                      // キャリブ確定、 効果音 + TTS + 500ms 待機
@@ -94,8 +99,16 @@ type CaptureState =
 
 type AdjustDirection = 'up' | 'down' | 'left' | 'right';
 
-// 3 秒キープ (= TTS の言い終わりからカウント開始、 ユーザに余裕を持たせる)
-const PALM_HOLD_MS = 3000;
+// パーのキープ (= 検出ビープからこの時間キープで中央判定)
+const PALM_HOLD_MS = 1000;
+// 装着待ちの判定。 静止は「tick 間の角速度」 で見る (= 装着した頭の自然な揺れ・呼吸は通し、
+// 手で扱っている大きな動きだけ弾く)。 「取り付けの動きを一度は観測した後」 でないと進まない
+// (= 手に持ったまま静止しても即通過しない)。 既装着で開いた場合のために TIMEOUT で解除。
+const MOUNT_STILL_DELTA_DEG = 2;      // 1 tick (100ms) あたりの角度変化がこれ超 = 扱い中
+const MOUNT_STILL_MS = 2000;
+const MOUNT_MOTION_MIN_MS = 1000;     // 取り付けの動きと見なす累計時間
+const MOUNT_TIMEOUT_MS = 8000;
+const MOUNT_WORN_PITCH_RANGE = { min: -30, max: 70 } as const; // 机に平置き (≈90°) を除外
 // 停止フロー (= 人間目線): 頭部装着・両手で家事中・画面は見ない前提。 thumbs-up が ARM_MS 継続して
 // 「検出」 → 即時音。 検出から HOLD_MS 立て続けると音声「そのまま立て続けると終了します」を流し、
 // 音声を最後まで言い終わった時にまだ立て続けていたら停止確定 (= 固定秒で切らず、 案内を最後まで聞かせる)。
@@ -171,7 +184,6 @@ function computeAdjustDirection(bbox: HandBoundingBox): AdjustDirection | null {
 // キャリブレーション音声ガイドの文言。
 // トーン = 機内アナウンス調 (= 丁寧・穏やか・誰にでも明確、 砕けすぎない)。
 // 文言は i18n 辞書 (capture.tts.*) に locale 別で持つ。 ja は読み間違い回避済 (= 「方」「開いて」 不使用)。
-const NEXT_TASK_PAUSE_MS = 1000;
 function calibAdjustText(d: AdjustDirection): string {
   switch (d) {
     case 'up':    return t('capture.tts.adjustUp');
@@ -187,6 +199,8 @@ function entryCue(s: CaptureState): { sfx?: SfxName; tts?: string; keep?: boolea
   switch (s.kind) {
     case 'announcing':
       return { tts: t('capture.tts.intro'), keep: true };
+    case 'palm_prompt':
+      return { tts: t('capture.tts.palmPrompt') };
     // next_task_announcing は二部構成 (お疲れさま → 間 → 続けるなら) なので state→audio effect で個別に積む。
     case 'adjust_needed':
       return { tts: calibAdjustText(s.direction) };
@@ -277,6 +291,15 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 録画尺 (= POST /api/clips の durationMs) 算出用に、 native 録画開始の wall-clock を控える。
   const recordingStartedAtRef = useRef(0);
   const sessionDirRef = useRef<string | null>(null);
+
+  // 装着判定 (= 取り付けの動き → 静止 + 装着らしい俯角)。 加速度計は装着待ちの間だけ回す。
+  const pitchRef = useCameraPitch(state.kind === 'announcing' || state.kind === 'mounting');
+  const mountTrackRef = useRef({ enteredTs: 0, lastPitch: null as number | null, motionMs: 0, stillSince: 0 });
+  useEffect(() => {
+    if (state.kind === 'mounting') {
+      mountTrackRef.current = { enteredTs: Date.now(), lastPitch: null, motionMs: 0, stillSince: 0 };
+    }
+  }, [state.kind]);
   // 「今の voiced state が待っている発話の seq」 (0 = まだ発行前 / 音声ゲート無し)。
   // voiced state へ遷移する瞬間に 0 にし (= 前 state の完了済 seq との誤一致を防ぐ)、
   // state→audio effect が発話を enqueue した seq をここに入れる。 ticker は
@@ -423,9 +446,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     // 撮影完了後の案内: 「お疲れさま → 少し間 → 続けるなら手のひらを」 の二部構成。 待つのは最後の発話の seq。
     if (state.kind === 'next_task_announcing') {
       clearAudioQueue();
-      enqueueSpeak(t('capture.tts.done'));
-      enqueuePause(NEXT_TASK_PAUSE_MS);
-      awaitedSpeechSeqRef.current = enqueueSpeak(t('capture.tts.continue'));
+      awaitedSpeechSeqRef.current = enqueueSpeak(t('capture.tts.done'));
       return;
     }
     const cue = entryCue(state);
@@ -525,9 +546,52 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     };
 
     switch (cur.kind) {
-      case 'announcing':
+      case 'announcing': {
+        // 取り付け案内を言い終わったら装着待ちへ。
+        if (speechDone()) setState({ kind: 'mounting' });
+        return;
+      }
       case 'next_task_announcing': {
-        // 案内 TTS を言い終わったら検出開始へ (= ticker が完了 seq を判定。 音声 callback では遷移しない)。
+        // クリップ間は装着済みなので、 装着待ちを飛ばしてパー待ちへ (= 案内は done TTS に含む)。
+        if (speechDone()) setState({ kind: 'awaiting_palm' });
+        return;
+      }
+      case 'mounting': {
+        const reading = pitchRef.current;
+        if (!reading.available) {
+          // 加速度計が使えない端末では装着判定をスキップ。
+          awaitedSpeechSeqRef.current = 0;
+          setState({ kind: 'palm_prompt' });
+          return;
+        }
+        const track = mountTrackRef.current;
+        const pitch = reading.pitchDownDeg;
+        // 動いているか = 読めない加速度 (激しい動き) or tick 間の角度変化が大きい。
+        const inMotion =
+          pitch == null || track.lastPitch == null ||
+          Math.abs(pitch - track.lastPitch) > MOUNT_STILL_DELTA_DEG;
+        track.lastPitch = pitch;
+        if (inMotion) {
+          track.motionMs += 100; // ≒ ticker 周期
+          track.stillSince = 0;
+          return;
+        }
+        const wornRange = pitch >= MOUNT_WORN_PITCH_RANGE.min && pitch <= MOUNT_WORN_PITCH_RANGE.max;
+        if (!wornRange) {
+          track.stillSince = 0; // 静止しているが装着角度ではない (= 机置き等)。 黙って待つ
+          return;
+        }
+        if (track.stillSince === 0) track.stillSince = now;
+        // 取り付けの動きを一度は見ているか、 既装着でタイムアウトしたか。
+        const handled = track.motionMs >= MOUNT_MOTION_MIN_MS || now - track.enteredTs >= MOUNT_TIMEOUT_MS;
+        if (handled && now - track.stillSince >= MOUNT_STILL_MS) {
+          awaitedSpeechSeqRef.current = 0;
+          setState({ kind: 'palm_prompt' });
+        }
+        return;
+      }
+      case 'palm_prompt': {
+        // パー案内を言い終わったら検出開始へ。
         if (speechDone()) setState({ kind: 'awaiting_palm' });
         return;
       }
@@ -733,8 +797,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     if (id === selectedConfigId) return;
     const k = stateRef.current.kind;
     const calibratePhase =
-      k === 'announcing' || k === 'next_task_announcing' || k === 'awaiting_palm' ||
-      k === 'palm_holding' || k === 'adjust_needed' || k === 'calibration_confirmed';
+      k === 'announcing' || k === 'next_task_announcing' || k === 'mounting' ||
+      k === 'palm_prompt' || k === 'awaiting_palm' || k === 'palm_holding' ||
+      k === 'adjust_needed' || k === 'calibration_confirmed';
     if (!calibratePhase) return;
     clearAudioQueue(); // 切替で旧構成の案内音声を止める
     setSelectedConfigId(id);
@@ -803,8 +868,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const hud = ((): { text: string; tone: 'normal' | 'accent' | 'dim'; arrow?: AdjustDirection } | null => {
     switch (state.kind) {
       case 'announcing':
-      case 'awaiting_palm':
+      case 'mounting':
         return { text: t('capture.tts.intro'), tone: 'normal' };
+      case 'palm_prompt':
+      case 'awaiting_palm':
+        return { text: t('capture.tts.palmPrompt'), tone: 'normal' };
       case 'palm_holding':
         return { text: t('capture.hud.detecting'), tone: 'accent' };
       case 'adjust_needed':
@@ -821,7 +889,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       case 'finalizing':
         return { text: t('capture.hud.saving'), tone: 'normal' };
       case 'next_task_announcing':
-        return { text: `${t('capture.tts.done')} ${t('capture.tts.continue')}`, tone: 'normal' };
+        return { text: t('capture.tts.done'), tone: 'normal' };
     }
   })();
 
@@ -1024,7 +1092,8 @@ function frameGesture(
 // 現フェーズで「意味のある」 ジェスチャーだけを通す (= 確定ビープのゲート)。
 //   キャリブ中 → open_palm のみ、 撮影中 → thumbs_up のみ、 それ以外 → なし
 const CALIB_KINDS: CaptureState['kind'][] = [
-  'announcing', 'next_task_announcing', 'awaiting_palm', 'palm_holding', 'adjust_needed', 'calibration_confirmed',
+  'announcing', 'next_task_announcing', 'mounting', 'palm_prompt',
+  'awaiting_palm', 'palm_holding', 'adjust_needed', 'calibration_confirmed',
 ];
 const RECORDING_KINDS: CaptureState['kind'][] = ['recording', 'stopping', 'stopping_confirm'];
 function relevantGesture(

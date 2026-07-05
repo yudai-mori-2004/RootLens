@@ -147,14 +147,14 @@ const ja = {
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
   // ⚠ ja TTS 読み間違い回避: 「方」(かた)・「開いて」(あいて)・「画角」 は使わない。
-  'capture.tts.intro': 'まず、スマホをヘッドセットに取り付けて、頭に装着してください。準備ができたら、両腕をまっすぐ前に伸ばして、手のひらをカメラに向けてください。',
+  'capture.tts.intro': 'スマホをヘッドセットに取り付けて、頭に装着してください。',
+  'capture.tts.palmPrompt': '準備ができたら、手をパーにして目線を指先に向けてください。',
   'capture.tts.confirmed': '位置が合いました。これより撮影を開始します。',
-  'capture.tts.done': '撮影を終了しました。お疲れさまでした。',
-  'capture.tts.continue': '続けるときは、もう一度、両腕を伸ばして手のひらを見せてください。',
-  'capture.tts.adjustUp': '手が画面の上に寄っています。カメラを少し上へ向けて、もう一度手のひらを見せてください。',
-  'capture.tts.adjustDown': '手が画面の下に寄っています。カメラを少し下へ向けて、もう一度手のひらを見せてください。',
-  'capture.tts.adjustLeft': '手が画面の左に寄っています。カメラを少し左へ向けて、もう一度手のひらを見せてください。',
-  'capture.tts.adjustRight': '手が画面の右に寄っています。カメラを少し右へ向けて、もう一度手のひらを見せてください。',
+  'capture.tts.done': '撮影終了です。次の準備ができたら、手をパーにして目線を指先に向けてください。',
+  'capture.tts.adjustUp': 'カメラを少し上へ向けてください。動画の真ん中に手を写すための調整です。',
+  'capture.tts.adjustDown': 'カメラを少し下へ向けてください。動画の真ん中に手を写すための調整です。',
+  'capture.tts.adjustLeft': 'カメラを少し左へ向けてください。動画の真ん中に手を写すための調整です。',
+  'capture.tts.adjustRight': 'カメラを少し右へ向けてください。動画の真ん中に手を写すための調整です。',
   'capture.tts.stoppingConfirm': 'そのまま親指を立て続けると、撮影を終了します。',
   'capture.tts.handLost': '両手をカメラに映してください。',
 
@@ -314,14 +314,14 @@ const en: Record<TranslationKey, string> = {
   'capture.hud.saving': 'Saving…',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
-  'capture.tts.intro': 'First, attach the phone to the headset and put it on. When you are ready, stretch both arms straight out and show your palms to the camera.',
+  'capture.tts.intro': 'Attach the phone to the headset and put it on.',
+  'capture.tts.palmPrompt': 'When you are ready, open your hands and look at your fingertips.',
   'capture.tts.confirmed': 'Position confirmed. Recording will now begin.',
-  'capture.tts.done': 'Recording finished. Nice work.',
-  'capture.tts.continue': 'To keep going, stretch your arms out and show your palms again.',
-  'capture.tts.adjustUp': 'Your hands are near the top of the frame. Tilt the camera up a little and show your palms again.',
-  'capture.tts.adjustDown': 'Your hands are near the bottom of the frame. Tilt the camera down a little and show your palms again.',
-  'capture.tts.adjustLeft': 'Your hands are toward the left. Turn the camera left a little and show your palms again.',
-  'capture.tts.adjustRight': 'Your hands are toward the right. Turn the camera right a little and show your palms again.',
+  'capture.tts.done': 'Recording finished. When you are ready for the next one, open your hands and look at your fingertips.',
+  'capture.tts.adjustUp': 'Tilt the camera up a little. This centers your hands in the video.',
+  'capture.tts.adjustDown': 'Tilt the camera down a little. This centers your hands in the video.',
+  'capture.tts.adjustLeft': 'Turn the camera left a little. This centers your hands in the video.',
+  'capture.tts.adjustRight': 'Turn the camera right a little. This centers your hands in the video.',
   'capture.tts.stoppingConfirm': 'Keep holding your thumbs up to finish recording.',
   'capture.tts.handLost': 'Show both hands to the camera.',
 
