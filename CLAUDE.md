@@ -48,6 +48,7 @@ root-lens/
 | 1 (端末) | `tools/mock-device/` (= iOS 実機実装は別フェーズ) | 撮影 → C2PA D1 → 顔ぼかし → C2PA D2 → signature_hash 抽出 → R2 アップロード → TP `/process` (= signature_hash + attestation 取得 + R2 signed-json/ 保存) → cNFT 発行 (= `/extension/solana` + Solana wallet 署名 + broadcast) → rootAssetId 確定 → `POST /api/clips` でサーバ登録 |
 | 2 (サーバ、 自動) | `web/workflow/process-clip.ts` + `tools/modal/{layer1_metadata,layer2_frame_sampling,layer3_vlm}.py` | 3 層スコアリング (= metadata 20 + frame sampling 15 + VLM 65) で 0..100 点。 起動条件は `clip.rootAssetId` not null。 出力 `processed/<signature_hash>/{quality_scores.json,semantic.jsonl}` |
 | 3 (サーバ、 手動) | `tools/modal/wilor.py` | WiLoR 手ポーズ推定のみ。 出力 `processed/<signature_hash>/wilor.jsonl`。 データセット化 (= 複数クリップを LeRobot v3 等にまとめる) はパイプライン外 |
+| fpvlabs (サーバ、 手動) | `tools/modal/fpvlabs.py` | FPV Labs (Stera) への受け渡し。 raw を顔ぼかし + Stera 互換 ROS2 MCAP に変換して `rootlens-fpvlabs/<signature_hash>/session.mcap` へ (= 冪等上書き)。 音声は含めない |
 
 TP register + cNFT 発行は v0.1.3 で Pipeline 1 内に前倒し済 (= 新 Gateway は `POST /process` 直叩き、 SDK 廃止)。 サーバ workflow からは tp-submit step を完全削除済、 mock-device が R2 upload 後に TP `/process` + cNFT 発行を実行して rootAssetId を確定させてから `POST /api/clips` でサーバに登録する。
 
@@ -59,7 +60,7 @@ TP register + cNFT 発行は v0.1.3 で Pipeline 1 内に前倒し済 (= 新 Gat
   - rootlens-layer1-metadata、 rootlens-layer2-frame-sampling、 rootlens-layer3-vlm、 rootlens-wilor
   - (旧 rootlens-gtsam-eval / rootlens-bundle は廃止。 deploy 済の旧 app は別途 tear down)
 - DB: Supabase (= web/drizzle/ + web/scripts/apply_migrations.mjs)。 drizzle-kit push は Supabase の auth/storage schema introspection で内部バグを踏むため使わない
-- R2 buckets: `rootlens-raw` (= raw/<signature_hash>/) + `rootlens-processed` (= processed/<signature_hash>/) の 2 つ
+- R2 buckets: `rootlens-raw` + `rootlens-raw-arkit` (= raw/<signature_hash>/)、 `rootlens-processed` (= processed/<signature_hash>/)、 `rootlens-fpvlabs` (= FPV Labs 受け渡し用 MCAP)
 
 smoke test の実行:
 
