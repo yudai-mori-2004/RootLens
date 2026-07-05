@@ -97,7 +97,7 @@ type CaptureState =
   | { kind: 'stopping_confirm'; startTs: number; lostSince: number }
   | { kind: 'finalizing' };
 
-type AdjustDirection = 'up' | 'down' | 'left' | 'right';
+type AdjustDirection = 'up' | 'down';
 
 // パーのキープ (= 検出ビープからこの時間キープで中央判定)
 const PALM_HOLD_MS = 1000;
@@ -124,10 +124,11 @@ const RELEASE_GRACE_MS = 800;
 const COUNTDOWN_TICKS = 3;
 const COUNTDOWN_TICK_MS = 750;
 const HAND_LOST_WARN_MS = 5000;
+const STOP_HINT_DELAY_MS = 5000;        // 録画開始から終了方法の案内までの間
 const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
 
-// シビアな中央許容範囲 (= 各軸 ±5%)。 user フィードバック「めっちゃシビアに真ん中である必要がある」
-const CALIBRATION_CENTER_MARGIN = 0.05;
+// 中央許容範囲 (= 縦方向のみ ±12%)。 左右は姿勢でほぼ決まるので見ない (2026-07-06 判断)。
+const CALIBRATION_CENTER_MARGIN = 0.12;
 const LANDMARK_CONF = 0.3;
 
 const STORAGE_BASELINE_KEY = '@rootlens/calibration/baseline/v1';
@@ -162,17 +163,12 @@ function computeHandBoundingBox(hands: HandTrackEvent['wearerHands']): HandBound
   };
 }
 
-/// 「ヘッドセットをどっち向きに動かせば手が中央に来るか」 を返す。
-/// 手が画面下なら ヘッドセットも下に向けてもらえば手は中央に来る (= 1 対 1)。
-/// 許容範囲内なら null (= 中央 OK)。
+/// 「カメラをどっち向きに動かせば手が中央に来るか」 を返す (= 縦方向のみ)。
+/// 手が画面下ならカメラも下に向けてもらえば手は中央に来る (= 1 対 1)。 許容内なら null。
 function computeAdjustDirection(bbox: HandBoundingBox): AdjustDirection | null {
-  const dx = bbox.cx - 0.5;
   const dy = bbox.cy - 0.5;
-  const absX = Math.abs(dx);
-  const absY = Math.abs(dy);
-  if (absX <= CALIBRATION_CENTER_MARGIN && absY <= CALIBRATION_CENTER_MARGIN) return null;
-  if (absY >= absX) return dy > 0 ? 'down' : 'up';
-  return dx > 0 ? 'right' : 'left';
+  if (Math.abs(dy) <= CALIBRATION_CENTER_MARGIN) return null;
+  return dy > 0 ? 'down' : 'up';
 }
 
 // ─── 音声ガイド ───────────────────────────────────────────────────────
@@ -185,12 +181,7 @@ function computeAdjustDirection(bbox: HandBoundingBox): AdjustDirection | null {
 // トーン = 機内アナウンス調 (= 丁寧・穏やか・誰にでも明確、 砕けすぎない)。
 // 文言は i18n 辞書 (capture.tts.*) に locale 別で持つ。 ja は読み間違い回避済 (= 「方」「開いて」 不使用)。
 function calibAdjustText(d: AdjustDirection): string {
-  switch (d) {
-    case 'up':    return t('capture.tts.adjustUp');
-    case 'down':  return t('capture.tts.adjustDown');
-    case 'left':  return t('capture.tts.adjustLeft');
-    case 'right': return t('capture.tts.adjustRight');
-  }
+  return d === 'up' ? t('capture.tts.adjustUp') : t('capture.tts.adjustDown');
 }
 
 // 各 state の「入場時に鳴らす cue」。 sfx → tts の順でキューに積まれる。 announcing だけは enter_capture
@@ -209,10 +200,11 @@ function entryCue(s: CaptureState): { sfx?: SfxName; tts?: string; keep?: boolea
       // (= キュー非経由で不発しない + アイコン表示と同期)。 ここは確定 TTS のみ。
       return { tts: t('capture.tts.confirmed') };
     case 'stopping':
-      // 検出ビープ (detect_thumbs_up) は即時再生 effect が鳴らすのでここでは何もしない。
+      // 保持の前半 (= ARM 後) は無音。 作業中の偶然の検出で音を出さない。
       return null;
     case 'stopping_confirm':
-      return { tts: t('capture.tts.stoppingConfirm') };
+      // 1.3 秒保持しきって初めて合図 (= ピロ) + 「撮影を終了します。」。 読み終わりまで保持で確定。
+      return { sfx: 'detect_thumbs_up', tts: t('capture.tts.stoppingConfirm') };
     default:
       return null;
   }
@@ -288,6 +280,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   useEffect(() => { stateRef.current = state; }, [state]);
 
   const recordingStartedRef = useRef(false);
+  // 終了方法の案内 (= 録画開始から数秒後に 1 回だけ)
+  const stopHintSpokenRef = useRef(false);
   // 録画尺 (= POST /api/clips の durationMs) 算出用に、 native 録画開始の wall-clock を控える。
   const recordingStartedAtRef = useRef(0);
   const sessionDirRef = useRef<string | null>(null);
@@ -470,6 +464,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     if (state.kind === 'recording' && !recordingStartedRef.current) {
       recordingStartedRef.current = true;  // 同期で即 true、 後続 fire 防止
+      stopHintSpokenRef.current = false;
       (async () => {
         try {
           const session = await config.startRecording(sink);
@@ -643,6 +638,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // 開始カウントダウンは専用 timer (countdown driver effect) が駆動。 ここでは何もしない。
         return;
       case 'recording': {
+        // 録画が乗ってきた頃に、 終了方法を 1 回だけ案内する (= 遷移を駆動しない副作用)。
+        if (!stopHintSpokenRef.current && now - cur.startTs >= STOP_HINT_DELAY_MS) {
+          stopHintSpokenRef.current = true;
+          enqueueSpeak(t('capture.tts.stopHint'));
+        }
         const handVisible = e.wearerHandCount >= 1;
         let lastHandSeen = cur.lastHandSeenTs;
         let lastWarn = cur.lastWarnTs;
@@ -1057,7 +1057,7 @@ const PulsingDot: React.FC = () => {
 
 /// 方向矢印 (= カメラをどっちに向けるか。 琥珀の大きめグリフ)。
 const ArrowGlyph: React.FC<{ dir: AdjustDirection }> = ({ dir }) => {
-  const rotate = dir === 'up' ? '0deg' : dir === 'right' ? '90deg' : dir === 'down' ? '180deg' : '270deg';
+  const rotate = dir === 'up' ? '0deg' : '180deg';
   return (
     <View style={{ transform: [{ rotate }], marginBottom: 8 }}>
       <Svg width={30} height={30} viewBox="0 0 26 26" fill="none">
@@ -1090,18 +1090,17 @@ function frameGesture(
 }
 
 // 現フェーズで「意味のある」 ジェスチャーだけを通す (= 確定ビープのゲート)。
-//   キャリブ中 → open_palm のみ、 撮影中 → thumbs_up のみ、 それ以外 → なし
+//   キャリブ中 → open_palm のみ。 撮影中の thumbs_up は即時ビープしない
+//   (= 作業中の偶然の検出で鳴るのが不快。 合図は保持しきった後の stopping_confirm 入場音で出す)。
 const CALIB_KINDS: CaptureState['kind'][] = [
   'announcing', 'next_task_announcing', 'mounting', 'palm_prompt',
   'awaiting_palm', 'palm_holding', 'adjust_needed', 'calibration_confirmed',
 ];
-const RECORDING_KINDS: CaptureState['kind'][] = ['recording', 'stopping', 'stopping_confirm'];
 function relevantGesture(
   g: 'open_palm' | 'thumbs_up' | null,
   kind: CaptureState['kind'],
 ): 'open_palm' | 'thumbs_up' | null {
   if (g === 'open_palm') return CALIB_KINDS.includes(kind) ? 'open_palm' : null;
-  if (g === 'thumbs_up') return RECORDING_KINDS.includes(kind) ? 'thumbs_up' : null;
   return null;
 }
 

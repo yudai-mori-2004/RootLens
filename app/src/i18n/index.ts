@@ -153,9 +153,8 @@ const ja = {
   'capture.tts.done': '撮影終了です。次の準備ができたら、手をパーにして目線を指先に向けてください。',
   'capture.tts.adjustUp': 'カメラを少し上へ向けてください。動画の真ん中に手を写すための調整です。',
   'capture.tts.adjustDown': 'カメラを少し下へ向けてください。動画の真ん中に手を写すための調整です。',
-  'capture.tts.adjustLeft': 'カメラを少し左へ向けてください。動画の真ん中に手を写すための調整です。',
-  'capture.tts.adjustRight': 'カメラを少し右へ向けてください。動画の真ん中に手を写すための調整です。',
-  'capture.tts.stoppingConfirm': 'そのまま親指を立て続けると、撮影を終了します。',
+  'capture.tts.stoppingConfirm': '撮影を終了します。',
+  'capture.tts.stopHint': '終了するときは、両手で親指を立てて、そのままキープしてください。',
   'capture.tts.handLost': '両手をカメラに映してください。',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
@@ -320,9 +319,8 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.done': 'Recording finished. When you are ready for the next one, open your hands and look at your fingertips.',
   'capture.tts.adjustUp': 'Tilt the camera up a little. This centers your hands in the video.',
   'capture.tts.adjustDown': 'Tilt the camera down a little. This centers your hands in the video.',
-  'capture.tts.adjustLeft': 'Turn the camera left a little. This centers your hands in the video.',
-  'capture.tts.adjustRight': 'Turn the camera right a little. This centers your hands in the video.',
-  'capture.tts.stoppingConfirm': 'Keep holding your thumbs up to finish recording.',
+  'capture.tts.stoppingConfirm': 'Ending the recording.',
+  'capture.tts.stopHint': 'To finish, hold a thumbs-up with both hands and keep it steady.',
   'capture.tts.handLost': 'Show both hands to the camera.',
 
   // ── Upload consent pop (= tap a card in My Videos) ──
