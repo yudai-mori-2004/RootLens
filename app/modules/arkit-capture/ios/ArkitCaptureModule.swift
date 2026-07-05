@@ -84,6 +84,12 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
     }
 
+    // 撮影設定 (JSON)。 次の startSession / startRecording から適用される。
+    AsyncFunction("setCaptureSettings") { (json: String, promise: Promise) in
+      ArkitCaptureController.shared.applyCaptureSettings(json: json)
+      promise.resolve(nil)
+    }
+
     AsyncFunction("isAvailable") { () -> Bool in
       return ARWorldTrackingConfiguration.isSupported
     }

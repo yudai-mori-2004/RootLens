@@ -66,6 +66,7 @@ interface ArkitCaptureNativeModule {
   startRecording(sessionDir: string): Promise<string>;
   /** 返値は startRecording の sessionDir をそのまま返す。 */
   stopRecording(): Promise<string>;
+  setCaptureSettings(json: string): Promise<void>;
   captureSnapshot(): Promise<string>;
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
   addListener(eventName: string): void;
@@ -100,6 +101,12 @@ export async function startArkitRecording(sessionDir = ''): Promise<string> {
 export async function stopArkitRecording(): Promise<string> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
   return nativeModule.stopRecording();
+}
+
+/** 撮影設定 (JSON 文字列) を native へ渡す。 次の startSession / startRecording から適用される。 */
+export async function setArkitCaptureSettings(json: string): Promise<void> {
+  if (!nativeModule) return;
+  return nativeModule.setCaptureSettings(json);
 }
 
 /** 現在の ARFrame を JPEG として temp に書き出して file:// URI を返す (VLM 用) */

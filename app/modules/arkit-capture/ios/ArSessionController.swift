@@ -113,6 +113,54 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private let motionManager = CMMotionManager()
   private let motionQueue = OperationQueue()
 
+  // MARK: - Capture settings (= JS 側の撮影設定。 次の startSession / startRecording から適用)
+
+  struct CaptureSettings {
+    var resolution = "1440p"        // "1440p" (4:3 最大画角) | "1080p" | "720p"
+    var autoFocus = true
+    var recordingRate = 30          // RGB / depth / point cloud の書き出し Hz (15/30/60)
+    var syncRate = true             // false なら depthRate / pointCloudRate を個別適用 (≤ recordingRate)
+    var depthRate = 30
+    var pointCloudRate = 30
+    var imuRateHz = 100             // 50 / 100 / 200
+    var streamImu = true
+    var streamDepth = true
+    var streamPointCloud = true
+    var streamMesh = true
+  }
+
+  private(set) var captureSettings = CaptureSettings()
+
+  /// JS からの撮影設定 (JSON)。 次の startSession / startRecording から適用される。
+  func applyCaptureSettings(json: String) {
+    guard let data = json.data(using: .utf8),
+          let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+      NSLog("[ArkitCaptureController] applyCaptureSettings: invalid json")
+      return
+    }
+    var s = CaptureSettings()
+    if let v = obj["resolution"] as? String { s.resolution = v }
+    if let v = obj["autoFocus"] as? Bool { s.autoFocus = v }
+    if let v = obj["recordingRate"] as? Int { s.recordingRate = v }
+    if let v = obj["syncRate"] as? Bool { s.syncRate = v }
+    if let v = obj["depthRate"] as? Int { s.depthRate = v }
+    if let v = obj["pointCloudRate"] as? Int { s.pointCloudRate = v }
+    if let v = obj["imuRateHz"] as? Int { s.imuRateHz = v }
+    if let v = obj["streamImu"] as? Bool { s.streamImu = v }
+    if let v = obj["streamDepth"] as? Bool { s.streamDepth = v }
+    if let v = obj["streamPointCloud"] as? Bool { s.streamPointCloud = v }
+    if let v = obj["streamMesh"] as? Bool { s.streamMesh = v }
+    captureSettings = s
+    NSLog("[ArkitCaptureController] capture settings applied: %@", json)
+  }
+
+  // 書き出しの間引き (= 録画開始時に videoFormat fps と設定から確定)
+  private var recFrameStride = 1        // ARFrame N 枚に 1 枚書く (= mp4 + jsonl)
+  private var depthEveryWritten = 1     // 書いた frame M 枚に 1 枚 depth
+  private var pcEveryWritten = 1        // 書いた frame M 枚に 1 枚 point cloud
+  private var recArFrameCounter = 0
+  private var pointCloudFileHandle: FileHandle?
+
   // セッション稼働状態
   private var sessionRunning = false
 
@@ -141,13 +189,14 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let config = ARWorldTrackingConfiguration()
     config.worldAlignment = .gravity
     config.providesAudioData = false
-    if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+    config.isAutoFocusEnabled = captureSettings.autoFocus
+    if captureSettings.streamDepth, ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
       config.frameSemantics.insert(.sceneDepth)
     }
-    if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+    if captureSettings.streamMesh, ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
       config.sceneReconstruction = .mesh
     }
-    let chosen = pickPreferredFormat()
+    let chosen = pickPreferredFormat(resolution: captureSettings.resolution)
     if let f = chosen {
       config.videoFormat = f
       let isUltra: Bool = {
@@ -241,20 +290,48 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     writer.startWriting()
     writer.startSession(atSourceTime: .zero)
 
-    // sensor stream の出力 file を準備
+    // sensor stream の出力 file を準備 (= IMU / point cloud は設定 ON のときだけ作る)
     let sensorsURL = sessionDir.appendingPathComponent("realtime_handpose.jsonl")
     let imuURL = sessionDir.appendingPathComponent("imu.jsonl")
+    let pcURL = sessionDir.appendingPathComponent("pointcloud.jsonl")
     try removeIfExists(at: sensorsURL)
     try removeIfExists(at: imuURL)
+    try removeIfExists(at: pcURL)
+    try removeIfExists(at: sessionDir.appendingPathComponent("mesh.jsonl"))
     FileManager.default.createFile(atPath: sensorsURL.path, contents: nil)
-    FileManager.default.createFile(atPath: imuURL.path, contents: nil)
     let sensorsHandle = try FileHandle(forWritingTo: sensorsURL)
-    let imuHandle = try FileHandle(forWritingTo: imuURL)
+    var imuHandle: FileHandle?
+    if captureSettings.streamImu {
+      FileManager.default.createFile(atPath: imuURL.path, contents: nil)
+      imuHandle = try FileHandle(forWritingTo: imuURL)
+    }
+    var pcHandle: FileHandle?
+    if captureSettings.streamPointCloud {
+      FileManager.default.createFile(atPath: pcURL.path, contents: nil)
+      pcHandle = try FileHandle(forWritingTo: pcURL)
+    }
 
     // depth は録画中に depth.tar へ streaming 追記する (= 初回 depth frame で lazy 生成)。
     // ここでは旧 depth/ dir を念のため除去するだけ。
     try removeIfExists(at: sessionDir.appendingPathComponent("depth.tar"))
     try removeIfExists(at: sessionDir.appendingPathComponent("depth"))
+
+    // 書き出しレートの間引き幅を確定 (= session fps と設定から)。
+    let sessionFps: Double = {
+      if let cfg = session.configuration as? ARWorldTrackingConfiguration {
+        return Double(cfg.videoFormat.framesPerSecond)
+      }
+      return 30.0
+    }()
+    recFrameStride = max(1, Int((sessionFps / Double(max(1, captureSettings.recordingRate))).rounded()))
+    let effectiveRate = sessionFps / Double(recFrameStride)
+    let dRate = captureSettings.syncRate ? captureSettings.recordingRate
+      : min(captureSettings.depthRate, captureSettings.recordingRate)
+    let pRate = captureSettings.syncRate ? captureSettings.recordingRate
+      : min(captureSettings.pointCloudRate, captureSettings.recordingRate)
+    depthEveryWritten = max(1, Int((effectiveRate / Double(max(1, dRate))).rounded()))
+    pcEveryWritten = max(1, Int((effectiveRate / Double(max(1, pRate))).rounded()))
+    recArFrameCounter = 0
 
     // metadata.json は intrinsics 確定するまで待ちたいので、 初回 frame で書く
     // (= ARFrame の camera.intrinsics は最初の didUpdate まで埋まらない可能性)
@@ -267,6 +344,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.rgbMp4URL = mp4URL
     self.sensorsFileHandle = sensorsHandle
     self.imuFileHandle = imuHandle
+    self.pointCloudFileHandle = pcHandle
     self.frameIndexCounter = 0
 
     if !sessionRunning { startSession() }
@@ -303,9 +381,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         try self.sensorsFileHandle?.close()
         try self.imuFileHandle?.synchronize()
         try self.imuFileHandle?.close()
+        try self.pointCloudFileHandle?.synchronize()
+        try self.pointCloudFileHandle?.close()
       } catch {
         sensorCloseError = error
       }
+    }
+
+    // シーンメッシュ (= ARMeshAnchor) を mesh.jsonl に書き出す (= 設定 ON かつ LiDAR 機のみ)。
+    if captureSettings.streamMesh {
+      writeMeshJsonl(into: dir)
     }
 
     self.assetWriter = nil
@@ -316,6 +401,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.rgbMp4URL = nil
     self.sensorsFileHandle = nil
     self.imuFileHandle = nil
+    self.pointCloudFileHandle = nil
     self.depthTarHandle = nil
     self.frameIndexCounter = 0
 
@@ -348,7 +434,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       NSLog("[ArkitCaptureController] CMDeviceMotion unavailable, skipping imu_high_rate")
       return
     }
-    motionManager.deviceMotionUpdateInterval = 1.0 / 100.0
+    motionManager.deviceMotionUpdateInterval = 1.0 / Double(max(1, captureSettings.imuRateHz))
     motionQueue.maxConcurrentOperationCount = 1
     motionManager.startDeviceMotionUpdates(to: motionQueue) { [weak self] motion, _ in
       guard let self = self, let m = motion else { return }
@@ -463,11 +549,44 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // LiDAR depth (= sceneDepth がある Pro 機のみ)。 標準形式の 16-bit PNG (mm) を
     // depth.tar に streaming 追記する (= 数万 loose PNG を避け 1 ファイルで upload。 中身は標準 PNG)。
     // tar 内パスは depth/<frameIndex:06>.png (= 展開すれば RGB-D 標準の depth/ レイアウト)。
-    if let sceneDepth = frame.sceneDepth, sessionDirURL != nil {
+    // depth レートが RGB より低い設定では書いた frame ベースで間引く (= index は jsonl と共有)。
+    if let sceneDepth = frame.sceneDepth, sessionDirURL != nil, frameIndex % depthEveryWritten == 0 {
       let buffer = sceneDepth.depthMap
       let idx = frameIndex
       sensorFileQueue.async {
         self.appendDepthFrameToTar(depthMap: buffer, frameIndex: idx)
+      }
+    }
+
+    // 特徴点群 (= ARKit VIO の rawFeaturePoints)。 xyz は float32 LE、 id は uint64 LE を base64 で
+    // 1 frame 1 行 (= pointcloud.jsonl)。 world 座標なので蓄積すれば map になる。
+    if let pcHandle = pointCloudFileHandle,
+       frameIndex % pcEveryWritten == 0,
+       let cloud = frame.rawFeaturePoints,
+       !cloud.points.isEmpty {
+      var pts = [Float]()
+      pts.reserveCapacity(cloud.points.count * 3)
+      for pt in cloud.points {
+        pts.append(pt.x); pts.append(pt.y); pts.append(pt.z)
+      }
+      let ptsData = pts.withUnsafeBufferPointer { Data(buffer: $0) }
+      let ids = cloud.identifiers
+      let idsData = ids.withUnsafeBufferPointer { Data(buffer: $0) }
+      let pcLine: [String: Any] = [
+        "frame_index": frameIndex,
+        "timestamp_ns": tsNs,
+        "count": cloud.points.count,
+        "points_b64": ptsData.base64EncodedString(),
+        "ids_b64": idsData.base64EncodedString(),
+      ]
+      sensorFileQueue.async {
+        do {
+          let data = try JSONSerialization.data(withJSONObject: pcLine, options: [])
+          try pcHandle.write(contentsOf: data)
+          try pcHandle.write(contentsOf: Data("\n".utf8))
+        } catch {
+          NSLog("[ArkitCaptureController] pointcloud.jsonl write failed: %@", "\(error)")
+        }
       }
     }
   }
@@ -545,6 +664,73 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   }
 
   /// tar の終端 (= 2×512 byte の zero block) を書いて close する。 depth が無ければ no-op。
+  /// ARKit のシーン再構成メッシュ (ARMeshAnchor) を 1 anchor = 1 行の JSONL で書き出す。
+  /// vertices = float32 LE xyz × n、 faces = uint32 LE 頂点 index × 3 × m を base64 で持つ。
+  /// transform は row-major 4x4 (= realtime_handpose.jsonl の camera_transform と同じ流儀、 world 座標へ)。
+  private func writeMeshJsonl(into dir: URL) {
+    guard let anchors = session.currentFrame?.anchors else { return }
+    let meshAnchors = anchors.compactMap { $0 as? ARMeshAnchor }
+    guard !meshAnchors.isEmpty else {
+      NSLog("[ArkitCaptureController] no mesh anchors to export")
+      return
+    }
+    let url = dir.appendingPathComponent("mesh.jsonl")
+    FileManager.default.createFile(atPath: url.path, contents: nil)
+    guard let handle = try? FileHandle(forWritingTo: url) else { return }
+    defer { try? handle.close() }
+
+    for anchorObj in meshAnchors {
+      let g = anchorObj.geometry
+
+      let vCount = g.vertices.count
+      var verts = [Float]()
+      verts.reserveCapacity(vCount * 3)
+      let vBase = g.vertices.buffer.contents().advanced(by: g.vertices.offset)
+      for i in 0..<vCount {
+        let pv = vBase.advanced(by: i * g.vertices.stride).assumingMemoryBound(to: Float.self)
+        verts.append(pv[0]); verts.append(pv[1]); verts.append(pv[2])
+      }
+
+      let fCount = g.faces.count
+      let idxPer = g.faces.indexCountPerPrimitive
+      var faces = [UInt32]()
+      faces.reserveCapacity(fCount * idxPer)
+      let fBase = g.faces.buffer.contents()
+      let bytesPerIndex = g.faces.bytesPerIndex
+      for i in 0..<(fCount * idxPer) {
+        let off = i * bytesPerIndex
+        if bytesPerIndex == 4 {
+          faces.append(fBase.advanced(by: off).assumingMemoryBound(to: UInt32.self).pointee)
+        } else {
+          faces.append(UInt32(fBase.advanced(by: off).assumingMemoryBound(to: UInt16.self).pointee))
+        }
+      }
+
+      let t = anchorObj.transform
+      let rows: [[Float]] = [
+        [t.columns.0[0], t.columns.1[0], t.columns.2[0], t.columns.3[0]],
+        [t.columns.0[1], t.columns.1[1], t.columns.2[1], t.columns.3[1]],
+        [t.columns.0[2], t.columns.1[2], t.columns.2[2], t.columns.3[2]],
+        [t.columns.0[3], t.columns.1[3], t.columns.2[3], t.columns.3[3]],
+      ]
+      let vData = verts.withUnsafeBufferPointer { Data(buffer: $0) }
+      let fData = faces.withUnsafeBufferPointer { Data(buffer: $0) }
+      let line: [String: Any] = [
+        "identifier": anchorObj.identifier.uuidString,
+        "transform": rows,
+        "vertex_count": vCount,
+        "face_count": fCount,
+        "vertices_b64": vData.base64EncodedString(),
+        "faces_b64": fData.base64EncodedString(),
+      ]
+      if let data = try? JSONSerialization.data(withJSONObject: line, options: []) {
+        try? handle.write(contentsOf: data)
+        try? handle.write(contentsOf: Data("\n".utf8))
+      }
+    }
+    NSLog("[ArkitCaptureController] mesh.jsonl written: %d anchors", meshAnchors.count)
+  }
+
   private func finalizeDepthTar() {
     guard let h = depthTarHandle else { return }
     try? h.write(contentsOf: Data(count: 1024))
@@ -666,6 +852,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       ]
     }
 
+    // 書き出し fps は間引き後の実効値 (= mp4 / jsonl の実レート)。 sensor fps は camera.fps。
+    camera["recording_fps"] = fps / Double(max(1, recFrameStride))
+
+    let cs = captureSettings
     let dict: [String: Any] = [
       "recording_config": "arkit",
       "device_model": currentDeviceModel(),
@@ -673,6 +863,22 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "os_version": UIDevice.current.systemVersion,
       "app_version": "\(appVer) (\(appBuild))",
       "camera": camera,
+      "capture_settings": [
+        "resolution": cs.resolution,
+        "auto_focus": cs.autoFocus,
+        "recording_rate_hz": cs.recordingRate,
+        "sync_rate": cs.syncRate,
+        "depth_rate_hz": cs.depthRate,
+        "point_cloud_rate_hz": cs.pointCloudRate,
+        "imu_rate_hz": cs.imuRateHz,
+        "streams": [
+          "imu": cs.streamImu,
+          "depth": cs.streamDepth,
+          "point_cloud": cs.streamPointCloud,
+          "mesh": cs.streamMesh,
+        ],
+        "frame_stride": recFrameStride,
+      ],
       "calibration_baseline": NSNull(),
     ]
 
@@ -797,7 +1003,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
     // 録画 (= AVAssetWriter に pixelBuffer を append + realtime_handpose.jsonl 行 append)。 録画中のみ。
     if let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter {
-      // realtime_handpose.jsonl は全 ARFrame に 1 行ずつ。 RGB frame と frame_index を揃える
+      // 書き出しレート (= recordingRate) への間引き。 ARFrame N 枚に 1 枚だけ mp4 + jsonl に書く。
+      let arIdx = recArFrameCounter
+      recArFrameCounter += 1
+      guard arIdx % recFrameStride == 0 else { return }
+      // realtime_handpose.jsonl は書き出す frame に 1 行ずつ。 RGB frame と frame_index を揃える
       // (= 録画中に append される rgb frame と 1:1 で対応)
       self.writeSensorsLine(frame: frame)
 
@@ -831,7 +1041,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   ///   2. 広角 + 任意の解像度
   ///   3. 通常広角 + 720 系
   ///   4. ARKit の default
-  private func pickPreferredFormat() -> ARConfiguration.VideoFormat? {
+  private func pickPreferredFormat(resolution: String) -> ARConfiguration.VideoFormat? {
     let supported = ARWorldTrackingConfiguration.supportedVideoFormats
 
     if #available(iOS 16.0, *) {
@@ -847,24 +1057,36 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // 1x (wide) カメラの最大画角を選ぶ。
-    //   - ultra-wide は選ばない (= 0.5x は別の撮影構成 ultra_wide が担う)
-    //   - フルセンサー 4:3 を優先 (= 16:9 や 720p は縦を切り出した狭い画角)
-    //   - 同じアスペクトなら画角は同じなので、 最小解像度で十分 (= 1920x1440。 4K はファイルが 4 倍)
-    //   - 同解像度なら高 fps
+    // 1x (wide) カメラのみを候補にする (= 0.5x は別の撮影構成 ultra_wide が担う)。
     var pool = supported
     if #available(iOS 16.0, *) {
       let wides = supported.filter { $0.captureDeviceType == .builtInWideAngleCamera }
       if !wides.isEmpty { pool = wides }
     }
-    return pool.min { a, b in
-      let aspectA = a.imageResolution.height / a.imageResolution.width
-      let aspectB = b.imageResolution.height / b.imageResolution.width
-      if abs(aspectA - aspectB) > 0.01 { return aspectA > aspectB }
-      let areaA = a.imageResolution.width * a.imageResolution.height
-      let areaB = b.imageResolution.width * b.imageResolution.height
-      if areaA != areaB { return areaA < areaB }
-      return a.framesPerSecond > b.framesPerSecond
+
+    // 解像度設定。 "720p" / "1080p" は 16:9 の切り出し (= 画角は狭くなる)、 該当が無ければ
+    // デフォルト (= 4:3 フルセンサー最大画角) に落ちる。
+    switch resolution {
+    case "720p":
+      if let f = pool.min(by: { abs($0.imageResolution.height - 720) < abs($1.imageResolution.height - 720) }),
+         abs(f.imageResolution.height - 720) <= 120 { return f }
+      fallthrough
+    case "1080p":
+      if let f = pool.min(by: { abs($0.imageResolution.height - 1080) < abs($1.imageResolution.height - 1080) }),
+         abs(f.imageResolution.height - 1080) <= 120 { return f }
+      fallthrough
+    default:
+      // "1440p": フルセンサー 4:3 を優先 (= 最大画角)。 同じアスペクトなら画角は同じなので
+      // 最小解像度で十分 (= 1920x1440。 4K はファイルが 4 倍)。 同解像度なら高 fps。
+      return pool.min { a, b in
+        let aspectA = a.imageResolution.height / a.imageResolution.width
+        let aspectB = b.imageResolution.height / b.imageResolution.width
+        if abs(aspectA - aspectB) > 0.01 { return aspectA > aspectB }
+        let areaA = a.imageResolution.width * a.imageResolution.height
+        let areaB = b.imageResolution.width * b.imageResolution.height
+        if areaA != areaB { return areaA < areaB }
+        return a.framesPerSecond > b.framesPerSecond
+      }
     }
   }
 }

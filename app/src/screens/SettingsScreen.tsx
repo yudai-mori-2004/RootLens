@@ -18,6 +18,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Switch,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
@@ -30,6 +31,15 @@ import { useAuth } from '../services/auth';
 import { useT, useLocale, setLocale, type Locale } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 import { LegalDocModal } from '../components/LegalDocModal';
+import {
+  DEFAULT_CAPTURE_SETTINGS,
+  loadCaptureSettings,
+  saveCaptureSettings,
+  type CaptureSettings,
+  type CaptureResolution,
+  type ImuRate,
+  type RecordingRate,
+} from '../services/captureSettings';
 import type { LegalDocKey } from '../content/legalDocs.generated';
 
 export const SettingsScreen: React.FC = () => {
@@ -41,6 +51,19 @@ export const SettingsScreen: React.FC = () => {
   const [signingOut, setSigningOut] = useState(false);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
+
+  // 撮影設定 (= Stera 同構成)。 保存は即時、 適用は次の撮影画面オープンから。
+  const [cs, setCs] = useState<CaptureSettings>({ ...DEFAULT_CAPTURE_SETTINGS });
+  useEffect(() => {
+    loadCaptureSettings().then(setCs).catch(() => {});
+  }, []);
+  const updateCs = (patch: Partial<CaptureSettings>) => {
+    setCs((cur) => {
+      const next = { ...cur, ...patch };
+      saveCaptureSettings(next).catch(() => {});
+      return next;
+    });
+  };
 
   const version = (Constants.expoConfig?.version as string | undefined) ?? '0.1.0';
 
@@ -144,11 +167,96 @@ export const SettingsScreen: React.FC = () => {
         </Section>
 
         <Section title={t('settings.section.capture')}>
+          <SegmentRow
+            label={t('settings.capture.resolution')}
+            value={cs.resolution}
+            options={[
+              { value: '1440p', label: t('settings.capture.res1440') },
+              { value: '1080p', label: '1080p' },
+              { value: '720p', label: '720p' },
+            ]}
+            onChange={(v) => updateCs({ resolution: v as CaptureResolution })}
+          />
+          <SwitchRow
+            label={t('settings.capture.autoFocus')}
+            value={cs.autoFocus}
+            onChange={(v) => updateCs({ autoFocus: v })}
+          />
+          <SegmentRow
+            label={t('settings.capture.recordingRate')}
+            value={String(cs.recordingRate)}
+            options={[
+              { value: '15', label: '15 Hz' },
+              { value: '30', label: '30 Hz' },
+              { value: '60', label: '60 Hz' },
+            ]}
+            onChange={(v) => updateCs({ recordingRate: Number(v) as RecordingRate })}
+          />
+          <SwitchRow
+            label={t('settings.capture.syncRate')}
+            value={cs.syncRate}
+            onChange={(v) => updateCs({ syncRate: v })}
+          />
+          {!cs.syncRate ? (
+            <SegmentRow
+              label={t('settings.capture.depthRate')}
+              value={String(cs.depthRate)}
+              options={[
+                { value: '15', label: '15 Hz' },
+                { value: '30', label: '30 Hz' },
+                { value: '60', label: '60 Hz' },
+              ]}
+              onChange={(v) => updateCs({ depthRate: Number(v) as RecordingRate })}
+            />
+          ) : null}
+          {!cs.syncRate ? (
+            <SegmentRow
+              label={t('settings.capture.pointCloudRate')}
+              value={String(cs.pointCloudRate)}
+              options={[
+                { value: '15', label: '15 Hz' },
+                { value: '30', label: '30 Hz' },
+                { value: '60', label: '60 Hz' },
+              ]}
+              onChange={(v) => updateCs({ pointCloudRate: Number(v) as RecordingRate })}
+            />
+          ) : null}
+          <SegmentRow
+            label={t('settings.capture.imuRate')}
+            value={String(cs.imuRateHz)}
+            options={[
+              { value: '50', label: '50 Hz' },
+              { value: '100', label: '100 Hz' },
+              { value: '200', label: '200 Hz' },
+            ]}
+            onChange={(v) => updateCs({ imuRateHz: Number(v) as ImuRate })}
+          />
+          <Row label={t('settings.capture.streamRgb')} value={t('settings.capture.alwaysOn')} />
+          <SwitchRow
+            label={t('settings.capture.streamImu')}
+            value={cs.streamImu}
+            onChange={(v) => updateCs({ streamImu: v })}
+          />
+          <SwitchRow
+            label={t('settings.capture.streamDepth')}
+            value={cs.streamDepth}
+            onChange={(v) => updateCs({ streamDepth: v })}
+          />
+          <SwitchRow
+            label={t('settings.capture.streamPointCloud')}
+            value={cs.streamPointCloud}
+            onChange={(v) => updateCs({ streamPointCloud: v })}
+          />
+          <SwitchRow
+            label={t('settings.capture.streamMesh')}
+            value={cs.streamMesh}
+            onChange={(v) => updateCs({ streamMesh: v })}
+          />
           <ActionRow
             label={t('settings.recalibrate')}
             onPress={async () => {
               try {
-                await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
+                await AsyncStorage.removeItem('@rootlens/aim/v1'); // 照準の学習補正をリセット
               } catch {}
             }}
           />
@@ -279,6 +387,22 @@ const ActionRow: React.FC<{
 };
 
 /// 1 行に収まるコンパクトなセグメント切替 (= ラベル左、 セグメント右)。
+const SwitchRow: React.FC<{
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}> = ({ label, value, onChange }) => (
+  <View style={styles.segmentRow}>
+    <Text style={styles.rowLabelInline}>{label}</Text>
+    <Switch
+      value={value}
+      onValueChange={onChange}
+      trackColor={{ true: colors.emerald, false: colors.border }}
+      thumbColor="#FFFFFF"
+    />
+  </View>
+);
+
 const SegmentRow: React.FC<{
   label: string;
   value: string;

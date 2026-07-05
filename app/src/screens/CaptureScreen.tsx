@@ -68,6 +68,7 @@ import {
   updateLearnedAim,
   useCameraPitch,
 } from '../services/aimCalibration';
+import { applyCaptureSettingsToNative } from '../services/captureSettings';
 import { PeaceHoldDetector } from '../domain/gestureDetect';
 import { t, useT } from '../i18n';
 import { colors, fonts, typography } from '../theme';
@@ -320,6 +321,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           await delay(CAMERA_RELEASE_DELAY_MS);
           if (cancelled) return;
         }
+        // 保存済みの撮影設定 (解像度 / レート / ストリーム) を session 起動前に native へ反映
+        await applyCaptureSettingsToNative().catch((e) =>
+          sink({ step: 'capture', level: 'warn', message: `撮影設定の適用失敗: ${errMsg(e)}` }),
+        );
         await target.startSession(sink);
         runningConfigRef.current = target;
         if (cancelled) return;
