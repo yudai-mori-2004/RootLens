@@ -60,8 +60,8 @@ export const ClipCard: React.FC<Props> = ({ clip, width, previewSource, onOpen }
             <Text style={styles.chipTextLight}>{t('clip.errorEyebrow')}</Text>
           </View>
         ) : isUploading ? (
-          <View style={[styles.chip, styles.chipInk]}>
-            <Text style={styles.chipTextLight}>
+          <View style={[styles.chip, styles.chipAmber]}>
+            <Text style={styles.chipTextDark}>
               {t('clip.uploading')}{progress > 0 ? ` ${Math.round(progress * 100)}%` : ''}
             </Text>
           </View>
@@ -216,14 +216,23 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: radii.sm,
   },
-  chipInk: { backgroundColor: 'rgba(10,12,16,0.85)' },
+  // サムネの上に載る文字は「琥珀地に黒」 か「濃い地に白」。 colors.paper (= ダークテーマでは
+  // ほぼ黒) を文字色に使うと黒地に黒文字になるので使わない。
+  chipAmber: { backgroundColor: colors.emerald },
   chipDanger: { backgroundColor: 'rgba(200,64,52,0.95)' },
   chipTextLight: {
     fontFamily: fonts.sansSemibold,
     fontSize: 9.5,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
-    color: colors.paper,
+    color: '#FFFFFF',
+  },
+  chipTextDark: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 9.5,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: '#131519',
   },
 
   durationTag: {
@@ -238,7 +247,7 @@ const styles = StyleSheet.create({
   durationText: {
     fontFamily: fonts.mono,
     fontSize: 10.5,
-    color: colors.paper,
+    color: '#FFFFFF',
   },
 
   progressTrack: {

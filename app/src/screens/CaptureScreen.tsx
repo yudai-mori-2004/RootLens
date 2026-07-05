@@ -124,11 +124,11 @@ const RELEASE_GRACE_MS = 800;
 const COUNTDOWN_TICKS = 3;
 const COUNTDOWN_TICK_MS = 750;
 const HAND_LOST_WARN_MS = 5000;
-const STOP_HINT_DELAY_MS = 5000;        // 録画開始から終了方法の案内までの間
+const STOP_HINT_DELAY_MS = 3000;        // 録画開始から終了方法の案内までの間
 const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
 
-// 中央許容範囲 (= 縦方向のみ ±12%)。 左右は姿勢でほぼ決まるので見ない (2026-07-06 判断)。
-const CALIBRATION_CENTER_MARGIN = 0.12;
+// 中央許容範囲 (= 縦方向のみ ±10%)。 左右は姿勢でほぼ決まるので見ない (2026-07-06 判断)。
+const CALIBRATION_CENTER_MARGIN = 0.10;
 const LANDMARK_CONF = 0.3;
 
 const STORAGE_BASELINE_KEY = '@rootlens/calibration/baseline/v1';
