@@ -103,6 +103,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private let latestHandOutputLock = NSLock()
 
   // 録画 state (recording 中のみ非 nil)
+  // 停止中フラグ: stopRecording が finishWriting を始める前に frameQueue バリア越しに true にする。
+  // 以降 frameQueue 上の映像追記は必ず bail するので、 追記と finishWriting が別スレッドで競合して
+  // writer が .failed に落ちる (= "The operation couldn't be completed") のを構造的に防ぐ。
+  private var finishingWriter = false
   private var assetWriter: AVAssetWriter?
   private var videoInput: AVAssetWriterInput?
   private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
@@ -366,6 +370,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // metadata.json は intrinsics 確定するまで待ちたいので、 初回 frame で書く
     // (= ARFrame の camera.intrinsics は最初の didUpdate まで埋まらない可能性)
 
+    self.finishingWriter = false
     self.assetWriter = writer
     self.videoInput = input
     self.pixelBufferAdaptor = adaptor
@@ -393,6 +398,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     handTracker.setRecordingMode(false)
     stopMotionUpdates()
+
+    // 進行中の映像追記を frameQueue (シリアル) 上で流し切り、 以後の追記を止めてから writer を閉じる。
+    // frameQueue.sync は enqueue 済みの append をすべて完了させてからフラグを立てるので、
+    // これ以降に append が finishWriting と重なることはない。
+    frameQueue.sync { self.finishingWriter = true }
 
     input.markAsFinished()
     let group = DispatchGroup()
@@ -1115,7 +1125,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
 
     // 録画 (= AVAssetWriter に pixelBuffer を append + realtime_handpose.jsonl 行 append)。 録画中のみ。
-    if let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter {
+    if !finishingWriter, let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter {
       // 書き出しレート (= recordingRate) への間引き。 ARFrame N 枚に 1 枚だけ mp4 + jsonl に書く。
       let arIdx = recArFrameCounter
       recArFrameCounter += 1
@@ -1126,6 +1136,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
       frameQueue.async { [weak self] in
         guard let self = self else { return }
+        // 停止に入ったら追記しない (= 権威的なゲート。 フラグは frameQueue 上で立つので順序保証がある)。
+        guard !self.finishingWriter else { return }
         guard writer.status == .writing else { return }
         guard let inp = self.videoInput, inp.isReadyForMoreMediaData else { return }
 
