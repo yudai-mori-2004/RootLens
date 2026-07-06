@@ -53,7 +53,7 @@ import {
   type HandTrackEvent,
 } from '../dataflow';
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
-import { enqueueSfx, enqueueSpeak, clearAudioQueue, getLastSpeechDone } from '../services/captureAudio';
+import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone } from '../services/captureAudio';
 import { applyCaptureSettingsToNative } from '../services/captureSettings';
 import { useCameraPitch } from '../services/devicePitch';
 import { GestureStabilizer } from '../domain/gestureDetect';
@@ -117,12 +117,12 @@ const MOUNT_WORN_PITCH_RANGE = { min: -30, max: 70 } as const; // 机に平置�
 // ⚠ 離脱判定は RELEASE_GRACE_MS のヒステリシス: 単フレームの検出フリッカーで即キャンセル (= 音声プチ切れ)
 //    しないよう、 thumbs-up が連続して消えて初めて離脱とみなす。
 const THUMBS_UP_ARM_MS = 300;
-const THUMBS_UP_HOLD_MS = 1000;
+const THUMBS_UP_HOLD_MS = 700;   // ARM と合わせて計 1.0 秒キープでチャイム + 確認 TTS
 // 離脱猶予を長めに (= 立て続けている最中の検出フリッカーを吸収。 意図的な離脱はこれより長く手を動かす)。
 const RELEASE_GRACE_MS = 800;
-// 開始カウント: 3,2,1 を COUNTDOWN_TICK_MS 間隔で刻む (= 秒ベースより速いテンポ)。 合計 = 3 * tick。
+// 開始カウント: 3,2,1 を COUNTDOWN_TICK_MS 間隔で刻む (= 120bpm)。 合計 = 3 * tick。
 const COUNTDOWN_TICKS = 3;
-const COUNTDOWN_TICK_MS = 750;
+const COUNTDOWN_TICK_MS = 500;
 const HAND_LOST_WARN_MS = 5000;
 const STOP_HINT_DELAY_MS = 3000;        // 録画開始から終了方法の案内までの間
 const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
@@ -698,8 +698,12 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         if (!thumbsUp) {
           const lostSince = cur.lostSince === 0 ? now : cur.lostSince;
           if (now - lostSince >= RELEASE_GRACE_MS) {
-            // 本当に離した → キャンセルして録画継続 (= 案内音声も止める)。
+            // 本当に離した → キャンセルして録画継続 (= 確認 TTS も止める)。
+            // 止め方が分からなくて離した可能性が高いので、 1 秒おいて終了方法をもう一度案内する
+            // (= 直列キューなので、 すぐ再挑戦して stopping_confirm に入れば cue が上書きする)。
             clearAudioQueue();
+            enqueuePause(1000);
+            enqueueSpeak(t('capture.tts.stopHint'));
             setState({ kind: 'recording', startTs: now, lastHandSeenTs: now, lastWarnTs: 0, armedSince: 0 });
           } else if (lostSince !== cur.lostSince) {
             setState({ ...cur, lostSince });
