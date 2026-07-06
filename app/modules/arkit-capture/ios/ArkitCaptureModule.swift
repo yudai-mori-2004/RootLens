@@ -19,7 +19,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
   public func definition() -> ModuleDefinition {
     Name("ArkitCapture")
 
-    Events("onHandTrack")
+    Events("onHandTrack", "onThermalState")
 
     OnCreate {
       ArkitCaptureController.shared.delegate = self
@@ -94,6 +94,19 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       return ARWorldTrackingConfiguration.isSupported
     }
 
+    // 画面消灯 (= 長時間録画の省電力・発熱対策): 輝度 0 + プレビュー描画停止。 false で復帰。
+    AsyncFunction("setScreenDimmed") { (dimmed: Bool, promise: Promise) in
+      DispatchQueue.main.async {
+        ArkitCaptureController.shared.setScreenDimmed(dimmed)
+        promise.resolve(nil)
+      }
+    }
+
+    // 現在の熱状態。 録画中の変化は onThermalState イベントで届く。
+    AsyncFunction("getThermalState") { () -> String in
+      return ArkitCaptureController.thermalStateString(ProcessInfo.processInfo.thermalState)
+    }
+
     AsyncFunction("setDisplayOrientation") { (value: String, promise: Promise) in
       let o: DisplayOrientation = {
         switch value {
@@ -113,6 +126,10 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
   func arkitCapture(didTrackHand output: HandTracker.Output) {
     let payload = buildHandTrackPayload(output)
     sendEvent("onHandTrack", payload)
+  }
+
+  func arkitCapture(didChangeThermalState state: String) {
+    sendEvent("onThermalState", ["state": state])
   }
 
   private func buildHandTrackPayload(_ out: HandTracker.Output) -> [String: Any] {

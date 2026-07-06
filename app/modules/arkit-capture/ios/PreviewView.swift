@@ -32,9 +32,21 @@ final class ArkitCapturePreviewView: ExpoView {
     addSubview(scnView)
     scnView.session = ArkitCaptureController.shared.arSession
     scnView.automaticallyUpdatesLighting = true
+    // 画面消灯 (= 長時間録画): 黒画面の下で 60fps 描画を続けない。 GPU / 帯域ぶんの発熱を削る。
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(onDimChanged(_:)), name: .rootlensPreviewDim, object: nil)
   }
 
   required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
+
+  deinit { NotificationCenter.default.removeObserver(self) }
+
+  @objc private func onDimChanged(_ n: Notification) {
+    let dimmed = (n.userInfo?["dimmed"] as? Bool) ?? false
+    scnView.isHidden = dimmed
+    // hidden でも display link が回り得るので描画レートも落とす (0 = デフォルトに復帰)。
+    scnView.preferredFramesPerSecond = dimmed ? 1 : 0
+  }
 
   override func layoutSubviews() {
     super.layoutSubviews()

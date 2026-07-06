@@ -15,7 +15,8 @@
 //   2. 撮影
 //        - サムズアップ 1 秒 → 3 秒カウントダウン → 録画停止 → 次タスク提案 → キャリブレーションに戻る
 //        - 両手が 5 秒以上画面から外れたら警告音 + TTS
-//        - 60 分は native 側で hard cap
+//        - 1 本 ~100 分の長時間録画を想定した守り: 録画が乗ったら画面消灯 (タップで復帰)、
+//          熱 critical / 空き容量低下 / 120 分で理由を読み上げて自動終了
 //
 // ⚠ v0.1.4: 録画停止後の自動アップロードは行わない。 クリップは state 'recorded' でローカル一覧
 //    (マイビデオ) に積まれ、 ユーザーがプレビュー確認 → 「アップロード」 した時に advanceClip が
@@ -36,12 +37,19 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import Svg, { Circle, Defs, Line, LinearGradient as SvgLinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { Camera } from 'expo-camera';
 import * as Device from 'expo-device';
+import * as FileSystem from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../app/types';
 import { WideCapturePreviewView } from '../native/wideCapture';
-import { ArkitCapturePreviewView } from '../native/arkitCapture';
+import {
+  ArkitCapturePreviewView,
+  getArkitThermalState,
+  setArkitScreenDimmed,
+  subscribeThermalState,
+  type ThermalState,
+} from '../native/arkitCapture';
 import {
   DEFAULT_RECORDING_CONFIG,
   RECORDING_CONFIGS,
@@ -126,6 +134,17 @@ const COUNTDOWN_TICK_MS = 500;
 const HAND_LOST_WARN_MS = 5000;
 const STOP_HINT_DELAY_MS = 3000;        // 録画開始から終了方法の案内までの間
 const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
+
+// ── 長時間録画 (= 1 本 ~100 分想定) の守り ──
+// 熱源はカメラ ISP + ARKit + 手ポーズ推論で録画中は止められない。 削れる最大の発熱源が画面なので、
+// 録画が乗ったら消灯する (= 輝度 0 + プレビュー描画停止。 タップで復帰)。 加えて、 続行できない状況
+// (= 熱 critical / 空き容量枯渇 / 停止し忘れ) は理由を 1 回読み上げて通常の終了フローで安全に畳む。
+const DIM_AFTER_MS = 15_000;            // 録画開始からこの時間で画面消灯
+const REDIM_AFTER_TAP_MS = 8_000;       // タップ復帰からの再消灯
+const MAX_RECORDING_MS = 120 * 60_000;  // 停止し忘れの安全弁 (= 100 分撮影 + 余裕)
+const LOW_DISK_WARN_BYTES = 12 * 1024 ** 3;  // 録画開始時にこれ未満なら一言注意
+const LOW_DISK_STOP_BYTES = 2 * 1024 ** 3;   // 録画中にこれを切ったら自動終了 (= writer が死ぬ前に)
+const DISK_POLL_MS = 30_000;
 
 // 中央許容範囲 (= 縦方向のみ ±10%)。 左右は姿勢でほぼ決まるので見ない (2026-07-06 判断)。
 const CALIBRATION_CENTER_MARGIN = 0.10;
@@ -283,6 +302,13 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
+  // 長時間録画の守り (= 熱 / 空き容量 / 画面消灯)。 判定は ticker、 ここは観測値の置き場。
+  const thermalRef = useRef<ThermalState>('nominal');
+  const freeDiskRef = useRef<number | null>(null);
+  const autoStopReasonRef = useRef<string | null>(null); // finalizing 冒頭で 1 回読む自動終了の理由
+  const [dimmed, setDimmed] = useState(false);
+  const wakeUntilRef = useRef(0); // タップ復帰後、 この時刻までは再消灯しない
+
   const recordingStartedRef = useRef(false);
   // 終了方法の案内 (= 録画開始から数秒後に 1 回だけ)
   const stopHintSpokenRef = useRef(false);
@@ -407,6 +433,64 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     config.setDisplayOrientation('landscapeRight').catch(() => {});
   }, [config]);
 
+  // 熱状態の購読 (= native は録画中のみ発火) + 空き容量の初期値。
+  useEffect(() => {
+    getArkitThermalState().then((s) => { thermalRef.current = s; }).catch(() => {});
+    FileSystem.getFreeDiskStorageAsync().then((b) => { freeDiskRef.current = b; }).catch(() => {});
+    const sub = subscribeThermalState(({ state: s }) => {
+      thermalRef.current = s;
+      sink({
+        step: 'capture',
+        level: s === 'critical' ? 'error' : 'info',
+        message: `端末の熱状態: ${s}`,
+      });
+    });
+    return () => sub.remove();
+  }, []);
+
+  // 録画中の空き容量ポーリング (= 30 秒ごと。 判定は ticker が freeDiskRef を見る)。
+  useEffect(() => {
+    const k = state.kind;
+    const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
+    if (!active) return;
+    let cancelled = false;
+    const poll = () => {
+      FileSystem.getFreeDiskStorageAsync()
+        .then((b) => { if (!cancelled) freeDiskRef.current = b; })
+        .catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, DISK_POLL_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [state.kind]);
+
+  // 画面消灯の driver: 録画が DIM_AFTER_MS 乗ったら消灯。 録画フローを抜けたら必ず復帰。
+  useEffect(() => {
+    const k = state.kind;
+    const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
+    if (!active) {
+      setDimmed(false);
+      wakeUntilRef.current = 0;
+      return;
+    }
+    const id = setInterval(() => {
+      const started = recordingStartedAtRef.current;
+      const now = Date.now();
+      if (started > 0 && now - started >= DIM_AFTER_MS && now >= wakeUntilRef.current) {
+        setDimmed(true);
+      }
+    }, 500);
+    return () => clearInterval(id);
+  }, [state.kind]);
+
+  // 消灯を native に反映 (= 輝度 + プレビュー描画)。 unmount では必ず復帰させる。
+  useEffect(() => {
+    setArkitScreenDimmed(dimmed).catch(() => {});
+  }, [dimmed]);
+  useEffect(() => {
+    return () => { setArkitScreenDimmed(false).catch(() => {}); };
+  }, []);
+
   // hand track subscription (= アクティブ構成のストリームを購読、 切替で貼り替え)。
   // ⚠ ここで tickState() を呼ばない: native イベントは ~15-30Hz で来るので、 毎イベント
   //    setState すると再描画ストーム → "Maximum update depth" でクラッシュする。 状態機械は
@@ -476,6 +560,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           recordingStartedAtRef.current = Date.now();
           sessionDirRef.current = session.sessionDir;
           // 録画開始の合図は countdown_end (= precapture_countdown 末尾で 1 度だけ鳴る) で完結。
+          // 空きが心もとない時だけ一言 (= 長時間撮影は途中終了があり得ると先に伝える)。
+          if (freeDiskRef.current !== null && freeDiskRef.current < LOW_DISK_WARN_BYTES) {
+            enqueueSpeak(t('capture.tts.lowDisk'));
+          }
         } catch (e: any) {
           recordingStartedRef.current = false;
           setError(`${t('capture.recStartFailed')}: ${e?.message ?? e}`);
@@ -488,6 +576,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         try {
           // 停止確定 → 残っている案内音声 (「このままキープ…」 等) を捨てて停止音を即鳴らせるようにする。
           clearAudioQueue();
+          // 自動終了 (= 熱 / 容量 / 長時間) はここで理由を 1 回だけ読む (= 保存と並行して再生される)。
+          const autoStopReason = autoStopReasonRef.current;
+          autoStopReasonRef.current = null;
+          if (autoStopReason) enqueueSpeak(autoStopReason);
           const session = await config.stopRecording(sink);
           sessionDirRef.current = session.sessionDir;
 
@@ -647,6 +739,19 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // 開始カウントダウンは専用 timer (countdown driver effect) が駆動。 ここでは何もしない。
         return;
       case 'recording': {
+        // 長時間録画の安全弁 (= 手検出と無関係に判定)。 続行できない状況は理由を積んで終了フローへ。
+        // 判定順 = 危険度順: 熱 critical (放置すると OS がカメラごと殺す) > 容量 (writer が書けなくなる) > 長時間。
+        const startedAt = recordingStartedAtRef.current;
+        const autoStopReason =
+          thermalRef.current === 'critical' ? t('capture.tts.autoStopHot')
+          : freeDiskRef.current !== null && freeDiskRef.current < LOW_DISK_STOP_BYTES ? t('capture.tts.autoStopDisk')
+          : startedAt > 0 && now - startedAt >= MAX_RECORDING_MS ? t('capture.tts.autoStopLong')
+          : null;
+        if (autoStopReason) {
+          autoStopReasonRef.current = autoStopReason;
+          setState({ kind: 'finalizing' });
+          return;
+        }
         if (!e) return;
         // 録画が乗ってきた頃に、 終了方法を 1 回だけ案内する (= 遷移を駆動しない副作用)。
         if (!stopHintSpokenRef.current && now - cur.startTs >= STOP_HINT_DELAY_MS) {
@@ -1055,6 +1160,21 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
       ) : null}
+
+      {/* 画面消灯 (= 長時間録画の省電力)。 OLED は黒 = 消灯なので全面黒 + ごく暗い録画ドットだけ。
+          どこをタップしても復帰する (= 復帰後しばらくして再消灯)。 */}
+      {dimmed ? (
+        <Pressable
+          accessibilityLabel={t('capture.recordingLabel')}
+          style={styles.dimOverlay}
+          onPress={() => {
+            wakeUntilRef.current = Date.now() + REDIM_AFTER_TAP_MS;
+            setDimmed(false);
+          }}
+        >
+          <View style={[styles.dimDot, { top: safeTop + 14, right: safeRight + 14 }]} />
+        </Pressable>
+      ) : null}
     </View>
   );
 };
@@ -1284,4 +1404,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansRegular,
     fontSize: 13,
   },
+
+  // 画面消灯 (= 長時間録画)。 ドットはごく暗い赤 (= 発光を最小にしつつ「録画中」 が分かる)。
+  dimOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000', zIndex: 10 },
+  dimDot: { position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#571510' },
 });

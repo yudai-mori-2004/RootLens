@@ -56,6 +56,9 @@ export interface HandTrackEvent {
  *  ジョイント座標系の補正をする。 録画中は変更しない (= MCAP intrinsics が固定でないと困る)。 */
 export type DisplayOrientation = 'portrait' | 'landscapeLeft' | 'landscapeRight';
 
+/** 端末の熱状態 (= ProcessInfo.thermalState)。 critical は撮影を安全に畳むべき水準。 */
+export type ThermalState = 'nominal' | 'fair' | 'serious' | 'critical' | 'unknown';
+
 interface ArkitCaptureNativeModule {
   isAvailable(): Promise<boolean>;
   startSession(): Promise<void>;
@@ -69,6 +72,8 @@ interface ArkitCaptureNativeModule {
   setCaptureSettings(json: string): Promise<void>;
   captureSnapshot(): Promise<string>;
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
+  setScreenDimmed(dimmed: boolean): Promise<void>;
+  getThermalState(): Promise<ThermalState>;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 }
@@ -121,6 +126,26 @@ export async function captureArkitSnapshot(): Promise<string> {
 export async function setArkitDisplayOrientation(orientation: DisplayOrientation): Promise<void> {
   if (!nativeModule) return;
   return nativeModule.setDisplayOrientation(orientation);
+}
+
+/** 画面消灯 (= 長時間録画の省電力・発熱対策): 輝度 0 + プレビュー描画停止。 false で復帰。 */
+export async function setArkitScreenDimmed(dimmed: boolean): Promise<void> {
+  if (!nativeModule) return;
+  return nativeModule.setScreenDimmed(dimmed);
+}
+
+/** 現在の熱状態。 録画中の変化は subscribeThermalState で届く。 */
+export async function getArkitThermalState(): Promise<ThermalState> {
+  if (!nativeModule) return 'unknown';
+  return nativeModule.getThermalState();
+}
+
+/** 熱状態の変化 (= 録画中のみ発火)。 */
+export function subscribeThermalState(listener: (e: { state: ThermalState }) => void): { remove: () => void } {
+  if (!nativeModule) return { remove: () => {} };
+  const sub = (nativeModule as any).addListener?.('onThermalState', listener);
+  if (sub && typeof sub.remove === 'function') return sub;
+  return { remove: () => (nativeModule as any).removeListeners?.(1) };
 }
 
 /** イベント購読: 15 Hz で発火 */

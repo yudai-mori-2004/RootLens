@@ -156,6 +156,11 @@ const ja = {
   'capture.tts.stoppingConfirm': '撮影を終了します。',
   'capture.tts.stopHint': '終了するときは、両手で親指を立てて、そのままキープしてください。',
   'capture.tts.handLost': '両手をカメラに映してください。',
+  // 自動終了の理由 (= 熱 / 空き容量 / 長時間の安全弁)。 終了フロー冒頭で 1 回だけ読む。
+  'capture.tts.autoStopHot': '本体が熱くなったため、撮影を終了します。',
+  'capture.tts.autoStopDisk': '空き容量が少なくなったため、撮影を終了します。',
+  'capture.tts.autoStopLong': '撮影が長くなったので、ここでいったん終了します。',
+  'capture.tts.lowDisk': '本体の空き容量が少なめです。長い撮影は途中で終わることがあります。',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
   'upload.consentTitle': 'アップロード前の確認',
@@ -322,6 +327,10 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.stoppingConfirm': 'Ending the recording.',
   'capture.tts.stopHint': 'To finish, hold a thumbs-up with both hands and keep it steady.',
   'capture.tts.handLost': 'Show both hands to the camera.',
+  'capture.tts.autoStopHot': 'The phone is getting hot, so recording will stop now.',
+  'capture.tts.autoStopDisk': 'Storage is running low, so recording will stop now.',
+  'capture.tts.autoStopLong': 'This has been a long recording, so it will stop here.',
+  'capture.tts.lowDisk': 'Free storage is limited. A long recording may stop early.',
 
   // ── Upload consent pop (= tap a card in My Videos) ──
   'upload.consentTitle': 'Before you upload',

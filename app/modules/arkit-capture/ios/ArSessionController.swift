@@ -22,6 +22,14 @@ import simd
 
 protocol ArkitCaptureControllerDelegate: AnyObject {
   func arkitCapture(didTrackHand output: HandTracker.Output)
+  /// 録画中に端末の熱状態 (= ProcessInfo.thermalState) が変わった。 "nominal" | "fair" | "serious" | "critical"。
+  func arkitCapture(didChangeThermalState state: String)
+}
+
+extension Notification.Name {
+  /// 画面消灯 (= 長時間録画の省電力・発熱対策)。 userInfo["dimmed"]: Bool。
+  /// PreviewView が購読してプレビュー描画を止める / 再開する。
+  static let rootlensPreviewDim = Notification.Name("io.rootlens.preview.dim")
 }
 
 /// 表示 orientation。 RN 側の ScreenOrientation listener から動的に渡される。
@@ -164,6 +172,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // セッション稼働状態
   private var sessionRunning = false
 
+  // 熱状態の記録 (= 録画中のみ)。 events は sensorFileQueue 上でだけ触る。
+  private var thermalObserver: NSObjectProtocol?
+  private var thermalEvents: [[String: Any]] = []
+
+  // 画面消灯前の輝度 (= 復帰時に戻す)。 main thread でだけ触る。
+  private var brightnessBeforeDim: CGFloat?
+
   private override init() {
     super.init()
     session.delegate = self
@@ -211,12 +226,19 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     session.run(config, options: [.resetTracking, .removeExistingAnchors])
     sessionRunning = true
+    // 撮影中は画面に触らない (= ヘッドセット装着) ので、 自動ロックを止める。
+    // これが無いと数十秒でロック → ARSession 停止 → 録画が黙って死ぬ。
+    DispatchQueue.main.async { UIApplication.shared.isIdleTimerDisabled = true }
   }
 
   func stopSession() {
     if !sessionRunning { return }
     session.pause()
     sessionRunning = false
+    DispatchQueue.main.async {
+      UIApplication.shared.isIdleTimerDisabled = false
+      self.setScreenDimmed(false)  // 消灯したまま画面を離れても輝度を戻す
+    }
     // 構成切替 (arkit → ultra_wide) で AVCaptureSession が同じ ultra-wide カメラを掴む前に、
     // ARKit frame の IOSurface を宙に浮かせないよう、 in-flight の HandTracker (= Vision/ANE) を
     // drain し、 保持中の pixel buffer / hand output を解放する (= wide-capture 側と対称)。
@@ -270,6 +292,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
       ],
     ]
+    // fragmented MP4 (= 10 秒ごとに moof を確定)。 通常の MP4 は moov を最後にしか書かないので、
+    // 長時間録画の途中でアプリが死ぬと全編が読めなくなる。 fragment 化すると直前の確定分までは
+    // 再生・変換できる (= 100 分録画の 99 分目クラッシュでも 10 秒しか失わない)。
+    writer.movieFragmentInterval = CMTimeMakeWithSeconds(10.0, preferredTimescale: 600)
+
     let input = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
     input.expectsMediaDataInRealTime = true
     input.transform = currentDisplayOrientation().videoTransform
@@ -350,6 +377,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     if !sessionRunning { startSession() }
     handTracker.setRecordingMode(true)
     startMotionUpdates()
+    startThermalMonitoring()
 
     return sessionDir
   }
@@ -393,6 +421,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       writeMeshJsonl(into: dir)
     }
 
+    stopThermalMonitoring(mergingInto: dir)
+
     self.assetWriter = nil
     self.videoInput = nil
     self.pixelBufferAdaptor = nil
@@ -417,6 +447,79 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
                     ])
     }
     return dir
+  }
+
+  // MARK: - 熱状態の監視 (= 長時間録画の安全弁)
+
+  static func thermalStateString(_ s: ProcessInfo.ThermalState) -> String {
+    switch s {
+    case .nominal:  return "nominal"
+    case .fair:     return "fair"
+    case .serious:  return "serious"
+    case .critical: return "critical"
+    @unknown default: return "unknown"
+    }
+  }
+
+  /// ARFrame.timestamp と同じ時間軸 (= systemUptime) の ns。 熱イベントを frame 列と突き合わせられる。
+  private static func uptimeNs() -> Int64 {
+    Int64(ProcessInfo.processInfo.systemUptime * 1_000_000_000.0)
+  }
+
+  private func startThermalMonitoring() {
+    let initial = ProcessInfo.processInfo.thermalState
+    sensorFileQueue.async {
+      self.thermalEvents = [["timestamp_ns": Self.uptimeNs(),
+                             "state": Self.thermalStateString(initial)]]
+    }
+    thermalObserver = NotificationCenter.default.addObserver(
+      forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: nil
+    ) { [weak self] _ in
+      guard let self = self else { return }
+      let str = Self.thermalStateString(ProcessInfo.processInfo.thermalState)
+      NSLog("[ArkitCaptureController] thermal state -> %@", str)
+      self.sensorFileQueue.async {
+        self.thermalEvents.append(["timestamp_ns": Self.uptimeNs(), "state": str])
+      }
+      self.delegate?.arkitCapture(didChangeThermalState: str)
+    }
+  }
+
+  /// 監視を止め、 記録した遷移列を metadata.json に thermal_events として合流させる
+  /// (= metadata.json は初回 frame で書かれているので read-modify-write)。
+  private func stopThermalMonitoring(mergingInto dir: URL) {
+    if let obs = thermalObserver {
+      NotificationCenter.default.removeObserver(obs)
+      thermalObserver = nil
+    }
+    var events: [[String: Any]] = []
+    sensorFileQueue.sync { events = self.thermalEvents; self.thermalEvents = [] }
+    guard !events.isEmpty else { return }
+    let url = dir.appendingPathComponent("metadata.json")
+    guard let data = try? Data(contentsOf: url),
+          var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+      NSLog("[ArkitCaptureController] metadata.json not readable, thermal_events dropped")
+      return
+    }
+    obj["thermal_events"] = events
+    if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
+      try? out.write(to: url, options: .atomic)
+    }
+  }
+
+  // MARK: - 画面消灯 (= 長時間録画の省電力・発熱対策。 main thread から呼ぶ)
+
+  /// 輝度を 0 にし、 プレビュー描画を止める (= 復帰で元の輝度に戻す)。 OLED では黒 = 消灯。
+  /// 録画・センサ書き出し・音声は一切影響を受けない。
+  func setScreenDimmed(_ dimmed: Bool) {
+    if dimmed {
+      if brightnessBeforeDim == nil { brightnessBeforeDim = UIScreen.main.brightness }
+      UIScreen.main.brightness = 0.0
+    } else if let b = brightnessBeforeDim {
+      UIScreen.main.brightness = b
+      brightnessBeforeDim = nil
+    }
+    NotificationCenter.default.post(name: .rootlensPreviewDim, object: nil, userInfo: ["dimmed": dimmed])
   }
 
   /// 存在しなければ no-op、 存在すれば throw 込みで削除する。 try? の代わりに使う。
