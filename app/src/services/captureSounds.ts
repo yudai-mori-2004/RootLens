@@ -104,6 +104,7 @@ export async function playSfxAwait(name: SfxName): Promise<void> {
   if (!s) return;
   await new Promise<void>((resolve) => {
     let done = false;
+    let started = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const finish = () => {
       if (done) return;
@@ -113,11 +114,16 @@ export async function playSfxAwait(name: SfxName): Promise<void> {
       resolve();
     };
     s.setOnPlaybackStatusUpdate((st) => {
-      if (st.isLoaded && st.didJustFinish) finish();
+      if (!st.isLoaded) return;
+      if (st.isPlaying) { started = true; return; }
+      // 自然終了 (didJustFinish) だけでなく、 stopAllSfx で止められた場合 (= 再生開始後に
+      // isPlaying が false へ戻る) も即 resolve する。 ⚠ これが無いと停止された音の await が
+      // 下の保険タイマーまで宙吊りになり、 音声キュー全体が数秒止まる。
+      if (st.didJustFinish || started) finish();
     });
     s.replayAsync().catch(() => finish());
-    // didJustFinish が来ないケースの保険 (= 想定最大長 + 余裕)。
-    timer = setTimeout(finish, 8000);
+    // status 更新が一切来ないケースの保険 (= 想定最大長 0.6s + 余裕)。
+    timer = setTimeout(finish, 3000);
   });
 }
 
