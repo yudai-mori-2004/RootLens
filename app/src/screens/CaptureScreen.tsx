@@ -101,14 +101,14 @@ type AdjustDirection = 'up' | 'down';
 
 // パーのキープ (= 検出ビープからこの時間キープで中央判定)
 const PALM_HOLD_MS = 1000;
-// 装着待ちの判定。 静止は「tick 間の角速度」 で見る (= 装着した頭の自然な揺れ・呼吸は通し、
-// 手で扱っている大きな動きだけ弾く)。 「取り付けの動きを一度は観測した後」 でないと進まない
-// (= 手に持ったまま静止しても即通過しない)。 既装着で開いた場合のために TIMEOUT で解除。
+// 装着待ちの判定は「早く次へ進むための補助」 であって、 進行のゲートにしない。
+// きれいな経路 (= 取り付けの動き → 静止 + 装着らしい角度) を検知したら早めに進み、
+// 検知できなくても MOUNT_HARD_TIMEOUT_MS で必ず進む (= 判定失敗で詰む経路を作らない)。
 const MOUNT_STILL_DELTA_DEG = 2;      // 1 tick (100ms) あたりの角度変化がこれ超 = 扱い中
 const MOUNT_STILL_MS = 2000;
 const MOUNT_MOTION_MIN_MS = 1000;     // 取り付けの動きと見なす累計時間
-const MOUNT_TIMEOUT_MS = 8000;
-const MOUNT_WORN_PITCH_RANGE = { min: -30, max: 70 } as const; // 机に平置き (≈90°) を除外
+const MOUNT_HARD_TIMEOUT_MS = 8000;   // これを超えたら判定に関係なく次の案内へ
+const MOUNT_WORN_PITCH_RANGE = { min: -40, max: 85 } as const; // 机に平置き (≈90°) だけ除外
 // 停止フロー (= 人間目線): 頭部装着・両手で家事中・画面は見ない前提。 thumbs-up が ARM_MS 継続して
 // 「検出」 → 即時音。 検出から HOLD_MS 立て続けると音声「そのまま立て続けると終了します」を流し、
 // 音声を最後まで言い終わった時にまだ立て続けていたら停止確定 (= 固定秒で切らず、 案内を最後まで聞かせる)。
@@ -557,14 +557,17 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return;
       }
       case 'mounting': {
+        const track = mountTrackRef.current;
+        // ⚠ ゲートにしない: 判定がどう転んでも HARD_TIMEOUT で必ず次へ進む。
+        //    (以前は装着角度の範囲に入らない限り進めず、 装着したまま手元を見下ろす普通の姿勢
+        //     (= 俯角 70° 超) で詰んでいた。)
+        const timedOut = now - track.enteredTs >= MOUNT_HARD_TIMEOUT_MS;
         const reading = pitchRef.current;
-        if (!reading.available) {
-          // 加速度計が使えない端末では装着判定をスキップ。
+        if (!reading.available || timedOut) {
           awaitedSpeechSeqRef.current = 0;
           setState({ kind: 'palm_prompt' });
           return;
         }
-        const track = mountTrackRef.current;
         const pitch = reading.pitchDownDeg;
         // 動いているか = 読めない加速度 (激しい動き) or tick 間の角度変化が大きい。
         const inMotion =
@@ -578,13 +581,12 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         }
         const wornRange = pitch >= MOUNT_WORN_PITCH_RANGE.min && pitch <= MOUNT_WORN_PITCH_RANGE.max;
         if (!wornRange) {
-          track.stillSince = 0; // 静止しているが装着角度ではない (= 机置き等)。 黙って待つ
+          track.stillSince = 0; // 静止しているが装着角度ではなさそう → 早期通過はしない (timeout 待ち)
           return;
         }
         if (track.stillSince === 0) track.stillSince = now;
-        // 取り付けの動きを一度は見ているか、 既装着でタイムアウトしたか。
-        const handled = track.motionMs >= MOUNT_MOTION_MIN_MS || now - track.enteredTs >= MOUNT_TIMEOUT_MS;
-        if (handled && now - track.stillSince >= MOUNT_STILL_MS) {
+        // きれいな経路: 取り付けの動きを見たあと、 装着らしい角度で静止 → 早めに次へ。
+        if (track.motionMs >= MOUNT_MOTION_MIN_MS && now - track.stillSince >= MOUNT_STILL_MS) {
           awaitedSpeechSeqRef.current = 0;
           setState({ kind: 'palm_prompt' });
         }
