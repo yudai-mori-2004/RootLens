@@ -19,7 +19,8 @@ const LEGAL_DIR = join(__dirname, '../../document/v0.1.3/legal');
 const OUT = join(__dirname, '../src/content/legalDocs.generated.ts');
 
 // アプリで表示する対ユーザー文書のみ (consent-log-spec 等の社内文書は対象外)。
-const DOCS = ['tester-consent', 'privacy-policy'];
+// tester-consent は 2026-07-06 に terms-of-service へ置換 (= 正本 md は証跡照合用に残置、 同梱はしない)。
+const DOCS = ['terms-of-service', 'privacy-policy'];
 const LOCALES = ['ja', 'en'];
 
 // ─── md → html (限定サブセット) ─────────────────────────────────────
@@ -147,7 +148,7 @@ const banner =
 
 const body =
   banner +
-  "export type LegalDocKey = 'tester-consent' | 'privacy-policy';\n\n" +
+  `export type LegalDocKey = ${DOCS.map((d) => `'${d}'`).join(' | ')};\n\n` +
   'export interface LegalDocContent {\n' +
   '  /** 正本 md の最初の見出し */\n  title: string;\n' +
   '  /** 正本 md (raw) の SHA-256。consent-log の「版+ハッシュ」に使う */\n  hash: string;\n' +

@@ -209,7 +209,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
             <View style={styles.termsOverlay}>
               <View style={styles.termsHeader}>
                 <Text style={styles.termsTitle} numberOfLines={1}>
-                  {getLegalDoc(locale, 'tester-consent').title}
+                  {getLegalDoc(locale, 'terms-of-service').title}
                 </Text>
                 <Pressable
                   onPress={() => setShowTerms(false)}
@@ -221,7 +221,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
                   </Svg>
                 </Pressable>
               </View>
-              <LegalDocBody doc="tester-consent" />
+              <LegalDocBody doc="terms-of-service" />
             </View>
           ) : null}
         </Pressable>

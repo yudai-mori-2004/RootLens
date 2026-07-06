@@ -19,11 +19,12 @@ import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
 /// 層1要約 (= アップロード同意画面) の版。 文言を変えたら必ず上げる。
-/// .2: 第三者チェックを「本人のみ」 から「本人 + 撮影に同意した大人のみ (子ども不可)」 へ
-///     (= 正本 §5/§7 の同意ベース化と同時改定、 2026-07-06)。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-06.2';
+/// .2: 第三者チェックを「本人のみ」 から「本人 + 撮影に同意した大人のみ (子ども不可)」 へ。
+/// .3: チェック 2 つを 1 行に短文化 + 正本を tester-consent から terms-of-service (本番規約) へ切替
+///     (2026-07-06)。
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-06.3';
 
-/// アップロード同意のスコープ (= tester-consent §4: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
+/// アップロード同意のスコープ (= terms-of-service §6: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;
 
 /// 画面に表示する層1文言を構成する i18n キー (= summaryHash の算出対象。 表示順に固定)。
@@ -60,7 +61,7 @@ export async function recordUploadConsent(input: {
   const locale = getLocale();
 
   // 正本 (層2) の版 + ハッシュ。 raw md の SHA-256 は生成時に確定済み。
-  const doc = getLegalDoc(locale, 'tester-consent');
+  const doc = getLegalDoc(locale, 'terms-of-service');
   const docVersion = `draft-${doc.hash.slice(0, 8)}`;
 
   // 表示した要約 (層1) のハッシュ = 表示 locale の文言を表示順に連結して SHA-256。
@@ -76,7 +77,7 @@ export async function recordUploadConsent(input: {
     body: JSON.stringify({
       eventType: 'consent',
       occurredAt: new Date().toISOString(),
-      docSlug: 'tester-consent',
+      docSlug: 'terms-of-service',
       docVersion,
       docContentHash: doc.hash,
       summaryVersion: UPLOAD_CONSENT_SUMMARY_VERSION,

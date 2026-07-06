@@ -164,8 +164,8 @@ const ja = {
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
   'upload.consentTitle': 'アップロード前の確認',
-  'upload.consentCheckAge': '私は18歳以上で、この場所で撮影する権利があります。',
-  'upload.consentCheckNoThirdParty': 'この動画に映っているのは、私本人と、撮影に同意した大人だけです(子どもは映っていません)。',
+  'upload.consentCheckAge': '18歳以上で、この場所での撮影は許可を得ています。',
+  'upload.consentCheckNoThirdParty': '撮影に同意していない第三者は映っていません。',
   'upload.consentCheckTerms': '利用規約(全文)に同意します。',
   'upload.consentAndUpload': '同意してアップロード',
   'upload.consentReadFull': '利用規約の全文を読む',
@@ -334,8 +334,8 @@ const en: Record<TranslationKey, string> = {
 
   // ── Upload consent pop (= tap a card in My Videos) ──
   'upload.consentTitle': 'Before you upload',
-  'upload.consentCheckAge': 'I am 18 or older and have the right to record in this location.',
-  'upload.consentCheckNoThirdParty': 'Only I and adults who consented to being recorded appear in this video (no children).',
+  'upload.consentCheckAge': 'I am 18 or older and have permission to record at this location.',
+  'upload.consentCheckNoThirdParty': 'No one appears in this video without consent to being recorded.',
   'upload.consentCheckTerms': 'I agree to the Terms of Use (full text).',
   'upload.consentAndUpload': 'Agree and upload',
   'upload.consentReadFull': 'Read the full terms',

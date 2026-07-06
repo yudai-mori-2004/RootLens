@@ -185,7 +185,7 @@ export const SettingsScreen: React.FC = () => {
         </Section>
 
         <Section title={t('settings.section.support')}>
-          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
+          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('terms-of-service')} />
           <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
           <ActionRow
             label={t('settings.contact')}

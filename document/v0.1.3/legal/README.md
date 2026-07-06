@@ -32,9 +32,9 @@ document/v0.1.3/legal/
 | slug | 文書 | 種別 | 状態 | ja | en |
 |------|------|------|------|----|----|
 | `legal-policy` | データ保護・法務方針(判断を固める母艦。§7 に残存リスク台帳を内包) | 社内(母艦) | ドラフト | [ja](legal-policy/ja.md) | [en](legal-policy/en.md) |
-| `tester-consent` | テスター向け同意 + 撮影ルール(アルファ/TestFlight 用、軽量) | 対ユーザー | ドラフト | [ja](tester-consent/ja.md) | [en](tester-consent/en.md) |
+| `tester-consent` | テスター向け同意 + 撮影ルール(アルファ/TestFlight 用、軽量) | 対ユーザー | 引退(2026-07-06 に `terms-of-service` へ置換。同意証跡のハッシュ照合用に保持) | [ja](tester-consent/ja.md) | [en](tester-consent/en.md) |
 | `privacy-policy` | プライバシーポリシー(対外) | 対ユーザー | ドラフト(公開前に弁護士確認) | [ja](privacy-policy/ja.md) | [en](privacy-policy/en.md) |
-| `terms-of-service` | 利用規約 + 撮影者データライセンス契約 | 対ユーザー | 未着手 | — | — |
+| `terms-of-service` | 利用規約 + 撮影者データライセンス契約 | 対ユーザー | ドラフト(公開前に弁護士確認。アプリ同梱中) | [ja](terms-of-service/ja.md) | [en](terms-of-service/en.md) |
 | `consent-log-spec` | 同意記録設計(誰が・いつ・どのクリップに・何に同意したか) | 仕様 | ドラフト | [ja](consent-log-spec/ja.md) | (ja先行) |
 | `incident-runbook` | インシデント対応(再識別/第三者見落とし/CSAM検知時の法定通報/漏洩) | 社内 | 未着手 | — | — |
 | `buyer-license` | 買い手向けライセンス契約(再識別禁止・用途制限・下流削除義務) | 対買い手 | 未着手 | — | — |

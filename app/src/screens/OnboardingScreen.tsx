@@ -205,7 +205,7 @@ const TosConsent: React.FC<{
         </View>
 
         <View style={styles.linksRow}>
-          <Pressable onPress={() => setLegalDoc('tester-consent')} hitSlop={8}>
+          <Pressable onPress={() => setLegalDoc('terms-of-service')} hitSlop={8}>
             <Text style={styles.linkText}>{t('settings.terms')}</Text>
           </Pressable>
           <View style={styles.linkDot} />
