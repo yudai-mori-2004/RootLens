@@ -175,6 +175,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // 熱状態の記録 (= 録画中のみ)。 events は sensorFileQueue 上でだけ触る。
   private var thermalObserver: NSObjectProtocol?
   private var thermalEvents: [[String: Any]] = []
+  // 録画開始時の電池残量 (= 0..1、 不明 -1)。 stop で残量と共に metadata.json に記録し、
+  // 「この撮影で何 % 使ったか」 の実測を蓄積する。
+  private var batteryStartLevel: Float = -1
 
   // 画面消灯前の輝度 (= 復帰時に戻す)。 main thread でだけ触る。
   private var brightnessBeforeDim: CGFloat?
@@ -472,6 +475,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       self.thermalEvents = [["timestamp_ns": Self.uptimeNs(),
                              "state": Self.thermalStateString(initial)]]
     }
+    DispatchQueue.main.async {
+      UIDevice.current.isBatteryMonitoringEnabled = true
+      self.batteryStartLevel = UIDevice.current.batteryLevel
+    }
     thermalObserver = NotificationCenter.default.addObserver(
       forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: nil
     ) { [weak self] _ in
@@ -485,7 +492,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// 監視を止め、 記録した遷移列を metadata.json に thermal_events として合流させる
+  /// 監視を止め、 熱遷移列 (thermal_events) と電池実測 (battery) を metadata.json に合流させる
   /// (= metadata.json は初回 frame で書かれているので read-modify-write)。
   private func stopThermalMonitoring(mergingInto dir: URL) {
     if let obs = thermalObserver {
@@ -494,14 +501,17 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     var events: [[String: Any]] = []
     sensorFileQueue.sync { events = self.thermalEvents; self.thermalEvents = [] }
-    guard !events.isEmpty else { return }
+    var endLevel: Float = -1
+    DispatchQueue.main.sync { endLevel = UIDevice.current.batteryLevel }
     let url = dir.appendingPathComponent("metadata.json")
     guard let data = try? Data(contentsOf: url),
           var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
       NSLog("[ArkitCaptureController] metadata.json not readable, thermal_events dropped")
       return
     }
-    obj["thermal_events"] = events
+    if !events.isEmpty { obj["thermal_events"] = events }
+    obj["battery"] = ["start_level": batteryStartLevel, "end_level": endLevel]
+    batteryStartLevel = -1
     if let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys]) {
       try? out.write(to: url, options: .atomic)
     }

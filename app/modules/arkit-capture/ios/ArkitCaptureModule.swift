@@ -1,6 +1,7 @@
 import ARKit
 import ExpoModulesCore
 import Foundation
+import UIKit
 
 // ARKit ベース撮影モジュールの Expo ブリッジ。
 //
@@ -63,7 +64,18 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
     }
 
     AsyncFunction("stopRecording") { (promise: Promise) in
+      // バックグラウンド移行中の停止 (= JS の AppState handler 発) でもファイルを閉じ切れるよう、
+      // 実行猶予を取る。 writer close 後も 5 秒残す (= JS 側の台帳登録が走る時間)。
+      var bgTask: UIBackgroundTaskIdentifier = .invalid
+      bgTask = UIApplication.shared.beginBackgroundTask(withName: "rootlens-stop-recording") {
+        if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
+      }
       DispatchQueue.global(qos: .userInitiated).async {
+        defer {
+          DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
+          }
+        }
         do {
           let url = try ArkitCaptureController.shared.stopRecording()
           promise.resolve(url.absoluteString)
@@ -105,6 +117,18 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
     // 現在の熱状態。 録画中の変化は onThermalState イベントで届く。
     AsyncFunction("getThermalState") { () -> String in
       return ArkitCaptureController.thermalStateString(ProcessInfo.processInfo.thermalState)
+    }
+
+    // 電池残量 (= 0..1、 不明なら -1) と充電中か。 長時間録画の自動終了判定に使う。
+    AsyncFunction("getPowerState") { (promise: Promise) in
+      DispatchQueue.main.async {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let state = UIDevice.current.batteryState
+        promise.resolve([
+          "level": UIDevice.current.batteryLevel,
+          "charging": state == .charging || state == .full,
+        ])
+      }
     }
 
     AsyncFunction("setDisplayOrientation") { (value: String, promise: Promise) in

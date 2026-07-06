@@ -59,6 +59,12 @@ export type DisplayOrientation = 'portrait' | 'landscapeLeft' | 'landscapeRight'
 /** 端末の熱状態 (= ProcessInfo.thermalState)。 critical は撮影を安全に畳むべき水準。 */
 export type ThermalState = 'nominal' | 'fair' | 'serious' | 'critical' | 'unknown';
 
+/** 電池残量 (= 0..1、 不明なら -1) と充電中か。 */
+export interface PowerState {
+  level: number;
+  charging: boolean;
+}
+
 interface ArkitCaptureNativeModule {
   isAvailable(): Promise<boolean>;
   startSession(): Promise<void>;
@@ -74,6 +80,7 @@ interface ArkitCaptureNativeModule {
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
   setScreenDimmed(dimmed: boolean): Promise<void>;
   getThermalState(): Promise<ThermalState>;
+  getPowerState(): Promise<PowerState>;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 }
@@ -138,6 +145,12 @@ export async function setArkitScreenDimmed(dimmed: boolean): Promise<void> {
 export async function getArkitThermalState(): Promise<ThermalState> {
   if (!nativeModule) return 'unknown';
   return nativeModule.getThermalState();
+}
+
+/** 電池残量と充電状態。 長時間録画の自動終了判定に使う。 */
+export async function getArkitPowerState(): Promise<PowerState> {
+  if (!nativeModule) return { level: -1, charging: false };
+  return nativeModule.getPowerState();
 }
 
 /** 熱状態の変化 (= 録画中のみ発火)。 */

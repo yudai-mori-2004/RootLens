@@ -160,7 +160,10 @@ const ja = {
   'capture.tts.autoStopHot': '本体が熱くなったため、撮影を終了します。',
   'capture.tts.autoStopDisk': '空き容量が少なくなったため、撮影を終了します。',
   'capture.tts.autoStopLong': '撮影が長くなったので、ここでいったん終了します。',
+  'capture.tts.autoStopBattery': '電池が少なくなったため、撮影を終了します。',
+  'capture.tts.autoStopBackground': 'アプリが中断されたため、撮影を終了しました。',
   'capture.tts.lowDisk': '本体の空き容量が少なめです。長い撮影は途中で終わることがあります。',
+  'capture.tts.lowBattery': '電池が少なめです。長い撮影は途中で終わることがあります。',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
   'upload.consentTitle': 'アップロード前の確認',
@@ -330,7 +333,10 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.autoStopHot': 'The phone is getting hot, so recording will stop now.',
   'capture.tts.autoStopDisk': 'Storage is running low, so recording will stop now.',
   'capture.tts.autoStopLong': 'This has been a long recording, so it will stop here.',
+  'capture.tts.autoStopBattery': 'The battery is running low, so recording will stop now.',
+  'capture.tts.autoStopBackground': 'The app was interrupted, so recording has stopped.',
   'capture.tts.lowDisk': 'Free storage is limited. A long recording may stop early.',
+  'capture.tts.lowBattery': 'The battery is low. A long recording may stop early.',
 
   // ── Upload consent pop (= tap a card in My Videos) ──
   'upload.consentTitle': 'Before you upload',

@@ -26,6 +26,7 @@ import { AuthGate } from './src/services/auth';
 import { colors } from './src/theme';
 import { USE_DEV_SANDBOX } from './src/env';
 import { initClipPersistence } from './src/clips/persistence';
+import { recoverOrphanRecordings } from './src/dataflow';
 import { initLocale } from './src/i18n';
 
 // 起点は既定で本番 UI (RootNavigator)。 EXPO_PUBLIC_USE_SANDBOX=1 の時だけ dataflow sandbox を起点にする。
@@ -50,7 +51,11 @@ export default function App() {
   const [localeReady, setLocaleReady] = React.useState(false);
   useEffect(() => {
     // クリップ永続化 (= Layer 2 アダプタ) を起動: 保存済みクリップを hydrate + 以降の変更を persist。
-    initClipPersistence().catch(() => {});
+    // hydrate 後に孤児録画 (= 電池切れ / クラッシュ / kill で台帳登録前に死んだ録画) を回収する。
+    initClipPersistence()
+      .then(() => recoverOrphanRecordings())
+      .then((n) => { if (n > 0) console.log(`[clips] 未登録の録画を ${n} 本回収しました`); })
+      .catch(() => {});
     // 保存済み locale を hydrate してから描画 (= 既定 locale のちらつきを防ぐ)。
     initLocale().finally(() => setLocaleReady(true));
   }, []);

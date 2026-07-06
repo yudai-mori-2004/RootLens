@@ -56,7 +56,7 @@ export {
 } from './steps';
 
 // 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → D1 → アップ + 登録)
-export { enqueueRecording, advanceClip, discardClip } from './pipeline';
+export { enqueueRecording, advanceClip, discardClip, recoverOrphanRecordings } from './pipeline';
 
 // store
 export {

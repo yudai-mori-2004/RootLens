@@ -28,6 +28,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Pressable,
   StyleSheet,
   Text,
@@ -45,9 +46,11 @@ import type { RootStackParamList } from '../app/types';
 import { WideCapturePreviewView } from '../native/wideCapture';
 import {
   ArkitCapturePreviewView,
+  getArkitPowerState,
   getArkitThermalState,
   setArkitScreenDimmed,
   subscribeThermalState,
+  type PowerState,
   type ThermalState,
 } from '../native/arkitCapture';
 import {
@@ -144,7 +147,9 @@ const REDIM_AFTER_TAP_MS = 8_000;       // タップ復帰からの再消灯
 const MAX_RECORDING_MS = 120 * 60_000;  // 停止し忘れの安全弁 (= 100 分撮影 + 余裕)
 const LOW_DISK_WARN_BYTES = 12 * 1024 ** 3;  // 録画開始時にこれ未満なら一言注意
 const LOW_DISK_STOP_BYTES = 2 * 1024 ** 3;   // 録画中にこれを切ったら自動終了 (= writer が死ぬ前に)
-const DISK_POLL_MS = 30_000;
+const LOW_BATTERY_WARN_LEVEL = 0.35;         // 録画開始時にこれ未満 (未充電) なら一言注意
+const LOW_BATTERY_STOP_LEVEL = 0.10;         // 録画中にこれを切ったら自動終了 (= 電池切れ死の前に)
+const RESOURCE_POLL_MS = 30_000;             // 録画中の空き容量 / 電池のポーリング間隔
 
 // 中央許容範囲 (= 縦方向のみ ±10%)。 左右は姿勢でほぼ決まるので見ない (2026-07-06 判断)。
 const CALIBRATION_CENTER_MARGIN = 0.10;
@@ -302,9 +307,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const stateRef = useRef(state);
   useEffect(() => { stateRef.current = state; }, [state]);
 
-  // 長時間録画の守り (= 熱 / 空き容量 / 画面消灯)。 判定は ticker、 ここは観測値の置き場。
+  // 長時間録画の守り (= 熱 / 空き容量 / 電池 / 画面消灯)。 判定は ticker、 ここは観測値の置き場。
   const thermalRef = useRef<ThermalState>('nominal');
   const freeDiskRef = useRef<number | null>(null);
+  const powerRef = useRef<PowerState | null>(null);
   const autoStopReasonRef = useRef<string | null>(null); // finalizing 冒頭で 1 回読む自動終了の理由
   const [dimmed, setDimmed] = useState(false);
   const wakeUntilRef = useRef(0); // タップ復帰後、 この時刻までは再消灯しない
@@ -433,9 +439,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     config.setDisplayOrientation('landscapeRight').catch(() => {});
   }, [config]);
 
-  // 熱状態の購読 (= native は録画中のみ発火) + 空き容量の初期値。
+  // 熱状態の購読 (= native は録画中のみ発火) + 空き容量 / 電池の初期値。
   useEffect(() => {
     getArkitThermalState().then((s) => { thermalRef.current = s; }).catch(() => {});
+    getArkitPowerState().then((p) => { powerRef.current = p; }).catch(() => {});
     FileSystem.getFreeDiskStorageAsync().then((b) => { freeDiskRef.current = b; }).catch(() => {});
     const sub = subscribeThermalState(({ state: s }) => {
       thermalRef.current = s;
@@ -448,7 +455,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     return () => sub.remove();
   }, []);
 
-  // 録画中の空き容量ポーリング (= 30 秒ごと。 判定は ticker が freeDiskRef を見る)。
+  // 録画中の空き容量 / 電池ポーリング (= 30 秒ごと。 判定は ticker が ref を見る)。
   useEffect(() => {
     const k = state.kind;
     const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
@@ -458,11 +465,34 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       FileSystem.getFreeDiskStorageAsync()
         .then((b) => { if (!cancelled) freeDiskRef.current = b; })
         .catch(() => {});
+      getArkitPowerState()
+        .then((p) => { if (!cancelled) powerRef.current = p; })
+        .catch(() => {});
     };
     poll();
-    const id = setInterval(poll, DISK_POLL_MS);
+    const id = setInterval(poll, RESOURCE_POLL_MS);
     return () => { cancelled = true; clearInterval(id); };
   }, [state.kind]);
+
+  // バックグラウンド移行 = その場で通常どおり撮影終了 (2026-07-06 ユーザー判断: 復帰継続はしない。
+  // 中断を挟んだ時系列は学習データに使えないので、 撮れていた分を 1 本として救って畳む)。
+  // 終了処理は native の background 実行猶予 (= stopRecording の beginBackgroundTask) 内で走り、
+  // 間に合わず kill された場合も fragmented mp4 + 起動時の孤児回収で拾える。
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'background') return;
+      const k = stateRef.current.kind;
+      if (k === 'recording' || k === 'stopping' || k === 'stopping_confirm') {
+        autoStopReasonRef.current = t('capture.tts.autoStopBackground');
+        setState({ kind: 'finalizing' });
+      } else if (k === 'precapture_countdown') {
+        // まだ録画が始まっていない → 開始せずパー待ちに戻す (= 復帰したらやり直し)。
+        clearAudioQueue();
+        setState({ kind: 'awaiting_palm' });
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // 画面消灯の driver: 録画が DIM_AFTER_MS 乗ったら消灯。 録画フローを抜けたら必ず復帰。
   useEffect(() => {
@@ -560,9 +590,13 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           recordingStartedAtRef.current = Date.now();
           sessionDirRef.current = session.sessionDir;
           // 録画開始の合図は countdown_end (= precapture_countdown 末尾で 1 度だけ鳴る) で完結。
-          // 空きが心もとない時だけ一言 (= 長時間撮影は途中終了があり得ると先に伝える)。
+          // 空き容量 / 電池が心もとない時だけ一言 (= 長時間撮影は途中終了があり得ると先に伝える)。
           if (freeDiskRef.current !== null && freeDiskRef.current < LOW_DISK_WARN_BYTES) {
             enqueueSpeak(t('capture.tts.lowDisk'));
+          }
+          const power = powerRef.current;
+          if (power !== null && power.level >= 0 && !power.charging && power.level < LOW_BATTERY_WARN_LEVEL) {
+            enqueueSpeak(t('capture.tts.lowBattery'));
           }
         } catch (e: any) {
           recordingStartedRef.current = false;
@@ -740,11 +774,16 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return;
       case 'recording': {
         // 長時間録画の安全弁 (= 手検出と無関係に判定)。 続行できない状況は理由を積んで終了フローへ。
-        // 判定順 = 危険度順: 熱 critical (放置すると OS がカメラごと殺す) > 容量 (writer が書けなくなる) > 長時間。
+        // 判定順 = 危険度順: 熱 critical (放置すると OS がカメラごと殺す) > 容量 (writer が書けなく
+        // なる) > 電池 (突然死 = 台帳登録前に消える) > 長時間。
         const startedAt = recordingStartedAtRef.current;
+        const power = powerRef.current;
+        const batteryLow =
+          power !== null && power.level >= 0 && !power.charging && power.level <= LOW_BATTERY_STOP_LEVEL;
         const autoStopReason =
           thermalRef.current === 'critical' ? t('capture.tts.autoStopHot')
           : freeDiskRef.current !== null && freeDiskRef.current < LOW_DISK_STOP_BYTES ? t('capture.tts.autoStopDisk')
+          : batteryLow ? t('capture.tts.autoStopBattery')
           : startedAt > 0 && now - startedAt >= MAX_RECORDING_MS ? t('capture.tts.autoStopLong')
           : null;
         if (autoStopReason) {
@@ -899,25 +938,44 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     return () => clearInterval(id);
   }, [state.kind]);
 
-  // クリーンアップ (= 録画中なら停止。 session 自体は handoff effect の unmount cleanup が止める)
-  useEffect(() => {
-    return () => {
-      if (recordingStartedRef.current) {
-        runningConfigRef.current?.stopRecording(sink).catch(() => {});
-      }
-      clearAudioQueue(); // 保留中の音声 + 再生中を停止
-    };
+  // 録画を止めて台帳登録まで行う (= ✕ 緊急停止 / unmount 用)。 通常フローの finalize と同じ結末に
+  // する: 撮れていた分を 1 本のクリップとして一覧に残す (= 以前は停止だけして登録せず、 孤児にしていた)。
+  // finalizing 中は何もしない (= 通常フローが停止処理中。 二重 stop は native writer を壊す)。
+  const stopAndRegisterImmediately = useCallback(() => {
+    if (!recordingStartedRef.current) return;
+    if (stateRef.current.kind === 'finalizing') return;
+    recordingStartedRef.current = false;
+    const cfg = runningConfigRef.current;
+    const startedAt = recordingStartedAtRef.current;
+    recordingStartedAtRef.current = 0;
+    if (!cfg) return;
+    cfg.stopRecording(sink)
+      .then((session) =>
+        enqueueRecording({
+          config: cfg,
+          session,
+          durationMs: startedAt > 0 ? Math.max(0, Date.now() - startedAt) : null,
+          deviceModel: Device.modelId ?? null,
+        }),
+      )
+      .catch(() => {});
   }, []);
 
+  // クリーンアップ (= 録画中なら停止 + 登録。 session 自体は handoff effect の unmount cleanup が止める)
+  useEffect(() => {
+    return () => {
+      stopAndRegisterImmediately();
+      clearAudioQueue(); // 保留中の音声 + 再生中を停止
+    };
+  }, [stopAndRegisterImmediately]);
+
   const onBack = useCallback(() => {
-    if (recordingStartedRef.current) {
-      runningConfigRef.current?.stopRecording(sink).catch(() => {});
-    }
+    stopAndRegisterImmediately();
     // 全画面 landscape 化に伴い、 退場時の portrait 先回りは不要になった (= タブも landscape)。
     // プレビューだけ隠してスムーズに戻る。
     setLeaving(true);
     requestAnimationFrame(() => navigation.goBack());
-  }, [navigation]);
+  }, [navigation, stopAndRegisterImmediately]);
 
   // 撮影構成の切替 (= キャリブレーション待機中のみ)。 切替後はキャリブレーションを最初からやり直す。
   const onSelectConfig = useCallback((id: string) => {

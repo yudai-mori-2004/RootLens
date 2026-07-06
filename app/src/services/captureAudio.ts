@@ -53,12 +53,27 @@ function ttsOptions(): Speech.SpeechOptions {
 /** 発話し、 自然に完了したか (= true) / 中断されたか (= false) で resolve する。 */
 function speakAwait(text: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
+    let settled = false;
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
+    const settle = (natural: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (watchdog) clearTimeout(watchdog);
+      resolve(natural);
+    };
+    // 番犬: バックグラウンド移行などで iOS が発話を握りつぶすと callback がどれも来ず、
+    // 直列キューが永久に詰まる。 十分すぎる猶予 (= 正常系では絶対に発話が終わっている長さ) で
+    // 必ず決着させる。 サスペンド中は timer も止まるので、 発火するのは復帰後 = 欲しい瞬間。
+    watchdog = setTimeout(() => {
+      Speech.stop();
+      settle(false);
+    }, 5000 + 300 * text.length);
     Speech.stop(); // 念のため (= 通常は直列なので残っていない)
     Speech.speak(text, {
       ...ttsOptions(),
-      onDone: () => resolve(true),
-      onStopped: () => resolve(false),
-      onError: () => resolve(false),
+      onDone: () => settle(true),
+      onStopped: () => settle(false),
+      onError: () => settle(false),
     });
   });
 }

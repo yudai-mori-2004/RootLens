@@ -86,6 +86,82 @@ export async function enqueueRecording(input: {
   return localId;
 }
 
+// ─── 孤児録画の回収 (= 起動時に 1 回) ─────────────────────────────────
+//
+// 台帳登録 (enqueueRecording) は正常な停止フローでしか走らないので、 電池切れ・クラッシュ・
+// OS kill で死んだ録画は Documents/recordings/ にファイルだけ残って一覧に出ない。 rgb.mp4 は
+// fragmented MP4 (= 10 秒粒度で確定) なので途中死でも読める → 起動時に走査して台帳に戻す。
+// 逆に録画として成立していない残骸 (mp4 が無い / 小さすぎる) はここで掃除する。
+//
+// ⚠ アップロード完了済みクリップは dir ごと掃除される (= cleanupTmpDir) 前提。 もし掃除に失敗した
+//    dir が残っていると再回収して二重になるが、 それは掃除失敗というバグの顕在化であって隠さない。
+
+const MIN_RECOVERABLE_MP4_BYTES = 3 * 1024 * 1024; // ~2 秒未満の録画は回収する価値が無い
+
+/** file:// URI → Documents 起点の相対 path (= コンテナ UUID / private prefix の揺れを無視して比較する)。 */
+function docRelative(uri: string | undefined): string | null {
+  if (!uri) return null;
+  const i = uri.indexOf('/Documents/');
+  return i >= 0 ? uri.slice(i + '/Documents/'.length).replace(/\/+$/, '') : null;
+}
+
+/** 台帳に無い録画 dir を走査して回収する。 返値は回収した本数。 hydrate 完了後に呼ぶこと。 */
+export async function recoverOrphanRecordings(): Promise<number> {
+  const doc = FileSystem.documentDirectory;
+  if (!doc) return 0;
+  const recRoot = `${doc}recordings/`;
+  let names: string[];
+  try {
+    names = await FileSystem.readDirectoryAsync(recRoot);
+  } catch {
+    return 0; // recordings/ 未作成 (= まだ一度も録画していない)
+  }
+  const known = new Set<string>();
+  for (const c of Object.values(dataflowStore.getState().clips)) {
+    const rel = docRelative(c.sessionDir);
+    if (rel) known.add(rel);
+  }
+  let recovered = 0;
+  for (const name of names) {
+    if (!name.startsWith('rec-')) continue;
+    if (known.has(`recordings/${name}`)) continue;
+    const dir = `${recRoot}${name}/`;
+    const mp4 = await FileSystem.getInfoAsync(`${dir}rgb.mp4`, { size: true });
+    if (!mp4.exists || mp4.isDirectory || (mp4.size ?? 0) < MIN_RECOVERABLE_MP4_BYTES) {
+      await FileSystem.deleteAsync(dir, { idempotent: true }).catch(() => {});
+      continue;
+    }
+    // 撮影構成と機種は metadata.json (= 初回 frame で書かれる) から復元。 録画尺は不明のまま
+    // (= 申告値が無いだけで、 実尺はサーバが mp4 から測れる)。
+    let configId = 'arkit';
+    let deviceModel: string | null = null;
+    try {
+      const meta = JSON.parse(await FileSystem.readAsStringAsync(`${dir}metadata.json`));
+      if (typeof meta.recording_config === 'string') configId = meta.recording_config;
+      if (typeof meta.device_model === 'string') deviceModel = meta.device_model;
+    } catch {
+      // metadata 無しでも mp4 があれば回収する (= 既定の arkit として扱う)
+    }
+    const config = getRecordingConfig(configId);
+    if (!config) continue;
+    const workDir = `${dir}sign/`;
+    await FileSystem.makeDirectoryAsync(workDir, { intermediates: true }).catch(() => {});
+    dataflowStore.getState().upsertClip({
+      id: makeLocalClipId(),
+      state: 'recorded',
+      createdAt: mp4.modificationTime ? Math.round(mp4.modificationTime * 1000) : Date.now(),
+      recordingConfigId: config.id,
+      durationMs: null,
+      deviceModel,
+      sessionDir: dir,
+      stage: 'unsigned',
+      workDir,
+    });
+    recovered += 1;
+  }
+  return recovered;
+}
+
 /**
  * クリップの現在 stage から実際に再開できる stage を返す (= 中間成果物の欠落をチェックして降格)。
  * 'signed' でも署名済 rgb.mp4 が消えていれば 'unsigned' に降格して再署名する。
