@@ -531,8 +531,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
 
   // 状態遷移処理
   const tickState = useCallback(() => {
+    // ⚠ ここで「手イベント未着なら return」 しない: 手検出が遅延/停止しても、 案内・装着待ち・
+    //    音声完了の遷移は止めない。 e が必要な branch (= palm 判定・録画) だけ個別に guard する。
     const e = latestHandRef.current;
-    if (!e) return;
     const now = Date.now();
     const cur = stateRef.current;
     // 平滑化済みジェスチャー (= subscription で stabilizer に通した確定値)。 両手要件 + 時間平滑は
@@ -609,6 +610,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           return;
         }
         if (now - cur.startTs >= PALM_HOLD_MS) {
+          if (!e) return; // 手イベント未着 (= 稀)。 次 tick で再判定
           const bbox = computeHandBoundingBox(e.wearerHands);
           if (!bbox) {
             setState({ kind: 'awaiting_palm' });
@@ -645,6 +647,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // 開始カウントダウンは専用 timer (countdown driver effect) が駆動。 ここでは何もしない。
         return;
       case 'recording': {
+        if (!e) return;
         // 録画が乗ってきた頃に、 終了方法を 1 回だけ案内する (= 遷移を駆動しない副作用)。
         if (!stopHintSpokenRef.current && now - cur.startTs >= STOP_HINT_DELAY_MS) {
           stopHintSpokenRef.current = true;
