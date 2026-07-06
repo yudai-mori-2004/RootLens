@@ -31,6 +31,7 @@ import { useAuth } from '../services/auth';
 import { useT, useLocale, setLocale, type Locale } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 import { LegalDocModal } from '../components/LegalDocModal';
+import { playSfxAwait, type SfxName } from '../services/captureSounds';
 import {
   DEFAULT_CAPTURE_SETTINGS,
   loadCaptureSettings,
@@ -301,12 +302,26 @@ export const SettingsScreen: React.FC = () => {
             />
           </Section>
         ) : null}
+
+        {/* ── 効果音の試聴 (= tools/asset-gen/gen-sfx.py で再生成 → reload で反映) ── */}
+        {provider.id === 'debug' ? (
+          <Section title="効果音テスト" tone="muted">
+            {SFX_NAMES.map((name) => (
+              <ActionRow key={name} label={name} onPress={() => { void playSfxAwait(name); }} />
+            ))}
+          </Section>
+        ) : null}
       </ScrollView>
 
       <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
     </View>
   );
 };
+
+const SFX_NAMES: SfxName[] = [
+  'enter_capture', 'detect_palm', 'detect_thumbs_up',
+  'countdown_tick', 'countdown_end', 'rec_stop', 'warn_hand_lost',
+];
 
 // ─── building blocks ────────────────────────────────────────────────────
 // Section が行間の hairline を一元管理する (= 行コンポーネントは罫線を持たない)。
