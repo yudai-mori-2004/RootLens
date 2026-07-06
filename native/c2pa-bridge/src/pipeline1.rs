@@ -33,6 +33,12 @@ const MIME_MP4: &str = "video/mp4";
 /// リモート署名の HTTP タイムアウト。 署名対象は数 KB なので通常 1 RTT で返る。
 const SIGN_HTTP_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// BMFF 署名のメモリ有界化 (= 45 分/4GB 動画で OOM しないため)。 pipeline1.rs 冒頭 sign_d1_with 参照。
+///   merkle chunk = mdat ハッシュのチャンク幅。 大きいほどマニフェスト内のハッシュ数は減る。
+///   backing store = 埋め込み中間ストリームをメモリに置く上限 (超過分はディスク)。
+const SIGN_MERKLE_CHUNK_KB: usize = 1024;
+const SIGN_BACKING_STORE_MB: usize = 16;
+
 /// 直近の失敗理由。 FFI は数値しか返せないので、 呼び出し側 (Swift) が
 /// pipeline1_last_error() で人間可読なメッセージを取り出してエラー表示に載せる。
 static LAST_ERROR: Mutex<String> = Mutex::new(String::new());
@@ -219,7 +225,15 @@ fn sign_d1_with(
         .unwrap_or("d1.mp4");
 
     let manifest_json = build_d1_manifest(title).to_string();
-    let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
+    // 大容量 MP4 を一定メモリで署名するための 2 設定 (2026-07-07 実測で確定):
+    //   1. merkle_tree_chunk_size_in_kb: mdat を固定チャンクでハッシュ (全体を読まない)。
+    //   2. backing_store_memory_threshold_in_mb: 埋め込み中間ストリームを閾値超でディスク退避。
+    // 両方入れると 1.5GB の署名でピーク ~42MB (無設定は ~1.8GB でモバイルは OOM した)。
+    // 出力は単一 MP4 のまま。 検証 (c2pa Reader / TP c2pa-verify) は Valid。
+    let mut ctx = c2pa::Context::default();
+    ctx.settings_mut().core.merkle_tree_chunk_size_in_kb = Some(SIGN_MERKLE_CHUNK_KB);
+    ctx.settings_mut().core.backing_store_memory_threshold_in_mb = SIGN_BACKING_STORE_MB;
+    let mut builder = c2pa::Builder::from_context(ctx)
         .with_definition(&manifest_json)
         .map_err(|e| format!("Builder::with_definition (D1) failed: {e}"))?;
 

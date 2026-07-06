@@ -117,6 +117,16 @@ pub fn selftest_sign_verify<P: AsRef<Path>>(input: P, format: &str) -> Result<St
     Ok(format!("state={:?} codes={:?}", reader.validation_state(), codes))
 }
 
+/// 大容量 MP4 を一定メモリで署名するための Context (= c2pa-bridge/pipeline1.rs と揃える)。
+/// merkle chunk で mdat をチャンクハッシュ + 埋め込み中間ストリームを 16MB 超でディスク退避。
+/// これが無いと c2pa が MP4 全体をメモリに載せ、 モバイルは 4GB 動画で OOM する (2026-07-07 実測)。
+fn bounded_context() -> c2pa::Context {
+    let mut ctx = c2pa::Context::default();
+    ctx.settings_mut().core.merkle_tree_chunk_size_in_kb = Some(1024);
+    ctx.settings_mut().core.backing_store_memory_threshold_in_mb = 16;
+    ctx
+}
+
 /// D1 署名: 生 MP4 → D1 manifest 付き MP4。
 pub fn sign_d1<P: AsRef<Path>>(input_mp4: P, output_mp4: P) -> Result<()> {
     let title = output_mp4
@@ -126,7 +136,7 @@ pub fn sign_d1<P: AsRef<Path>>(input_mp4: P, output_mp4: P) -> Result<()> {
         .unwrap_or("d1.mp4");
 
     let manifest_json = build_d1_manifest(title).to_string();
-    let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
+    let mut builder = c2pa::Builder::from_context(bounded_context())
         .with_definition(&manifest_json)
         .map_err(|e| anyhow!("Builder::with_definition (D1) failed: {e}"))?;
     let signer = make_signer()?;
@@ -168,7 +178,7 @@ pub fn sign_d2_with_parent<P: AsRef<Path>>(
         .unwrap_or("d2.mp4");
 
     let manifest_json = build_d2_manifest(title, faces_blurred).to_string();
-    let mut builder = c2pa::Builder::from_context(c2pa::Context::default())
+    let mut builder = c2pa::Builder::from_context(bounded_context())
         .with_definition(&manifest_json)
         .map_err(|e| anyhow!("Builder::with_definition (D2) failed: {e}"))?;
     // intent=Edit + parentOf ingredient で、 Builder が先頭に `c2pa.opened`
