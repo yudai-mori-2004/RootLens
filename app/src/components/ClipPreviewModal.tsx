@@ -24,9 +24,10 @@ import { ResizeMode, Video } from 'expo-av';
 
 import type { Clip } from '../dataflow';
 import { localVideoUri, formatDuration, formatCardDate, formatCardTime, configLabel } from './ClipCard';
-import { LegalDocModal } from './LegalDocModal';
+import { LegalDocBody } from './LegalDocModal';
+import { getLegalDoc } from '../content/legalDocs.generated';
 import { recordUploadConsent, type UploadConsentChecks } from '../services/consent';
-import { useT } from '../i18n';
+import { useLocale, useT } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
 interface Props {
@@ -46,6 +47,7 @@ const INITIAL_CHECKS: UploadConsentChecks = {
 
 export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUpload, onRemove }) => {
   const t = useT();
+  const locale = useLocale();
   const [checks, setChecks] = useState<UploadConsentChecks>(INITIAL_CHECKS);
   const [sending, setSending] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
     setChecks(INITIAL_CHECKS);
     setSending(false);
     setConsentError(null);
+    setShowTerms(false);
   }, [visible, clip?.id]);
 
   if (!clip) return null;
@@ -111,7 +114,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
                 style={styles.video}
                 resizeMode={ResizeMode.CONTAIN}
                 useNativeControls
-                shouldPlay
+                shouldPlay={!showTerms}
                 isLooping
               />
             ) : (
@@ -157,14 +160,14 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
                 label={t('upload.consentCheckTerms')}
                 onPress={() => toggle('terms_agreed')}
               />
+              {/* 全文リンクは規約チェックの直下 (= 意味的に紐づく位置。 アップロードボタンから離して誤タップを防ぐ) */}
+              <Pressable onPress={() => setShowTerms(true)} style={({ pressed }) => [styles.readFull, pressed && styles.pressedDim]} hitSlop={6}>
+                <Text style={styles.readFullLabel}>{t('upload.consentReadFull')}</Text>
+                <Svg width={12} height={12} viewBox="0 0 12 12">
+                  <Path d="M4 2.5 L8 6 L4 9.5" stroke={colors.emerald} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </Svg>
+              </Pressable>
             </View>
-
-            <Pressable onPress={() => setShowTerms(true)} style={({ pressed }) => [styles.readFull, pressed && styles.pressedDim]} hitSlop={6}>
-              <Text style={styles.readFullLabel}>{t('upload.consentReadFull')}</Text>
-              <Svg width={12} height={12} viewBox="0 0 12 12">
-                <Path d="M4 2.5 L8 6 L4 9.5" stroke={colors.emerald} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </Svg>
-            </Pressable>
 
             <View style={styles.spacer} />
 
@@ -199,11 +202,30 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
               </Pressable>
             </View>
           </View>
+
+          {/* 利用規約 全文 (= 同意はこの全文に対して成立する)。 別シートに出すと横持ちで
+              ノッチにはみ出るので、 同じポップの中に重ねて表示する (= 寸法もそのまま)。 */}
+          {showTerms ? (
+            <View style={styles.termsOverlay}>
+              <View style={styles.termsHeader}>
+                <Text style={styles.termsTitle} numberOfLines={1}>
+                  {getLegalDoc(locale, 'tester-consent').title}
+                </Text>
+                <Pressable
+                  onPress={() => setShowTerms(false)}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.termsCloseBtn, pressed && styles.pressedDim]}
+                >
+                  <Svg width={14} height={14} viewBox="0 0 14 14">
+                    <Path d="M3 3 L11 11 M11 3 L3 11" stroke={colors.ink} strokeWidth={1.7} strokeLinecap="round" fill="none" />
+                  </Svg>
+                </Pressable>
+              </View>
+              <LegalDocBody doc="tester-consent" />
+            </View>
+          ) : null}
         </Pressable>
       </Pressable>
-
-      {/* 利用規約 全文 (= 同意はこの全文に対して成立する) */}
-      <LegalDocModal doc={showTerms ? 'tester-consent' : null} onClose={() => setShowTerms(false)} />
     </Modal>
   );
 };
@@ -318,7 +340,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: spacing.md,
+    marginLeft: 30, // チェックボックス幅 + gap (= 規約チェックの文言に揃えてぶら下げる)
   },
   readFullLabel: {
     fontFamily: fonts.sansSemibold,
@@ -326,7 +348,40 @@ const styles = StyleSheet.create({
     color: colors.emerald,
   },
 
-  spacer: { flex: 1, minHeight: spacing.sm },
+  spacer: { flex: 1, minHeight: spacing.lg },
+
+  // 規約全文のポップ内オーバーレイ (= シートと同寸に重ねる)
+  termsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.paper,
+  },
+  termsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  termsTitle: {
+    flex: 1,
+    fontFamily: fonts.serifMedium,
+    fontSize: 16,
+    letterSpacing: -0.2,
+    color: colors.ink,
+  },
+  termsCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
 
   consentErrorText: {
     ...typography.caption,

@@ -1,4 +1,4 @@
-# Tester Terms
+# Terms of Use
 
 Terms of use for alpha (TestFlight) testers. These terms apply until the production Terms of Service and Privacy Policy are published. The Japanese version ([ja.md](ja.md)) is authoritative.
 
@@ -28,11 +28,10 @@ Recorded data is used to build training data for AI and robots. For that purpose
 
 For every video you upload, you agree to and warrant the following:
 
-- Record only when you are alone. Do not record when family members or visitors are present.
-- Do not record children. Stop recording if a child enters the frame.
+- Only you and adults who have consented to being recorded and to the use of the data may appear. Do not upload videos in which a non-consenting person appears.
+- Do not record children, even with a guardian's consent. Stop recording if a child enters the frame.
 - Do not record bathrooms, bedrooms, toilets, or changing.
 - Avoid scenes where TV, music, books, or other copyrighted works appear prominently.
-- Do not upload videos in which another person appears.
 
 ## 6. Deletion and withdrawal of consent
 
@@ -40,9 +39,9 @@ For every video you upload, you agree to and warrant the following:
 - Data not yet used for training can be deleted on request.
 - Data already used for training can be excluded from future training, but past training results cannot be undone. We do not promise that data can always be completely deleted.
 
-## 7. If another person appears
+## 7. If a non-consenting person appears
 
-Videos showing another person will not be sold, even with the tester's consent. If detected, they are excluded from sale.
+Videos showing a person who has not consented will not be sold, even with the tester's consent. If detected, they are excluded from sale.
 
 ## 8. Scope
 
@@ -56,4 +55,4 @@ contact@rootlens.io
 
 ---
 
-Last revised: July 4, 2026
+Last revised: July 6, 2026

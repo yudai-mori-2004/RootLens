@@ -19,7 +19,9 @@ import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
 /// 層1要約 (= アップロード同意画面) の版。 文言を変えたら必ず上げる。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-06.1';
+/// .2: 第三者チェックを「本人のみ」 から「本人 + 撮影に同意した大人のみ (子ども不可)」 へ
+///     (= 正本 §5/§7 の同意ベース化と同時改定、 2026-07-06)。
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-06.2';
 
 /// アップロード同意のスコープ (= tester-consent §4: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;

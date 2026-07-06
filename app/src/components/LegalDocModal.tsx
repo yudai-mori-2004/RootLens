@@ -44,6 +44,20 @@ const pageHtml = (bodyHtml: string): string => `<!DOCTYPE html><html lang="ja"><
   hr { border:none; border-top:1px solid ${colors.border}; margin:20px 0; }
 </style></head><body>${bodyHtml}</body></html>`;
 
+/** 文書本文だけの WebView (= モーダルの器を持たない)。 同意ポップ等、 別の器の中に埋めて使う。 */
+export const LegalDocBody: React.FC<{ doc: LegalDocKey }> = ({ doc }) => {
+  const locale = useLocale();
+  const content = getLegalDoc(locale, doc);
+  return (
+    <WebView
+      originWhitelist={['*']}
+      source={{ html: pageHtml(content.html) }}
+      style={styles.web}
+      showsVerticalScrollIndicator={false}
+    />
+  );
+};
+
 export const LegalDocModal: React.FC<Props> = ({ doc, onClose }) => {
   const locale = useLocale();
   const content = doc ? getLegalDoc(locale, doc) : null;
@@ -56,7 +70,8 @@ export const LegalDocModal: React.FC<Props> = ({ doc, onClose }) => {
       supportedOrientations={['portrait', 'landscape']}
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+      {/* 横持ちではノッチが左右に来るので left / right も safe edge に含める (= 本文のはみ出し防止)。 */}
+      <SafeAreaView style={styles.root} edges={['top', 'bottom', 'left', 'right']}>
         <View style={styles.header}>
           <View style={styles.handle} />
           <View style={styles.headerRow}>
