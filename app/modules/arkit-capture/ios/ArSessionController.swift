@@ -107,6 +107,12 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // 以降 frameQueue 上の映像追記は必ず bail するので、 追記と finishWriting が別スレッドで競合して
   // writer が .failed に落ちる (= "The operation couldn't be completed") のを構造的に防ぐ。
   private var finishingWriter = false
+  // 録画中に adaptor.append が false を返した回数 (= 診断用。 エンコーダが録画中に死んだかの切り分け)。
+  private var appendFailCount = 0
+  // capturedImage のコピー先プール (= ARKit の使い回しバッファを非同期 append に掴ませないため。
+  // 初回フレームの解像度・フォーマットで lazy 生成し、 録画終了で解放する)。
+  private var copyPool: CVPixelBufferPool?
+  private var copyPoolDims: (w: Int, h: Int, fmt: OSType) = (0, 0, 0)
   private var assetWriter: AVAssetWriter?
   private var videoInput: AVAssetWriterInput?
   private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
@@ -371,6 +377,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // (= ARFrame の camera.intrinsics は最初の didUpdate まで埋まらない可能性)
 
     self.finishingWriter = false
+    self.appendFailCount = 0
+    self.copyPool = nil
+    self.copyPoolDims = (0, 0, 0)
     self.assetWriter = writer
     self.videoInput = input
     self.pixelBufferAdaptor = adaptor
@@ -404,6 +413,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // これ以降に append が finishWriting と重なることはない。
     frameQueue.sync { self.finishingWriter = true }
 
+    // 診断: finishWriting を呼ぶ前の writer 状態を控える。 ここが既に .failed(3) なら
+    // 「録画中にエンコーダが死んだ」、 .writing(1) なら「finishWriting 自体が失敗」 と切り分けられる。
+    let preFinishStatus = writer.status.rawValue
+    NSLog("[ArkitCaptureController] stopRecording begin: writer.status=%ld framesWritten=%d appendFails=%d free=%lld error=%@",
+          preFinishStatus, frameIndexCounter, appendFailCount, Self.freeDiskBytes(),
+          Self.describeNSError(writer.error))
+
     input.markAsFinished()
     let group = DispatchGroup()
     group.enter()
@@ -411,6 +427,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       group.leave()
     }
     group.wait()
+
+    NSLog("[ArkitCaptureController] finishWriting done: status=%ld error=%@",
+          Int(writer.status.rawValue), Self.describeNSError(writer.error))
 
     // sensor file は sensorFileQueue 上で書いてるので、 そこでの flush を待ってから close する。
     // sync を欠かすと データが途中で切れる (= 不正データ) ので、 失敗時は必ず throw して呼び出し元に伝える。
@@ -436,6 +455,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
     stopThermalMonitoring(mergingInto: dir)
 
+    // リセット前に診断値を控える (= 失敗時にエラーメッセージへ載せる。 NSLog は unified log で
+    // <private> に伏せられるため、 真因の OSStatus は throw メッセージに含めて JS / 画面に出す)。
+    let framesWritten = self.frameIndexCounter
+    let freeMB = Self.freeDiskBytes() / 1_000_000
+
     self.assetWriter = nil
     self.videoInput = nil
     self.pixelBufferAdaptor = nil
@@ -447,10 +471,34 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.pointCloudFileHandle = nil
     self.depthTarHandle = nil
     self.frameIndexCounter = 0
+    self.copyPool = nil
+    self.copyPoolDims = (0, 0, 0)
 
     if writer.status == .failed {
-      throw writer.error ?? NSError(domain: "ArkitCaptureController", code: 5,
-                                    userInfo: [NSLocalizedDescriptionKey: "writer failed"])
+      // 真因 (AVFoundation code + underlying OSStatus) と frame 数・空き容量。 稀な -16341
+      // (= VideoToolbox/MediaToolbox エンコーダの finalize フレーク) の切り分け用に残す。
+      let e = writer.error as NSError?
+      let u = e?.userInfo[NSUnderlyingErrorKey] as? NSError
+      let diag = "av=\(e.map { "\($0.domain):\($0.code)" } ?? "nil")"
+        + " under=\(u.map { "\($0.domain):\($0.code)" } ?? "-")"
+        + " pre=\(preFinishStatus) appFail=\(appendFailCount)"
+        + " frames=\(framesWritten) free=\(freeMB)MB"
+
+      // フラグメント化 MP4 (movieFragmentInterval=10s) なので、 finalize が失敗しても直近フラグメント
+      // までの映像はディスク上に確定済み。 十分な frame が書けていてファイルが実在するなら、 録画全体を
+      // 捨てずに救う (= エンコーダの稀な finalize フレークで長時間録画を失わない。 末尾数秒の欠けは
+      // サーバ再エンコードで吸収され、 ユーザーはアップロード前にプレビューで確認できる)。
+      let mp4Path = dir.appendingPathComponent("rgb.mp4").path
+      let mp4Size = ((try? FileManager.default.attributesOfItem(atPath: mp4Path))?[.size] as? Int) ?? 0
+      if framesWritten > 30, mp4Size > 1_000_000 {
+        NSLog("[ArkitCaptureController] finishWriting failed; salvaged fragmented mp4 (%d bytes). %@",
+              mp4Size, diag)
+        return dir
+      }
+      // 救えるだけの中身が無い (= ほぼ空) 場合のみ失敗として返す。
+      NSLog("[ArkitCaptureController] finishWriting failed, unsalvageable. %@", diag)
+      throw NSError(domain: "ArkitCaptureController", code: 5,
+                    userInfo: [NSLocalizedDescriptionKey: diag])
     }
     if let sensorCloseError {
       throw NSError(domain: "ArkitCaptureController", code: 6,
@@ -540,6 +588,85 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       brightnessBeforeDim = nil
     }
     NotificationCenter.default.post(name: .rootlensPreviewDim, object: nil, userInfo: ["dimmed": dimmed])
+  }
+
+  /// capturedImage (= ARKit の使い回しバッファ) を独立メモリへ deep copy する。
+  /// ⚠ これを呼ぶのは delegate queue 上、 バッファがまだ有効なうち。 コピーを非同期 append に渡すことで、
+  ///    ARKit のプール buffer を非同期境界をまたいで掴まず、 プール枯渇 → session 破綻 → writer が
+  ///    -11800 / -163xx で落ちる、 を根本から断つ (2026-07-06 調査で確定した -16341 の原因)。
+  private func copyPixelBuffer(_ src: CVPixelBuffer) -> CVPixelBuffer? {
+    let w = CVPixelBufferGetWidth(src)
+    let h = CVPixelBufferGetHeight(src)
+    let fmt = CVPixelBufferGetPixelFormatType(src)
+    if copyPool == nil || copyPoolDims != (w, h, fmt) {
+      let pbAttrs: [String: Any] = [
+        kCVPixelBufferPixelFormatTypeKey as String: fmt,
+        kCVPixelBufferWidthKey as String: w,
+        kCVPixelBufferHeightKey as String: h,
+        kCVPixelBufferIOSurfacePropertiesKey as String: [:],
+      ]
+      let poolAttrs: [String: Any] = [kCVPixelBufferPoolMinimumBufferCountKey as String: 4]
+      var pool: CVPixelBufferPool?
+      guard CVPixelBufferPoolCreate(nil, poolAttrs as CFDictionary, pbAttrs as CFDictionary, &pool) == kCVReturnSuccess else {
+        return nil
+      }
+      copyPool = pool
+      copyPoolDims = (w, h, fmt)
+    }
+    guard let pool = copyPool else { return nil }
+    var dstOpt: CVPixelBuffer?
+    guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &dstOpt) == kCVReturnSuccess, let dst = dstOpt else {
+      return nil
+    }
+    CVPixelBufferLockBaseAddress(src, .readOnly)
+    CVPixelBufferLockBaseAddress(dst, [])
+    defer {
+      CVPixelBufferUnlockBaseAddress(dst, [])
+      CVPixelBufferUnlockBaseAddress(src, .readOnly)
+    }
+    let planeCount = CVPixelBufferGetPlaneCount(src)
+    if planeCount == 0 {
+      guard let s = CVPixelBufferGetBaseAddress(src), let d = CVPixelBufferGetBaseAddress(dst) else { return nil }
+      let sbpr = CVPixelBufferGetBytesPerRow(src)
+      let dbpr = CVPixelBufferGetBytesPerRow(dst)
+      let n = min(sbpr, dbpr)
+      for row in 0..<CVPixelBufferGetHeight(src) { memcpy(d + row * dbpr, s + row * sbpr, n) }
+    } else {
+      for p in 0..<planeCount {
+        guard let s = CVPixelBufferGetBaseAddressOfPlane(src, p),
+              let d = CVPixelBufferGetBaseAddressOfPlane(dst, p) else { return nil }
+        let ph = CVPixelBufferGetHeightOfPlane(src, p)
+        let sbpr = CVPixelBufferGetBytesPerRowOfPlane(src, p)
+        let dbpr = CVPixelBufferGetBytesPerRowOfPlane(dst, p)
+        if sbpr == dbpr {
+          memcpy(d, s, ph * sbpr)
+        } else {
+          let n = min(sbpr, dbpr)
+          for row in 0..<ph { memcpy(d + row * dbpr, s + row * sbpr, n) }
+        }
+      }
+    }
+    return dst
+  }
+
+  /// NSError を診断用に丸ごと文字列化する (= domain / code / underlying / failure reason)。
+  /// 汎用の localizedDescription ("The operation couldn't be completed") だけだと真因が分からないため。
+  static func describeNSError(_ error: Error?) -> String {
+    guard let e = error as NSError? else { return "nil" }
+    var s = "domain=\(e.domain) code=\(e.code) desc=\(e.localizedDescription)"
+    if let reason = e.userInfo[NSLocalizedFailureReasonErrorKey] as? String {
+      s += " | reason=\(reason)"
+    }
+    if let u = e.userInfo[NSUnderlyingErrorKey] as? NSError {
+      s += " | underlying: domain=\(u.domain) code=\(u.code) desc=\(u.localizedDescription)"
+    }
+    return s
+  }
+
+  /// アプリのホーム以下の空き容量 (バイト)。 disk full 由来かを切り分ける診断用。
+  private static func freeDiskBytes() -> Int64 {
+    let attrs = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
+    return (attrs?[.systemFreeSize] as? NSNumber)?.int64Value ?? -1
   }
 
   /// 存在しなければ no-op、 存在すれば throw 込みで削除する。 try? の代わりに使う。
@@ -1125,31 +1252,35 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
 
     // 録画 (= AVAssetWriter に pixelBuffer を append + realtime_handpose.jsonl 行 append)。 録画中のみ。
-    if !finishingWriter, let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter {
+    // ⚠ didUpdate は既定でメインスレッド。 encode は frameQueue に逃がすが、 ARKit の capturedImage は
+    //    使い回しバッファなので「ここでコピー → コピーを非同期 append」 とする (copyPixelBuffer 参照)。
+    if !finishingWriter, let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter,
+       let input = self.videoInput {
       // 書き出しレート (= recordingRate) への間引き。 ARFrame N 枚に 1 枚だけ mp4 + jsonl に書く。
       let arIdx = recArFrameCounter
       recArFrameCounter += 1
       guard arIdx % recFrameStride == 0 else { return }
-      // realtime_handpose.jsonl は書き出す frame に 1 行ずつ。 RGB frame と frame_index を揃える
-      // (= 録画中に append される rgb frame と 1:1 で対応)
+      // realtime_handpose.jsonl は書き出す frame に 1 行ずつ。 RGB frame と frame_index を揃える。
       self.writeSensorsLine(frame: frame)
+
+      // encoder が受け付けない / 停止処理中はスキップ (= バッファもコピーも作らない)。
+      guard writer.status == .writing, input.isReadyForMoreMediaData else { return }
+
+      // ARKit のバッファがまだ有効なこの場 (メインスレッド) で独立メモリへコピーし、 ARKit のバッファは
+      // 即解放する。 PTS もここで単調に確定 (= 非同期化による並び替えを排除)。
+      guard let copy = self.copyPixelBuffer(pixelBuffer) else { return }
+      let pts = CMTimeMakeWithSeconds(timestamp, preferredTimescale: 1_000_000_000)
+      if self.recordingStartTime == .invalid { self.recordingStartTime = pts }
+      let adjPts = CMTimeSubtract(pts, self.recordingStartTime)
 
       frameQueue.async { [weak self] in
         guard let self = self else { return }
         // 停止に入ったら追記しない (= 権威的なゲート。 フラグは frameQueue 上で立つので順序保証がある)。
-        guard !self.finishingWriter else { return }
-        guard writer.status == .writing else { return }
-        guard let inp = self.videoInput, inp.isReadyForMoreMediaData else { return }
-
-        let pts = CMTimeMakeWithSeconds(timestamp, preferredTimescale: 1_000_000_000)
-        // session の base time を最初の frame に合わせる (= MP4 の time origin を 0 にしない)
-        if self.recordingStartTime == .invalid {
-          self.recordingStartTime = pts
-        }
-        let adjPts = CMTimeSubtract(pts, self.recordingStartTime)
-        if !adaptor.append(pixelBuffer, withPresentationTime: adjPts) {
-          NSLog("[ArkitCaptureController] adaptor.append failed: status=%ld error=%@",
-                Int(writer.status.rawValue), "\(writer.error?.localizedDescription ?? "nil")")
+        guard !self.finishingWriter, writer.status == .writing, input.isReadyForMoreMediaData else { return }
+        if !adaptor.append(copy, withPresentationTime: adjPts) {
+          self.appendFailCount += 1
+          NSLog("[ArkitCaptureController] adaptor.append failed (#%d): status=%ld error=%@",
+                self.appendFailCount, Int(writer.status.rawValue), Self.describeNSError(writer.error))
         }
       }
     }

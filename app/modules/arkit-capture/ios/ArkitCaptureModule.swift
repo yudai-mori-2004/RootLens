@@ -80,6 +80,8 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
           let url = try ArkitCaptureController.shared.stopRecording()
           promise.resolve(url.absoluteString)
         } catch {
+          NSLog("[ArkitCaptureController] stopRecording threw: %@",
+                ArkitCaptureController.describeNSError(error))
           promise.reject("ARKIT_CAPTURE_STOP_ERROR", error.localizedDescription)
         }
       }
