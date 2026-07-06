@@ -1,11 +1,11 @@
-// Settings タブ (= 横持ち、 2 カラム誌面レイアウト)。
+// Settings タブ (= 横持ち、 扉カラム + 設定リスト)。
 //
-// セクション分類 (= ユーザーの関心単位で 4 + 開発者 1):
-//   左: • アカウント — アカウント ID / サインアウト
-//       • 撮影       — キャリブレーションやり直し
-//       • サポート   — 利用規約 / プライバシーポリシー / お問い合わせ
-//   右: • アプリ     — 表示言語 / ストレージ使用量 / キャッシュクリア / バージョン
-//       • 開発者向け — SERVER / ACCOUNT / AUTH PROVIDER / GitHub (= debug provider 時のみ)
+// セクションは「よく触る順」 に上から並べる (2026-07-06 判断):
+//   • アカウント — アカウント ID / サインアウト
+//   • アプリ     — 表示言語 / ストレージ使用量 / キャッシュクリア / バージョン
+//   • サポート   — 利用規約 / プライバシーポリシー / お問い合わせ
+//   • 撮影       — 解像度 / レート / ストリーム (= ほぼ触らないので下)
+//   • 開発者向け — SERVER / ACCOUNT / AUTH PROVIDER / GitHub / 効果音テスト (= debug provider 時のみ)
 //
 // 行は Section が hairline で区切る (= 各行が罫線を持たない。 二重線を作らない)。
 
@@ -24,7 +24,6 @@ import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { config } from '../config';
 import { useAuth } from '../services/auth';
@@ -167,6 +166,33 @@ export const SettingsScreen: React.FC = () => {
           />
         </Section>
 
+        <Section title={t('settings.section.app')}>
+          <SegmentRow
+            label={t('settings.languageLabel')}
+            value={locale}
+            options={[
+              { value: 'ja', label: t('settings.languageJa') },
+              { value: 'en', label: t('settings.languageEn') },
+            ]}
+            onChange={(v) => setLocale(v as Locale)}
+          />
+          <Row
+            label={t('settings.storageUsage')}
+            value={cacheSize === null ? t('settings.calculating') : formatBytes(cacheSize)}
+          />
+          <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
+          <Row label={t('settings.version')} value={version} />
+        </Section>
+
+        <Section title={t('settings.section.support')}>
+          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
+          <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
+          <ActionRow
+            label={t('settings.contact')}
+            onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
+          />
+        </Section>
+
         <Section title={t('settings.section.capture')}>
           <SegmentRow
             label={t('settings.capture.resolution')}
@@ -232,7 +258,6 @@ export const SettingsScreen: React.FC = () => {
             ]}
             onChange={(v) => updateCs({ imuRateHz: Number(v) as ImuRate })}
           />
-          <Row label={t('settings.capture.streamRgb')} value={t('settings.capture.alwaysOn')} />
           <SwitchRow
             label={t('settings.capture.streamImu')}
             value={cs.streamImu}
@@ -252,41 +277,6 @@ export const SettingsScreen: React.FC = () => {
             label={t('settings.capture.streamMesh')}
             value={cs.streamMesh}
             onChange={(v) => updateCs({ streamMesh: v })}
-          />
-          <ActionRow
-            label={t('settings.recalibrate')}
-            onPress={async () => {
-              try {
-                await AsyncStorage.removeItem('@rootlens/calibration/baseline/v1');
-              } catch {}
-            }}
-          />
-        </Section>
-
-        <Section title={t('settings.section.app')}>
-          <SegmentRow
-            label={t('settings.languageLabel')}
-            value={locale}
-            options={[
-              { value: 'ja', label: t('settings.languageJa') },
-              { value: 'en', label: t('settings.languageEn') },
-            ]}
-            onChange={(v) => setLocale(v as Locale)}
-          />
-          <Row
-            label={t('settings.storageUsage')}
-            value={cacheSize === null ? t('settings.calculating') : formatBytes(cacheSize)}
-          />
-          <ActionRow label={t('settings.clearCache')} onPress={onClearCache} kind="warn" />
-          <Row label={t('settings.version')} value={version} />
-        </Section>
-
-        <Section title={t('settings.section.support')}>
-          <ActionRow label={t('settings.terms')} onPress={() => setLegalDoc('tester-consent')} />
-          <ActionRow label={t('settings.privacy')} onPress={() => setLegalDoc('privacy-policy')} />
-          <ActionRow
-            label={t('settings.contact')}
-            onPress={() => Linking.openURL('mailto:support@rootlens.io').catch(() => {})}
           />
         </Section>
 

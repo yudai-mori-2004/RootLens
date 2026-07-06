@@ -82,7 +82,6 @@ const ja = {
   'settings.unauthenticated': '未認証',
 
 
-  'settings.recalibrate': 'カメラの位置合わせをやり直す',
   'settings.capture.resolution': '解像度',
   'settings.capture.res1440': '1440p(最大画角)',
   'settings.capture.autoFocus': 'オートフォーカス',
@@ -91,8 +90,6 @@ const ja = {
   'settings.capture.depthRate': '深度レート',
   'settings.capture.pointCloudRate': '点群レート',
   'settings.capture.imuRate': 'IMUレート',
-  'settings.capture.streamRgb': 'RGBカメラ',
-  'settings.capture.alwaysOn': '常時オン(署名対象)',
   'settings.capture.streamImu': 'IMU(加速度・ジャイロ)',
   'settings.capture.streamDepth': '深度(LiDAR)',
   'settings.capture.streamPointCloud': '特徴点群',
@@ -257,7 +254,6 @@ const en: Record<TranslationKey, string> = {
   'settings.unauthenticated': 'Not signed in',
 
 
-  'settings.recalibrate': 'Redo camera alignment',
   'settings.capture.resolution': 'Resolution',
   'settings.capture.res1440': '1440p (max FOV)',
   'settings.capture.autoFocus': 'Auto focus',
@@ -266,8 +262,6 @@ const en: Record<TranslationKey, string> = {
   'settings.capture.depthRate': 'Depth rate',
   'settings.capture.pointCloudRate': 'Point cloud rate',
   'settings.capture.imuRate': 'IMU rate',
-  'settings.capture.streamRgb': 'RGB camera',
-  'settings.capture.alwaysOn': 'Always on (signed)',
   'settings.capture.streamImu': 'IMU (gyroscope & accelerometer)',
   'settings.capture.streamDepth': 'Depth (LiDAR)',
   'settings.capture.streamPointCloud': 'Feature point cloud',

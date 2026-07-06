@@ -51,8 +51,10 @@ export const RootNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       initialRouteName={initialRoute}
-      // v0.1.4: アプリ全体を横持ち (landscape) ベースにする (= 常に landscape 動画を撮る前提の UI)。
-      screenOptions={{ ...navigationHeaderOptions, orientation: 'landscape' }}
+      // v0.1.4: アプリ全体を横持ちベースにする (= 常に landscape 動画を撮る前提の UI)。
+      // 撮影画面が landscape_right 固定なので、 他画面も同じ向きに固定する (= タブで逆さに持って
+      // いた人が撮影に入ると UI が 180° 回る、 を無くす。 2026-07-06 判断)。
+      screenOptions={{ ...navigationHeaderOptions, orientation: 'landscape_right' }}
     >
       <Stack.Screen name="Onboarding" options={{ headerShown: false }}>
         {({ navigation }) => (
