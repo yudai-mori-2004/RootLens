@@ -30,10 +30,14 @@ export interface CaptureSettings {
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   resolution: '1440p',
   autoFocus: true,
-  recordingRate: 30,
+  // RGB-D の既定は 15 Hz (= Stera のネイティブ仕様に合わせる。 製品ページ「RGB-D 15 Hz」+
+  // Stera-10M が 10M frames / 200h ≈ 14 fps)。 sync 時は depth / point cloud も追従する。
+  // ⚠ これは初期値の宣言のみ。 fps は撮影設定として native へ渡るだけで、 実行時に別経路で
+  //    fps を書き換えるコードは持たせない (= ユーザーが設定画面で選んだ値がそのまま効く)。
+  recordingRate: 15,
   syncRate: true,
-  depthRate: 30,
-  pointCloudRate: 30,
+  depthRate: 15,
+  pointCloudRate: 15,
   imuRateHz: 100,
   streamImu: true,
   streamDepth: true,
