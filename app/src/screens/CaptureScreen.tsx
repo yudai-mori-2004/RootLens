@@ -65,7 +65,7 @@ import {
 } from '../dataflow';
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
 import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isSpeechSettled } from '../services/captureAudio';
-import { applyCaptureSettingsToNative } from '../services/captureSettings';
+import { applyCaptureSettingsToNative, loadCaptureSettings } from '../services/captureSettings';
 import { useCameraPitch } from '../services/devicePitch';
 import { GestureStabilizer } from '../domain/gestureDetect';
 import { t, useT } from '../i18n';
@@ -106,7 +106,11 @@ type CaptureState =
   // lostSince: thumbs-up が見えなくなった時刻 (0=保持中)。 離脱ヒステリシスを state に内包。
   | { kind: 'stopping'; startTs: number; lostSince: number }
   | { kind: 'stopping_confirm'; startTs: number; lostSince: number }
-  | { kind: 'finalizing' };
+  | { kind: 'finalizing' }
+  // 自動サイクルの休止 (= ARKit 停止で冷却しながら pauseMs 待つ)。 効果は専用 effect が駆動。
+  | { kind: 'cycle_pausing'; startTs: number }
+  // 休止明けの再開案内 TTS 中 (= 「撮影を再開します」)。 言い終わりで palm_prompt へ。
+  | { kind: 'cycle_resuming' };
 
 type AdjustDirection = 'up' | 'down';
 
@@ -229,6 +233,8 @@ function entryCue(s: CaptureState): { sfx?: SfxName; tts?: string; keep?: boolea
     case 'stopping_confirm':
       // 1.3 秒保持しきって初めて合図 (= ピロ) + 「撮影を終了します。」。 読み終わりまで保持で確定。
       return { sfx: 'detect_thumbs_up', tts: t('capture.tts.stoppingConfirm') };
+    case 'cycle_resuming':
+      return { tts: t('capture.tts.cycleResume') };
     default:
       return null;
   }
@@ -314,6 +320,23 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const autoStopReasonRef = useRef<string | null>(null); // finalizing 冒頭で 1 回読む自動終了の理由
   const [dimmed, setDimmed] = useState(false);
   const wakeUntilRef = useRef(0); // タップ復帰後、 この時刻までは再消灯しない
+
+  // 自動サイクル撮影の設定 (= 設定画面の値を撮影中に読む)。 cycleStopRef は「今の停止が
+  // 計画的なサイクル区切りか」 のフラグ (= finalizing が休止へ分岐するかの判定に使う)。
+  const cycleRef = useRef({ enabled: false, recordMs: 30 * 60_000, pauseMs: 10 * 60_000 });
+  const cycleStopRef = useRef(false);
+  const [pauseRemainingSec, setPauseRemainingSec] = useState(0);
+  useEffect(() => {
+    loadCaptureSettings()
+      .then((s) => {
+        cycleRef.current = {
+          enabled: s.cycleEnabled,
+          recordMs: Math.max(1, s.cycleRecordMinutes) * 60_000,
+          pauseMs: Math.max(1, s.cyclePauseMinutes) * 60_000,
+        };
+      })
+      .catch(() => {});
+  }, []);
 
   const recordingStartedRef = useRef(false);
   // 終了方法の案内 (= 録画開始から数秒後に 1 回だけ)
@@ -643,9 +666,14 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           // 終了の合図のあと少し間を置いてから次の案内へ (= 畳みかけない)。
           await delay(900);
           if (stateRef.current.kind !== 'finalizing') return;
-          // 次タスク案内は state→audio effect が鳴らし、 完了で ticker が awaiting_palm に遷移する。
           awaitedSpeechSeqRef.current = 0; // 前 state の完了 seq との誤一致防止
-          setState({ kind: 'next_task_announcing' });
+          // 計画的なサイクル区切りなら休止へ (= ARKit 停止で冷却)。 それ以外は従来どおり次タスク案内。
+          if (cycleStopRef.current) {
+            cycleStopRef.current = false;
+            setState({ kind: 'cycle_pausing', startTs: Date.now() });
+          } else {
+            setState({ kind: 'next_task_announcing' });
+          }
         } catch (e: any) {
           recordingStartedRef.current = false;
           setError(`${t('capture.recStopFailed')}: ${e?.message ?? e}`);
@@ -777,6 +805,18 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // 判定順 = 危険度順: 熱 critical (放置すると OS がカメラごと殺す) > 容量 (writer が書けなく
         // なる) > 電池 (突然死 = 台帳登録前に消える) > 長時間。
         const startedAt = recordingStartedAtRef.current;
+        // 計画的なサイクル区切り (= 自動サイクル ON で連続撮影時間に到達)。 これは異常停止ではなく、
+        // finalize 後に休止 → 再開へ進む (cycleStopRef で finalizing に伝える)。
+        const cyc = cycleRef.current;
+        if (cyc.enabled && startedAt > 0 && now - startedAt >= cyc.recordMs) {
+          autoStopReasonRef.current = t('capture.tts.cyclePause');
+          cycleStopRef.current = true;
+          setState({ kind: 'finalizing' });
+          return;
+        }
+        // 長時間録画の安全弁 (= 手検出と無関係に判定)。 続行できない状況は理由を積んで終了フローへ。
+        // 判定順 = 危険度順: 熱 critical (放置すると OS がカメラごと殺す) > 容量 (writer が書けなく
+        // なる) > 電池 (突然死 = 台帳登録前に消える) > 長時間。
         const power = powerRef.current;
         const batteryLow =
           power !== null && power.level >= 0 && !power.charging && power.level <= LOW_BATTERY_STOP_LEVEL;
@@ -883,6 +923,13 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       }
       case 'finalizing':
         return;
+      case 'cycle_pausing':
+        // 休止は専用 effect (session 停止 + タイマー) が駆動。 ticker はここでは何もしない。
+        return;
+      case 'cycle_resuming':
+        // 再開案内を言い終わったらパー案内へ (= 既存のキャリブレーションに合流)。
+        if (speechDone()) setState({ kind: 'palm_prompt' });
+        return;
     }
   }, []);
 
@@ -925,6 +972,55 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     const id = setInterval(update, 50);
     return () => clearInterval(id);
   }, [state]);
+
+  // 自動サイクルの休止駆動: cycle_pausing に入ったら ARKit セッションを止めて冷却し、 pauseMs 経過で
+  // session を再起動 → cycle_resuming (再開案内) へ。 セッション操作は sessionOpRef で handoff と直列化。
+  useEffect(() => {
+    if (state.kind !== 'cycle_pausing') { setPauseRemainingSec(0); return; }
+    let cancelled = false;
+    const startTs = state.startTs;
+    const pauseMs = cycleRef.current.pauseMs;
+
+    // ARKit を止めて冷却 (= プレビューは消える。 発熱源が完全に止まる)。
+    sessionOpRef.current = sessionOpRef.current.then(async () => {
+      if (cancelled) return;
+      const running = runningConfigRef.current;
+      if (running) {
+        await running.stopSession(sink).catch(() => {});
+        runningConfigRef.current = null;
+        setActiveConfigId(null);
+      }
+    });
+
+    setPauseRemainingSec(Math.ceil(pauseMs / 1000));
+    const tick = setInterval(() => {
+      setPauseRemainingSec(Math.max(0, Math.ceil((startTs + pauseMs - Date.now()) / 1000)));
+    }, 500);
+
+    // 休止明け: session を再起動 → 再開案内へ。
+    const id = setTimeout(() => {
+      if (cancelled) return;
+      sessionOpRef.current = sessionOpRef.current
+        .then(async () => {
+          if (cancelled) return;
+          await applyCaptureSettingsToNative().catch(() => {});
+          await config.startSession(sink);
+          runningConfigRef.current = config;
+          if (cancelled) return;
+          enqueueSfx('enter_capture');
+          setActiveConfigId(config.id);
+        })
+        .then(() => {
+          if (!cancelled) {
+            awaitedSpeechSeqRef.current = 0;
+            setState({ kind: 'cycle_resuming' });
+          }
+        })
+        .catch((err) => sink({ step: 'capture', level: 'error', message: `サイクル再開失敗: ${errMsg(err)}` }));
+    }, pauseMs);
+
+    return () => { cancelled = true; clearInterval(tick); clearTimeout(id); };
+  }, [state.kind]);
 
   // 録画経過タイマー (= 0.5s 刻み。 native 録画開始時刻を基準にするので state 遷移で揺れない)
   useEffect(() => {
@@ -1075,6 +1171,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return { text: t('capture.hud.saving'), tone: 'normal' };
       case 'next_task_announcing':
         return { text: t('capture.tts.done'), tone: 'normal' };
+      case 'cycle_pausing':
+        return { text: t('capture.hud.cyclePausing'), tone: 'dim' };
+      case 'cycle_resuming':
+        return { text: t('capture.tts.cycleResume'), tone: 'accent' };
     }
   })();
 
@@ -1232,6 +1332,15 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         >
           <View style={[styles.dimDot, { top: safeTop + 14, right: safeRight + 14 }]} />
         </Pressable>
+      ) : null}
+
+      {/* 自動サイクルの休止中: 全面オーバーレイで「休憩中 あとN:MM」を出す (= ARKit 停止で
+          プレビューは消えているので、 状態を明示)。 装着者は何もしなくていい。 */}
+      {state.kind === 'cycle_pausing' ? (
+        <View style={styles.pauseOverlay} pointerEvents="none">
+          <Text style={styles.pauseTitle}>{t('capture.hud.cyclePausing')}</Text>
+          <Text style={styles.pauseRemain}>{formatElapsed(pauseRemainingSec)}</Text>
+        </View>
       ) : null}
     </View>
   );
@@ -1466,4 +1575,25 @@ const styles = StyleSheet.create({
   // 画面消灯 (= 長時間録画)。 ドットはごく暗い赤 (= 発光を最小にしつつ「録画中」 が分かる)。
   dimOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000', zIndex: 10 },
   dimDot: { position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: '#571510' },
+
+  pauseOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#06070A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    zIndex: 9,
+  },
+  pauseTitle: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 20,
+    letterSpacing: 2,
+    color: colors.paper,
+  },
+  pauseRemain: {
+    fontFamily: fonts.mono,
+    fontSize: 40,
+    color: colors.emerald,
+    letterSpacing: 1,
+  },
 });

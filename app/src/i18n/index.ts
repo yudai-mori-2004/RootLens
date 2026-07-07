@@ -94,6 +94,10 @@ const ja = {
   'settings.capture.streamDepth': '深度(LiDAR)',
   'settings.capture.streamPointCloud': '特徴点群',
   'settings.capture.streamMesh': '3Dメッシュ',
+  'settings.capture.cycleEnabled': '自動サイクル撮影',
+  'settings.capture.cycleRecord': '連続撮影時間',
+  'settings.capture.cyclePause': '休止時間',
+  'settings.capture.minutesUnit': '分',
 
   'settings.storageUsage': 'ストレージ使用量',
   'settings.calculating': '計算中…',
@@ -161,6 +165,10 @@ const ja = {
   'capture.tts.autoStopBackground': 'アプリが中断されたため、撮影を終了しました。',
   'capture.tts.lowDisk': '本体の空き容量が少なめです。長い撮影は途中で終わることがあります。',
   'capture.tts.lowBattery': '電池が少なめです。長い撮影は途中で終わることがあります。',
+  // 自動サイクル: 区切りの停止と再開の案内。
+  'capture.tts.cyclePause': '撮影をひと区切りします。少し休憩します。',
+  'capture.tts.cycleResume': '撮影を再開します。',
+  'capture.hud.cyclePausing': '休憩中',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
   'upload.consentTitle': 'アップロード前の確認',
@@ -266,6 +274,10 @@ const en: Record<TranslationKey, string> = {
   'settings.capture.streamDepth': 'Depth (LiDAR)',
   'settings.capture.streamPointCloud': 'Feature point cloud',
   'settings.capture.streamMesh': '3D mesh',
+  'settings.capture.cycleEnabled': 'Auto cycle recording',
+  'settings.capture.cycleRecord': 'Recording length',
+  'settings.capture.cyclePause': 'Pause length',
+  'settings.capture.minutesUnit': 'min',
 
   'settings.storageUsage': 'Storage used',
   'settings.calculating': 'Calculating…',
@@ -331,6 +343,9 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.autoStopBackground': 'The app was interrupted, so recording has stopped.',
   'capture.tts.lowDisk': 'Free storage is limited. A long recording may stop early.',
   'capture.tts.lowBattery': 'The battery is low. A long recording may stop early.',
+  'capture.tts.cyclePause': 'Pausing recording for a short break.',
+  'capture.tts.cycleResume': 'Resuming recording.',
+  'capture.hud.cyclePausing': 'On break',
 
   // ── Upload consent pop (= tap a card in My Videos) ──
   'upload.consentTitle': 'Before you upload',

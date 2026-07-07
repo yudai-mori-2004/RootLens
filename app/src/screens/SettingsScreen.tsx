@@ -278,6 +278,32 @@ export const SettingsScreen: React.FC = () => {
             value={cs.streamMesh}
             onChange={(v) => updateCs({ streamMesh: v })}
           />
+          {/* 自動サイクル撮影 (= N 分録画 → 休止 → 再開のループ)。 有効時のみ分数を出す。 */}
+          <SwitchRow
+            label={t('settings.capture.cycleEnabled')}
+            value={cs.cycleEnabled}
+            onChange={(v) => updateCs({ cycleEnabled: v })}
+          />
+          {cs.cycleEnabled ? (
+            <StepperRow
+              label={t('settings.capture.cycleRecord')}
+              value={cs.cycleRecordMinutes}
+              min={1}
+              max={90}
+              unit={t('settings.capture.minutesUnit')}
+              onChange={(v) => updateCs({ cycleRecordMinutes: v })}
+            />
+          ) : null}
+          {cs.cycleEnabled ? (
+            <StepperRow
+              label={t('settings.capture.cyclePause')}
+              value={cs.cyclePauseMinutes}
+              min={1}
+              max={30}
+              unit={t('settings.capture.minutesUnit')}
+              onChange={(v) => updateCs({ cyclePauseMinutes: v })}
+            />
+          ) : null}
         </Section>
 
         {/* ── 開発者向け (= debug provider 時のみ表示) ── */}
@@ -407,6 +433,42 @@ const SwitchRow: React.FC<{
     />
   </View>
 );
+
+/// 分数などの任意整数を −/+ で増減するステッパ (= ラベル左、 [−] 値 [+] 右)。
+const StepperRow: React.FC<{
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  unit: string;
+  onChange: (v: number) => void;
+}> = ({ label, value, min, max, unit, onChange }) => {
+  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  return (
+    <View style={styles.segmentRow}>
+      <Text style={styles.rowLabelInline}>{label}</Text>
+      <View style={styles.stepper}>
+        <Pressable
+          onPress={() => onChange(clamp(value - 1))}
+          disabled={value <= min}
+          style={({ pressed }) => [styles.stepBtn, pressed && styles.segmentBtnPressed, value <= min && styles.rowDisabled]}
+          hitSlop={6}
+        >
+          <Text style={styles.stepBtnLabel}>−</Text>
+        </Pressable>
+        <Text style={styles.stepValue}>{value}{unit}</Text>
+        <Pressable
+          onPress={() => onChange(clamp(value + 1))}
+          disabled={value >= max}
+          style={({ pressed }) => [styles.stepBtn, pressed && styles.segmentBtnPressed, value >= max && styles.rowDisabled]}
+          hitSlop={6}
+        >
+          <Text style={styles.stepBtnLabel}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+};
 
 const SegmentRow: React.FC<{
   label: string;
@@ -544,6 +606,34 @@ const styles = StyleSheet.create({
     padding: 2.5,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  stepBtn: {
+    width: 34,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.md,
+    backgroundColor: colors.paperDeep,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stepBtnLabel: {
+    fontFamily: fonts.sansSemibold,
+    fontSize: 18,
+    lineHeight: 20,
+    color: colors.ink,
+  },
+  stepValue: {
+    minWidth: 44,
+    textAlign: 'center',
+    fontFamily: fonts.sansSemibold,
+    fontSize: 14,
+    color: colors.ink,
   },
   segmentBtn: {
     paddingVertical: 6,

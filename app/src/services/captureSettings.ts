@@ -25,6 +25,16 @@ export interface CaptureSettings {
   streamDepth: boolean;
   streamPointCloud: boolean;
   streamMesh: boolean;
+
+  // ── 自動サイクル撮影 (= 長時間シフト用。 UI 層の挙動なので native へは渡らない) ──
+  // N 分録画 → 自動停止 (= 1 クリップ確定) → M 分休止 (= ARKit 停止で冷却) → 再開案内 +
+  // パーのキャリブレーションに戻る、 を繰り返す。 各クリップは独立エピソード。
+  /** 自動サイクルを有効にするか。 false なら従来どおりジェスチャーで手動停止。 */
+  cycleEnabled: boolean;
+  /** 1 サイクルの連続撮影時間 (分)。 */
+  cycleRecordMinutes: number;
+  /** 各サイクル間の休止時間 (分)。 */
+  cyclePauseMinutes: number;
 }
 
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
@@ -43,6 +53,9 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   streamDepth: true,
   streamPointCloud: true,
   streamMesh: true,
+  cycleEnabled: false,
+  cycleRecordMinutes: 30,
+  cyclePauseMinutes: 10,
 };
 
 const STORAGE_KEY = '@rootlens/capture-settings/v1';
