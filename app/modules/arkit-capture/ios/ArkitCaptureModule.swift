@@ -108,10 +108,30 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       return ARWorldTrackingConfiguration.isSupported
     }
 
+    // 計測用: 現在のアプリのメモリ使用量 (phys_footprint MB)。 アップロード OOM の切り分けに使う。
+    AsyncFunction("getMemoryFootprintMB") { () -> Double in
+      var info = task_vm_info_data_t()
+      var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size) / 4
+      let kr = withUnsafeMutablePointer(to: &info) { ptr in
+        ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+          task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+      }
+      return kr == KERN_SUCCESS ? Double(info.phys_footprint) / 1_000_000.0 : -1
+    }
+
     // 画面消灯 (= 長時間録画の省電力・発熱対策): 輝度 0 + プレビュー描画停止。 false で復帰。
     AsyncFunction("setScreenDimmed") { (dimmed: Bool, promise: Promise) in
       DispatchQueue.main.async {
         ArkitCaptureController.shared.setScreenDimmed(dimmed)
+        promise.resolve(nil)
+      }
+    }
+
+    // 自動ロック抑止 (= 撮影画面が開いている間 true。 ARSession の on/off とは独立)。
+    AsyncFunction("setKeepAwake") { (on: Bool, promise: Promise) in
+      DispatchQueue.main.async {
+        ArkitCaptureController.shared.setKeepAwake(on)
         promise.resolve(nil)
       }
     }

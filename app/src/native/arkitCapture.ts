@@ -79,8 +79,10 @@ interface ArkitCaptureNativeModule {
   captureSnapshot(): Promise<string>;
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
   setScreenDimmed(dimmed: boolean): Promise<void>;
+  setKeepAwake(on: boolean): Promise<void>;
   getThermalState(): Promise<ThermalState>;
   getPowerState(): Promise<PowerState>;
+  getMemoryFootprintMB(): Promise<number>;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 }
@@ -141,10 +143,22 @@ export async function setArkitScreenDimmed(dimmed: boolean): Promise<void> {
   return nativeModule.setScreenDimmed(dimmed);
 }
 
+/** 自動ロック抑止 (= 撮影画面が開いている間 true)。 ARSession の on/off とは独立に制御する。 */
+export async function setArkitKeepAwake(on: boolean): Promise<void> {
+  if (!nativeModule) return;
+  return nativeModule.setKeepAwake(on);
+}
+
 /** 現在の熱状態。 録画中の変化は subscribeThermalState で届く。 */
 export async function getArkitThermalState(): Promise<ThermalState> {
   if (!nativeModule) return 'unknown';
   return nativeModule.getThermalState();
+}
+
+/** 計測用: アプリのメモリ使用量 (phys_footprint MB)。 取得不能なら -1。 */
+export async function getArkitMemoryFootprintMB(): Promise<number> {
+  if (!nativeModule) return -1;
+  return nativeModule.getMemoryFootprintMB();
 }
 
 /** 電池残量と充電状態。 長時間録画の自動終了判定に使う。 */

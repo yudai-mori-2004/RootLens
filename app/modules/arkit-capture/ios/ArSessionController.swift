@@ -244,19 +244,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     session.run(config, options: [.resetTracking, .removeExistingAnchors])
     sessionRunning = true
-    // 撮影中は画面に触らない (= ヘッドセット装着) ので、 自動ロックを止める。
-    // これが無いと数十秒でロック → ARSession 停止 → 録画が黙って死ぬ。
-    DispatchQueue.main.async { UIApplication.shared.isIdleTimerDisabled = true }
+    // ⚠ 自動ロック無効化 (keep-awake) と画面消灯 (dim) はここでは触らない。 これらは ARSession の
+    //    on/off ではなく「撮影画面が開いている間ずっと」 に紐付けるべきもの。 自動サイクルの休止では
+    //    ARKit を止めても画面はロックさせたくない (= ロック → app サスペンド → サイクル停止)。
+    //    制御は setKeepAwake / setScreenDimmed を JS 側の撮影画面ライフサイクルから呼んで行う。
   }
 
   func stopSession() {
     if !sessionRunning { return }
     session.pause()
     sessionRunning = false
-    DispatchQueue.main.async {
-      UIApplication.shared.isIdleTimerDisabled = false
-      self.setScreenDimmed(false)  // 消灯したまま画面を離れても輝度を戻す
-    }
     // 構成切替 (arkit → ultra_wide) で AVCaptureSession が同じ ultra-wide カメラを掴む前に、
     // ARKit frame の IOSurface を宙に浮かせないよう、 in-flight の HandTracker (= Vision/ANE) を
     // drain し、 保持中の pixel buffer / hand output を解放する (= wide-capture 側と対称)。
@@ -597,6 +594,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       brightnessBeforeDim = nil
     }
     NotificationCenter.default.post(name: .rootlensPreviewDim, object: nil, userInfo: ["dimmed": dimmed])
+  }
+
+  /// 自動ロック (idle timer) の抑止。 撮影画面が開いている間 (= 録画・キャリブ・休止すべて含む) true。
+  /// ⚠ ARSession の on/off とは独立。 休止で ARKit を止めても、 撮影画面にいる限りロックさせない
+  ///    (ロック → app サスペンド → 自動サイクルの休止タイマーが凍結して止まる、 を防ぐ)。
+  func setKeepAwake(_ on: Bool) {
+    UIApplication.shared.isIdleTimerDisabled = on
   }
 
   /// capturedImage (= ARKit の使い回しバッファ) を独立メモリへ deep copy する。

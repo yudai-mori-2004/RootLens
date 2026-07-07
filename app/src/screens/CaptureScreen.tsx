@@ -49,6 +49,7 @@ import {
   getArkitPowerState,
   getArkitThermalState,
   setArkitScreenDimmed,
+  setArkitKeepAwake,
   subscribeThermalState,
   type PowerState,
   type ThermalState,
@@ -517,21 +518,24 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     return () => sub.remove();
   }, []);
 
-  // 画面消灯の driver: 録画が DIM_AFTER_MS 乗ったら消灯。 録画フローを抜けたら必ず復帰。
+  // 画面消灯の driver: 録画は DIM_AFTER_MS 乗ったら消灯、 自動サイクルの休止は即消灯 (= 発熱源も
+  // プレビューも無いので暗くて良い)。 どちらもタップ (wakeUntilRef) で一時的に点灯。 録画/休止を
+  // 抜けたら必ず復帰。
   useEffect(() => {
     const k = state.kind;
-    const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
-    if (!active) {
+    const recActive = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
+    const pauseActive = k === 'cycle_pausing';
+    if (!recActive && !pauseActive) {
       setDimmed(false);
       wakeUntilRef.current = 0;
       return;
     }
     const id = setInterval(() => {
-      const started = recordingStartedAtRef.current;
       const now = Date.now();
-      if (started > 0 && now - started >= DIM_AFTER_MS && now >= wakeUntilRef.current) {
-        setDimmed(true);
-      }
+      if (now < wakeUntilRef.current) { setDimmed(false); return; } // タップ直後は点灯
+      if (pauseActive) { setDimmed(true); return; }                 // 休止は即暗く
+      const started = recordingStartedAtRef.current;
+      if (started > 0 && now - started >= DIM_AFTER_MS) setDimmed(true);
     }, 500);
     return () => clearInterval(id);
   }, [state.kind]);
@@ -540,8 +544,14 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     setArkitScreenDimmed(dimmed).catch(() => {});
   }, [dimmed]);
+  // 自動ロック抑止は「撮影画面が開いている間ずっと」 (= 録画・キャリブ・休止すべて)。 ARSession の
+  // on/off とは独立。 これで自動サイクルの休止 (ARKit 停止) 中もロックされず、 サイクルが止まらない。
   useEffect(() => {
-    return () => { setArkitScreenDimmed(false).catch(() => {}); };
+    setArkitKeepAwake(true).catch(() => {});
+    return () => {
+      setArkitKeepAwake(false).catch(() => {});
+      setArkitScreenDimmed(false).catch(() => {});
+    };
   }, []);
 
   // hand track subscription (= アクティブ構成のストリームを購読、 切替で貼り替え)。
@@ -1319,9 +1329,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         </View>
       ) : null}
 
-      {/* 画面消灯 (= 長時間録画の省電力)。 OLED は黒 = 消灯なので全面黒 + ごく暗い録画ドットだけ。
-          どこをタップしても復帰する (= 復帰後しばらくして再消灯)。 */}
-      {dimmed ? (
+      {/* 画面消灯 (= 録画中の省電力)。 OLED は黒 = 消灯なので全面黒 + ごく暗い録画ドットだけ。
+          どこをタップしても復帰する。 ⚠ 休止 (cycle_pausing) は下の専用オーバーレイが担うので除外。 */}
+      {dimmed && state.kind !== 'cycle_pausing' ? (
         <Pressable
           accessibilityLabel={t('capture.recordingLabel')}
           style={styles.dimOverlay}
@@ -1334,13 +1344,19 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         </Pressable>
       ) : null}
 
-      {/* 自動サイクルの休止中: 全面オーバーレイで「休憩中 あとN:MM」を出す (= ARKit 停止で
-          プレビューは消えているので、 状態を明示)。 装着者は何もしなくていい。 */}
+      {/* 自動サイクルの休止中: ARKit 停止 + 輝度 0 で「本当に暗く」 する。 タップで数秒だけ点灯して
+          「休憩中 あとN:MM」を確認できる (= dimmed のときは黒、 タップで復帰した数秒だけ文字が見える)。 */}
       {state.kind === 'cycle_pausing' ? (
-        <View style={styles.pauseOverlay} pointerEvents="none">
+        <Pressable
+          style={styles.pauseOverlay}
+          onPress={() => {
+            wakeUntilRef.current = Date.now() + REDIM_AFTER_TAP_MS;
+            setDimmed(false);
+          }}
+        >
           <Text style={styles.pauseTitle}>{t('capture.hud.cyclePausing')}</Text>
           <Text style={styles.pauseRemain}>{formatElapsed(pauseRemainingSec)}</Text>
-        </View>
+        </Pressable>
       ) : null}
     </View>
   );
