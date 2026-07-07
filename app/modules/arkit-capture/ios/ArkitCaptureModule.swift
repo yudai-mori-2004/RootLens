@@ -1,4 +1,5 @@
 import ARKit
+import AVFoundation
 import ExpoModulesCore
 import Foundation
 import UIKit
@@ -106,6 +107,32 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
 
     AsyncFunction("isAvailable") { () -> Bool in
       return ARWorldTrackingConfiguration.isSupported
+    }
+
+    // MP4 を faststart 化 (= moov を先頭へ) して outputPath に書く。 再エンコード無し (passthrough)。
+    // これで署名前に faststart しておけば、 C2PA が box 順を保つので署名済み mp4 も faststart になり、
+    // アップロード後の再生が尺に依存せず即開始する (2026-07-07 実測で確認)。
+    AsyncFunction("faststartMp4") { (inputPath: String, outputPath: String, promise: Promise) in
+      let inURL = URL(fileURLWithPath: inputPath.replacingOccurrences(of: "file://", with: ""))
+      let outURL = URL(fileURLWithPath: outputPath.replacingOccurrences(of: "file://", with: ""))
+      try? FileManager.default.removeItem(at: outURL)
+      let asset = AVURLAsset(url: inURL)
+      guard let export = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {
+        promise.reject("FASTSTART_ERROR", "cannot create export session")
+        return
+      }
+      export.outputURL = outURL
+      export.outputFileType = .mp4
+      export.shouldOptimizeForNetworkUse = true  // moov を先頭へ = faststart
+      export.exportAsynchronously {
+        switch export.status {
+        case .completed:
+          promise.resolve(outURL.absoluteString)
+        default:
+          promise.reject("FASTSTART_ERROR",
+                         export.error?.localizedDescription ?? "export status \(export.status.rawValue)")
+        }
+      }
     }
 
     // 計測用: 現在のアプリのメモリ使用量 (phys_footprint MB)。 アップロード OOM の切り分けに使う。

@@ -17,6 +17,7 @@ import * as FileSystem from 'expo-file-system';
 import { SERVER_URL } from '../../env';
 import { getCurrentSession } from '../../services/auth/instance';
 import { signD1, computeSignatureHash } from '../../native/c2paBridge';
+import { faststartMp4 } from '../../native/arkitCapture';
 import type { EventSink } from '../events';
 import type { SignInput, SignResult } from '../types';
 
@@ -60,10 +61,28 @@ export async function signRecording(
   workDir: string,
   sink: EventSink,
 ): Promise<SignResult> {
+  // ─── faststart (= moov を先頭へ) ──────────────────────────────────
+  // 署名の「前」 に faststart しておく。 C2PA は box 順を保つので、 署名済み mp4 も faststart になり、
+  // アップロード後の再生が尺に依存せず即開始する。 失敗しても署名は続行 (= 再生が遅いだけで壊れない)。
+  const fastStartUri = `${workDir}faststart.mp4`;
+  let toSignUri = rawMp4Uri;
+  try {
+    await faststartMp4(rawMp4Uri, fastStartUri);
+    toSignUri = fastStartUri;
+    sink({ step: 'sign-d1', level: 'info', message: 'faststart 化 (moov 先頭化) 完了' });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    sink({ step: 'sign-d1', level: 'warn', message: `faststart 失敗、 生 mp4 で署名続行: ${msg}` });
+  }
+
   // ─── D1 リモート署名 ──────────────────────────────────────────────
   sink({ step: 'sign-d1', level: 'info', message: 'C2PA D1 署名 (リモート署名 = サーバ組織鍵)' });
   const signedMp4Uri = signedUriIn(workDir);
-  await signD1(rawMp4Uri, signedMp4Uri, SIGN_SERVICE_URL, accountPubkeyOrThrow());
+  await signD1(toSignUri, signedMp4Uri, SIGN_SERVICE_URL, accountPubkeyOrThrow());
+  // faststart 中間物はもう不要 (= 署名済みが本体)。 残しても cleanupTmpDir で消えるが、 早めに解放。
+  if (toSignUri === fastStartUri) {
+    await FileSystem.deleteAsync(fastStartUri, { idempotent: true }).catch(() => {});
+  }
   sink({ step: 'sign-d1', level: 'success', message: 'D1 署名完了' });
 
   // ─── signature_hash 抽出 ──────────────────────────────────────────

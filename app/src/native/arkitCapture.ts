@@ -77,6 +77,7 @@ interface ArkitCaptureNativeModule {
   stopRecording(): Promise<string>;
   setCaptureSettings(json: string): Promise<void>;
   captureSnapshot(): Promise<string>;
+  faststartMp4(inputPath: string, outputPath: string): Promise<string>;
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
   setScreenDimmed(dimmed: boolean): Promise<void>;
   setKeepAwake(on: boolean): Promise<void>;
@@ -127,6 +128,13 @@ export async function setArkitCaptureSettings(json: string): Promise<void> {
 export async function captureArkitSnapshot(): Promise<string> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
   return nativeModule.captureSnapshot();
+}
+
+/** MP4 を faststart 化 (= moov を先頭へ、 再エンコード無し) して outputUri に書き出し、 その file:// URI を返す。
+ *  ⚠ C2PA 署名の「前」 に通すこと (= C2PA は box 順を保つので、 署名済み mp4 も faststart になる)。 */
+export async function faststartMp4(inputUri: string, outputUri: string): Promise<string> {
+  if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
+  return nativeModule.faststartMp4(inputUri, outputUri);
 }
 
 /** ARKit / Vision に伝える表示 orientation を更新。
