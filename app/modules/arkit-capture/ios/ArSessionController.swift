@@ -172,8 +172,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     NSLog("[ArkitCaptureController] capture settings applied: %@", json)
   }
 
-  // 書き出しの間引き (= 録画開始時に videoFormat fps と設定から確定)
-  private var recFrameStride = 1        // ARFrame N 枚に 1 枚書く (= mp4 + jsonl)
+  // 書き出しの間引き。
+  // ⚠ RGB は「時間ベース」 で間引く (recTargetInterval / nextKeepTs)。 固定枚数 stride だと、
+  //    端末が熱で serious になり iOS がカメラを 60→30fps に絞ったとき、 出力が 15fps に半減する
+  //    (2026-07-07 実測)。 実撮影時刻で間引けば、 源が 60fps でも 30fps でも出力は目標に追従する。
+  private var recTargetInterval: Double = 1.0 / 30.0  // 採用間隔 (秒) = 1 / recordingRate
+  private var nextKeepTs: Double = 0                  // 次に採用する最小 timestamp (0 = 初回未採用)
+  private var recFrameStride = 1        // metadata 表示用の公称 stride (= sessionFps / recordingRate)
   private var depthEveryWritten = 1     // 書いた frame M 枚に 1 枚 depth
   private var pcEveryWritten = 1        // 書いた frame M 枚に 1 枚 point cloud
   private var recArFrameCounter = 0
@@ -363,8 +368,12 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
       return 30.0
     }()
-    recFrameStride = max(1, Int((sessionFps / Double(max(1, captureSettings.recordingRate))).rounded()))
-    let effectiveRate = sessionFps / Double(recFrameStride)
+    // RGB は時間ベース間引き: 目標 recordingRate の間隔で採用する (熱スロットリングに追従)。
+    recTargetInterval = 1.0 / Double(max(1, captureSettings.recordingRate))
+    nextKeepTs = 0
+    recFrameStride = max(1, Int((sessionFps / Double(max(1, captureSettings.recordingRate))).rounded())) // metadata 用の公称値
+    // depth / point cloud は「書いた frame (= 目標レートで採用済み)」 基準でさらに間引く。
+    let effectiveRate = Double(max(1, captureSettings.recordingRate))
     let dRate = captureSettings.syncRate ? captureSettings.recordingRate
       : min(captureSettings.depthRate, captureSettings.recordingRate)
     let pRate = captureSettings.syncRate ? captureSettings.recordingRate
@@ -1256,10 +1265,14 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     //    使い回しバッファなので「ここでコピー → コピーを非同期 append」 とする (copyPixelBuffer 参照)。
     if !finishingWriter, let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter,
        let input = self.videoInput {
-      // 書き出しレート (= recordingRate) への間引き。 ARFrame N 枚に 1 枚だけ mp4 + jsonl に書く。
-      let arIdx = recArFrameCounter
-      recArFrameCounter += 1
-      guard arIdx % recFrameStride == 0 else { return }
+      // 時間ベース間引き: 前回採用から目標間隔以上経過したフレームだけ採用する。 熱でカメラが
+      // 60→30fps に絞られても、 源フレームをそのまま拾って目標レート (30fps) に追従する
+      // (固定 stride だと同じ状況で 15fps に半減していた。 2026-07-07 実測)。
+      // マージン (0.25 * 間隔) で源のジッターを吸収し、 60fps 源から綺麗に 30fps を拾う。
+      if nextKeepTs == 0 { nextKeepTs = timestamp }
+      guard timestamp >= nextKeepTs - recTargetInterval * 0.25 else { return }
+      nextKeepTs += recTargetInterval
+      if nextKeepTs <= timestamp { nextKeepTs = timestamp + recTargetInterval } // 大きな間欠で溜め込まない
       // realtime_handpose.jsonl は書き出す frame に 1 行ずつ。 RGB frame と frame_index を揃える。
       self.writeSensorsLine(frame: frame)
 
