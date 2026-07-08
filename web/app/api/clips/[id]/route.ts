@@ -23,7 +23,7 @@ export async function GET(req: Request, ctx: Ctx) {
   const rows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, id), eq(clips.walletPubkey, accountPubkey)))
+    .where(and(eq(clips.id, id), eq(clips.accountPubkey, accountPubkey)))
     .limit(1);
   if (rows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -45,7 +45,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const rows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, id), eq(clips.walletPubkey, accountPubkey)))
+    .where(and(eq(clips.id, id), eq(clips.accountPubkey, accountPubkey)))
     .limit(1);
   if (rows.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

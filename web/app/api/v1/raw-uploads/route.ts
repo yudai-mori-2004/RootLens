@@ -3,9 +3,9 @@
 // v0.1.4: 端末側 Pipeline 1 用 presigned PUT URL endpoint。
 //
 // 流れ:
-//   1. device が C2PA D1 署名 (生 mp4 への 1 回のみ) を済ませて signature_hash を確定
-//   2. このエンドポイントに signatureHash を投げ、 撮影構成ファイル分の presigned PUT を得る
-//   3. R2 (raw/<signature_hash>/{rgb.mp4 + realtime_handpose.jsonl + metadata.json + 等}) に並列 PUT
+//   1. device が C2PA D1 署名 (生 mp4 への 1 回のみ) を済ませて content_hash を確定
+//   2. このエンドポイントに contentHash を投げ、 撮影構成ファイル分の presigned PUT を得る
+//   3. R2 (raw/<content_hash>/{rgb.mp4 + realtime_handpose.jsonl + metadata.json + 等}) に並列 PUT
 //   4. POST /api/clips でクリップ行を作成 (= rootAssetId は不要)
 //
 // /api/clips とは別エンドポイントにする理由:
@@ -22,7 +22,7 @@ import { presignRawSessionUploads } from "@/lib/r2";
 const CONTENT_ID_RE = /^[0-9a-f]{64}$/;
 
 const RequestSchema = z.object({
-  signatureHash: z.string().regex(CONTENT_ID_RE, "signatureHash must be 64-char lowercase hex (SHA-256)"),
+  contentHash: z.string().regex(CONTENT_ID_RE, "contentHash must be 64-char lowercase hex (SHA-256)"),
   // 撮影構成 → アップロード先バケット + ファイルマニフェストが決まる (DATA_SPECS §3)。
   // 旧クライアント互換のため省略時は ultra_wide。
   recordingConfig: z.enum(["ultra_wide", "arkit"]).default("ultra_wide"),
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const presigned = await presignRawSessionUploads({
-      signatureHash: parsed.data.signatureHash,
+      contentHash: parsed.data.contentHash,
       recordingConfig: parsed.data.recordingConfig,
     });
     return NextResponse.json(presigned);

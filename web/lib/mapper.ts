@@ -16,7 +16,7 @@ export function clipToDto(row: Clip): ClipDto {
     contentSize: row.contentSize,
     deviceModel: row.deviceModel,
 
-    signatureHash: row.signatureHash,
+    contentHash: row.contentHash,
 
     errorMessage: row.errorMessage,
   };

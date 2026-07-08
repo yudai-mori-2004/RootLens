@@ -22,7 +22,7 @@ export interface ClipDto {
   deviceModel: string | null;
 
   // ── 識別 ──
-  signatureHash: string;
+  contentHash: string;
 
   /// アップロード失敗時のメッセージ (= error 状態時のみ非 null)
   errorMessage: string | null;
@@ -32,10 +32,10 @@ export interface ClipDto {
 
 /// POST /api/clips
 /// 端末で C2PA D1 署名 + R2 アップロードを終えてから呼ぶ。
-/// 重複排除キーは (account, signatureHash)、 既存行があれば idempotent に返す。
+/// 重複排除キーは (account, contentHash)、 既存行があれば idempotent に返す。
 export interface CreateClipRequest {
-  /// 端末で確定した signature_hash (= C2PA D1 アクティブマニフェスト署名の SHA-256 hex)
-  signatureHash: string;
+  /// 端末で確定した content_hash (= C2PA D1 アクティブマニフェスト署名の SHA-256 hex)
+  contentHash: string;
   /// rgb.mp4 (= D1 署名済、 blur 無し) のサイズ (bytes)
   contentSize: number;
   /// 採用された撮影構成 (= 'ultra_wide' | 'arkit')
@@ -58,7 +58,7 @@ export type RawSessionFilename =
   | "depth.tar";
 
 export interface RawUploadsRequest {
-  signatureHash: string;
+  contentHash: string;
   recordingConfig: RecordingConfig;
 }
 

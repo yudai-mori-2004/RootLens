@@ -51,7 +51,7 @@ export { signedMp4Key };
 /// 構成マニフェスト (RAW_SESSION_MANIFEST) のファイルだけを、 構成対応バケットに presign する。
 /// optional なファイル (= depth.tar 等) も presign には含め、 端末は実際に生成したものだけ PUT する。
 export async function presignRawSessionUploads(opts: {
-  signatureHash: string;
+  contentHash: string;
   recordingConfig: RecordingConfigId;
   expiresInSec?: number;
 }): Promise<RawSessionUploadResponse> {
@@ -60,7 +60,7 @@ export async function presignRawSessionUploads(opts: {
   const manifest = RAW_SESSION_MANIFEST[opts.recordingConfig];
   const files: RawSessionUploadResponse["files"] = {};
   for (const { filename, contentType } of manifest) {
-    const key = rawSessionFileKey(opts.signatureHash, filename);
+    const key = rawSessionFileKey(opts.contentHash, filename);
     const cmd = new PutObjectCommand({
       Bucket: bucket,
       Key: key,

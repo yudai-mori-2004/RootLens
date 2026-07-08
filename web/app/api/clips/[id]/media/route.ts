@@ -27,7 +27,7 @@ export async function GET(
   const rows = await db
     .select()
     .from(clips)
-    .where(and(eq(clips.id, id), eq(clips.walletPubkey, accountPubkey)))
+    .where(and(eq(clips.id, id), eq(clips.accountPubkey, accountPubkey)))
     .limit(1);
   if (rows.length === 0) {
     return NextResponse.json({ error: "clip not found" }, { status: 404 });
@@ -36,7 +36,7 @@ export async function GET(
 
   const expiresInSec = 3600;
   const url = await presignRawGet(
-    signedMp4Key(clip.signatureHash),
+    signedMp4Key(clip.contentHash),
     rawBucketFor((clip.recordingConfig ?? "ultra_wide") as RecordingConfigId),
     expiresInSec,
   );

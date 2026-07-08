@@ -4,13 +4,13 @@
 // v0.1.4: バケットは撮影構成ごとに分離する (DATA_SPECS §3):
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw、 超広角 RGB の raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= depth / IMU / 6DoF ポーズ等 ARKit 由来 raw)
-// key prefix はどちらのバケットでも raw/<signature_hash>/ で対称。
+// key prefix はどちらのバケットでも raw/<content_hash>/ で対称。
 
 // ─── raw (= 端末アップロード) ───────────────────────────────────────────
 
 /// クリップ 1 件の raw プレフィックス。 端末アップロードのファイル群がこの配下に並ぶ。
-export function rawSessionPrefix(signatureHash: string): string {
-  return `raw/${signatureHash}/`;
+export function rawSessionPrefix(contentHash: string): string {
+  return `raw/${contentHash}/`;
 }
 
 /// 撮影構成 ID (= app/src/dataflow/recording-configs/ と 1:1)。
@@ -48,11 +48,11 @@ export const RAW_SESSION_MANIFEST: Record<
   ],
 };
 
-export function rawSessionFileKey(signatureHash: string, filename: RawSessionFilename): string {
-  return `${rawSessionPrefix(signatureHash)}${filename}`;
+export function rawSessionFileKey(contentHash: string, filename: RawSessionFilename): string {
+  return `${rawSessionPrefix(contentHash)}${filename}`;
 }
 
 /// C2PA D1 署名済 MP4 の R2 キー。
-export function signedMp4Key(signatureHash: string): string {
-  return rawSessionFileKey(signatureHash, "rgb.mp4");
+export function signedMp4Key(contentHash: string): string {
+  return rawSessionFileKey(contentHash, "rgb.mp4");
 }
