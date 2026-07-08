@@ -14,8 +14,6 @@
 		58D847869BA04CEA9DE42E99 /* noop-file.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3CBB4769E284F44983D8959 /* noop-file.swift */; };
 		8C8EDFD73EBD77BDDD07FFDE /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6C10A14EDEA69E3590FECE0D /* PrivacyInfo.xcprivacy */; };
 		96905EF65AED1B983A6B3ABC /* libPods-RootLens.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 58EEBF8E8E6FB1BC6CAF49B5 /* libPods-RootLens.a */; };
-		A1B2C3D4E5F60001AESGCM01 /* AesGcmModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60002AESGCM01 /* AesGcmModule.swift */; };
-		A1B2C3D4E5F60003AESGCM01 /* AesGcmModule.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60004AESGCM01 /* AesGcmModule.m */; };
 		B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC715A2D49A985799AEE119 /* ExpoModulesProvider.swift */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 /* End PBXBuildFile section */
@@ -32,8 +30,6 @@
 		6C10A14EDEA69E3590FECE0D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = RootLens/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6C2E3173556A471DD304B334 /* Pods-RootLens.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RootLens.debug.xcconfig"; path = "Target Support Files/Pods-RootLens/Pods-RootLens.debug.xcconfig"; sourceTree = "<group>"; };
 		7A4D352CD337FB3A3BF06240 /* Pods-RootLens.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RootLens.release.xcconfig"; path = "Target Support Files/Pods-RootLens/Pods-RootLens.release.xcconfig"; sourceTree = "<group>"; };
-		A1B2C3D4E5F60002AESGCM01 /* AesGcmModule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = AesGcmModule.swift; path = RootLens/AesGcmModule.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60004AESGCM01 /* AesGcmModule.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = AesGcmModule.m; path = RootLens/AesGcmModule.m; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = RootLens/SplashScreen.storyboard; sourceTree = "<group>"; };
 		B3CBB4769E284F44983D8959 /* noop-file.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = "noop-file.swift"; path = "RootLens/noop-file.swift"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
@@ -64,8 +60,6 @@
 				13B07FB71A68108700A75B9A /* main.m */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				B3CBB4769E284F44983D8959 /* noop-file.swift */,
-				A1B2C3D4E5F60002AESGCM01 /* AesGcmModule.swift */,
-				A1B2C3D4E5F60004AESGCM01 /* AesGcmModule.m */,
 				23BE2B82E86343A9B5840FB0 /* RootLens-Bridging-Header.h */,
 				6C10A14EDEA69E3590FECE0D /* PrivacyInfo.xcprivacy */,
 			);
@@ -347,8 +341,6 @@
 				13B07FC11A68108700A75B9A /* main.m in Sources */,
 				B18059E884C0ABDD17F3DC3D /* ExpoModulesProvider.swift in Sources */,
 				58D847869BA04CEA9DE42E99 /* noop-file.swift in Sources */,
-				A1B2C3D4E5F60001AESGCM01 /* AesGcmModule.swift in Sources */,
-				A1B2C3D4E5F60003AESGCM01 /* AesGcmModule.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
