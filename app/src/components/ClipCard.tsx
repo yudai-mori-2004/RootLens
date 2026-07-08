@@ -129,8 +129,11 @@ const ClipThumb: React.FC<{
 // ─── 進捗バー (= サムネ下端の 3px) ──────────────────────────────────────
 
 const ProgressEdge: React.FC<{ progress: number }> = ({ progress }) => {
-  const anim = useRef(new Animated.Value(0)).current;
+  const anim = useRef(new Animated.Value(0)).current;   // 不定シマー用
+  const fill = useRef(new Animated.Value(0)).current;   // 決定的な塗り (0..1)
   const [trackW, setTrackW] = useState(0);
+
+  // 不定 (進捗ゼロ) のシマー
   useEffect(() => {
     if (progress > 0) return;
     const loop = Animated.loop(
@@ -142,10 +145,19 @@ const ProgressEdge: React.FC<{ progress: number }> = ({ progress }) => {
     return () => loop.stop();
   }, [anim, progress]);
 
+  // 決定的な進捗: 新しい値へ ~280ms でイージング補間して伸ばす (= バイト更新の間もカクつかない)。
+  useEffect(() => {
+    if (progress <= 0) return;
+    Animated.timing(fill, {
+      toValue: progress, duration: 280, easing: Easing.out(Easing.ease), useNativeDriver: false,
+    }).start();
+  }, [fill, progress]);
+
   if (progress > 0) {
+    const w = fill.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'], extrapolate: 'clamp' });
     return (
       <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+        <Animated.View style={[styles.progressFill, { width: w }]} />
       </View>
     );
   }

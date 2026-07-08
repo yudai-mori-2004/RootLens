@@ -42,15 +42,21 @@ async function exists(uri: string): Promise<boolean> {
   }
 }
 
-/** Pipeline 1 の step 名 → uploadProgress (0..1) の段階写像。 */
+/** Pipeline 1 の step 名 → uploadProgress (0..1) の段階写像。
+ *  r2-upload 区間はここでは固定値にせず (= null)、 実バイト進捗で 0.4→0.97 を滑らかに埋める
+ *  (= uploadToR2 の onProgress。 一番長いアップロードが飛び飛びにならないように)。 */
 function stepProgress(step: string): number | null {
   switch (step) {
     case 'sign-d1':       return 0.2;
     case 'signature-hash': return 0.35;
-    case 'r2-upload':     return 0.7;
     case 'register-clip': return 1.0;
     default:              return null;
   }
+}
+
+/** アップロードの実バイト進捗 (0..1) を uploadProgress の 0.4→0.97 区間に写す。 */
+function uploadFractionToProgress(f: number): number {
+  return 0.4 + Math.max(0, Math.min(1, f)) * 0.57;
 }
 
 /**
@@ -252,6 +258,9 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
       await uploadToR2(
         { signatureHash: cur.signatureHash, recordingConfig: config.id, files },
         progressSink,
+        (f) => {
+          dataflowStore.getState().patchClip(targetIdRef.id, { uploadProgress: uploadFractionToProgress(f) });
+        },
       );
 
       await registerClip(
