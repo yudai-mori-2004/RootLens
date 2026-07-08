@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/v1/indexer/poll",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}
