@@ -1,14 +1,15 @@
-# pipeline-fpvlabs: raw セッション → 顔ぼかし → Stera 互換 raw MCAP (DATA_SPECS 外の受け渡し工程)。
+# pipeline-fpvlabs: raw セッション → (任意) 顔ぼかし → Stera 互換 raw MCAP (DATA_SPECS 外の受け渡し工程)。
 #
 # FPV Labs (https://fpvlabs.ai/stera) へのデータ受け渡し用。 rootlens-raw-arkit の
-# raw/<signature_hash>/ を読み、 顔ぼかしを適用した上で stera-sdk の MCAPReader が
-# そのまま読める ROS2 スキーマの MCAP を組み立て、 rootlens-fpvlabs バケットへ書く。
+# raw/<signature_hash>/ を読み、 任意で顔ぼかしを適用した上で (= --blur/--no-blur、 既定オン)
+# stera-sdk の MCAPReader がそのまま読める ROS2 スキーマの MCAP を組み立て、
+# rootlens-fpvlabs バケットへ書く。 撮影者は写っている人全員の許可を取得済み (= ぼかしは追加保護)。
 #
 #   入力: raw/<hash>/{rgb.mp4, realtime_handpose.jsonl, imu.jsonl, metadata.json[, depth.tar]}
 #   出力: <hash>/session.mcap  (= 決定論的キー。 再実行は同キーへの上書き = 冪等)
 #
 # トピック構成は stera-sdk の TopicConfig (data/mcap/_reader.py) に一致させる:
-#   /camera/rgb/compressed   sensor_msgs/CompressedImage (JPEG、 ぼかし適用済み)
+#   /camera/rgb/compressed   sensor_msgs/CompressedImage (JPEG、 --blur 時のみ顔ぼかし適用)
 #   /camera/depth            sensor_msgs/Image 16UC1 (mm)      ← depth.tar がある場合のみ
 #   /camera/camera_info      sensor_msgs/CameraInfo
 #   /camera/depth/camera_info sensor_msgs/CameraInfo           ← 同上
@@ -17,15 +18,16 @@
 #   /device/imu              sensor_msgs/Imu (m/s^2、 CoreMotion 軸のまま)
 #   /tf                      tf2_msgs/TFMessage (camera_link → camera_optical_frame)
 #   /trajectory              nav_msgs/Path
-#   /rootlens/processing_info std_msgs/String (JSON: ぼかしモデル・パラメータ・pipeline version)
+#   /rootlens/processing_info std_msgs/String (JSON: ぼかし有無・モデル・検出閾値・pipeline version)
 #
 # 冪等性: 出力キーは signature_hash から決定論的。 ローカル一時ファイルに全て書いてから
 # 1 回の put_object / multipart で上書きする (= 半端な状態がバケットに残らない)。
 # 設定を変えて再実行すれば同キーが新しい内容で置き換わり、 processing_info で判別できる。
 #
 # 実行:
-#   ローカル:  python tools/modal/fpvlabs.py <signature_hash>   (R2 creds は env で)
-#   Modal:    modal run tools/modal/fpvlabs.py --signature-hash <hash>
+#   ローカル:  python tools/modal/fpvlabs.py <signature_hash>   (R2 creds は env で、 ぼかしオン)
+#   Modal:    modal run tools/modal/fpvlabs.py --signature-hash <hash>            (ぼかしオン)
+#             modal run tools/modal/fpvlabs.py --signature-hash <hash> --no-blur  (ぼかしオフ)
 #   deploy:   modal deploy tools/modal/fpvlabs.py
 
 from __future__ import annotations
@@ -37,7 +39,13 @@ import tarfile
 import tempfile
 import time
 
-PIPELINE_VERSION = "fpvlabs-1"
+PIPELINE_VERSION = "fpvlabs-2"  # v2: 顔ぼかしの検出閾値を厳格化 + on/off をコマンド切替可能に
+
+# 顔ぼかしの検出閾値 (= mediapipe BlazeFace の min_detection_confidence)。
+# stera-sdk 既定の 0.5 は緩く、 家事映像で手・床・物体を顔と誤検出して丸ボケを乗せていた
+# (= 2026-07-08 実測: 約 1 割のフレームで非顔領域を誤爆、 操作中の手の上に乗ることも)。
+# 0.9 まで上げて誤検出を潰す。 実在の顔は近距離で高信頼に出るため取りこぼしは小さい。
+FACE_BLUR_MIN_CONFIDENCE = 0.9
 
 # ─── ROS2 msgdef (= mcap_ros2 に register する連結スキーマ) ────────────
 
@@ -307,11 +315,16 @@ def _camera_info_msg(ts_ns: int, width: int, height: int, fx: float, fy: float, 
 # ─── MCAP 組み立て本体 (= ストリーミング。 フレームをメモリに溜めない) ──
 
 
-def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
+def build_mcap(session_dir: str, out_path: str, blur: bool = True,
+               blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
+    """raw セッションを Stera 互換 MCAP に組み立てる。
+
+    blur=True (既定) のとき、 RGB 各フレームに顔ぼかしを適用する。 検出閾値は
+    FACE_BLUR_MIN_CONFIDENCE (= 誤爆を抑えるため SDK 既定より厳しく)。 blur=False で完全に無効化。
+    """
     import cv2
     import numpy as np
     from mcap_ros2.writer import Writer as Ros2Writer
-    from stera.models import FaceBlurrer
 
     t0 = time.time()
 
@@ -330,7 +343,12 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
     if not frames_meta:
         raise RuntimeError("realtime_handpose.jsonl is empty")
 
-    blur = FaceBlurrer(model=blur_model)
+    # 顔ぼかし (= blur=True のときだけ初期化)。 検出閾値を厳格化して誤検出を抑える。
+    face_blurrer = None
+    if blur:
+        from stera.models import FaceBlurrer
+        face_blurrer = FaceBlurrer(model=blur_model,
+                                   min_detection_confidence=FACE_BLUR_MIN_CONFIDENCE)
     blurred_faces_total = 0
 
     stats = {"rgb": 0, "depth": 0, "pose": 0, "imu": 0, "tracking": 0, "point_cloud": 0, "mesh_anchors": 0}
@@ -350,7 +368,9 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
         # ── 処理来歴 (= どの設定で作った MCAP か) ──
         write("/rootlens/processing_info", "std_msgs/String", {"data": json.dumps({
             "pipeline_version": PIPELINE_VERSION,
-            "blur_model": blur_model,
+            "blur": blur,
+            "blur_model": blur_model if blur else None,
+            "blur_min_confidence": FACE_BLUR_MIN_CONFIDENCE if blur else None,
             "jpeg_quality": jpeg_quality,
             "source": "rootlens raw session",
             "device_model": meta.get("device_model"),
@@ -441,7 +461,7 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
                     }, ts)
                     stats["imu"] += 1
 
-        # ── /camera/rgb/compressed (= デコード → ぼかし → JPEG。 1 フレームずつ) ──
+        # ── /camera/rgb/compressed (= デコード → (任意) ぼかし → JPEG。 1 フレームずつ) ──
         cap = cv2.VideoCapture(os.path.join(session_dir, "rgb.mp4"))
         try:
             i = 0
@@ -456,10 +476,13 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
                     fps = float(cam.get("fps", 30.0)) or 30.0
                     ts = int(frames_meta[-1]["timestamp_ns"]) + int((i - len(frames_meta) + 1) * 1e9 / fps)
                 rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                blurred = blur.blur(rgb)
-                if blurred is not rgb:
-                    blurred_faces_total += 1  # 近似 (= 検出があったフレーム数ではなく blur 呼出成功数)
-                ok_enc, jpg = cv2.imencode(".jpg", cv2.cvtColor(blurred, cv2.COLOR_RGB2BGR),
+                if face_blurrer is not None:
+                    out_rgb = face_blurrer.blur(rgb)
+                    if out_rgb is not rgb:
+                        blurred_faces_total += 1  # 近似 (= 検出があったフレーム数ではなく blur 呼出成功数)
+                else:
+                    out_rgb = rgb
+                ok_enc, jpg = cv2.imencode(".jpg", cv2.cvtColor(out_rgb, cv2.COLOR_RGB2BGR),
                                            [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
                 if not ok_enc:
                     raise RuntimeError(f"jpeg encode failed at frame {i}")
@@ -565,6 +588,8 @@ def build_mcap(session_dir: str, out_path: str, blur_model: str = "mediapipe", j
 
     return {
         "stats": stats,
+        "blur": blur,
+        "blurredFaces": blurred_faces_total,
         "durationMs": int((time.time() - t0) * 1000),
         "outputBytes": os.path.getsize(out_path),
         "jsonlFrames": len(frames_meta),
@@ -589,8 +614,11 @@ def _r2_client():
     )
 
 
-def process_session(signature_hash: str, blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
-    """raw/<hash>/ を取得 → build_mcap → rootlens-fpvlabs/<hash>/session.mcap に上書き。"""
+def process_session(signature_hash: str, blur: bool = True,
+                    blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
+    """raw/<hash>/ を取得 → build_mcap → rootlens-fpvlabs/<hash>/session.mcap に上書き。
+
+    blur=False で顔ぼかしを無効化 (= raw の生映像そのまま)。"""
     s3 = _r2_client()
     bucket_raw = os.environ.get("R2_BUCKET_RAW_ARKIT", "rootlens-raw-arkit")
     bucket_out = os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
@@ -609,7 +637,8 @@ def process_session(signature_hash: str, blur_model: str = "mediapipe", jpeg_qua
                 # depth.tar / imu.jsonl はオプショナル
 
         out_path = os.path.join(tmp, "session.mcap")
-        result = build_mcap(session_dir, out_path, blur_model=blur_model, jpeg_quality=jpeg_quality)
+        result = build_mcap(session_dir, out_path, blur=blur,
+                            blur_model=blur_model, jpeg_quality=jpeg_quality)
 
         out_key = f"{signature_hash}/session.mcap"
         s3.upload_file(out_path, bucket_out, out_key, ExtraArgs={"ContentType": "application/octet-stream"})
@@ -627,7 +656,7 @@ try:
         .apt_install("libgl1", "libglib2.0-0", "libegl1", "libgles2")  # mediapipe が GLES を要求
         .pip_install(
             "numpy", "opencv-python-headless", "boto3",
-            "mcap", "mcap-ros2-support", "stera-sdk", "mediapipe",
+            "mcap", "mcap-ros2-support", "stera-sdk==0.0.4", "mediapipe",
         )
     )
     app = modal.App("rootlens-fpvlabs")
@@ -639,12 +668,16 @@ try:
         cpu=4.0,
         secrets=[modal.Secret.from_name("r2-creds")],
     )
-    def fpvlabs_process(signature_hash: str, blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
-        return process_session(signature_hash, blur_model=blur_model, jpeg_quality=jpeg_quality)
+    def fpvlabs_process(signature_hash: str, blur: bool = True,
+                        blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
+        return process_session(signature_hash, blur=blur,
+                               blur_model=blur_model, jpeg_quality=jpeg_quality)
 
     @app.local_entrypoint()
-    def main(signature_hash: str, blur_model: str = "mediapipe", jpeg_quality: int = 85):
-        print(json.dumps(fpvlabs_process.remote(signature_hash, blur_model, jpeg_quality), indent=2))
+    def main(signature_hash: str, blur: bool = True,
+             blur_model: str = "mediapipe", jpeg_quality: int = 85):
+        # ぼかし切替: --blur (既定) / --no-blur。 検出閾値は FACE_BLUR_MIN_CONFIDENCE。
+        print(json.dumps(fpvlabs_process.remote(signature_hash, blur, blur_model, jpeg_quality), indent=2))
 
 except ImportError:
     modal = None  # ローカル実行 (= python fpvlabs.py <hash>) では modal 不要
