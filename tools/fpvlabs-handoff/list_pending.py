@@ -92,7 +92,7 @@ if real:
     print("\n処理コマンド:")
     for h in sorted(real, key=lambda x: raw[x]):
         note = "" if depth_ok[h] else "   # ⚠ depth なし"
-        print(f"  modal run tools/modal/fpvlabs.py --signature-hash {h}{note}")
+        print(f"  modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash {h}{note}")
 else:
     print("本命候補なし (= 未処理の大物なし)")
 

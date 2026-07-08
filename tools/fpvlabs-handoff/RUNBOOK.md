@@ -37,7 +37,7 @@
 
 2. 各 hash を処理する (顔ぼかしオン、EgoBlur GPU がデフォルト):
    ```
-   modal run tools/modal/fpvlabs.py --signature-hash <hash>
+   modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash <hash>
    ```
    出力 JSON を確認:
    - `blur: true` / `faceDetector: "egoblur"` / `detectionsTotal: N` (検出した顔 bbox の合計数)
@@ -52,7 +52,7 @@
 
 - 顔ぼかしを外す: `--no-blur` を付ける (raw の生映像そのまま)。
 - 検出器切替: `--face-detector mediapipe` (EgoBlur が使えないときの CPU fallback)。
-- EgoBlur 検出閾値: `tools/modal/fpvlabs.py` の `EGOBLUR_SCORE_THRESHOLD` (既定 0.5)。
+- EgoBlur 検出閾値: `tools/modal/fpvlabs/fpvlabs.py` の `EGOBLUR_SCORE_THRESHOLD` (既定 0.5)。
   実測で本物の顔は 0.95+、誤爆は 0.3 以下なので、0.5 で綺麗に分離できる。
 - コスト削減: `EGOBLUR_RESIZE` を下げる (480 → 320 で更に高速化、 ただし小さい遠景の顔は取りこぼす)。
 - 超長尺 (60 分超) で timeout する場合: `@app.function(timeout=7200)` を上げる。
@@ -65,7 +65,7 @@
 本番と完全に同一。 テスト用バケットは自分で R2 に作成しておく (例: `rootlens-fpvlabs-scratch`)。
 
 ```
-modal run tools/modal/fpvlabs.py --signature-hash <hash> --target-bucket rootlens-fpvlabs-scratch
+modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash <hash> --target-bucket rootlens-fpvlabs-scratch
 ```
 
 結果を rclone や boto3 で落として目視 → 良ければ `--target-bucket` を外して本番に反映。
