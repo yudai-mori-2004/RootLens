@@ -52,9 +52,8 @@ async function hydrate(): Promise<void> {
       const clip: Clip = {
         ...c,
         sessionDir: toAbsoluteUri(c.sessionDir),
-        workDir: toAbsoluteUri(c.workDir),
       };
-      // uploading (= Pipeline 1 が中断) は error にする。 段 (stage) と作業 dir は保持されるので、
+      // uploading (= Pipeline 1 が中断) は error にする。 段 (stage) は保持されるので、
       // 「もう一度試す」 で advanceClip が成功済みの段から再開できる。
       if (clip.state === 'uploading') {
         return { ...clip, state: 'error' as const, errorMessage: 'アプリ再起動中に中断されました' };
@@ -84,7 +83,6 @@ function schedulePersist(clips: Record<string, Clip>): void {
       .map((c) => ({
         ...c,
         sessionDir: toRelativePath(c.sessionDir),
-        workDir: toRelativePath(c.workDir),
       }));
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(arr)).catch(() => {});
   }, PERSIST_DEBOUNCE_MS);
