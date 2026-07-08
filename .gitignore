@@ -102,3 +102,9 @@ tmp_transcode/
 
 # hyphenbox 渡し用 zip (= 26 GB、 R2 で配布)
 rootlens-sample-*.zip
+
+# Cloudflare wrangler のローカル dev state (自動生成、 コミットしない)
+.wrangler/
+
+# ローカル raw ダウンロードの scratch (生映像を置く一時場所)
+/raw/
