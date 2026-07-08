@@ -1,80 +1,80 @@
 # CLAUDE.md
 
-## Project Overview
+## Project overview
 
-RootLens: Physical AI (= ヒューマノイドロボット / VLA モデル) の訓練データとして、 家庭内の家事映像をモバイル端末で収集し売買するプラットフォーム。 撮影来歴の署名 (C2PA + センサーデータ同梱) で出自を明確化する。
+RootLens: iPhone アプリで家事の一人称視点映像 + LiDAR 深度 + IMU + 手ポーズを収集し、
+Embodied AI / VLA モデル向けの学習データとして FPV Labs (Stera) に渡すプラットフォーム。
 
-- 現行フェーズ: **v0.1.3** (= データパイプライン production 稼働中)
-- 仕様: `document/v0.1.3/DATA_SPECS_JA.md` + `document/v0.1.3/UI_SPECS_JA.md`
-- task 進捗: `document/v0.1.3/tasks/README.md`
-- 過去仕様: `document/v0.1.0..v0.1.2/` (= 参照用に保持、 触らない)
-- Title Protocol: `../title-protocol/` (= 隣接リポジトリ、 v0.1.3 で `/process` Gateway 直叩きに移行)
+- 現行フェーズ: **v0.1.4** (= C2PA / Title Protocol / Solana を撤去し、 データ収集 + 手渡し
+  だけに絞った実装。 task 12 で残骸掃除まで実行済み)。
+- 仕様: `document/v0.1.4/DATA_SPECS_JA.md` + `document/v0.1.3/UI_SPECS_JA.md` (= UI は v0.1.3 のまま)
+- タスク進捗: `document/v0.1.4/tasks/README.md`
+- 過去仕様: `document/v0.1.0..v0.1.3/` (= 参照用に保持、 触らない)
 
-## リポジトリ構造 (= 2 本柱 + 周辺)
+## リポジトリ構造
 
 ```
 root-lens/
-├── web/                Next.js 16 App Router (= rootlens.io、 Vercel link 済)。 LP + REST API + WDK workflow
+├── web/                Next.js 16 App Router (= rootlens.io、 Vercel link 済)。 LP + REST API
 ├── app/                React Native (= Expo)。 撮影端末アプリ
 │
-├── native/             app から参照する Rust crate
-│   └── c2pa-bridge/    iOS / Android FFI (= v0.1.4 で iOS 実機統合復活時の起点)
-├── programs/           Anchor program (= license-nft on Solana)
-├── crates/             Rust CLI (= license-cli)
-├── tests/              Anchor program の TS テスト
-│
 ├── tools/              web / app 以外の周辺 dev / ops ツール
-│   ├── mock-device/    iOS 端末を模擬する macOS Rust CLI (= Pipeline 1 mock + TP /process)
-│   ├── modal/          Modal Python 関数 5 本 (= layer1-3 + gtsam + bundle)
-│   ├── macos-blur/     Apple Vision 顔ぼかし Swift CLI
-│   ├── lp-sample/      LP 用 dataset build / upload Python 群
-│   ├── asset-gen/      LP イラスト生成
-│   ├── gen-dummy-sensors.py
-│   └── smoke-test.sh   end-to-end smoke (= mock-device → R2 → /api/clips → Pipeline 2 → Pipeline 3)
+│   ├── modal/          Modal Python パイプライン
+│   │   ├── fpvlabs/    FPV Labs (Stera) 手渡し用 (= EgoBlur + Stera 互換 MCAP。 現運用の中心)
+│   │   └── score-wilor/ 旧 score 3 層 + WiLoR 手ポーズ (= legacy、 現運用外)
+│   ├── fpvlabs-handoff/ 運用手順 (RUNBOOK) + 未処理クリップ一覧 + FPV 向け README
+│   ├── egoblur_probe.py 新クリップで EgoBlur 閾値を検証するローカルハーネス
+│   ├── asset-gen/       LP イラスト / SFX 生成
+│   └── lp-sample/       LP のサンプル動画パイプライン
 │
-├── keys/               ローカル秘密鍵 (= .gitignore 済)
-└── document/           仕様 + 過去仕様
-    └── v0.1.3/         current spec + tasks/
+└── document/
+    └── v0.1.4/         current spec + tasks/
 ```
 
-兄弟 repo: `../rootlens-mobile/` (= v0.0.x Android + Solana Seeker hackathon 系、 別系統で並行開発、 root-lens/app/ とは内容が大きく重なるが意図的に分離維持)
+参考リポ: `../rootlens-mobile/` (= v0.0.x Android + Solana Seeker hackathon 系、
+別系統で並行開発、 意図的に分離維持)
 
-## データパイプライン (= v0.1.3)
+## データフロー (v0.1.4 現行)
 
-3 段構成。 各 pipeline はデータへのリンクを入力に取り、 データへのリンクを出力する純粋関数として設計される (= `document/v0.1.3/DATA_SPECS_JA.md` §1)。
+```
+[撮影端末: app/]
+  録画完了                → sha256(raw mp4) 計算 → content_hash 誕生
+  → R2 rootlens-raw-arkit へ並列 PUT (rgb.mp4 + realtime_handpose.jsonl +
+     imu.jsonl + metadata.json + depth.tar)
+  → POST /api/clips で登録 (= state='uploaded')
 
-| Pipeline | 場所 | 役割 |
-|---|---|---|
-| 1 (端末) | `tools/mock-device/` (= iOS 実機実装は別フェーズ) | 撮影 → C2PA D1 → 顔ぼかし → C2PA D2 → signature_hash 抽出 → R2 アップロード → TP `/process` (= signature_hash + attestation 取得 + R2 signed-json/ 保存) → cNFT 発行 (= `/extension/solana` + Solana wallet 署名 + broadcast) → rootAssetId 確定 → `POST /api/clips` でサーバ登録 |
-| 2 (サーバ、 自動) | `web/workflow/process-clip.ts` + `tools/modal/{layer1_metadata,layer2_frame_sampling,layer3_vlm}.py` | 3 層スコアリング (= metadata 20 + frame sampling 15 + VLM 65) で 0..100 点。 起動条件は `clip.rootAssetId` not null。 出力 `processed/<signature_hash>/{quality_scores.json,semantic.jsonl}` |
-| 3 (サーバ、 手動) | `tools/modal/wilor.py` | WiLoR 手ポーズ推定のみ。 出力 `processed/<signature_hash>/wilor.jsonl`。 データセット化 (= 複数クリップを LeRobot v3 等にまとめる) はパイプライン外 |
-| fpvlabs (サーバ、 手動) | `tools/modal/fpvlabs.py` | FPV Labs (Stera) への受け渡し。 raw を顔ぼかし + Stera 互換 ROS2 MCAP に変換して `rootlens-fpvlabs/<signature_hash>/session.mcap` へ (= 冪等上書き)。 音声は含めない |
+[サーバ: web/]
+  REST API のみ (自動後段処理なし)。 /api/clips で登録、 /api/v1/raw-uploads で presigned URL、
+  /api/v1/consents で同意証跡。
 
-TP register + cNFT 発行は v0.1.3 で Pipeline 1 内に前倒し済 (= 新 Gateway は `POST /process` 直叩き、 SDK 廃止)。 サーバ workflow からは tp-submit step を完全削除済、 mock-device が R2 upload 後に TP `/process` + cNFT 発行を実行して rootAssetId を確定させてから `POST /api/clips` でサーバに登録する。
+[運用: tools/modal/fpvlabs/]
+  手動で `modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash <hash>` 実行。
+  raw を落として EgoBlur (GPU L4) で顔ぼかし → Stera 互換 MCAP を組み立て → rootlens-fpvlabs に put。
 
-## 動作確認 (= production)
+[FPV Labs]
+  rclone で rootlens-fpvlabs から MCAP を pull。 詳細は tools/fpvlabs-handoff/。
+```
+
+## 動作確認 (production)
 
 - web: `https://rootlens.io` (= Vercel auto deploy on main push)
-- API: `https://rootlens.io/api/clips` 系 + `/api/clips/:id/finalize` で WDK workflow キック
-- Modal: workspace `yudai-mori-2004`
-  - rootlens-layer1-metadata、 rootlens-layer2-frame-sampling、 rootlens-layer3-vlm、 rootlens-wilor
-  - (旧 rootlens-gtsam-eval / rootlens-bundle は廃止。 deploy 済の旧 app は別途 tear down)
-- DB: Supabase (= web/drizzle/ + web/scripts/apply_migrations.mjs)。 drizzle-kit push は Supabase の auth/storage schema introspection で内部バグを踏むため使わない
-- R2 buckets: `rootlens-raw` + `rootlens-raw-arkit` (= raw/<signature_hash>/)、 `rootlens-processed` (= processed/<signature_hash>/)、 `rootlens-fpvlabs` (= FPV Labs 受け渡し用 MCAP)
+- API: `https://rootlens.io/api/clips` 系
+- Modal: workspace `yudai-mori-2004`、 fpvlabs 用 image + volume `rootlens-egoblur` (= EgoBlur jit)
+- DB: Supabase (= web/drizzle/ + web/scripts/apply_one_migration.mjs)。 SQL 直流し方式で、
+  drizzle-kit の snapshot は使わない。
+- R2 buckets:
+  - `rootlens-raw-arkit` (arkit 端末の raw)
+  - `rootlens-raw` (旧 ultra_wide 用、 参考残置)
+  - `rootlens-fpvlabs` (FPV Labs 受け渡し用 MCAP)
+  - `rootlens-public` (LP 用 / 検証テスト用のスクラッチ)
 
-smoke test の実行:
-
-```
-API_BASE=https://rootlens.io bash tools/smoke-test.sh
-```
-
-これで mock-device → R2 → finalize → Pipeline 2 (= 4 step) → state=ready → Pipeline 3 (= bundle) まで通る。
-
-## Development Methodology
+## Development methodology
 
 ### 原則: 仕様駆動 + タスク駆動
 
-`document/v0.1.3/DATA_SPECS_JA.md` (= データパイプライン) と `UI_SPECS_JA.md` (= UX) が Source of Truth。 タスクは `document/v0.1.3/tasks/01..10/` に分割、 各 README に「目的 / 読むべきファイル / スコープ (= やること / やらないこと) / 成功基準 / 進捗」 を持つ (Title Protocol 形式)。
+`document/v0.1.4/DATA_SPECS_JA.md` (= データパイプライン) が Source of Truth。
+タスクは `document/v0.1.4/tasks/NN-name/` に分割、 各 README に「目的 / 読むべきファイル / スコープ
+(= やること / やらないこと) / 成功基準 / 進捗」 を持つ。
 
 ### 1 タスク = 1 セッションを基本
 
@@ -82,29 +82,33 @@ API_BASE=https://rootlens.io bash tools/smoke-test.sh
 
 ### Commit 規約
 
-- メッセージは英語 (= 「Git commit messages in English」 memory に従う)
+- メッセージは英語
 - 1 つの設計判断 = 1 commit (= bisect 可能性を保つ)
 - 大規模 mv は `git mv` で history を保つ
 
-## Coding Conventions
+## Coding conventions
 
-- TypeScript / Python は仕様書セクション参照を doc comment に書く (例: `// DATA_SPECS §3.2.4`)
-- 公開向け文章 (= LP / dataset card) には内部設計プロセスを混ぜない (= `feedback_no_internal_process_in_public` 参照)
-- 完了バージョンの仕様書 (= `document/v0.1.0..v0.1.2/`) は誤り修正以外で変更しない
+- TypeScript / Python は仕様書セクション参照を doc comment に書く
+- 公開向け文章 (= LP / dataset card) には内部設計プロセスを混ぜない
+- 完了バージョンの仕様書 (= `document/v0.1.0..v0.1.3/`) は誤り修正以外で変更しない
 
-## Key Design Decisions
+## Key design decisions
 
-### TP register + cNFT 発行は Pipeline 1 末尾
+### 識別子は content_hash (= sha256 of raw mp4)
 
-v0.1.3 で Title Protocol が SDK 廃止 + `POST /process` 直叩き経路に切替したのを契機に、 TP register + cNFT 発行を Pipeline 1 内に前倒した。 mock-device は R2 upload 後に `POST /process` (= signature_hash + attestation 取得 → R2 signed-json/ 保存) → `POST /extension/solana` (= partial_tx 取得 → Solana wallet 署名 → RPC broadcast) を実行して `rootAssetId` を確定させる。 確定後にのみ `POST /api/clips` でサーバに登録する。
+v0.1.3 まで C2PA D1 署名のハッシュを identity として使っていたが、 task 12 で C2PA 全廃と同時に
+「生 mp4 のバイト列の SHA-256」 に置換。 端末で計算し、 R2 raw キー / DB PK として使う。
+値の意味が変わったので、 旧 raw/<signature_hash>/ の R2 オブジェクトは orphan として残置する
+(= 参照だけ切って新データは新 content_hash キーで再アップロード)。
 
-`rootAssetId` は Pipeline 2 起動の前提条件として扱う (= DB schema 上 notNull、 `POST /api/clips` の必須 field、 finalize で not null check)。 確定するまで `POST /api/clips` は叩かない。 サーバから TP を呼ぶ経路は v0.1.3 で完全廃止 (= サーバ workflow は scoring 3 step のみ)。
+### 顔ぼかしは EgoBlur (GPU L4、 Stera-10M と同じ)
 
-### Pipeline 2 / 3 の出力先
+`tools/modal/fpvlabs/fpvlabs.py`。 mediapipe は緊急時 fallback。 閾値は 0.8 (stera-sdk 既定)、
+resize は 480 でコスト目標 1 時間あたり ~¥120。 実測で本物の顔は 0.97+、 誤爆は 0.3 以下で
+ケタで分離する。 詳細は `tools/fpvlabs-handoff/RUNBOOK.md`。
 
-Pipeline 2 / 3 の出力はいずれも `processed/<signature_hash>/` に書き出す (= raw と同じ signature_hash キーで対称、 DATA_SPECS §5)。 Pipeline 2 = `quality_scores.json` + `semantic.jsonl`、 Pipeline 3 = `wilor.jsonl`。 複数クリップをデータセット形式 (= LeRobot v3 等) にまとめる作業はパイプライン外で事後的に行う。
+### 検証用の --target-bucket
 
-### オフチェーンストレージについて
-
-- signed_json の保存先に言及する場合は「オフチェーンストレージ」 「json_uri の指す先」 等の一般名称。 特定のストレージサービス名を推測で挙げない
-- ストレージの種類は検証の信頼性に影響しない (= TEE 署名で自己証明的な設計)
+fpvlabs.py に `--target-bucket <name>` オプションを持たせて、 本番 `rootlens-fpvlabs` を書き換えずに
+挙動確認できる。 検証は必ずこの経路を使う (= 過去に production を触って FPV へ渡した内容を壊した
+事故がある)。

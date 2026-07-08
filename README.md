@@ -1,8 +1,10 @@
 # RootLens
 
-Robot training data, sourced from real homes.
+Egocentric home-chore video for embodied-AI training data.
 
-A camera app where anyone can film household tasks and get paid when AI companies license the footage.
+An iPhone app that records first-person home chores with a rich sensor stack
+(ARKit camera, LiDAR depth, IMU, per-frame camera pose), plus the tooling to
+turn each recording into the format the buyer wants.
 
 ## Demo
 
@@ -10,39 +12,34 @@ A camera app where anyone can film household tasks and get paid when AI companie
 
 ▶ **[Watch the 3-minute demo on Loom](https://www.loom.com/share/4cb5a0bf683f41c8ac4103775894613f)**
 
-## Why
+## What's in this repo
 
-Robot intelligence is evolving fast, and a major reason is human action footage — robots learn how to move by watching people perform tasks. But high-quality footage of real household tasks is massively scarce.
-
-Buyers face their own bottleneck. Starting August 2026, the EU AI Act tightens enforcement on training data. A single clip with unclear rights can trigger massive fines, so AI companies need data at scale with verifiable rights.
-
-RootLens turns everyday filming into a marketplace for that data — with on-chain proof of every rights holder, from capture to license.
-
-## How it works
-
-**Film** — Pick a household task. Film first-person, two-handed. The app tracks 21 hand joints in real time and vibrates if your hand drifts off-frame, since you cannot touch the screen while filming. AI scores and classifies each clip before upload, and bad takes get rejected automatically.
-
-**Prove** — Faces and text are auto-blurred. You confirm the blurred version before anything leaves the device. The clip is signed with C2PA (the content provenance standard backed by Adobe, Google, Microsoft, and others), with the signing key bound to the smartphone's secure enclave. Both the original and the redacted versions are signed.
-
-**Mint** — A cloud TEE (Trusted Execution Environment, a sealed runtime that even our own team cannot inspect) verifies the C2PA chain and mints a Root NFT on Solana, anchored to your wallet. The Root NFT is your on-chain ownership token for this footage. The TEE code is open source and remote-attestable, so no one can forge a Root NFT.
-
-**Earn** — Stake your Root NFT to put the footage on the market. When a buyer pays, a smart contract mints them a separate license NFT, which is their on-chain right to use the footage for AI training. Revenue flows back to the Root NFT holder automatically. No platform processing, no payout cycle.
-
+- `app/` — iOS / Android capture app (React Native + Expo). ARKit-based
+  recording, IMU + hand-pose logging, previews, upload to R2.
+- `web/` — Next.js 16 landing + REST API (`/api/clips`,
+  `/api/v1/raw-uploads`, `/api/v1/consents`). Deployed to
+  [rootlens.io](https://rootlens.io).
+- `tools/modal/fpvlabs/` — Modal worker that converts a raw session in
+  `rootlens-raw-arkit` into a Stera-compatible ROS2 MCAP for
+  [FPV Labs](https://fpvlabs.ai/stera), with EgoBlur face blur on GPU.
+- `tools/modal/score-wilor/` — earlier score + WiLoR hand-pose pipeline
+  (kept as legacy reference, not part of the current production flow).
+- `tools/fpvlabs-handoff/` — operator runbook + a helper that lists raw
+  clips not yet handed off + the README the buyer receives.
+- `tools/egoblur_probe.py` — local calibration harness for the EgoBlur
+  detector on new footage.
+- `document/v0.1.4/` — active spec + task tracking.
 
 ## Stack
 
-- **Mobile app** — React Native (Expo), iOS + Android
-- **Hand pose** — iOS Vision / Android MediaPipe HandLandmarker
-- **C2PA signing** — c2pa-rs via device secure enclave
-- **Verification pipeline** — cloud TEE, end-to-end encrypted
-- **On-chain** — Solana (Root NFT + License NFT, Anchor program)
-- **Auth** — Privy
-
-## Built on
-
-- **[Title Protocol](https://github.com/yudai-mori-2004/title-protocol)** — the open-source verification layer that handles Root NFT issuance trustlessly. RootLens is the first application built on top of it.
-- **[C2PA](https://c2pa.org/)** — content provenance standard co-developed by Adobe, Google, Microsoft, and others.
-- **Solana** — Root NFT and License NFT are recorded on-chain.
+- **Mobile app** — React Native (Expo), iOS + Android.
+- **Capture** — ARKit + LiDAR + CoreMotion IMU, on-device MediaPipe
+  hand landmarker for framing guidance.
+- **Storage** — Cloudflare R2 (`rootlens-raw-arkit` for raw, `rootlens-fpvlabs`
+  for the handoff MCAPs).
+- **Server** — Next.js 16 REST API on Vercel, Supabase Postgres via drizzle.
+- **Workers** — Modal (Python) for the FPV Labs handoff (EgoBlur GPU + Stera
+  MCAP writer).
 
 ## License
 
