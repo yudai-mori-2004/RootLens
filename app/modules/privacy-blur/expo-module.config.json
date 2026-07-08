@@ -1,7 +1,0 @@
-{
-  "platforms": ["ios"],
-  "ios": {
-    "modules": ["PrivacyBlurModule"]
-  },
-  "_android_intentionally_omitted": "Android is not implemented in this iteration. See android/README.md."
-}

@@ -1,13 +1,13 @@
 // Pipeline 1 の段レジューム型ランナー (= 「送る」 と 「もう一度試す」 を統一する単一の前進関数)。
 //
-// v0.1.4: 段を 3 つに縮小 (= 旧 4 段から blur+D2 段を撤去)。
+// v0.1.4 (task 12 適用後): C2PA 署名を廃止し、 段は以下の 3 つ:
 //
-//   未署名 (unsigned)   → C2PA D1 署名         → 'signed' (= signature_hash 誕生、 local id → hash に re-key)
-//   署名済 (signed)     → upload + POST /api/clips → 'registered' (= state='uploaded')
-//   登録済 (registered) → (端末側はここまで)
+//   pending    → 生 MP4 の SHA-256 計算  → 'hashed'   (= content_hash 誕生、 local id → hash に re-key)
+//   hashed     → upload + POST /api/clips → 'registered' (= state='uploaded')
+//   registered → (端末側はここまで)
 //
-// 冪等性: 'signed' 以降は同じ signature_hash を使い回す (= 再署名しない)。 サーバ側の重複排除
-// (= (account, signature_hash)) が効いて二重 clip 行を防ぐ。
+// 冪等性: 'hashed' 以降は同じ content_hash を使い回す。 サーバ側の重複排除
+// (= (account, content_hash)) が効いて二重 clip 行を防ぐ。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
@@ -16,7 +16,7 @@ import * as FileSystem from 'expo-file-system';
 import type { EventSink, DataflowEventInput } from './events';
 import { getRecordingConfig, type RecordingConfig, type RecordingSession } from './recording-configs';
 import type { Pipeline1Stage } from './types';
-import { signRecording, cleanupTmpDir, signedUriIn } from './steps/sign';
+import { computeContentHash } from './steps/hash';
 import { uploadToR2 } from './steps/upload';
 import { registerClip } from './steps/register';
 import { dataflowStore, makeLocalClipId } from './store';
@@ -34,11 +34,12 @@ function errMsg(e: unknown): string {
   try { return JSON.stringify(e); } catch { return String(e); }
 }
 
-async function exists(uri: string): Promise<boolean> {
+/** clip dir 配下のゴミを掃除する (アップロード完了 or 破棄時)。 */
+async function cleanupClipDir(dir: string): Promise<void> {
   try {
-    return (await FileSystem.getInfoAsync(uri)).exists;
+    await FileSystem.deleteAsync(dir, { idempotent: true });
   } catch {
-    return false;
+    // 失敗は致命ではない
   }
 }
 
@@ -47,8 +48,7 @@ async function exists(uri: string): Promise<boolean> {
  *  (= uploadToR2 の onProgress。 一番長いアップロードが飛び飛びにならないように)。 */
 function stepProgress(step: string): number | null {
   switch (step) {
-    case 'sign-d1':       return 0.2;
-    case 'signature-hash': return 0.35;
+    case 'content-hash':  return 0.35;
     case 'register-clip': return 1.0;
     default:              return null;
   }
@@ -72,10 +72,6 @@ export async function enqueueRecording(input: {
   deviceModel?: string | null;
 }): Promise<string> {
   const localId = makeLocalClipId();
-  // 署名中間物 (rgb.mp4) は録画と同じ durable な clip dir 配下 (sign/) に置く。
-  // こうすると app-kill 後も raw + 中間物が揃って残り、 advanceClip が段から正確に再開できる。
-  const workDir = `${input.session.sessionDir}sign/`;
-  await FileSystem.makeDirectoryAsync(workDir, { intermediates: true }).catch(() => {});
   const store = dataflowStore.getState();
   store.upsertClip({
     id: localId,
@@ -85,8 +81,7 @@ export async function enqueueRecording(input: {
     durationMs: input.durationMs ?? null,
     deviceModel: input.deviceModel ?? null,
     sessionDir: input.session.sessionDir,
-    stage: 'unsigned',
-    workDir,
+    stage: 'pending',
   });
   store.setCurrentClipId(localId);
   return localId;
@@ -150,8 +145,6 @@ export async function recoverOrphanRecordings(): Promise<number> {
     }
     const config = getRecordingConfig(configId);
     if (!config) continue;
-    const workDir = `${dir}sign/`;
-    await FileSystem.makeDirectoryAsync(workDir, { intermediates: true }).catch(() => {});
     dataflowStore.getState().upsertClip({
       id: makeLocalClipId(),
       state: 'recorded',
@@ -160,8 +153,7 @@ export async function recoverOrphanRecordings(): Promise<number> {
       durationMs: null,
       deviceModel,
       sessionDir: dir,
-      stage: 'unsigned',
-      workDir,
+      stage: 'pending',
     });
     recovered += 1;
   }
@@ -169,37 +161,34 @@ export async function recoverOrphanRecordings(): Promise<number> {
 }
 
 /**
- * クリップの現在 stage から実際に再開できる stage を返す (= 中間成果物の欠落をチェックして降格)。
- * 'signed' でも署名済 rgb.mp4 が消えていれば 'unsigned' に降格して再署名する。
+ * クリップの現在 stage から実際に再開できる stage を返す。
+ * content_hash が store から消えていれば 'pending' に降格して再計算する。
  */
-async function effectiveStage(stage: Pipeline1Stage, workDir: string | undefined): Promise<Pipeline1Stage> {
+function effectiveStage(stage: Pipeline1Stage, contentHash: string | undefined): Pipeline1Stage {
   if (stage === 'registered') return 'registered';
-  if (stage === 'signed') {
-    if (workDir && (await exists(signedUriIn(workDir)))) return 'signed';
-  }
-  return 'unsigned';
+  if (stage === 'hashed' && contentHash) return 'hashed';
+  return 'pending';
 }
 
 /**
  * クリップを現在 stage から前進させる (= submit / retry 共通)。
  *
- *   unsigned → signRecording → 'signed' (= signature_hash 誕生、 local id → hash に re-key)
- *   signed   → upload + register → 'registered' (= state='uploaded')
+ *   pending → computeContentHash → 'hashed' (= content_hash 誕生、 local id → hash に re-key)
+ *   hashed  → upload + register  → 'registered' (= state='uploaded')
  */
 export async function advanceClip(clipId: string, sink: EventSink): Promise<void> {
   const initial = dataflowStore.getState().clips[clipId];
   if (!initial) return;
 
   const config = initial.recordingConfigId ? getRecordingConfig(initial.recordingConfigId) : undefined;
-  if (!config || !initial.sessionDir || !initial.workDir) {
+  if (!config || !initial.sessionDir) {
     dataflowStore.getState().patchClip(clipId, {
       state: 'error',
-      errorMessage: 'クリップのメタ情報 (撮影構成 / session / 作業 dir) が不足し再開できません',
+      errorMessage: 'クリップのメタ情報 (撮影構成 / session) が不足し再開できません',
     });
     return;
   }
   const session: RecordingSession = { sessionDir: initial.sessionDir };
-  const workDir = initial.workDir;
 
   dataflowStore.getState().setCurrentClipId(clipId);
   dataflowStore.getState().patchClip(clipId, { state: 'uploading', errorMessage: null, uploadProgress: 0 });
@@ -214,39 +203,33 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
   };
 
   try {
-    let stage = await effectiveStage(initial.stage ?? 'unsigned', workDir);
+    let stage = effectiveStage(initial.stage ?? 'pending', initial.contentHash);
 
-    // ─── 未署名 → 署名済み (D1 → signature_hash 誕生) ──────────────────
-    if (stage === 'unsigned') {
+    // ─── pending → hashed (content_hash 誕生) ─────────────────────────
+    if (stage === 'pending') {
       const rawMp4Uri = config.primaryVideoUri(session);
-      const signed = await signRecording(rawMp4Uri, workDir, progressSink);
-      // identity 誕生: local id → 新 signature_hash に re-key。
-      dataflowStore.getState().renameClipId(clipId, signed.signatureHash);
-      clipId = signed.signatureHash;
+      const hashed = await computeContentHash(rawMp4Uri, progressSink);
+      dataflowStore.getState().renameClipId(clipId, hashed.contentHash);
+      clipId = hashed.contentHash;
       targetIdRef.id = clipId;
       dataflowStore.getState().patchClip(clipId, {
-        stage: 'signed',
-        signatureHash: signed.signatureHash,
-        contentSize: signed.contentSize,
+        stage: 'hashed',
+        contentHash: hashed.contentHash,
+        contentSize: hashed.contentSize,
         uploadProgress: 0.4,
       });
-      stage = 'signed';
+      stage = 'hashed';
     }
 
-    // ─── 署名済み → 登録済み (R2 + POST /api/clips) ───────────────────
-    if (stage === 'signed') {
+    // ─── hashed → registered (R2 + POST /api/clips) ───────────────────
+    if (stage === 'hashed') {
       const cur = dataflowStore.getState().clips[clipId];
-      if (!cur?.signatureHash) throw new Error('signature_hash 未確定で登録段に進めません');
+      if (!cur?.contentHash) throw new Error('content_hash 未確定で登録段に進めません');
 
-      // 撮影構成が出力したファイル群を R2 に並列 PUT。
-      // 主な動画 (= isPrimaryVideo true) は workDir の D1 署名済を使う。
-      // それ以外 (realtime_handpose.jsonl / metadata.json / imu.jsonl 等) は sessionDir からそのまま。
+      // 撮影構成が出力したファイル群を R2 に並列 PUT。 v0.1.4 (task 12 適用後) は署名を挟まないので、
+      // 主な動画も session dir の生 mp4 をそのまま送る。
       const files: Record<string, string> = {};
       for (const spec of config.outputFiles) {
-        if (spec.isPrimaryVideo) {
-          files[spec.name] = signedUriIn(workDir);
-          continue;
-        }
         const localUri = `${session.sessionDir}${spec.name}`;
         const info = await FileSystem.getInfoAsync(localUri);
         if (info.exists) {
@@ -256,7 +239,7 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
         }
       }
       await uploadToR2(
-        { signatureHash: cur.signatureHash, recordingConfig: config.id, files },
+        { contentHash: cur.contentHash, recordingConfig: config.id, files },
         progressSink,
         (f) => {
           dataflowStore.getState().patchClip(targetIdRef.id, { uploadProgress: uploadFractionToProgress(f) });
@@ -265,7 +248,7 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
 
       await registerClip(
         {
-          signatureHash: cur.signatureHash,
+          contentHash: cur.contentHash,
           contentSize: cur.contentSize ?? 0,
           accountPubkey: getAccountPubkey(),
           recordingConfig: config.id,
@@ -281,7 +264,7 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
         uploadProgress: 1,
       });
       // アップロード完了。 durable な clip dir を片付ける (サムネは以後サーバの動画から都度起こす)。
-      await cleanupTmpDir(session.sessionDir);
+      await cleanupClipDir(session.sessionDir);
       return;
     }
 
@@ -296,6 +279,6 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
  */
 export async function discardClip(clipId: string): Promise<void> {
   const clip = dataflowStore.getState().clips[clipId];
-  if (clip?.sessionDir) await cleanupTmpDir(clip.sessionDir);
+  if (clip?.sessionDir) await cleanupClipDir(clip.sessionDir);
   dataflowStore.getState().removeClip(clipId);
 }

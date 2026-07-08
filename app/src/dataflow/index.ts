@@ -11,8 +11,8 @@ export type {
   ClipState,
   Pipeline1Stage,
   ServerClipStatus,
-  SignInput,
-  SignResult,
+  HashInput,
+  HashResult,
   UploadInput,
   UploadResult,
   RegisterInput,
@@ -44,18 +44,15 @@ export {
 
 // 個別 step
 export {
-  signClip,
-  signRecording,
-  makeSignTmpDir,
-  cleanupTmpDir,
-  signedUriIn,
+  hashClip,
+  computeContentHash,
   uploadToR2,
   registerClip,
   fetchMyClips,
   fetchClipMediaUrl,
 } from './steps';
 
-// 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → D1 → アップ + 登録)
+// 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → hash → アップ + 登録)
 export { enqueueRecording, advanceClip, discardClip, recoverOrphanRecordings } from './pipeline';
 
 // store

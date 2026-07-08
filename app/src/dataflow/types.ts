@@ -16,13 +16,13 @@ export type ClipState =
 /**
  * Pipeline 1 (= 端末側) のチェックポイント段。 advanceClip がここを見て前進する。
  *
- *   unsigned    生 MP4 のみ (= 未署名)。 retry → D1 署名から
- *   signed      D1 署名済み (= signature_hash 誕生、 アップロード対象 rgb.mp4 あり)。 retry → アップロードから
+ *   pending     生 MP4 のみ、 content_hash 未計算。 retry → hash 計算から
+ *   hashed      content_hash 確定 (= 生 mp4 の SHA-256、 アップロード対象は生 mp4 そのもの)。 retry → アップロードから
  *   registered  R2 PUT + POST /api/clips 済み (= state='uploaded')
  *
- * ⚠ signature_hash は 'signed' で初めて確定する。 それ以前の clip は local id のみで持つ。
+ * ⚠ content_hash は 'hashed' で初めて確定する。 それ以前の clip は local id のみで持つ。
  */
-export type Pipeline1Stage = 'unsigned' | 'signed' | 'registered';
+export type Pipeline1Stage = 'pending' | 'hashed' | 'registered';
 
 // ─── クリップ ─────────────────────────────────────────────────────────
 
@@ -40,13 +40,10 @@ export interface Clip {
 
   /** Pipeline 1 のチェックポイント段。 */
   stage?: Pipeline1Stage;
-  /** 署名中間成果物 (rgb.mp4) を置くローカル作業 dir (file:// URI、 末尾 /)。
-   *  段が通るまで保持し、 retry で再利用する。 登録済みになったら片付ける。 */
-  workDir?: string;
 
-  /** C2PA D1 アクティブマニフェスト署名の SHA-256 hex (64 文字)。 sign 完了で確定。 */
-  signatureHash?: string;
-  /** D1 署名済 MP4 (= raw/<hash>/rgb.mp4) のバイト数 */
+  /** 生 MP4 の SHA-256 hex (64 文字)。 hash 段完了で確定。 R2 キー / DB PK として使う。 */
+  contentHash?: string;
+  /** 生 MP4 (= raw/<content_hash>/rgb.mp4) のバイト数 */
   contentSize?: number;
 
   /** 録画尺 (ms)。 端末が record stop−start で申告。 */
@@ -65,23 +62,21 @@ export interface Clip {
 // ─── step 入出力 ────────────────────────────────────────────────────────
 // 各 step は (input, sink) → Promise<output> の純粋関数。
 
-/** sign step: 生 MP4 → C2PA D1 署名 → signature_hash 抽出。 v0.1.4 では blur / D2 は無し。 */
-export interface SignInput {
+/** hash step: 生 MP4 → SHA-256 (= content_hash)。 C2PA 署名は v0.1.4 で廃止。 */
+export interface HashInput {
   /** 撮影 native が出力した生 MP4 (file:// URI) */
   rawMp4Uri: string;
 }
-export interface SignResult {
-  /** D1 署名済 MP4 (= R2 に rgb.mp4 として上げる本体) */
-  signedMp4Uri: string;
-  /** SHA-256 hex 64 文字 (= "sha256:" prefix なし) */
-  signatureHash: string;
-  /** 署名済 MP4 バイト数 */
+export interface HashResult {
+  /** SHA-256 hex 64 文字 (raw mp4 bytes) */
+  contentHash: string;
+  /** raw MP4 バイト数 */
   contentSize: number;
 }
 
-/** upload step: signature_hash の presigned URL を取得し、 ファイル群を R2 に並列 PUT。 */
+/** upload step: content_hash の presigned URL を取得し、 ファイル群を R2 に並列 PUT。 */
 export interface UploadInput {
-  signatureHash: string;
+  contentHash: string;
   /** 撮影構成 ID。 サーバ側でアップロード先バケット + ファイルマニフェストが決まる (DATA_SPECS §3)。 */
   recordingConfig: string;
   /** R2 ファイル名 → ローカル file:// URI のマップ (= 撮影構成の outputFiles に対応) */
@@ -94,7 +89,7 @@ export interface UploadResult {
 
 /** register step: POST /api/clips でサーバに登録する (= v0.1.4 では finalize 無し)。 */
 export interface RegisterInput {
-  signatureHash: string;
+  contentHash: string;
   contentSize: number;
   /** クリップ所有者のアカウント公開鍵 (= Ed25519 base58)。 */
   accountPubkey: string;
@@ -116,7 +111,7 @@ export interface ServerClipStatus {
   state: ClipState;
   /** 行作成時刻 (= ISO 8601、 撮影日時)。 list 取得時に使う。 */
   createdAt?: string;
-  signatureHash?: string;
+  contentHash?: string;
   durationMs?: number | null;
   recordingConfig?: string | null;
   deviceModel?: string | null;

@@ -311,7 +311,7 @@ export const DevSandboxScreen: React.FC = () => {
       {/* クリップ状態バー */}
       <View style={styles.statusBar}>
         <StatusRow label="clipId" value={clip?.id} />
-        <StatusRow label="signature_hash" value={clip?.signatureHash} mono />
+        <StatusRow label="signature_hash" value={clip?.contentHash} mono />
         <StatusRow label="stage" value={clip?.stage} />
         <StatusRow
           label="state"

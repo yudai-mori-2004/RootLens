@@ -1,7 +1,7 @@
 // Pipeline 1 step: R2 アップロード (DATA_SPECS §2.4)。
 //
-// signature_hash + 撮影構成を /api/v1/raw-uploads に投げて presigned PUT URL を取得し、
-// 撮影構成が出力したファイル群を raw/<signature_hash>/ に並列 PUT する。
+// content_hash + 撮影構成を /api/v1/raw-uploads に投げて presigned PUT URL を取得し、
+// 撮影構成が出力したファイル群を raw/<content_hash>/ に並列 PUT する。
 // アップロード先バケットは構成でサーバが決める (= ultra_wide → raw、 arkit → raw-arkit)。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
@@ -23,13 +23,13 @@ interface PresignResponse {
 }
 
 async function requestPresignedUrls(
-  signatureHash: string,
+  contentHash: string,
   recordingConfig: string,
 ): Promise<PresignResponse> {
   const res = await fetch(`${SERVER_URL}/api/v1/raw-uploads`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signatureHash, recordingConfig }),
+    body: JSON.stringify({ contentHash, recordingConfig }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -39,7 +39,7 @@ async function requestPresignedUrls(
 }
 
 /**
- * signature_hash の presigned URL を取得し、 files マップ (= 名前 → ローカル URI) を R2 に並列 PUT。
+ * content_hash の presigned URL を取得し、 files マップ (= 名前 → ローカル URI) を R2 に並列 PUT。
  * presigned に存在しない名前のファイルが渡された場合は fail-loud (= 構成と server contract のズレ検出)。
  */
 export async function uploadToR2(
@@ -49,7 +49,7 @@ export async function uploadToR2(
   onProgress?: (fraction: number) => void,
 ): Promise<UploadResult> {
   sink({ step: 'r2-upload', level: 'info', message: `presigned URL を取得 (構成 ${input.recordingConfig})` });
-  const presigned = await requestPresignedUrls(input.signatureHash, input.recordingConfig);
+  const presigned = await requestPresignedUrls(input.contentHash, input.recordingConfig);
 
   const names = Object.keys(input.files);
 

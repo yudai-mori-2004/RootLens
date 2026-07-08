@@ -2,13 +2,7 @@
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
-export {
-  signClip,
-  signRecording,
-  makeSignTmpDir,
-  cleanupTmpDir,
-  signedUriIn,
-} from './sign';
+export { hashClip, computeContentHash } from './hash';
 export { uploadToR2 } from './upload';
 export { registerClip } from './register';
 export { fetchMyClips, fetchClipMediaUrl } from './list';

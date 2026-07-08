@@ -1,9 +1,0 @@
-# Android NDK linker設定
-# ANDROID_NDK_HOME 環境変数が設定されている前提
-# 例: export ANDROID_NDK_HOME=$HOME/Library/Android/sdk/ndk/27.2.12479018
-
-[target.aarch64-linux-android]
-linker = "/Users/forest/Library/Android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android35-clang"
-
-[target.x86_64-linux-android]
-linker = "/Users/forest/Library/Android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android35-clang"

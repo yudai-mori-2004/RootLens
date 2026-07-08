@@ -1,9 +1,0 @@
-{
-  "platforms": ["ios", "android"],
-  "ios": {
-    "modules": ["SensorSessionModule"]
-  },
-  "android": {
-    "modules": ["io.rootlens.sensorsession.SensorSessionModule"]
-  }
-}

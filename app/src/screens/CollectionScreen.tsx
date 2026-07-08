@@ -76,7 +76,7 @@ const HISTORY_MOCKS: { clip: ServerClipStatus; source: ImageSourcePropType }[] =
         id: `hmock_${i}`,
         state: 'uploaded' as const,
         createdAt: new Date(Date.now() - (i + 1) * 86_400_000 * 1.3).toISOString(),
-        signatureHash: `hmock_${i}`,
+        contentHash: `hmock_${i}`,
         durationMs: ((i * 97) % 40 + 3) * 60_000,
       },
       source: [
@@ -359,7 +359,7 @@ const HistoryTile: React.FC<{
   onPress?: () => void;
 }> = ({ clip, source, selected, onPress }) => {
   // サムネは R2 の mp4 から range リクエストで 1 フレームだけ読む (= 端末に動画は置かない)。
-  const frame = useUploadedClipFrame(clip.signatureHash ?? clip.id, source ? null : clip.id);
+  const frame = useUploadedClipFrame(clip.contentHash ?? clip.id, source ? null : clip.id);
   const resolved = source ?? (frame ? { uri: frame } : undefined);
   return (
   <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}>

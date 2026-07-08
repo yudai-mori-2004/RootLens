@@ -38,7 +38,7 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
   const [mediaError, setMediaError] = useState(false);
   // 動画ロード中のつなぎ表示。 履歴タイルが同じ key で解決済みならキャッシュから即返る。
   const frame = useUploadedClipFrame(
-    clip ? clip.signatureHash ?? clip.id : null,
+    clip ? clip.contentHash ?? clip.id : null,
     clip && !thumbSource ? clip.id : null,
   );
   const poster = thumbSource ?? (frame ? { uri: frame } : undefined);

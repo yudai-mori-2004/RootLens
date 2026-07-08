@@ -1,4 +1,0 @@
-module C2paBridgeFFI {
-  header "c2pa_bridge.h"
-  export *
-}

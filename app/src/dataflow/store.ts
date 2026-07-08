@@ -23,7 +23,7 @@ export type RecordingPhase =
 const MAX_EVENTS = 500;
 
 let localIdSeq = 0;
-/** 端末発番のローカル clip id (= sign 完了で signature_hash へ renameClipId する)。 */
+/** 端末発番のローカル clip id (= hash 完了で content_hash へ renameClipId する)。 */
 export function makeLocalClipId(): string {
   localIdSeq += 1;
   return `local_${Date.now().toString(36)}_${localIdSeq.toString(36)}`;
@@ -53,8 +53,8 @@ export interface DataflowState {
   upsertClip(clip: Clip): void;
   patchClip(id: string, patch: Partial<Clip>): void;
   removeClip(id: string): void;
-  /** local id → signature_hash へ key を貼り替える (= sign 完了で identity 誕生)。 */
-  renameClipId(localId: string, signatureHash: string): void;
+  /** local id → content_hash へ key を貼り替える (= hash 完了で identity 誕生)。 */
+  renameClipId(localId: string, contentHash: string): void;
   /** server から受け取った状態を、 指定 id のクリップにマージする。 */
   applyServerStatus(targetId: string, status: ServerClipStatus): void;
   /** 永続化アダプタからの一括 hydrate (= 起動時に保存済みクリップを流し込む)。 */
@@ -108,15 +108,15 @@ export const dataflowStore = createStore<DataflowState>((set, get) => ({
       currentClipId: get().currentClipId === id ? null : get().currentClipId,
     });
   },
-  renameClipId(localId, signatureHash) {
-    if (localId === signatureHash) return;
+  renameClipId(localId, contentHash) {
+    if (localId === contentHash) return;
     const clips = get().clips;
     const cur = clips[localId];
     if (!cur) return;
     const { [localId]: _old, ...rest } = clips;
     set({
-      clips: { ...rest, [signatureHash]: { ...cur, id: signatureHash } },
-      currentClipId: get().currentClipId === localId ? signatureHash : get().currentClipId,
+      clips: { ...rest, [contentHash]: { ...cur, id: contentHash } },
+      currentClipId: get().currentClipId === localId ? contentHash : get().currentClipId,
     });
   },
   applyServerStatus(targetId, status) {

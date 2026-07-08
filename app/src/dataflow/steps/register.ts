@@ -21,7 +21,7 @@ export async function registerClip(
       'X-Account-Pubkey': input.accountPubkey,
     },
     body: JSON.stringify({
-      signatureHash: input.signatureHash,
+      contentHash: input.contentHash,
       contentSize: input.contentSize,
       recordingConfig: input.recordingConfig,
       ...(input.durationMs != null ? { durationMs: input.durationMs } : {}),
