@@ -58,21 +58,11 @@ tools/**/__pycache__/
 tools/**/*.pyc
 tools/**/.venv/
 
-# Solana / Anchor (Unit D 以降)
-/target/
-/.anchor/
-test-ledger/
-**/*.so
-# program keypair はローカル保管。本番デプロイ前にチームで共有 keypair を作る
-/target/deploy/*-keypair.json
-# License Collection / USDC mint keypair も同じくローカル保管
+# Rust build artifacts (どのクレートでも target/ は無視)
+**/target/
+
+# ローカル鍵置き場 (dev-only Solana deployer 等の履歴、 v0.1.4 以降は使わない)
 keys/
-# Anchor / license-cli が生成する bootstrap config (環境ローカル)
-network.json
-# setup スクリプトが devnet で生成する fixtures (= 各開発者ローカル artifact)。
-# leaf owner の secret key を含むので絶対に commit しない。
-tests/license-nft/fixtures.json
-tests/license-nft/fixtures-canopy.json
 
 # Vendored external reference repos (= 開発者ローカル参照、 sub-repo として持つ)。
 # stera-sdk / ml-egodex / VisionProTeleop / Arvos など 600 MB 級なので commit しない。
