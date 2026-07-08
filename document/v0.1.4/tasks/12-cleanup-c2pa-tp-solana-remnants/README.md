@@ -42,6 +42,10 @@ v0.1.4 の実像 (= FPV Labs 向けデータ収集 + EgoBlur ぼかし + Stera �
 - `AUDIT.md` (このタスクの隣) — Opus エージェントによる全ファイル読破監査の生レポート。 削除対象・
   編集対象・ 順序・ 影響範囲・ 曖昧項目を全て列挙している。 このタスクの実装は AUDIT.md の記述を
   正として進める。 本 README は方針と scope の要約。
+- `AUDIT-ADDENDUM.md` (このタスクの隣) — AUDIT.md 生成直後、 user 指摘 (「license-nft の
+  ファイルがまだ残ってる。 もう一回全部監査してくれ」) を受けて回した 2 回目の Opus 監査の差分。
+  15 件の新規発見 + 1 件の訂正 + PR 順序更新 (10 PR → 12 PR、 6.5 = native/jarosz-wasm、
+  8.5 = 孤児 sensors/units) + 各 PR 後の grep 検証コマンド。 実装時は AUDIT.md と併読する。
 - `document/v0.1.4/tasks/08-deblockchain-cleanup/README.md` — 前段。 何が既に消えて何が残ったか。
 - `document/v0.1.4/tasks/09-remote-signing/README.md` — 前段。 このタスクで消される対象。
 - `document/v0.1.4/tasks/07-manual-upload-landscape-arkit/README.md` §6 — 「v0.1.5 の mint 再配線
@@ -208,17 +212,22 @@ tools/modal/
 
 ## 順序と依存
 
-AUDIT.md §7 の 10 PR で進める。 PR 間の依存は最小化されているが、 以下だけ厳守:
+AUDIT-ADDENDUM.md §5 の **12 PR** (AUDIT.md の 10 PR + 6.5 と 8.5 を追加) で進める。
+PR 間の依存は最小化されているが、 以下だけ厳守:
 
 - PR 8 (DB migration + rename) はコード変更が全部載る breaking PR。 独立して合流させる。
-- PR 9 (C2PA D1 削除) は PR 8 の後 (rename 済のコードベースを触るので)。
+- PR 8.5 (孤児 sensors/units 削除) は PR 8 の後 (もしくは無関係、 独立)。
+- PR 9 (C2PA D1 + AesGcm 削除) は PR 8 の後 (rename 済のコードベースを触るので)。
 - PR 10 (Modal 再編) は他 PR と独立、 いつでも入れられる。
+- PR 6.5 (native/jarosz-wasm 削除) は完全独立、 いつでも入れられる。
 - PR 1〜7 は互いに独立、 並行可。
 
 ## 成功基準
 
-- `grep -rE '(c2pa|C2PA|title.protocol|cNFT|Solana|signature_hash|wallet_pubkey|rootAssetId|signedJsonUri)' .`
+- 各 PR 適用後に AUDIT-ADDENDUM.md §6 の grep コマンドを走らせて残骸ゼロを確認する。
+- `grep -rE '(c2pa|C2PA|title.protocol|cNFT|Solana|signature_hash|wallet_pubkey|rootAssetId|signedJsonUri|AesGcm|jarosz)' .`
   で残るのは `document/v0.1.0-v0.1.3/`、 過去タスク README、 `references/`、 履歴用途の一部だけ。
+- `git ls-files | wc -l` が 667 → 500 前後に減る (= AUDIT-ADDENDUM.md 想定)。
 - `web/` `pnpm typecheck` + `next build` green。 依存 11 個削除後も build 通る。
 - `app/` `pnpm typecheck` + iOS/Android build 通る。 sign step が消えても capture → upload flow が動く。
 - `POST /api/clips` の contract が `contentHash` (SHA-256 of raw mp4) を受け取る形。
