@@ -51,8 +51,6 @@ progress/
 app/modules/sensor-session/android/build/
 
 # tools/ build artifacts
-tools/mock-device/target/
-tools/macos-blur/.build/
 tools/**/__pycache__/
 tools/**/*.pyc
 tools/**/.venv/

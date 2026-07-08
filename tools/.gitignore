@@ -1,20 +1,10 @@
-# Python build cache (= modal/ + lp-sample/ 等)
+# Python build cache (= modal/ 配下)
 __pycache__/
 *.pyc
 
-# Rust build outputs (= mock-device/ 配下、 既に mock-device/.gitignore でも個別管理)
-target/
-
-# Swift build outputs (= macos-blur/ 配下)
-.build/
-
-# Local env (= web/.env.local から vercel env pull で再取得可能)
+# Local env
 .env
 .env.local
-
-# tmp / 中間出力
-mock_device_out/
-*_intermediate_*.mp4
 
 # OS
 .DS_Store
