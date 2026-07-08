@@ -5,6 +5,10 @@
 # stera-sdk の MCAPReader がそのまま読める ROS2 スキーマの MCAP を組み立て、
 # rootlens-fpvlabs バケットへ書く。 撮影者は写っている人全員の許可を取得済み (= ぼかしは追加保護)。
 #
+# 顔検出器は EgoBlur (= Stera-10M と同じ、 Meta gen2 TorchScript) が既定。
+# GPU で batch 推論、 短辺リサイズを効かせて 1 時間あたり数十円を狙う (詳細は EGOBLUR_* 定数)。
+# 検出器の切替: --face-detector egoblur|mediapipe (mediapipe は CPU 動作の fallback)。
+#
 #   入力: raw/<hash>/{rgb.mp4, realtime_handpose.jsonl, imu.jsonl, metadata.json[, depth.tar]}
 #   出力: <hash>/session.mcap  (= 決定論的キー。 再実行は同キーへの上書き = 冪等)
 #
@@ -24,6 +28,13 @@
 # 1 回の put_object / multipart で上書きする (= 半端な状態がバケットに残らない)。
 # 設定を変えて再実行すれば同キーが新しい内容で置き換わり、 processing_info で判別できる。
 #
+# 事前セットアップ (Modal, 1 回だけ):
+#   1. EgoBlur モデル jit を Modal Volume に置く:
+#        modal volume create rootlens-egoblur
+#        modal volume put rootlens-egoblur references/egoblur/ego_blur_face_gen2.jit /
+#      jit は Meta EgoBlur の gen2 顔検出モデル (400MB)。 Modal image はビルド時に
+#      https://github.com/facebookresearch/EgoBlur を clone するので、 gen2 ソースは自動で入る。
+#
 # 実行:
 #   ローカル:  python tools/modal/fpvlabs.py <signature_hash>   (R2 creds は env で、 ぼかしオン)
 #   Modal:    modal run tools/modal/fpvlabs.py --signature-hash <hash>            (ぼかしオン)
@@ -39,12 +50,30 @@ import tarfile
 import tempfile
 import time
 
-PIPELINE_VERSION = "fpvlabs-2"  # v2: 顔ぼかしの検出閾値を厳格化 + on/off をコマンド切替可能に
+PIPELINE_VERSION = "fpvlabs-3"  # v3: 顔検出器を EgoBlur (GPU) に切替。 mediapipe は fallback。
 
-# 顔ぼかしの検出閾値 (= mediapipe BlazeFace の min_detection_confidence)。
-# stera-sdk 既定の 0.5 は緩く、 家事映像で手・床・物体を顔と誤検出して丸ボケを乗せていた
-# (= 2026-07-08 実測: 約 1 割のフレームで非顔領域を誤爆、 操作中の手の上に乗ることも)。
-# 0.9 まで上げて誤検出を潰す。 実在の顔は近距離で高信頼に出るため取りこぼしは小さい。
+# ─── EgoBlur (既定) ──────────────────────────────────────────────
+# Stera-10M と同じ検出器 (Meta gen2 EgoBlur、 arXiv:2308.13093)。
+# 閾値は stera-sdk の既定に合わせる (= 0.8)。 Meta gen2 の per-camera calibrated 値は
+# camera-rgb で 0.674 (Aria RGB 想定) だが、 stera-sdk (fpvlabs 本家) は 0.8 で運用しており、
+# iPhone RGB での calibration が無いため本家の運用値をそのまま採用する。
+EGOBLUR_SCORE_THRESHOLD = 0.8
+EGOBLUR_NMS_IOU = 0.3
+EGOBLUR_SCALE_FACTOR = 1.15  # 検出 bbox を 15% 拡張してからぼかす (境界の取りこぼし対策)
+
+# 短辺リサイズ。 EgoBlur 既定 1200 は精度重視。 480 まで落として ~6 倍高速化 (推論は O(HW))。
+# エゴセントリックの実顔は近距離〜中距離で数百 px 出るので、 480 でも捕まえられる
+# (実運用でもし取りこぼしが確認されたら 640 に戻す)。
+EGOBLUR_RESIZE = 480
+EGOBLUR_BATCH = 16  # GPU の VRAM 内で回るバッチ数。 A10G 24GB なら余裕。
+
+# コンテナ内での配置 (image ビルドで clone / volume mount で jit を配置)
+EGOBLUR_CODE_DIR = "/opt/egoblur"                     # git clone 先 (gen2/script/... が入る)
+EGOBLUR_JIT_PATH = "/egoblur_model/ego_blur_face_gen2.jit"  # modal volume の mount 先
+
+# ─── Mediapipe (fallback) ────────────────────────────────────────
+# 家事映像で手や床を顔と誤検出しやすいので、 EgoBlur が使えない場合の緊急時のみ。
+# min_detection_confidence は 0.9 まで上げて誤検出を潰す (実測で 0.9 なら誤爆ゼロ)。
 FACE_BLUR_MIN_CONFIDENCE = 0.9
 
 # ─── ROS2 msgdef (= mcap_ros2 に register する連結スキーマ) ────────────
@@ -312,15 +341,145 @@ def _camera_info_msg(ts_ns: int, width: int, height: int, fx: float, fy: float, 
     }
 
 
+# ─── 顔ぼかし backend (= EgoBlur GPU / mediapipe CPU) ─────────────
+
+
+def _apply_elliptical_blur(rgb, boxes_xyxy, scale_factor: float):
+    """EgoBlur gen2 demo と同じ楕円 blur を bbox 群に対して合成。 boxes は元解像度 XYXY。"""
+    import cv2
+    import numpy as np
+    if not len(boxes_xyxy):
+        return rgb
+    h, w = rgb.shape[:2]
+    out = rgb.copy()
+    mask = np.zeros((h, w), np.uint8)
+    ksize = (max(1, h // 2), max(1, w // 2))
+    for x1, y1, x2, y2 in boxes_xyxy:
+        cx = (x1 + x2) * 0.5
+        cy = (y1 + y2) * 0.5
+        bw = (x2 - x1) * scale_factor
+        bh = (y2 - y1) * scale_factor
+        x1i = max(0, int(round(cx - bw * 0.5)))
+        y1i = max(0, int(round(cy - bh * 0.5)))
+        x2i = min(w, int(round(cx + bw * 0.5)))
+        y2i = min(h, int(round(cy + bh * 0.5)))
+        if x2i <= x1i or y2i <= y1i:
+            continue
+        out[y1i:y2i, x1i:x2i] = cv2.blur(out[y1i:y2i, x1i:x2i], ksize)
+        cv2.ellipse(mask, (((x1i + x2i) // 2, (y1i + y2i) // 2),
+                          (x2i - x1i, y2i - y1i), 0), 255, -1)
+    inv = cv2.bitwise_not(mask)
+    bg = cv2.bitwise_and(rgb, rgb, mask=inv)
+    fg = cv2.bitwise_and(out, out, mask=mask)
+    return cv2.add(bg, fg)
+
+
+class EgoBlurBackend:
+    """Meta EgoBlur gen2 (TorchScript) 経由の顔検出 → ぼかし。 GPU 前提。 batch 推論対応。
+
+    stera-sdk の EgoBlurFace ラッパーは detectron2 の名前空間衝突で動かないので、
+    gen2 の EgoblurDetector を直接叩く (demo と同じ経路)。
+    """
+
+    NAME = "egoblur"
+
+    def __init__(self, jit_path: str, code_dir: str, device: str,
+                 score_threshold: float, nms_iou: float, resize: int,
+                 batch: int, scale_factor: float):
+        import sys
+        # gen2 パッケージを path に (= `import gen2.script.*` を解決)
+        if code_dir not in sys.path:
+            sys.path.insert(0, code_dir)
+        # gen2/script も path に (= jit の scripted 名 `detectron2.*` を bare で解決)
+        script_dir = os.path.join(code_dir, "gen2", "script")
+        if os.path.isdir(script_dir) and script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+
+        from gen2.script.detectron2.export.torchscript_patch import patch_instances
+        from gen2.script.predictor import (
+            EgoblurDetector, ClassID, PATCH_INSTANCES_FIELDS,
+        )
+        self._patch_instances = patch_instances
+        self._patch_fields = PATCH_INSTANCES_FIELDS
+        self._scale_factor = scale_factor
+        self._batch = batch
+        self.detector = EgoblurDetector(
+            model_path=jit_path, device=device, detection_class=ClassID.FACE,
+            score_threshold=score_threshold, nms_iou_threshold=nms_iou,
+            resize_aug={"min_size_test": resize, "max_size_test": resize},
+            image_format="BGR", use_gpu_resize=(device == "cuda"),
+        )
+        self.batch_size = batch
+        self.detections_total = 0
+
+    def blur_batch(self, bgr_frames):
+        """bgr_frames: list of HxWx3 uint8 BGR。 検出+ぼかし後の RGB list を返す (同順)。"""
+        import cv2
+        import numpy as np
+        import torch
+        if not bgr_frames:
+            return []
+        tensors = [torch.from_numpy(np.transpose(f, (2, 0, 1))) for f in bgr_frames]
+        batched = torch.stack(tensors)
+        with self._patch_instances(fields=self._patch_fields):
+            boxes_per_frame = self.detector.run(batched)  # score_threshold で絞り込み済
+        outs = []
+        for bgr, boxes in zip(bgr_frames, boxes_per_frame):
+            self.detections_total += len(boxes)
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            outs.append(_apply_elliptical_blur(rgb, boxes, self._scale_factor))
+        return outs
+
+
+class MediapipeBackend:
+    """CPU 動作の fallback。 EgoBlur が使えないときだけ。 batch 非対応 (1 枚ずつ)。"""
+
+    NAME = "mediapipe"
+
+    def __init__(self, min_confidence: float):
+        from stera.models import FaceBlurrer
+        self._blurrer = FaceBlurrer(model="mediapipe", min_detection_confidence=min_confidence)
+        self.batch_size = 1
+        self.detections_total = 0  # mediapipe は「検出があったフレーム数」近似 (blur が新配列を返したか)
+
+    def blur_batch(self, bgr_frames):
+        import cv2
+        outs = []
+        for bgr in bgr_frames:
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            out_rgb = self._blurrer.blur(rgb)
+            if out_rgb is not rgb:
+                self.detections_total += 1
+            outs.append(out_rgb)
+        return outs
+
+
+def _make_face_backend(face_detector: str):
+    """face_detector 名 → backend インスタンス。 build_mcap 内で 1 回だけ呼ぶ。"""
+    if face_detector == "egoblur":
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        return EgoBlurBackend(
+            jit_path=EGOBLUR_JIT_PATH, code_dir=EGOBLUR_CODE_DIR, device=device,
+            score_threshold=EGOBLUR_SCORE_THRESHOLD, nms_iou=EGOBLUR_NMS_IOU,
+            resize=EGOBLUR_RESIZE, batch=EGOBLUR_BATCH,
+            scale_factor=EGOBLUR_SCALE_FACTOR,
+        )
+    if face_detector == "mediapipe":
+        return MediapipeBackend(min_confidence=FACE_BLUR_MIN_CONFIDENCE)
+    raise ValueError(f"unknown face_detector: {face_detector}")
+
+
 # ─── MCAP 組み立て本体 (= ストリーミング。 フレームをメモリに溜めない) ──
 
 
 def build_mcap(session_dir: str, out_path: str, blur: bool = True,
-               blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
+               face_detector: str = "egoblur", jpeg_quality: int = 85) -> dict:
     """raw セッションを Stera 互換 MCAP に組み立てる。
 
-    blur=True (既定) のとき、 RGB 各フレームに顔ぼかしを適用する。 検出閾値は
-    FACE_BLUR_MIN_CONFIDENCE (= 誤爆を抑えるため SDK 既定より厳しく)。 blur=False で完全に無効化。
+    blur=True (既定) のとき、 RGB 各フレームに顔ぼかしを適用する。 face_detector で検出器を選ぶ
+    ("egoblur" = 既定、 GPU、 Stera-10M と同じ / "mediapipe" = CPU fallback)。
+    blur=False で完全に無効化。
     """
     import cv2
     import numpy as np
@@ -343,13 +502,8 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
     if not frames_meta:
         raise RuntimeError("realtime_handpose.jsonl is empty")
 
-    # 顔ぼかし (= blur=True のときだけ初期化)。 検出閾値を厳格化して誤検出を抑える。
-    face_blurrer = None
-    if blur:
-        from stera.models import FaceBlurrer
-        face_blurrer = FaceBlurrer(model=blur_model,
-                                   min_detection_confidence=FACE_BLUR_MIN_CONFIDENCE)
-    blurred_faces_total = 0
+    # 顔ぼかし (= blur=True のときだけ初期化)。 既定は EgoBlur (GPU、 Stera-10M と同じ)。
+    face_backend = _make_face_backend(face_detector) if blur else None
 
     stats = {"rgb": 0, "depth": 0, "pose": 0, "imu": 0, "tracking": 0, "point_cloud": 0, "mesh_anchors": 0}
 
@@ -366,11 +520,20 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         first_ts = int(frames_meta[0]["timestamp_ns"])
 
         # ── 処理来歴 (= どの設定で作った MCAP か) ──
+        blur_meta = {"detector": None, "threshold": None, "resize": None}
+        if blur:
+            blur_meta["detector"] = face_detector
+            if face_detector == "egoblur":
+                blur_meta["threshold"] = EGOBLUR_SCORE_THRESHOLD
+                blur_meta["resize"] = EGOBLUR_RESIZE
+            elif face_detector == "mediapipe":
+                blur_meta["threshold"] = FACE_BLUR_MIN_CONFIDENCE
         write("/rootlens/processing_info", "std_msgs/String", {"data": json.dumps({
             "pipeline_version": PIPELINE_VERSION,
             "blur": blur,
-            "blur_model": blur_model if blur else None,
-            "blur_min_confidence": FACE_BLUR_MIN_CONFIDENCE if blur else None,
+            "blur_detector": blur_meta["detector"],
+            "blur_threshold": blur_meta["threshold"],
+            "blur_resize": blur_meta["resize"],
             "jpeg_quality": jpeg_quality,
             "source": "rootlens raw session",
             "device_model": meta.get("device_model"),
@@ -461,38 +624,54 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
                     }, ts)
                     stats["imu"] += 1
 
-        # ── /camera/rgb/compressed (= デコード → (任意) ぼかし → JPEG。 1 フレームずつ) ──
-        cap = cv2.VideoCapture(os.path.join(session_dir, "rgb.mp4"))
-        try:
-            i = 0
-            while True:
-                ok, bgr = cap.read()
-                if not ok:
-                    break
-                # フレーム時刻: jsonl の同 index 行から。 動画の方が長い場合は fps で外挿。
-                if i < len(frames_meta):
-                    ts = int(frames_meta[i]["timestamp_ns"])
-                else:
-                    fps = float(cam.get("fps", 30.0)) or 30.0
-                    ts = int(frames_meta[-1]["timestamp_ns"]) + int((i - len(frames_meta) + 1) * 1e9 / fps)
-                rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-                if face_blurrer is not None:
-                    out_rgb = face_blurrer.blur(rgb)
-                    if out_rgb is not rgb:
-                        blurred_faces_total += 1  # 近似 (= 検出があったフレーム数ではなく blur 呼出成功数)
-                else:
-                    out_rgb = rgb
+        # ── /camera/rgb/compressed (= デコード → (任意) ぼかし → JPEG) ──
+        # ぼかしを GPU で回すため、 face_backend.batch_size フレームずつ束ねて blur_batch する。
+        # backend=None (ぼかしオフ) や mediapipe (batch_size=1) では実質 1 フレームずつと同じ。
+        batch_size = face_backend.batch_size if face_backend is not None else 1
+
+        def _timestamp_for(idx: int) -> int:
+            if idx < len(frames_meta):
+                return int(frames_meta[idx]["timestamp_ns"])
+            fps_local = float(cam.get("fps", 30.0)) or 30.0
+            return int(frames_meta[-1]["timestamp_ns"]) + int((idx - len(frames_meta) + 1) * 1e9 / fps_local)
+
+        def _flush_batch(bgr_batch, i_batch):
+            # ぼかしを掛けて (or そのまま RGB 化して) JPEG 化 → MCAP 書き込み
+            if face_backend is not None:
+                rgb_batch = face_backend.blur_batch(bgr_batch)
+            else:
+                rgb_batch = [cv2.cvtColor(b, cv2.COLOR_BGR2RGB) for b in bgr_batch]
+            for idx, out_rgb in zip(i_batch, rgb_batch):
                 ok_enc, jpg = cv2.imencode(".jpg", cv2.cvtColor(out_rgb, cv2.COLOR_RGB2BGR),
                                            [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
                 if not ok_enc:
-                    raise RuntimeError(f"jpeg encode failed at frame {i}")
+                    raise RuntimeError(f"jpeg encode failed at frame {idx}")
+                ts = _timestamp_for(idx)
                 write("/camera/rgb/compressed", "sensor_msgs/CompressedImage", {
                     "header": {"stamp": _stamp(ts), "frame_id": "camera_optical_frame"},
                     "format": "jpeg",
                     "data": jpg.tobytes(),
                 }, ts)
                 stats["rgb"] += 1
+
+        cap = cv2.VideoCapture(os.path.join(session_dir, "rgb.mp4"))
+        try:
+            bgr_batch: list = []
+            i_batch: list = []
+            i = 0
+            while True:
+                ok, bgr = cap.read()
+                if not ok:
+                    break
+                bgr_batch.append(bgr)
+                i_batch.append(i)
                 i += 1
+                if len(bgr_batch) >= batch_size:
+                    _flush_batch(bgr_batch, i_batch)
+                    bgr_batch = []
+                    i_batch = []
+            if bgr_batch:
+                _flush_batch(bgr_batch, i_batch)
         finally:
             cap.release()
 
@@ -586,10 +765,12 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
 
         writer.finish()
 
+    detections_total = face_backend.detections_total if face_backend is not None else 0
     return {
         "stats": stats,
         "blur": blur,
-        "blurredFaces": blurred_faces_total,
+        "faceDetector": face_detector if blur else None,
+        "detectionsTotal": detections_total,
         "durationMs": int((time.time() - t0) * 1000),
         "outputBytes": os.path.getsize(out_path),
         "jsonlFrames": len(frames_meta),
@@ -615,13 +796,16 @@ def _r2_client():
 
 
 def process_session(signature_hash: str, blur: bool = True,
-                    blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
-    """raw/<hash>/ を取得 → build_mcap → rootlens-fpvlabs/<hash>/session.mcap に上書き。
+                    face_detector: str = "egoblur", jpeg_quality: int = 85,
+                    target_bucket: str | None = None) -> dict:
+    """raw/<hash>/ を取得 → build_mcap → <target_bucket>/<hash>/session.mcap に上書き。
 
-    blur=False で顔ぼかしを無効化 (= raw の生映像そのまま)。"""
+    blur=False で顔ぼかしを無効化 (= raw の生映像そのまま)。
+    target_bucket が None のときは環境変数 R2_BUCKET_FPVLABS (既定 rootlens-fpvlabs = 本番) を使う。
+    検証時は本番以外の書ける R2 バケットを指定すること。"""
     s3 = _r2_client()
     bucket_raw = os.environ.get("R2_BUCKET_RAW_ARKIT", "rootlens-raw-arkit")
-    bucket_out = os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
+    bucket_out = target_bucket or os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
 
     with tempfile.TemporaryDirectory() as tmp:
         session_dir = os.path.join(tmp, "session")
@@ -638,7 +822,7 @@ def process_session(signature_hash: str, blur: bool = True,
 
         out_path = os.path.join(tmp, "session.mcap")
         result = build_mcap(session_dir, out_path, blur=blur,
-                            blur_model=blur_model, jpeg_quality=jpeg_quality)
+                            face_detector=face_detector, jpeg_quality=jpeg_quality)
 
         out_key = f"{signature_hash}/session.mcap"
         s3.upload_file(out_path, bucket_out, out_key, ExtraArgs={"ContentType": "application/octet-stream"})
@@ -651,33 +835,69 @@ def process_session(signature_hash: str, blur: bool = True,
 try:
     import modal
 
+    # EgoBlur repo を build 時に clone (gen2/script/... と detectron2 vendored 版が入る)。
+    # commit を pin して再現性を確保。 jit モデル (400MB) は build に混ぜず、
+    # 別途 modal volume `rootlens-egoblur` にユーザが 1 回 put する (docstring 参照)。
+    EGOBLUR_COMMIT = "main"  # 実運用が固まったら固定ハッシュに差し替え
+
     image = (
         modal.Image.debian_slim(python_version="3.11")
-        .apt_install("libgl1", "libglib2.0-0", "libegl1", "libgles2")  # mediapipe が GLES を要求
+        .apt_install(
+            "libgl1", "libglib2.0-0",           # opencv / mediapipe が要求
+            "libegl1", "libgles2",
+            "git",                               # EgoBlur clone 用
+        )
         .pip_install(
-            "numpy", "opencv-python-headless", "boto3",
-            "mcap", "mcap-ros2-support", "stera-sdk==0.0.4", "mediapipe",
+            # 共通
+            "numpy<2", "opencv-python-headless", "boto3",
+            "mcap", "mcap-ros2-support", "stera-sdk==0.0.4",
+            # mediapipe backend (fallback)
+            "mediapipe",
+            # egoblur backend (Meta gen2)。 torch は CUDA 版 (Modal image が cuda 対応)。
+            "torch", "torchvision", "tqdm",
+            "moviepy<2.0",  # egoblur package の import 時に必要
+        )
+        .run_commands(
+            f"git clone --depth 1 https://github.com/facebookresearch/EgoBlur {EGOBLUR_CODE_DIR}",
         )
     )
+
+    # EgoBlur jit を置く persistent volume。 事前に:
+    #   modal volume create rootlens-egoblur
+    #   modal volume put rootlens-egoblur references/egoblur/ego_blur_face_gen2.jit /
+    egoblur_volume = modal.Volume.from_name("rootlens-egoblur", create_if_missing=True)
+
     app = modal.App("rootlens-fpvlabs")
 
     @app.function(
         image=image,
-        timeout=3600,
-        memory=8192,
+        gpu="L4",                                # egoblur 推論用。 L4 は A10G より 25% 安く、
+                                                 # FasterRCNN gen2 の処理には十分 (2026-07-09 選定)。
+        timeout=7200,                            # 60 分クリップまで余裕を持たせる
+        memory=16384,
         cpu=4.0,
+        volumes={"/egoblur_model": egoblur_volume},
         secrets=[modal.Secret.from_name("r2-creds")],
     )
     def fpvlabs_process(signature_hash: str, blur: bool = True,
-                        blur_model: str = "mediapipe", jpeg_quality: int = 85) -> dict:
+                        face_detector: str = "egoblur", jpeg_quality: int = 85,
+                        target_bucket: str = "") -> dict:
         return process_session(signature_hash, blur=blur,
-                               blur_model=blur_model, jpeg_quality=jpeg_quality)
+                               face_detector=face_detector, jpeg_quality=jpeg_quality,
+                               target_bucket=target_bucket or None)
 
     @app.local_entrypoint()
     def main(signature_hash: str, blur: bool = True,
-             blur_model: str = "mediapipe", jpeg_quality: int = 85):
-        # ぼかし切替: --blur (既定) / --no-blur。 検出閾値は FACE_BLUR_MIN_CONFIDENCE。
-        print(json.dumps(fpvlabs_process.remote(signature_hash, blur, blur_model, jpeg_quality), indent=2))
+             face_detector: str = "egoblur", jpeg_quality: int = 85,
+             target_bucket: str = ""):
+        # ぼかし切替:   --blur (既定) / --no-blur
+        # 検出器切替:   --face-detector egoblur (既定、 Stera-10M と同じ) / mediapipe (CPU fallback)
+        # 出力先切替:   --target-bucket <bucket>  (空 = 既定 rootlens-fpvlabs = 本番)
+        #              検証やチューニングは自分専用の別バケットを指定して本番に触れないようにする。
+        print(json.dumps(
+            fpvlabs_process.remote(signature_hash, blur, face_detector, jpeg_quality, target_bucket),
+            indent=2,
+        ))
 
 except ImportError:
     modal = None  # ローカル実行 (= python fpvlabs.py <hash>) では modal 不要
