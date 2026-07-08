@@ -38,6 +38,13 @@ v0.1.4 (簡素化スプリント)
                                     実機スクショの自己反復でデザイン検証
   11. upload-consent            🔄 新 アップロード同意の 2 段化 (層1要約 + 3チェック + 全文導線 →
                                     consent_events に証跡記録 → 動画確認 + アップロード)
+  12. cleanup-c2pa-tp-solana    🔄 新 C2PA/TP/Solana 残骸の全撤去 + Modal パイプライン再編。
+                                    ・C2PA 署名インフラ (task 09) を撤回
+                                    ・programs/ crates/ tests/ Anchor.toml network.json 削除
+                                    ・web/lib/verify/ + 検証 LP ページ削除
+                                    ・signature_hash → content_hash rename
+                                    ・tools/modal/ 直下を score-wilor/ + fpvlabs/ に再編
+                                    詳細と AUDIT.md は 12-cleanup-c2pa-tp-solana-remnants/
 ```
 
 凡例: ✅ = 完了、 🔄 = 進行中 / 未着手、 新 = 新規追加。
@@ -48,6 +55,9 @@ v0.1.4 (簡素化スプリント)
 ## 順序
 
 01 (DB) → 02 (web API) → 03 (app dataflow) → 04 (app UI) → 05 (workflow/modal cleanup) → 07 (全貌確定) → 06 (E2E)。
+
+08〜11 は 07 の後、 それぞれ独立。 **12 は最後** (= 08 + 09 で残った塵と v0.1.5 予定廃棄後の crates/programs
+の一掃、 別セッションで小分け PR 10 本)。
 
 DB → web → app → cleanup → 検証 の素直な依存順。 02 と 03 は contract が一致していれば並行可。
 
