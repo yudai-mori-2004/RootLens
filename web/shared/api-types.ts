@@ -31,12 +31,12 @@ export interface ClipDto {
 // ─── API リクエスト / レスポンス ─────────────────────────────────────
 
 /// POST /api/clips
-/// 端末で C2PA D1 署名 + R2 アップロードを終えてから呼ぶ。
+/// 端末で content_hash 計算 + R2 アップロードを終えてから呼ぶ。
 /// 重複排除キーは (account, contentHash)、 既存行があれば idempotent に返す。
 export interface CreateClipRequest {
-  /// 端末で確定した content_hash (= C2PA D1 アクティブマニフェスト署名の SHA-256 hex)
+  /// 端末で計算した content_hash (= raw mp4 バイト列の SHA-256 hex)
   contentHash: string;
-  /// rgb.mp4 (= D1 署名済、 blur 無し) のサイズ (bytes)
+  /// rgb.mp4 (= raw、 blur 無し) のサイズ (bytes)
   contentSize: number;
   /// 採用された撮影構成 (= 'ultra_wide' | 'arkit')
   recordingConfig: RecordingConfig;
@@ -74,7 +74,7 @@ export interface CreateClipResponse {
 }
 
 /// GET /api/clips
-/// 撮影者の全クリップを返す。 wallet pubkey は X-Wallet-Pubkey header で渡す。
+/// 撮影者の全クリップを返す。 account pubkey は X-Account-Pubkey header で渡す。
 export interface ListClipsResponse {
   clips: ClipDto[];
 }

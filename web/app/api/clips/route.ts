@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 }
 
 // POST /api/clips
-// v0.1.4: 端末で C2PA D1 署名 + R2 raw アップロードを終えてから呼ぶ「ただの登録」 endpoint。
+// v0.1.4: 端末で content_hash 計算 + R2 raw アップロードを終えてから呼ぶ「ただの登録」 endpoint。
 // 重複排除キーは (account, contentHash)。 既存行があれば idempotent に返す。
 const createSchema = z.object({
   contentHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),

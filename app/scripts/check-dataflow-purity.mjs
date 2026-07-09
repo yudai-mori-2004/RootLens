@@ -3,7 +3,7 @@
 //
 // app/src/dataflow/** は「React を知らないデータ層」でなければならない。
 // react / react-native / zustand(bare の React binding) を import したら fail する。
-// 許可: zustand/vanilla (= React 非依存)、 expo-*、 @solana/web3.js、 相対 import、
+// 許可: zustand/vanilla (= React 非依存)、 expo-*、 相対 import、
 //       native bridge (= それ自身は react-native を使うが、 dataflow からは関数 export のみ参照)。
 //
 // このプロジェクトは ESLint 未導入のため、 単一目的の軽量ガードとして実装している。

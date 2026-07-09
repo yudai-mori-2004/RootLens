@@ -131,7 +131,7 @@ export async function captureArkitSnapshot(): Promise<string> {
 }
 
 /** MP4 を faststart 化 (= moov を先頭へ、 再エンコード無し) して outputUri に書き出し、 その file:// URI を返す。
- *  ⚠ C2PA 署名の「前」 に通すこと (= C2PA は box 順を保つので、 署名済み mp4 も faststart になる)。 */
+ *  */
 export async function faststartMp4(inputUri: string, outputUri: string): Promise<string> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
   return nativeModule.faststartMp4(inputUri, outputUri);

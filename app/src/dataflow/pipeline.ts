@@ -1,6 +1,6 @@
 // Pipeline 1 の段レジューム型ランナー (= 「送る」 と 「もう一度試す」 を統一する単一の前進関数)。
 //
-// v0.1.4 (task 12 適用後): C2PA 署名を廃止し、 段は以下の 3 つ:
+// v0.1.4 (task 12 適用後): 段は以下の 3 つ:
 //
 //   pending    → 生 MP4 の SHA-256 計算  → 'hashed'   (= content_hash 誕生、 local id → hash に re-key)
 //   hashed     → upload + POST /api/clips → 'registered' (= state='uploaded')
@@ -60,9 +60,9 @@ function uploadFractionToProgress(f: number): number {
 }
 
 /**
- * 撮影完了時にクリップを起こす (= state 'recorded' + stage 'unsigned' で local id 採番)。
+ * 撮影完了時にクリップを起こす (= state 'recorded' + stage 'pending' で local id 採番)。
  * v0.1.4: ここでは自動アップロードしない。 ユーザーが一覧 (マイビデオ) でプレビューを確認し
- * 「アップロード」 を押した時に advanceClip が 署名 → R2 → 登録 を進める。
+ * 「アップロード」 を押した時に advanceClip が hash → R2 → 登録 を進める。
  */
 export async function enqueueRecording(input: {
   config: RecordingConfig;

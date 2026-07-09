@@ -52,7 +52,7 @@ export function rawSessionFileKey(contentHash: string, filename: RawSessionFilen
   return `${rawSessionPrefix(contentHash)}${filename}`;
 }
 
-/// C2PA D1 署名済 MP4 の R2 キー。
-export function signedMp4Key(contentHash: string): string {
+/// raw MP4 の R2 キー。
+export function rawMp4Key(contentHash: string): string {
   return rawSessionFileKey(contentHash, "rgb.mp4");
 }

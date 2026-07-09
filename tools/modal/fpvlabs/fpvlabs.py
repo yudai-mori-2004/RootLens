@@ -1,7 +1,7 @@
 # pipeline-fpvlabs: raw セッション → (任意) 顔ぼかし → Stera 互換 raw MCAP (DATA_SPECS 外の受け渡し工程)。
 #
 # FPV Labs (https://fpvlabs.ai/stera) へのデータ受け渡し用。 rootlens-raw-arkit の
-# raw/<signature_hash>/ を読み、 任意で顔ぼかしを適用した上で (= --blur/--no-blur、 既定オン)
+# raw/<content_hash>/ を読み、 任意で顔ぼかしを適用した上で (= --blur/--no-blur、 既定オン)
 # stera-sdk の MCAPReader がそのまま読める ROS2 スキーマの MCAP を組み立て、
 # rootlens-fpvlabs バケットへ書く。 撮影者は写っている人全員の許可を取得済み (= ぼかしは追加保護)。
 #
@@ -24,7 +24,7 @@
 #   /trajectory              nav_msgs/Path
 #   /rootlens/processing_info std_msgs/String (JSON: ぼかし有無・モデル・検出閾値・pipeline version)
 #
-# 冪等性: 出力キーは signature_hash から決定論的。 ローカル一時ファイルに全て書いてから
+# 冪等性: 出力キーは content_hash から決定論的。 ローカル一時ファイルに全て書いてから
 # 1 回の put_object / multipart で上書きする (= 半端な状態がバケットに残らない)。
 # 設定を変えて再実行すれば同キーが新しい内容で置き換わり、 processing_info で判別できる。
 #
@@ -36,9 +36,9 @@
 #      https://github.com/facebookresearch/EgoBlur を clone するので、 gen2 ソースは自動で入る。
 #
 # 実行:
-#   ローカル:  python tools/modal/fpvlabs.py <signature_hash>   (R2 creds は env で、 ぼかしオン)
-#   Modal:    modal run tools/modal/fpvlabs.py --signature-hash <hash>            (ぼかしオン)
-#             modal run tools/modal/fpvlabs.py --signature-hash <hash> --no-blur  (ぼかしオフ)
+#   ローカル:  python tools/modal/fpvlabs.py <content_hash>   (R2 creds は env で、 ぼかしオン)
+#   Modal:    modal run tools/modal/fpvlabs.py --content-hash <hash>            (ぼかしオン)
+#             modal run tools/modal/fpvlabs.py --content-hash <hash> --no-blur  (ぼかしオフ)
 #   deploy:   modal deploy tools/modal/fpvlabs.py
 
 from __future__ import annotations
@@ -795,7 +795,7 @@ def _r2_client():
     )
 
 
-def process_session(signature_hash: str, blur: bool = True,
+def process_session(content_hash: str, blur: bool = True,
                     face_detector: str = "egoblur", jpeg_quality: int = 85,
                     target_bucket: str | None = None) -> dict:
     """raw/<hash>/ を取得 → build_mcap → <target_bucket>/<hash>/session.mcap に上書き。
@@ -811,7 +811,7 @@ def process_session(signature_hash: str, blur: bool = True,
         session_dir = os.path.join(tmp, "session")
         os.makedirs(session_dir)
         for name in SESSION_FILES:
-            key = f"raw/{signature_hash}/{name}"
+            key = f"raw/{content_hash}/{name}"
             dest = os.path.join(session_dir, name)
             try:
                 s3.download_file(bucket_raw, key, dest)
@@ -824,7 +824,7 @@ def process_session(signature_hash: str, blur: bool = True,
         result = build_mcap(session_dir, out_path, blur=blur,
                             face_detector=face_detector, jpeg_quality=jpeg_quality)
 
-        out_key = f"{signature_hash}/session.mcap"
+        out_key = f"{content_hash}/session.mcap"
         s3.upload_file(out_path, bucket_out, out_key, ExtraArgs={"ContentType": "application/octet-stream"})
         result["outputKey"] = f"{bucket_out}/{out_key}"
         return result
@@ -879,15 +879,15 @@ try:
         volumes={"/egoblur_model": egoblur_volume},
         secrets=[modal.Secret.from_name("r2-creds")],
     )
-    def fpvlabs_process(signature_hash: str, blur: bool = True,
+    def fpvlabs_process(content_hash: str, blur: bool = True,
                         face_detector: str = "egoblur", jpeg_quality: int = 85,
                         target_bucket: str = "") -> dict:
-        return process_session(signature_hash, blur=blur,
+        return process_session(content_hash, blur=blur,
                                face_detector=face_detector, jpeg_quality=jpeg_quality,
                                target_bucket=target_bucket or None)
 
     @app.local_entrypoint()
-    def main(signature_hash: str, blur: bool = True,
+    def main(content_hash: str, blur: bool = True,
              face_detector: str = "egoblur", jpeg_quality: int = 85,
              target_bucket: str = ""):
         # ぼかし切替:   --blur (既定) / --no-blur
@@ -895,7 +895,7 @@ try:
         # 出力先切替:   --target-bucket <bucket>  (空 = 既定 rootlens-fpvlabs = 本番)
         #              検証やチューニングは自分専用の別バケットを指定して本番に触れないようにする。
         print(json.dumps(
-            fpvlabs_process.remote(signature_hash, blur, face_detector, jpeg_quality, target_bucket),
+            fpvlabs_process.remote(content_hash, blur, face_detector, jpeg_quality, target_bucket),
             indent=2,
         ))
 

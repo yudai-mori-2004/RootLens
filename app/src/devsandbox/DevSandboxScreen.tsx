@@ -205,7 +205,7 @@ export const DevSandboxScreen: React.FC = () => {
     });
   }, [config, runAction]);
 
-  // 録画停止 → クリップを起こす (= stage 'unsigned'、 local id で進行表示対象に)。
+  // 録画停止 → クリップを起こす (= stage 'pending'、 local id で進行表示対象に)。
   // 署名は「Pipeline 実行」 (= advanceClip) の段で行われる (= 失敗段から再開できる)。
   const onStopRecording = useCallback(() => {
     runAction('録画停止', async () => {
@@ -217,8 +217,8 @@ export const DevSandboxScreen: React.FC = () => {
     });
   }, [config, runAction]);
 
-  // Pipeline 実行 = 段レジュームランナー (advanceClip)。 未署名 → 撮影署名 → ぼかし署名
-  // (signature_hash 誕生) → upload/TP/mint/登録 → Pipeline 2 polling までを一気に駆動する。
+  // Pipeline 実行 = 段レジュームランナー (advanceClip)。 pending → hash (content_hash 誕生)
+  // → R2 upload → POST /api/clips まで一気に駆動する。
   // 失敗した段は clip.state='error' に反映され、 もう一度押すとその段から再開する。
   const onRunPipeline1 = useCallback(() => {
     runAction('Pipeline 実行 (段レジューム)', async () => {
@@ -311,7 +311,7 @@ export const DevSandboxScreen: React.FC = () => {
       {/* クリップ状態バー */}
       <View style={styles.statusBar}>
         <StatusRow label="clipId" value={clip?.id} />
-        <StatusRow label="signature_hash" value={clip?.contentHash} mono />
+        <StatusRow label="content_hash" value={clip?.contentHash} mono />
         <StatusRow label="stage" value={clip?.stage} />
         <StatusRow
           label="state"

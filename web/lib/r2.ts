@@ -1,7 +1,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
-  signedMp4Key,
+  rawMp4Key,
   rawSessionFileKey,
   RAW_SESSION_MANIFEST,
   type RecordingConfigId,
@@ -43,7 +43,7 @@ export function rawBucketFor(config: RecordingConfigId): string {
 }
 
 // key / prefix 命名関数は lib/r2-keys.ts に分離。 互換性のためここから再エクスポート。
-export { signedMp4Key };
+export { rawMp4Key };
 
 // ─── presigned URLs ────────────────────────────────────────────────────
 

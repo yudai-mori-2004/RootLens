@@ -1,7 +1,7 @@
 """未処理クリップを一覧する。
 
 rootlens-raw-arkit に上がっているが、 まだ rootlens-fpvlabs に session.mcap が無い
-signature_hash を表示する (= これから modal で処理すべきもの)。
+content_hash を表示する (= これから modal で処理すべきもの)。
 
   python tools/fpvlabs-handoff/list_pending.py
 
@@ -43,7 +43,7 @@ OUT = "rootlens-fpvlabs"
 
 
 def hashes_in(bucket, prefix=""):
-    """bucket 直下 (prefix 配下) の第1階層フォルダ名 = signature_hash 集合。"""
+    """bucket 直下 (prefix 配下) の第1階層フォルダ名 = content_hash 集合。"""
     got, sizes = {}, {}
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
@@ -92,7 +92,7 @@ if real:
     print("\n処理コマンド:")
     for h in sorted(real, key=lambda x: raw[x]):
         note = "" if depth_ok[h] else "   # ⚠ depth なし"
-        print(f"  modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash {h}{note}")
+        print(f"  modal run tools/modal/fpvlabs/fpvlabs.py --content-hash {h}{note}")
 else:
     print("本命候補なし (= 未処理の大物なし)")
 

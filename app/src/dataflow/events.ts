@@ -18,7 +18,7 @@ export interface DataflowEvent {
   step: string;
   level: EventLevel;
   message: string;
-  /** 任意の構造化詳細 (= signatureHash / rootAssetId / バイト数など) */
+  /** 任意の構造化詳細 (= contentHash / バイト数など) */
   detail?: unknown;
 }
 

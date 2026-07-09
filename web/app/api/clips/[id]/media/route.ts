@@ -9,7 +9,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
 import { requireAccountPubkey } from "@/lib/auth";
-import { presignRawGet, rawBucketFor, signedMp4Key } from "@/lib/r2";
+import { presignRawGet, rawBucketFor, rawMp4Key } from "@/lib/r2";
 import type { RecordingConfigId } from "@/lib/r2-keys";
 
 export async function GET(
@@ -36,7 +36,7 @@ export async function GET(
 
   const expiresInSec = 3600;
   const url = await presignRawGet(
-    signedMp4Key(clip.contentHash),
+    rawMp4Key(clip.contentHash),
     rawBucketFor((clip.recordingConfig ?? "ultra_wide") as RecordingConfigId),
     expiresInSec,
   );

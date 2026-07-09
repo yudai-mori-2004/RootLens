@@ -9,7 +9,7 @@
 
 export type ClipState =
   | 'recorded'    // 撮影完了、 端末ローカルに保存済み (= まだアップロードしていない。 一覧に並ぶ)
-  | 'uploading'   // ユーザーがアップロードを押した → 署名 → R2 PUT → POST /api/clips 進行中
+  | 'uploading'   // ユーザーがアップロードを押した → hash → R2 PUT → POST /api/clips 進行中
   | 'uploaded'    // R2 アップ + サーバ登録 完了 (= 一覧から消える)
   | 'error';      // 段のどこかで失敗 (= 一覧に残り「もう一度試す」可能)
 
@@ -27,7 +27,7 @@ export type Pipeline1Stage = 'pending' | 'hashed' | 'registered';
 // ─── クリップ ─────────────────────────────────────────────────────────
 
 export interface Clip {
-  /** 内部 ID。 撮影時に local id で生まれ、 sign 完了で signature_hash に re-key する。 */
+  /** 内部 ID。 撮影時に local id で生まれ、 hash 完了で content_hash に re-key する。 */
   id: string;
   state: ClipState;
   /** 端末で撮影完了した時刻 (ms epoch) */
@@ -62,7 +62,7 @@ export interface Clip {
 // ─── step 入出力 ────────────────────────────────────────────────────────
 // 各 step は (input, sink) → Promise<output> の純粋関数。
 
-/** hash step: 生 MP4 → SHA-256 (= content_hash)。 C2PA 署名は v0.1.4 で廃止。 */
+/** hash step: 生 MP4 → SHA-256 (= content_hash)。 */
 export interface HashInput {
   /** 撮影 native が出力した生 MP4 (file:// URI) */
   rawMp4Uri: string;

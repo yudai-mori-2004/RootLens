@@ -37,7 +37,7 @@
 
 2. 各 hash を処理する (顔ぼかしオン、EgoBlur GPU がデフォルト):
    ```
-   modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash <hash>
+   modal run tools/modal/fpvlabs/fpvlabs.py --content-hash <hash>
    ```
    出力 JSON を確認:
    - `blur: true` / `faceDetector: "egoblur"` / `detectionsTotal: N` (検出した顔 bbox の合計数)
@@ -65,7 +65,7 @@
 本番と完全に同一。 テスト用バケットは自分で R2 に作成しておく (例: `rootlens-fpvlabs-scratch`)。
 
 ```
-modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash <hash> --target-bucket rootlens-fpvlabs-scratch
+modal run tools/modal/fpvlabs/fpvlabs.py --content-hash <hash> --target-bucket rootlens-fpvlabs-scratch
 ```
 
 結果を rclone や boto3 で落として目視 → 良ければ `--target-bucket` を外して本番に反映。

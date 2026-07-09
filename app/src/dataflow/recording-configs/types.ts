@@ -61,7 +61,7 @@ export interface HandTrackSubscription {
 
 /** 撮影構成が session dir に出力する 1 ファイルの宣言。 */
 export interface OutputFileSpec {
-  /** session dir 内のファイル名 (= R2 raw/<signature_hash>/ 配下にも同名で並ぶ) */
+  /** session dir 内のファイル名 (= R2 raw/<content_hash>/ 配下にも同名で並ぶ) */
   name: string;
   /** アップロード時の Content-Type */
   contentType: string;
@@ -70,7 +70,7 @@ export interface OutputFileSpec {
    * DATA_SPECS §3.2「撮影構成固有のデータがある場合は、 存在すれば使い、 なければスキップする」。
    */
   required: boolean;
-  /** この MP4 が C2PA 署名 + 顔ぼかしの対象本体か (= 撮影構成につき 1 つ) */
+  /** この MP4 が blur / 手渡し MCAP の対象本体か (= 撮影構成につき 1 つ) */
   isPrimaryVideo?: boolean;
 }
 
