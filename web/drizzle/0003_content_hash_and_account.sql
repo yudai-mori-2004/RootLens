@@ -9,24 +9,27 @@
 --
 -- 既存の R2 raw/<signature_hash>/... オブジェクトは orphan として R2 上に残置する
 -- (= 中身が違う値を新 content_hash で再アップロードする流れ、 過去データは参照しない)。
--- app / server コードは本 migration の前に「content_hash + account_pubkey で読み書き」 に
--- 切り替え済み。 手動で `node web/scripts/apply_one_migration.mjs 0003_content_hash_and_account.sql`
--- を流して適用する。
-
-BEGIN;
+-- 適用済み (production Supabase): 2026-07-10。
+--
+-- apply_one_migration.mjs は `--> statement-breakpoint` を境に分割して 1 文ずつ流すので、
+-- 全体を単一 BEGIN/COMMIT で包まず、 各 DDL を個別 statement として置く。
 
 ALTER TABLE "clips" RENAME COLUMN "signature_hash" TO "content_hash";
-ALTER TABLE "clips" RENAME COLUMN "wallet_pubkey"   TO "account_pubkey";
+--> statement-breakpoint
+ALTER TABLE "clips" RENAME COLUMN "wallet_pubkey" TO "account_pubkey";
+--> statement-breakpoint
 ALTER TABLE "clips" DROP COLUMN IF EXISTS "network";
-
+--> statement-breakpoint
 DROP INDEX IF EXISTS "clips_wallet_sig_network_uq";
+--> statement-breakpoint
 DROP INDEX IF EXISTS "clips_wallet_idx";
+--> statement-breakpoint
 DROP INDEX IF EXISTS "clips_signature_hash_idx";
-
-CREATE INDEX        "clips_account_idx"        ON "clips" USING btree ("account_pubkey");
-CREATE INDEX        "clips_content_hash_idx"   ON "clips" USING btree ("content_hash");
+--> statement-breakpoint
+CREATE INDEX "clips_account_idx" ON "clips" USING btree ("account_pubkey");
+--> statement-breakpoint
+CREATE INDEX "clips_content_hash_idx" ON "clips" USING btree ("content_hash");
+--> statement-breakpoint
 CREATE UNIQUE INDEX "clips_account_content_uq" ON "clips" USING btree ("account_pubkey", "content_hash");
-
+--> statement-breakpoint
 DROP TABLE IF EXISTS "tos_consents";
-
-COMMIT;
