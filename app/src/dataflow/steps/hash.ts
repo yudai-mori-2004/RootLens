@@ -3,8 +3,10 @@
 // v0.1.4 で C2PA D1 署名を廃止し、 クリップの識別子は「生 mp4 のバイト内容の SHA-256」 に置換。
 // 端末で計算し、 その 64 文字 hex を R2 キー / DB PK として使う。
 //
-// 4GB 級の mp4 でも OOM しないよう、 8MB ずつ base64 chunk read → noble/hashes で incremental update
-// してから最後に digest する。 iOS の phys_footprint はこれで平坦。
+// 計算は 2 経路:
+//   1. ネイティブ (ContentHashModule = CryptoKit)。 順次読みで数 GB でも数秒。 これが本線。
+//   2. JS フォールバック (モジュール未搭載ビルド用): 8MB ずつ base64 chunk read →
+//      noble/hashes で incremental update。 OOM しないが Hermes では 1GB あたり数分かかる。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 
@@ -14,6 +16,9 @@ import { bytesToHex } from '@noble/hashes/utils';
 
 import type { EventSink } from '../events';
 import type { HashInput, HashResult } from '../types';
+import { nativeSha256File } from '../../native/contentHash';
+
+const HEX64 = /^[0-9a-f]{64}$/;
 
 const CHUNK_BYTES = 8 * 1024 * 1024; // 8 MB。 iOS / Android どちらも余裕。
 
@@ -23,6 +28,7 @@ const CHUNK_BYTES = 8 * 1024 * 1024; // 8 MB。 iOS / Android どちらも余裕
 export async function computeContentHash(
   rawMp4Uri: string,
   sink: EventSink,
+  onProgress?: (fraction: number) => void,
 ): Promise<HashResult> {
   const info = await FileSystem.getInfoAsync(rawMp4Uri, { size: true });
   if (!info.exists) throw new Error(`raw mp4 missing: ${rawMp4Uri}`);
@@ -31,6 +37,28 @@ export async function computeContentHash(
 
   sink({ step: 'content-hash', level: 'info', message: `SHA-256 計算開始 (${(size / 1e6).toFixed(1)} MB)` });
 
+  // ── 本線: ネイティブ計算 (順次読み + CryptoKit) ─────────────────────
+  try {
+    const nativeHex = await nativeSha256File(rawMp4Uri);
+    if (nativeHex != null) {
+      if (!HEX64.test(nativeHex)) throw new Error(`native hash malformed: ${nativeHex.slice(0, 80)}`);
+      onProgress?.(1);
+      sink({
+        step: 'content-hash',
+        level: 'success',
+        message: `content_hash 確定 (native): ${nativeHex}`,
+        detail: { contentHash: nativeHex, contentSize: size },
+      });
+      return { contentHash: nativeHex, contentSize: size };
+    }
+    // null = モジュール未搭載ビルド → JS フォールバックへ
+  } catch (e) {
+    // ネイティブ計算の失敗は握りつぶさず知らせた上で、 JS 実装で続行する (結果は同一のはず)
+    const msg = e instanceof Error ? e.message : String(e);
+    sink({ step: 'content-hash', level: 'info', message: `ネイティブ計算に失敗、 JS 実装へフォールバック: ${msg}` });
+  }
+
+  // ── フォールバック: JS chunked 計算 ─────────────────────────────────
   const hasher = sha256.create();
   let read = 0;
   while (read < size) {
@@ -46,6 +74,7 @@ export async function computeContentHash(
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     hasher.update(bytes);
     read += length;
+    onProgress?.(read / size);
   }
 
   const contentHash = bytesToHex(hasher.digest());

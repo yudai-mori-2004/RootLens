@@ -44,14 +44,18 @@ async function cleanupClipDir(dir: string): Promise<void> {
 }
 
 /** Pipeline 1 の step 名 → uploadProgress (0..1) の段階写像。
- *  r2-upload 区間はここでは固定値にせず (= null)、 実バイト進捗で 0.4→0.97 を滑らかに埋める
- *  (= uploadToR2 の onProgress。 一番長いアップロードが飛び飛びにならないように)。 */
+ *  content-hash 区間 (0→0.35) と r2-upload 区間 (0.4→0.97) はここでは固定値にせず (= null)、
+ *  それぞれの onProgress の実進捗で滑らかに埋める (数 GB のハッシュ計算が数十分無言にならないように)。 */
 function stepProgress(step: string): number | null {
   switch (step) {
-    case 'content-hash':  return 0.35;
     case 'register-clip': return 1.0;
     default:              return null;
   }
+}
+
+/** ハッシュ計算の実バイト進捗 (0..1) を uploadProgress の 0→0.35 区間に写す。 */
+function hashFractionToProgress(f: number): number {
+  return Math.max(0, Math.min(1, f)) * 0.35;
 }
 
 /** アップロードの実バイト進捗 (0..1) を uploadProgress の 0.4→0.97 区間に写す。 */
@@ -208,7 +212,9 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
     // ─── pending → hashed (content_hash 誕生) ─────────────────────────
     if (stage === 'pending') {
       const rawMp4Uri = config.primaryVideoUri(session);
-      const hashed = await computeContentHash(rawMp4Uri, progressSink);
+      const hashed = await computeContentHash(rawMp4Uri, progressSink, (f) => {
+        dataflowStore.getState().patchClip(targetIdRef.id, { uploadProgress: hashFractionToProgress(f) });
+      });
       dataflowStore.getState().renameClipId(clipId, hashed.contentHash);
       clipId = hashed.contentHash;
       targetIdRef.id = clipId;
