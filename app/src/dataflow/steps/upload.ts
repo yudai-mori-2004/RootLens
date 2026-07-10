@@ -38,6 +38,62 @@ async function requestPresignedUrls(
   return (await res.json()) as PresignResponse;
 }
 
+// R2 は大きい単発 PUT で一過性の 500 InternalError を返すことがある (2026-07-11 実測)。
+// 5xx とネットワーク断は自動リトライし、 4xx (= presign 失効・contract 不一致) は即座に諦めて
+// 外側の手動リトライ (= presign 再発行から) に委ねる。 単発 PUT は途中再開できないので、
+// リトライはそのファイルの送り直しになる。
+const MAX_PUT_ATTEMPTS = 4;
+const PUT_RETRY_DELAYS_MS = [2_000, 5_000, 15_000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function putWithRetry(
+  name: string,
+  localUri: string,
+  target: PresignedFile,
+  sink: EventSink,
+  onSentBytes: (sent: number) => void,
+): Promise<void> {
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= MAX_PUT_ATTEMPTS; attempt++) {
+    const task = FileSystem.createUploadTask(
+      target.url,
+      localUri,
+      {
+        httpMethod: 'PUT',
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
+        headers: { 'Content-Type': target.contentType },
+      },
+      (data) => onSentBytes(data.totalBytesSent),
+    );
+    let res: Awaited<ReturnType<typeof task.uploadAsync>>;
+    try {
+      res = await task.uploadAsync();
+    } catch (e) {
+      res = undefined;
+      lastErr = e instanceof Error ? e : new Error(String(e));
+    }
+    if (res && res.status >= 200 && res.status < 300) return;
+    if (res) {
+      lastErr = new Error(`R2 PUT ${name} ${res.status}: ${res.body?.slice(0, 200) ?? ''}`);
+      if (res.status < 500) break; // 4xx はリトライ無意味
+    }
+    if (attempt < MAX_PUT_ATTEMPTS) {
+      const wait = PUT_RETRY_DELAYS_MS[attempt - 1];
+      sink({
+        step: 'r2-upload',
+        level: 'info',
+        message: `${name} の PUT に失敗、 ${Math.round(wait / 1000)} 秒後に送り直し (${attempt}/${MAX_PUT_ATTEMPTS - 1}): ${lastErr?.message ?? '不明なエラー'}`,
+      });
+      await sleep(wait);
+    }
+  }
+  throw lastErr ?? new Error(`R2 PUT ${name} failed`);
+}
+
 /**
  * content_hash の presigned URL を取得し、 files マップ (= 名前 → ローカル URI) を R2 に並列 PUT。
  * presigned に存在しない名前のファイルが渡された場合は fail-loud (= 構成と server contract のズレ検出)。
@@ -85,23 +141,9 @@ export async function uploadToR2(
     const target = presigned.files[name];
     if (!target) throw new Error(`presigned URL missing for ${name} (server contract mismatch?)`);
     const base = sentBytes;
-    const task = FileSystem.createUploadTask(
-      target.url,
-      local,
-      {
-        httpMethod: 'PUT',
-        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
-        headers: { 'Content-Type': target.contentType },
-      },
-      (data) => {
-        if (totalBytes > 0) onProgress?.((base + data.totalBytesSent) / totalBytes);
-      },
-    );
-    const res = await task.uploadAsync();
-    if (!res || res.status < 200 || res.status >= 300) {
-      throw new Error(`R2 PUT ${name} ${res?.status ?? '??'}: ${res?.body?.slice(0, 200) ?? ''}`);
-    }
+    await putWithRetry(name, local, target, sink, (sent) => {
+      if (totalBytes > 0) onProgress?.((base + sent) / totalBytes);
+    });
     sentBytes += sizes[name];
     if (totalBytes > 0) onProgress?.(sentBytes / totalBytes);
     uploadedKeys.push(target.key);
