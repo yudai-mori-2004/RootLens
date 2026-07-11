@@ -1,22 +1,22 @@
 /* ============================================================
-   Shared: NavBar
+   Shared: NavBar (ネオン zine)
    ============================================================ */
 
 .nav {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(250, 250, 246, 0.85);
+  background: rgba(23, 5, 41, 0.82);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(20, 23, 28, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .navInner {
   max-width: 1120px;
   margin: 0 auto;
   padding: 0 32px;
-  height: 56px;
+  height: 58px;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -32,15 +32,21 @@
 .navLogoIcon {
   width: 26px;
   height: 26px;
-  border-radius: 4px;
+  border-radius: 6px;
+  transform: rotate(-6deg);
 }
 
 .navLogoText {
-  font-family: var(--font-lp-heading, serif);
-  font-size: 1.2rem;
-  font-weight: 400;
-  letter-spacing: -0.015em;
-  color: #14233b;
+  font-family: var(--font-lp-body, sans-serif);
+  font-size: 1.06rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  color: #fff;
+}
+
+.navLogoText em {
+  font-style: normal;
+  color: var(--rl-yellow);
 }
 
 .navSpacer {
@@ -49,21 +55,18 @@
 
 .navLink {
   font-family: var(--font-lp-mono, monospace);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #6e7682;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: var(--rl-wt-dim);
   text-decoration: none;
   padding: 6px 12px;
-  border-radius: 4px;
   transition: color 0.15s ease;
 }
 
 .navLink:hover {
-  color: #14233b;
+  color: var(--rl-cyan);
 }
 
 .navLinkActive {
-  color: #14233b;
+  color: var(--rl-cyan);
 }

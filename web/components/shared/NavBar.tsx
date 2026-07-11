@@ -11,7 +11,9 @@ export default function NavBar() {
       <div className={s.navInner}>
         <a href="/" className={s.navLogo}>
           <img src="/logo.png" alt="" className={s.navLogoIcon} />
-          <span className={s.navLogoText}>RootLens</span>
+          <span className={s.navLogoText}>
+            Root<em>Lens</em>
+          </span>
         </a>
         <div className={s.navSpacer} />
       </div>

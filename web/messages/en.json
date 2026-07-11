@@ -72,7 +72,8 @@
       "tagline": "Hands-on footage from real workplaces, made robot-ready.",
       "description": "RootLens is a University of Osaka-born data company. We collect first-person video of people at work and deliver it to teams building physical AI, turning real kitchens and shops into training data robots can learn from.",
       "ctaStores": "For store owners",
-      "ctaSample": "View sample data"
+      "ctaSample": "View sample data",
+      "burst": "JAPAN'S FIRST"
     },
     "problem": {
       "title": "Robots learn by watching people. The footage is the bottleneck.",
@@ -125,6 +126,20 @@
         "app": "RootLens App"
       },
       "license": "Apache 2.0"
+    },
+    "marquee": "Hands-on footage from real workplaces, made robot-ready",
+    "math": {
+      "tag": "THE MATH, PER HOUR",
+      "wageLabel": "Wage the store pays",
+      "wage": "¥1,200",
+      "wageUnit": "",
+      "feeLabel": "Filming fee back",
+      "fee": "¥500",
+      "feeUnit": "",
+      "resultLabel": "Effective cost",
+      "result": "≈¥700",
+      "resultUnit": "/h",
+      "note": "Example at a ¥1,200 hourly wage. The fee is paid per recorded hour. ¥500 is the current base rate; we raise it as data sales grow, aiming for zero effective cost."
     }
   }
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Instrument_Serif, Manrope, JetBrains_Mono } from "next/font/google";
+import { Anton, Noto_Sans_JP, DotGothic16 } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import "./globals.css";
@@ -15,26 +15,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// LP-specific fonts (anti-average-design: no Inter/Roboto/system defaults)
-const instrumentSerif = Instrument_Serif({
+// LP-specific fonts。 フライヤー (progress/promo-video) と同じ空気にする:
+//   Anton       = 欧文ポスター見出し (極太コンデンス)
+//   Noto Sans JP = 本文 (和文はウェイトで殴る)
+//   DotGothic16 = ラベル / メタ表示 (ドット文字 = zine の空気)
+const anton = Anton({
   variable: "--font-lp-heading",
   subsets: ["latin"],
   weight: ["400"],
-  style: ["normal", "italic"],
   display: "swap",
 });
 
-const manrope = Manrope({
+const notoSansJp = Noto_Sans_JP({
   variable: "--font-lp-body",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "700", "900"],
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const dotGothic = DotGothic16({
   variable: "--font-lp-mono",
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: ["400"],
   display: "swap",
 });
 
@@ -55,7 +57,7 @@ export default async function RootLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} ${manrope.variable} ${jetbrainsMono.variable}`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} ${notoSansJp.variable} ${dotGothic.variable}`}>
         <NextIntlClientProvider locale={locale} messages={{}}>
           {children}
         </NextIntlClientProvider>

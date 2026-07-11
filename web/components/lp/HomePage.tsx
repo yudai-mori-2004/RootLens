@@ -8,15 +8,25 @@ export default async function HomePage() {
   const tProblem = await getTranslations("lp.problem");
   const tFlow = await getTranslations("lp.appFlow");
   const tIssues = await getTranslations("lp.issues");
+  const tMath = await getTranslations("lp.math");
   const tHome = await getTranslations("pages.home");
+  const t = await getTranslations("lp");
 
   const flowSteps = ["step1", "step2", "step3"] as const;
   const issues = ["hands", "sensors", "diversity", "consent"] as const;
+
+  // マーキー1周ぶん (= トラックに2周入れて -50% でシームレスにループ)
+  const marqueeRun = Array.from({ length: 6 }, (_, i) => (
+    <span key={i}>
+      ROOTLENS <span aria-hidden="true">✦</span> {t("marquee")} <span aria-hidden="true">✦</span>
+    </span>
+  ));
 
   return (
     <div className={s.page}>
       {/* Hero */}
       <section className={s.hero}>
+        <div className={s.burst}>{tHero("burst")}</div>
         <div className={s.heroInner}>
           <div className={s.heroMain}>
             <div className={s.heroEyebrow}>
@@ -53,6 +63,14 @@ export default async function HomePage() {
           </aside>
         </div>
       </section>
+
+      {/* マーキー帯 (= フライヤーの下端帯) */}
+      <div className={s.mq} aria-hidden="true">
+        <div className={s.mqTrack}>
+          {marqueeRun}
+          {marqueeRun}
+        </div>
+      </div>
 
       {/* §01 Problem */}
       <section className={s.section}>
@@ -104,6 +122,35 @@ export default async function HomePage() {
               );
             })}
           </div>
+
+          {/* 計算ストリップ (= フライヤーの白カード) */}
+          <div className={s.mathStrip}>
+            <div className={s.mathTag}>{tMath("tag")}</div>
+            <div className={s.mathCell}>
+              <div className={s.mathLb}>{tMath("wageLabel")}</div>
+              <div className={s.mathVal}>
+                {tMath("wage")}
+                <span className={s.mathValUnit}>{tMath("wageUnit")}</span>
+              </div>
+            </div>
+            <div className={s.mathOp}>−</div>
+            <div className={`${s.mathCell} ${s.mathGive}`}>
+              <div className={s.mathLb}>{tMath("feeLabel")}</div>
+              <div className={s.mathVal}>
+                {tMath("fee")}
+                <span className={s.mathValUnit}>{tMath("feeUnit")}</span>
+              </div>
+            </div>
+            <div className={s.mathOp}>=</div>
+            <div className={`${s.mathCell} ${s.mathResult}`}>
+              <div className={s.mathLb}>{tMath("resultLabel")}</div>
+              <div className={s.mathVal}>
+                {tMath("result")}
+                <span className={s.mathValUnit}>{tMath("resultUnit")}</span>
+              </div>
+            </div>
+          </div>
+          <p className={s.mathNote}>{tMath("note")}</p>
         </div>
       </section>
 
@@ -136,6 +183,14 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* マーキー帯 2 本目 */}
+      <div className={`${s.mq} ${s.mqAlt}`} aria-hidden="true" style={{ marginTop: 72 }}>
+        <div className={s.mqTrack}>
+          {marqueeRun}
+          {marqueeRun}
+        </div>
+      </div>
 
       {/* §04 Closing CTA */}
       <section className={s.closingCta}>
