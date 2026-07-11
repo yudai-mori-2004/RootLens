@@ -3,9 +3,8 @@ import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
-import { requireAccountPubkey } from "@/lib/auth";
+import { requireAccountId } from "@/lib/auth";
 import { clipToDto, clipsToDtos } from "@/lib/mapper";
-import { makeClipId } from "@/lib/clipId";
 import type {
   CreateClipRequest,
   CreateClipResponse,
@@ -13,12 +12,12 @@ import type {
 } from "@/shared/api-types";
 
 // GET /api/clips
-// 撮影者の所有クリップ一覧を新しい順に返す。
+// 撮影アカウント (= Bearer token の sub) の所有クリップ一覧を新しい順に返す。
 // optional query: contentHash を渡すと絞り込む (= 端末の冪等チェック用)。
 export async function GET(req: Request) {
-  let accountPubkey: string;
+  let accountId: string;
   try {
-    accountPubkey = requireAccountPubkey(req);
+    accountId = await requireAccountId(req);
   } catch (r) {
     return r as Response;
   }
@@ -26,7 +25,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const contentHash = url.searchParams.get("contentHash");
 
-  const conditions = [eq(clips.accountPubkey, accountPubkey)];
+  const conditions = [eq(clips.accountId, accountId)];
   if (contentHash) conditions.push(eq(clips.contentHash, contentHash));
 
   const rows = await db
@@ -42,19 +41,21 @@ export async function GET(req: Request) {
 
 // POST /api/clips
 // v0.1.4: 端末で content_hash 計算 + R2 raw アップロードを終えてから呼ぶ「ただの登録」 endpoint。
-// 重複排除キーは (account, contentHash)。 既存行があれば idempotent に返す。
+// content_hash が PK (= ストレージの raw/<content_hash>/ と 1:1)。 同一 hash の再登録は
+// 同一アカウントなら idempotent に既存行を返し、 別アカウントなら 409。
 const createSchema = z.object({
   contentHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
   contentSize: z.number().int().positive(),
   recordingConfig: z.enum(["ultra_wide", "arkit"]),
   durationMs: z.number().int().positive().optional(),
   deviceModel: z.string().min(1).max(64).optional(),
+  consentEventId: z.string().min(1).max(64).optional(),
 }) satisfies z.ZodType<CreateClipRequest>;
 
 export async function POST(req: Request) {
-  let accountPubkey: string;
+  let accountId: string;
   try {
-    accountPubkey = requireAccountPubkey(req);
+    accountId = await requireAccountId(req);
   } catch (r) {
     return r as Response;
   }
@@ -74,32 +75,30 @@ export async function POST(req: Request) {
     );
   }
 
-  // 重複排除 (= 同 account × 同 content_hash は既存行を返す)。
+  // 重複排除 (= content_hash は世界一意)。
   const existing = await db
     .select()
     .from(clips)
-    .where(
-      and(
-        eq(clips.accountPubkey, accountPubkey),
-        eq(clips.contentHash, parsed.data.contentHash),
-      ),
-    )
+    .where(eq(clips.contentHash, parsed.data.contentHash))
     .limit(1);
   if (existing.length > 0) {
+    if (existing[0].accountId !== accountId) {
+      return NextResponse.json(
+        { error: "content_hash already registered by another account" },
+        { status: 409 },
+      );
+    }
     const body: CreateClipResponse = { clip: clipToDto(existing[0]) };
     return NextResponse.json(body);
   }
 
-  // 新規作成。 端末は R2 アップロード完了後にのみ登録する (= presign は /api/v1/raw-uploads の役目)
-  // ので、 登録行はその時点で uploaded。
-  const id = makeClipId(parsed.data.contentHash);
+  // 新規作成。 端末は R2 アップロード完了後にのみ登録する (= presign は /api/v1/raw-uploads の役目)。
   const [inserted] = await db
     .insert(clips)
     .values({
-      id,
-      accountPubkey: accountPubkey,
-      state: "uploaded",
       contentHash: parsed.data.contentHash,
+      accountId,
+      consentEventId: parsed.data.consentEventId ?? null,
       recordingConfig: parsed.data.recordingConfig,
       contentSize: parsed.data.contentSize,
       durationMs: parsed.data.durationMs ?? null,

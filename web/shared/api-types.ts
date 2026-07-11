@@ -1,18 +1,17 @@
 // クライアント (= iOS アプリ) と サーバ で共有する API 型定義。
-// v0.1.4: 「カメラ計測 + raw アップロード入口」 への簡素化版。 詳細は document/v0.1.4/DATA_SPECS_JA.md。
+// v0.1.4 (task 13 適用後): 認証は Authorization: Bearer <supabase JWT>。
+// 詳細は document/v0.1.4/DATA_SPECS_JA.md。
 
-// ─── クリップ状態機械 (= DATA_SPECS §4) ──────────────────────────
-// 3 値のみ。 v0.1.3 の processing / ready / staked は撤去 (= 後段ワーカー未配線)。
-export type ClipState = "uploading" | "uploaded" | "error";
-
-// ─── 撮影構成 (= DATA_SPECS §2.2) ────────────────────────────────
+// ─── 撮影構成 (= DATA_SPECS §3) ────────────────────────────────
 export type RecordingConfig = "ultra_wide" | "arkit";
 
 // ─── ClipDto ─────────────────────────────────────────────────────
+// サーバの clip 行はアップロード完了後にしか作られないので、 状態機械は持たない
+// (state / errorMessage は task 13 で撤去。 端末側のローカル state とは別物)。
 
 export interface ClipDto {
-  id: string;
-  state: ClipState;
+  /// 識別子 (= raw mp4 の SHA-256 hex。 DB PK / R2 raw キーと同値)
+  contentHash: string;
   createdAt: string; // ISO 8601
 
   // ── 撮影ファクト (= 端末申告) ──
@@ -21,11 +20,8 @@ export interface ClipDto {
   contentSize: number | null;
   deviceModel: string | null;
 
-  // ── 識別 ──
-  contentHash: string;
-
-  /// アップロード失敗時のメッセージ (= error 状態時のみ非 null)
-  errorMessage: string | null;
+  /// このクリップのアップロード同意イベント id (= consent_events.id)
+  consentEventId: string | null;
 }
 
 // ─── API リクエスト / レスポンス ─────────────────────────────────────
@@ -44,6 +40,8 @@ export interface CreateClipRequest {
   durationMs?: number;
   /// 撮影端末の機種 (= "iPhone15,2" 等)。
   deviceModel?: string;
+  /// アップロード同意イベント id (= POST /api/v1/consents の返り値)。
+  consentEventId?: string;
 }
 
 /// POST /api/v1/raw-uploads (DATA_SPECS §2.4)
@@ -74,13 +72,13 @@ export interface CreateClipResponse {
 }
 
 /// GET /api/clips
-/// 撮影者の全クリップを返す。 account pubkey は X-Account-Pubkey header で渡す。
+/// 撮影アカウントの全クリップを返す。 アカウントは Bearer token の sub で決まる。
 export interface ListClipsResponse {
   clips: ClipDto[];
 }
 
-/// DELETE /api/clips/:id
-/// 撮影者がクリップを破棄する (= ローカル削除のみ。 R2 オブジェクトは残置)。
+/// DELETE /api/clips/:contentHash
+/// 撮影者がクリップを破棄する (= 行削除のみ。 R2 オブジェクトは残置)。
 export interface DeleteClipResponse {
   ok: true;
 }

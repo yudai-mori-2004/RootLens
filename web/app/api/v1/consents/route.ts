@@ -4,15 +4,15 @@
 // append-only: この route は INSERT のみ。 UPDATE / DELETE は提供しない
 // (= 同意の有効性を後から立証する証跡。 撤回も event_type='withdrawal' の追記)。
 //
-// subject は body ではなく X-Account-Pubkey header から取る (= なりすまし防止は
-// 他 API と同じ MVP 水準。 本実装では鍵署名に置き換える)。
+// subject は body ではなく Bearer token の sub から取る (= 検証済み JWT。 task 13 で
+// X-Account-Pubkey の MVP 認証を置換)。
 
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { consentEvents } from "@/db/schema";
-import { requireAccountPubkey } from "@/lib/auth";
+import { requireAccountId } from "@/lib/auth";
 
 const RequestSchema = z.object({
   eventType: z.enum(["consent", "reconsent", "withdrawal"]),
@@ -34,9 +34,9 @@ const RequestSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  let subjectPubkey: string;
+  let accountId: string;
   try {
-    subjectPubkey = requireAccountPubkey(req);
+    accountId = await requireAccountId(req);
   } catch (r) {
     return r as Response;
   }
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     .values({
       id,
       eventType: parsed.data.eventType,
-      subjectPubkey,
+      accountId,
       occurredAt: new Date(parsed.data.occurredAt),
       docSlug: parsed.data.docSlug,
       docVersion: parsed.data.docVersion,

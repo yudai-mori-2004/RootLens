@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# task 13: アカウント発行 QR (= 資格情報そのもの。 コミット禁止)
+accounts-out/

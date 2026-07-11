@@ -1,14 +1,13 @@
 import type { Clip } from "@/db/schema";
-import type { ClipDto, ClipState, RecordingConfig } from "@/shared/api-types";
+import type { ClipDto, RecordingConfig } from "@/shared/api-types";
 
 // DB row → API DTO 変換。 client が見るのはこれだけ。
-// v0.1.4: presigned preview URL の発行は不要 (= ClipDto から previewVideoUrl 撤去、 端末プレビューは
-// アップロード前のローカル mp4 で済む)。
+// task 13: 識別子は content_hash そのもの (合成 id 撤去)。 account_id は DTO に出さない
+// (= 呼び出し元は自分のトークンで取った自分の行しか見えないので不要)。
 
 export function clipToDto(row: Clip): ClipDto {
   return {
-    id: row.id,
-    state: row.state as ClipState,
+    contentHash: row.contentHash,
     createdAt: row.createdAt.toISOString(),
 
     recordingConfig: row.recordingConfig as RecordingConfig,
@@ -16,9 +15,7 @@ export function clipToDto(row: Clip): ClipDto {
     contentSize: row.contentSize,
     deviceModel: row.deviceModel,
 
-    contentHash: row.contentHash,
-
-    errorMessage: row.errorMessage,
+    consentEventId: row.consentEventId,
   };
 }
 

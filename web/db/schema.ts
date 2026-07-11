@@ -1,44 +1,36 @@
 import {
-  pgTable, text, integer, bigint, timestamp, index, uniqueIndex, jsonb,
+  pgTable, text, integer, bigint, timestamp, index, jsonb, uuid,
 } from "drizzle-orm/pg-core";
 
-// v0.1.4 (task 12 適用後): 「ただのカメラ計測アプリ + raw アップロード入口」 の最小 schema。
+// v0.1.4 (task 13 適用後): 「データを取って id に紐づけるだけの機械」 の最小 schema。
 //
-// 1 クリップ = 1 行。 列は (識別 / ライフサイクル / 撮影ファクト) の最小集合のみ。
-// C2PA 署名も Solana も廃止したので、 識別子は生 mp4 の SHA-256 (= content_hash)、
-// 所有者は Ed25519 pubkey (= account_pubkey、 Solana 由来ではない)。
-//
-// 重複排除キー (account_pubkey, content_hash) は UNIQUE 制約で DB が保証する。
+// public スキーマは clips と consent_events の 2 テーブルのみ。 アカウントは Supabase Auth
+// (auth.users) が持ち、 このスキーマにアカウントテーブルは無い。 現場名・契約・振込先などの
+// 意味論は一切 DB に置かず、 運営の台帳 (freee 取引先メモ等) で uuid ↔ 実世界を対応させる
+// (= 店名非公表の構造的保証。 詳細は document/v0.1.4/tasks/13-supabase-auth-accounts/)。
 
 export const clips = pgTable(
   "clips",
   {
     // ── 識別・所有 ───────────────────────────────────────────────────
-    /// 内部 ID (= 端末指定 UUID、 または server 生成)。 不変。
-    id: text("id").primaryKey(),
+    /// raw mp4 バイト列の SHA-256 hex (= DATA_SPECS §2)。 端末で計算し、 R2 raw キーと
+    /// 完全に 1:1 (= raw/<content_hash>/*)。 ストレージが内容アドレスで世界一意なので DB も同じ。
+    contentHash: text("content_hash").primaryKey(),
 
-    /// 撮影者のアカウント公開鍵 (= Ed25519 base58)。
-    accountPubkey: text("account_pubkey").notNull(),
+    /// 撮影アカウント (= auth.users.id)。 検証済み JWT の sub からのみ書かれる。
+    accountId: uuid("account_id").notNull(),
 
-    /// raw mp4 バイト列の SHA-256 hex。 端末で計算し、 R2 raw キー / DB PK として使う。
-    contentHash: text("content_hash").notNull(),
+    /// このクリップのアップロード同意イベント (= consent_events.id)。 クリップ ⇔ 同意証跡の結合。
+    consentEventId: text("consent_event_id"),
 
-    // ── ライフサイクル ───────────────────────────────────────────────
-    /// DATA_SPECS §4 の状態。 'uploading' | 'uploaded' | 'error' の 3 値のみ。
-    state: text("state").notNull().default("uploading"),
-
-    /// 行作成時刻 (= 撮影者「送る」 押下時刻 ≒ 撮影日時)。
+    /// 行作成時刻 (= 登録 ≒ アップロード完了時刻)。
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-
-    /// アップロード失敗時のエラーメッセージ (= error 状態時のみ非 null)。
-    errorMessage: text("error_message"),
 
     // ── 撮影ファクト (端末申告) ───────────────────────────────────────
-    /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit'、 DATA_SPECS §2.2)。 端末が登録時に申告。
+    /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit'、 DATA_SPECS §3)。
     recordingConfig: text("recording_config").notNull(),
 
-    /// 録画尺 (ms)。 端末申告。
+    /// 録画尺 (ms)。 端末申告。 現場 × 月の録画時間集計 (= 撮影協力費の明細) の元。
     durationMs: integer("duration_ms"),
 
     /// rgb.mp4 (= raw、 blur 無し) のバイト数。
@@ -48,17 +40,16 @@ export const clips = pgTable(
     deviceModel: text("device_model"),
   },
   (t) => [
-    index("clips_account_idx").on(t.accountPubkey),
-    index("clips_content_hash_idx").on(t.contentHash),
-    // 重複排除を DB で保証 (= 同 account × 同 content_hash は 1 行)。
-    uniqueIndex("clips_account_content_uq").on(t.accountPubkey, t.contentHash),
+    // GET /api/clips (= account 別一覧) と明細集計 (account × 月) 用。
+    index("clips_account_id_idx").on(t.accountId),
   ],
 );
 
 export type Clip = typeof clips.$inferSelect;
 export type NewClip = typeof clips.$inferInsert;
 
-/// 同意イベントログ (= document/v0.1.3/legal/consent-log-spec/ja.md が正典)。
+/// 同意イベントログ (= document/v0.1.3/legal/consent-log-spec/ja.md が正典。
+/// task 13 での差分: subject の識別子を pubkey から account_id (uuid) に置換)。
 ///
 /// append-only: 同意・再同意・撤回のたびに 1 行追記する。 UPDATE / DELETE は行わない
 /// (= 同意の有効性を後から立証する証跡。 撤回も event_type='withdrawal' の追記で表現)。
@@ -71,12 +62,12 @@ export const consentEvents = pgTable(
     id: text("id").primaryKey(),
     /// 'consent' | 'reconsent' | 'withdrawal'
     eventType: text("event_type").notNull(),
-    /// 同意者のアカウント公開鍵 (= X-Account-Pubkey。 subject_id)
-    subjectPubkey: text("subject_pubkey").notNull(),
+    /// 同意者のアカウント (= auth.users.id。 検証済み JWT の sub)
+    accountId: uuid("account_id").notNull(),
     /// 端末申告の同意時刻 (UTC)
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
 
-    /// 同意対象の正本 (= 'tester-consent' 等)
+    /// 同意対象の正本 (= 'terms-of-service' 等)
     docSlug: text("doc_slug").notNull(),
     docVersion: text("doc_version").notNull(),
     /// 正本全文 (raw md) の SHA-256 hex
@@ -88,7 +79,7 @@ export const consentEvents = pgTable(
 
     /// 同意スコープ (= ['collection','ai_training_use','license_sale','cross_border'])
     scopes: jsonb("scopes").notNull(),
-    /// 各チェック項目の真偽 (= { age18_and_location_right, no_third_party, agree_terms })
+    /// 各チェック項目の真偽 (= { location_permission, no_third_party, terms_agreed })
     checkboxResults: jsonb("checkbox_results").notNull(),
 
     /// 表示言語 ('ja' | 'en')
@@ -104,7 +95,7 @@ export const consentEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    index("consent_events_subject_idx").on(t.subjectPubkey),
+    index("consent_events_account_idx").on(t.accountId),
     index("consent_events_occurred_idx").on(t.occurredAt),
   ],
 );

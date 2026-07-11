@@ -16,23 +16,25 @@
     "@aws-sdk/s3-request-presigner": "^3.1008.0",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
+    "@supabase/supabase-js": "^2.110.2",
+    "drizzle-orm": "^0.36.4",
     "next": "16.1.6",
     "next-intl": "^4.8.3",
+    "postgres": "^3.4.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "yaml": "^2.6.0",
-    "drizzle-orm": "^0.36.4",
-    "postgres": "^3.4.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "drizzle-kit": "^0.31.10",
     "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "qrcode": "^1.5.4",
     "typescript": "^5",
     "vitest": "^4.1.2"
   }
