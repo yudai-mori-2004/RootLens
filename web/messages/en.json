@@ -70,11 +70,10 @@
   "lp": {
     "hero": {
       "tagline": "Field data, made robot-ready.",
-      "description": "RootLens collects work data from real workplaces, sells it to robotics companies, and returns part of the proceeds to the site: wage rebates for stores, free adoption diagnostics for companies. Born at the University of Osaka.",
-      "ctaStores": "For stores",
-      "ctaCompanies": "For companies",
+      "description": "RootLens is a University of Osaka-born data company. We collect work data from real workplaces and sell it to robotics companies, returning part of the proceeds to the workplaces the data came from.",
       "ctaSample": "Sample data",
-      "burst": "JAPAN'S FIRST"
+      "burst": "JAPAN'S FIRST",
+      "ctaModel": "How it works"
     },
     "problem": {
       "title": "Robots learn by watching people. The footage is the bottleneck.",

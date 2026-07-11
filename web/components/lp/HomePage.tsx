@@ -45,18 +45,13 @@ export default async function HomePage() {
               <span className={s.heroEyebrowDesc}>{tHero("tagline")}</span>
             </div>
             <h1 className={s.heroTitle}>
-              Real work<br />
-              teaches robots.<br />
-              <span className={s.heroTitleAccent}>The floor gets paid.</span>
+              Real work is<br />
+              <span className={s.heroTitleAccent}>training data.</span>
             </h1>
             <p className={s.heroDescription}>{tHero("description")}</p>
             <div className={s.heroCtas}>
-              <a href="#for-stores" className={s.ctaPrimary}>
-                {tHero("ctaStores")}
-                <span aria-hidden="true">→</span>
-              </a>
-              <a href="#for-companies" className={s.ctaSecondary}>
-                {tHero("ctaCompanies")}
+              <a href="#model" className={s.ctaPrimary}>
+                {tHero("ctaModel")}
                 <span aria-hidden="true">→</span>
               </a>
               <a href="/sample" className={s.ctaSecondary}>
@@ -112,7 +107,7 @@ export default async function HomePage() {
       </section>
 
       {/* §02 モデル */}
-      <section className={s.section}>
+      <section className={s.section} id="model">
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§02</div>
