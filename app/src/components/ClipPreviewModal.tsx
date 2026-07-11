@@ -40,7 +40,7 @@ interface Props {
 }
 
 const INITIAL_CHECKS: UploadConsentChecks = {
-  age_and_right: false,
+  location_permission: false,
   no_third_party: false,
   terms_agreed: false,
 };
@@ -64,7 +64,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
   if (!clip) return null;
   const uri = localVideoUri(clip);
   const dur = formatDuration(clip.durationMs);
-  const allChecked = checks.age_and_right && checks.no_third_party && checks.terms_agreed;
+  const allChecked = checks.location_permission && checks.no_third_party && checks.terms_agreed;
 
   const toggle = (key: keyof UploadConsentChecks) =>
     setChecks((c) => ({ ...c, [key]: !c[key] }));
@@ -146,27 +146,29 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
 
             <View style={styles.checks}>
               <CheckRow
-                checked={checks.age_and_right}
-                label={t('upload.consentCheckAge')}
-                onPress={() => toggle('age_and_right')}
+                checked={checks.location_permission}
+                label={t('upload.consentCheckLocation')}
+                onPress={() => toggle('location_permission')}
               />
               <CheckRow
                 checked={checks.no_third_party}
                 label={t('upload.consentCheckNoThirdParty')}
                 onPress={() => toggle('no_third_party')}
               />
+              {/* 「利用規約」 の部分だけ全文表示へのインラインリンク。 行の他の部分はチェックのトグル */}
               <CheckRow
                 checked={checks.terms_agreed}
-                label={t('upload.consentCheckTerms')}
+                label={
+                  <>
+                    {t('upload.consentCheckTermsPrefix')}
+                    <Text style={styles.termsLink} onPress={() => setShowTerms(true)}>
+                      {t('upload.consentCheckTermsLink')}
+                    </Text>
+                    {t('upload.consentCheckTermsSuffix')}
+                  </>
+                }
                 onPress={() => toggle('terms_agreed')}
               />
-              {/* 全文リンクは規約チェックの直下 (= 意味的に紐づく位置。 アップロードボタンから離して誤タップを防ぐ) */}
-              <Pressable onPress={() => setShowTerms(true)} style={({ pressed }) => [styles.readFull, pressed && styles.pressedDim]} hitSlop={6}>
-                <Text style={styles.readFullLabel}>{t('upload.consentReadFull')}</Text>
-                <Svg width={12} height={12} viewBox="0 0 12 12">
-                  <Path d="M4 2.5 L8 6 L4 9.5" stroke={colors.emerald} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                </Svg>
-              </Pressable>
             </View>
 
             <View style={styles.spacer} />
@@ -234,7 +236,7 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
 
 const CheckRow: React.FC<{
   checked: boolean;
-  label: string;
+  label: React.ReactNode;
   onPress: () => void;
 }> = ({ checked, label, onPress }) => (
   <Pressable onPress={onPress} style={({ pressed }) => [styles.checkRow, pressed && styles.pressedDim]} hitSlop={4}>
@@ -336,16 +338,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  readFull: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 30, // チェックボックス幅 + gap (= 規約チェックの文言に揃えてぶら下げる)
-  },
-  readFullLabel: {
+  termsLink: {
     fontFamily: fonts.sansSemibold,
-    fontSize: 12.5,
     color: colors.emerald,
+    textDecorationLine: 'underline',
   },
 
   spacer: { flex: 1, minHeight: spacing.lg },

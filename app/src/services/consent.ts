@@ -22,7 +22,10 @@ import { getLocale, t } from '../i18n';
 /// .2: 第三者チェックを「本人のみ」 から「本人 + 撮影に同意した大人のみ (子ども不可)」 へ。
 /// .3: チェック 2 つを 1 行に短文化 + 正本を tester-consent から terms-of-service (本番規約) へ切替
 ///     (2026-07-06)。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-06.3';
+/// .4: 店舗運用向けに整理 (2026-07-12): 年齢確認を撤去 (= 年齢条項は正本側に委ねる)、 場所の撮影許可を
+///     独立チェック化、 第三者文言を「同意していない人物は映り込んでいない」 に形式化、 規約リンクを
+///     チェック文言内のインラインリンクへ。
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-12.4';
 
 /// アップロード同意のスコープ (= terms-of-service §6: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;
@@ -32,15 +35,17 @@ const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 
 /// 同意する単一画面に変更 (= 表示文言はチェック 3 つとボタンラベル)。
 const SUMMARY_KEYS = [
   'upload.consentTitle',
-  'upload.consentCheckAge',
+  'upload.consentCheckLocation',
   'upload.consentCheckNoThirdParty',
-  'upload.consentCheckTerms',
+  'upload.consentCheckTermsPrefix',
+  'upload.consentCheckTermsLink',
+  'upload.consentCheckTermsSuffix',
   'upload.consentAndUpload',
 ] as const;
 
-/// 個別チェック 3 つ (= 18歳以上と撮影権利 / 第三者なし / 正本への同意)。
+/// 個別チェック 3 つ (= 場所の撮影許可 / 同意なき映り込みなし / 正本への同意)。
 export interface UploadConsentChecks {
-  age_and_right: boolean;
+  location_permission: boolean;
   no_third_party: boolean;
   terms_agreed: boolean;
 }
