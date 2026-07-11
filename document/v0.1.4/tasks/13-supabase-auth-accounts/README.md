@@ -82,7 +82,7 @@
       死にコード applyServerStatus 撤去 (2026-07-12)
 - [x] ops: scripts/create_account.mjs (発行 + QR)、 scripts/archive_legacy_tables.mjs、
       drizzle/0004 (アカウント移行) + 0005 (死骸 DROP) (2026-07-12)
-- [ ] 「自宅」アカウント発行 (= 本番 Supabase への書き込み。 GO 待ち)
-- [ ] 0004 適用 (= uuid 置換後に apply_one_migration。 GO 待ち)
-- [ ] アーカイブ取得 → 0005 適用 (GO 待ち)
-- [ ] web push (= Vercel デプロイ) → TestFlight ビルド → 実機ログイン + アップロード確認
+- [x] アカウント発行 (developer_iphone_12 / developer_iphone_15_pro / bakery_01。 2026-07-12)
+- [x] 0004 適用 (旧残骸35本削除、 41本を2アカウントへ、 PK content_hash 化。 2026-07-12)
+- [x] アーカイブ取得 → 0005 適用 (public は clips + consent_events の2テーブルに。 2026-07-12)
+- [ ] TestFlight build 24 → 実機ログイン + アップロード確認 (web は 4b7f21c でデプロイ済み)
