@@ -28,8 +28,9 @@ C2PA / Title Protocol / Solana / 自動採点は全て撤去済み。
 
 **content_hash** = raw mp4 全バイト列の SHA-256 hex (64 文字、 prefix なし)。
 
-- 端末が録画完了直後に計算する (= `app/src/dataflow/steps/hash.ts`)。 4 GB 級でも OOM しないよう
-  8 MB base64 chunk read + noble/hashes による incremental update で計算する。
+- 端末が録画完了直後に計算する (= `app/src/dataflow/steps/hash.ts`)。 本線はネイティブ計算
+  (`modules/content-hash/` = CryptoKit のストリーム SHA-256。 数 GB でも数秒)。 モジュール未搭載
+  ビルド用に 8 MB base64 chunk read + noble/hashes の JS フォールバックを残す (= 同一結果)。
 - R2 の raw キー: `raw/<content_hash>/rgb.mp4` (+ 他ファイル)。
 - DB `clips.content_hash` に格納。 重複排除キーは `(account_pubkey, content_hash)`。
 

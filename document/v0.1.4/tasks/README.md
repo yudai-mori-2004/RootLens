@@ -45,6 +45,11 @@ v0.1.4 (簡素化スプリント)
                                     ・signature_hash → content_hash rename
                                     ・tools/modal/ 直下を score-wilor/ + fpvlabs/ に再編
                                     詳細と AUDIT.md は 12-cleanup-c2pa-tp-solana-remnants/
+  13. supabase-auth-accounts    🔄 新 店舗運用向けアカウント基盤。 端末ローカル鍵を Supabase Auth の
+                                    運営発行アカウント (uuid+pwd、 合成メール、 自己登録なし) に置換。
+                                    clips/consent_events を account_id (uuid) に紐づけ、 死骸 5 テーブル
+                                    DROP + clips の PK を content_hash 化。 現場名等の意味論はサーバに
+                                    置かず運営台帳 (freee) 側で管理。 詳細は 13-supabase-auth-accounts/
 ```
 
 凡例: ✅ = 完了、 🔄 = 進行中 / 未着手、 新 = 新規追加。
