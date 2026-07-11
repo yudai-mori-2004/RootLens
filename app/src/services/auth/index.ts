@@ -7,10 +7,12 @@ export {
   setAuthProvider,
   getCurrentSession,
   requireCurrentSession,
+  getAuthHeader,
 } from './instance';
 
 // 実装
 export { DebugAuthProvider } from './DebugAuthProvider';
+export { SupabaseAuthProvider } from './SupabaseAuthProvider';
 
 // 型
 export type { AuthProvider, AuthState, AuthSession, AuthStatus } from './types';

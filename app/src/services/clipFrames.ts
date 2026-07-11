@@ -17,7 +17,6 @@ import * as FileSystem from 'expo-file-system';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 
 import { fetchClipMediaUrl } from '../dataflow';
-import { getCurrentSession } from './auth/instance';
 
 const frames = new Map<string, string>();
 const inflight = new Map<string, Promise<string | null>>();
@@ -101,21 +100,20 @@ export function useLocalClipFrame(key: string, videoUri: string | null): string 
   return uri;
 }
 
-/** アップロード済みクリップの代表フレーム (= /media の presigned URL から range 読み)。 */
-export function useUploadedClipFrame(key: string | null, clipId: string | null): string | null {
+/** アップロード済みクリップの代表フレーム (= /media の presigned URL から range 読み)。
+ *  識別子は content_hash (task 13)。 */
+export function useUploadedClipFrame(key: string | null, contentHash: string | null): string | null {
   const [uri, setUri] = useState<string | null>(key ? frames.get(key) ?? null : null);
   useEffect(() => {
     cleanupLegacyThumbs();
-    if (!key || !clipId || frames.has(key)) return;
+    if (!key || !contentHash || frames.has(key)) return;
     let cancelled = false;
     void resolveFrame(key, async () => {
-      const session = getCurrentSession();
-      if (!session) throw new Error('not authenticated');
-      return fetchClipMediaUrl(clipId, session.pubkey);
+      return fetchClipMediaUrl(contentHash);
     }).then((u) => {
       if (!cancelled && u) setUri(u);
     });
     return () => { cancelled = true; };
-  }, [key, clipId]);
+  }, [key, contentHash]);
   return uri;
 }

@@ -16,6 +16,8 @@ const ENV: Record<string, string | undefined> = {
   EXPO_PUBLIC_USE_SANDBOX: process.env.EXPO_PUBLIC_USE_SANDBOX,
   EXPO_PUBLIC_SERVER_URL: process.env.EXPO_PUBLIC_SERVER_URL,
   EXPO_PUBLIC_DEBUG_ACCOUNT_BASE58: process.env.EXPO_PUBLIC_DEBUG_ACCOUNT_BASE58,
+  EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
 };
 
 function readOptional(key: string): string | undefined {
@@ -35,6 +37,13 @@ export const USE_DEV_SANDBOX = readOptional('EXPO_PUBLIC_USE_SANDBOX') === '1';
 
 export const SERVER_URL =
   readOptional('EXPO_PUBLIC_SERVER_URL') ?? 'https://www.rootlens.io';
+
+// ─── Supabase Auth (task 13) ────────────────────────────────────────────
+// 運営発行アカウント (uuid + パスワード) のログイン先。 anon key は公開前提の値。
+// 未設定のビルドは DebugAuthProvider に落ちる (= ローカル検証用)。
+
+export const SUPABASE_URL = readOptional('EXPO_PUBLIC_SUPABASE_URL');
+export const SUPABASE_ANON_KEY = readOptional('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 // ─── Debug only ─────────────────────────────────────────────────────────
 // DebugAuthProvider のアカウント鍵を env で固定するための optional override

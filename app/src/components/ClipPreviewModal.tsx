@@ -22,7 +22,7 @@ import {
 import Svg, { Circle, Path, Polygon } from 'react-native-svg';
 import { ResizeMode, Video } from 'expo-av';
 
-import type { Clip } from '../dataflow';
+import { dataflowStore, type Clip } from '../dataflow';
 import { localVideoUri, formatDuration, formatCardDate, formatCardTime, configLabel } from './ClipCard';
 import { LegalDocBody } from './LegalDocModal';
 import { getLegalDoc } from '../content/legalDocs.generated';
@@ -75,12 +75,14 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
     setConsentError(null);
     try {
       // 同意イベントをサーバに記録 (= append-only の証跡)。 成功したときだけアップロードを開始する。
-      await recordUploadConsent({
+      const consentEventId = await recordUploadConsent({
         checks,
         clipLocalId: clip.id,
         clipCreatedAt: clip.createdAt,
         recordingConfig: clip.recordingConfigId,
       });
+      // register 段でサーバの clip 行に保存される (= クリップ ⇔ 同意証跡の結合)。
+      dataflowStore.getState().patchClip(clip.id, { consentEventId });
       onUpload(clip); // モーダルは閉じ、 進捗はカード側で見せる
     } catch {
       setConsentError(t('upload.consentError'));

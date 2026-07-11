@@ -8,12 +8,16 @@
 
 import type { AuthProvider, AuthSession } from './types';
 import { DebugAuthProvider } from './DebugAuthProvider';
+import { SupabaseAuthProvider } from './SupabaseAuthProvider';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../env';
 
 let instance: AuthProvider | null = null;
 
 export function getAuthProvider(): AuthProvider {
   if (!instance) {
-    instance = new DebugAuthProvider();
+    // 既定は Supabase (task 13)。 env 未設定のビルド (= ローカル検証) だけ debug に落ちる。
+    instance =
+      SUPABASE_URL && SUPABASE_ANON_KEY ? new SupabaseAuthProvider() : new DebugAuthProvider();
   }
   return instance;
 }
@@ -35,4 +39,16 @@ export function requireCurrentSession(): AuthSession {
     throw new Error('auth: no authenticated session');
   }
   return session;
+}
+
+/**
+ * API 呼び出し用の Authorization ヘッダ。 トークンが取れない (= 未ログイン / debug provider)
+ * 場合は throw する。 サーバはこのトークンの sub をアカウント id として使う (task 13)。
+ */
+export async function getAuthHeader(): Promise<{ Authorization: string }> {
+  const token = await getAuthProvider().getAccessToken();
+  if (!token) {
+    throw new Error('未認証: アクセストークンがありません (= ログインしてください)');
+  }
+  return { Authorization: `Bearer ${token}` };
 }

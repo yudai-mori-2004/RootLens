@@ -47,7 +47,7 @@ export const SettingsScreen: React.FC = () => {
   const t = useT();
   const insets = useSafeAreaInsets();
   const locale = useLocale();
-  const ownerStr = state.status === 'authenticated' ? state.session.pubkey : null;
+  const ownerStr = state.status === 'authenticated' ? state.session.accountId : null;
   const [signingOut, setSigningOut] = useState(false);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);

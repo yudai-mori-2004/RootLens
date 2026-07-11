@@ -59,7 +59,7 @@ export class DebugAuthProvider implements AuthProvider {
       }
       this.setState({
         status: 'authenticated',
-        session: { pubkey: this.key.pubkeyBase58, providerId: PROVIDER_ID },
+        session: { accountId: this.key.pubkeyBase58, providerId: PROVIDER_ID },
       });
     } catch (err) {
       console.error('[DebugAuthProvider] initialize failed', err);
@@ -76,6 +76,11 @@ export class DebugAuthProvider implements AuthProvider {
     await SecureStore.deleteItemAsync(STORAGE_KEY);
     this.key = null;
     this.setState({ status: 'unauthenticated' });
+  }
+
+  /** debug 実装はトークンを発行できない (= 本番 API の Bearer 認証には通らない)。 */
+  async getAccessToken(): Promise<string | null> {
+    return null;
   }
 
   private setState(state: AuthState) {

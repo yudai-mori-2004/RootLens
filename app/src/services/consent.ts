@@ -14,7 +14,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 
 import { SERVER_URL } from '../env';
-import { getCurrentSession } from './auth/instance';
+import { getCurrentSession, getAuthHeader } from './auth/instance';
 import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
@@ -77,7 +77,7 @@ export async function recordUploadConsent(input: {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Account-Pubkey': session.pubkey,
+      ...(await getAuthHeader()),
     },
     body: JSON.stringify({
       eventType: 'consent',

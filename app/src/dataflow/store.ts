@@ -10,7 +10,7 @@
 import { createStore } from 'zustand/vanilla';
 
 import { makeEvent, type DataflowEvent, type DataflowEventInput, type EventSink } from './events';
-import type { Clip, ServerClipStatus } from './types';
+import type { Clip } from './types';
 import type { RecordingSession } from './recording-configs';
 
 /** 録画ライフサイクル。 */
@@ -55,8 +55,6 @@ export interface DataflowState {
   removeClip(id: string): void;
   /** local id → content_hash へ key を貼り替える (= hash 完了で identity 誕生)。 */
   renameClipId(localId: string, contentHash: string): void;
-  /** server から受け取った状態を、 指定 id のクリップにマージする。 */
-  applyServerStatus(targetId: string, status: ServerClipStatus): void;
   /** 永続化アダプタからの一括 hydrate (= 起動時に保存済みクリップを流し込む)。 */
   replaceClips(clips: Clip[]): void;
   /** 進行表示対象のクリップ id を設定する。 */
@@ -118,20 +116,6 @@ export const dataflowStore = createStore<DataflowState>((set, get) => ({
       clips: { ...rest, [contentHash]: { ...cur, id: contentHash } },
       currentClipId: get().currentClipId === localId ? contentHash : get().currentClipId,
     });
-  },
-  applyServerStatus(targetId, status) {
-    const cur = get().clips[targetId];
-    if (!cur) return;
-    const merged: Clip = {
-      ...cur,
-      state: status.state,
-      durationMs: status.durationMs ?? cur.durationMs ?? null,
-      deviceModel: status.deviceModel ?? cur.deviceModel ?? null,
-      recordingConfigId: cur.recordingConfigId ?? status.recordingConfig ?? undefined,
-      contentSize: status.contentSize ?? cur.contentSize,
-      errorMessage: status.errorMessage ?? null,
-    };
-    set({ clips: { ...get().clips, [targetId]: merged } });
   },
   replaceClips(clips) {
     const map: Record<string, Clip> = {};

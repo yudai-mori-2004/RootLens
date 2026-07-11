@@ -46,6 +46,10 @@ export interface Clip {
   /** 生 MP4 (= raw/<content_hash>/rgb.mp4) のバイト数 */
   contentSize?: number;
 
+  /** アップロード同意イベント id (= POST /api/v1/consents の返り値)。 同意記録の成功で確定し、
+   *  register 段でサーバの clip 行に保存される (= クリップ ⇔ 同意証跡の結合)。 */
+  consentEventId?: string;
+
   /** 録画尺 (ms)。 端末が record stop−start で申告。 */
   durationMs?: number | null;
   /** 撮影端末の機種 (= "iPhone15,2" 等)。 */
@@ -87,34 +91,35 @@ export interface UploadResult {
   uploadedKeys: string[];
 }
 
-/** register step: POST /api/clips でサーバに登録する (= v0.1.4 では finalize 無し)。 */
+/** register step: POST /api/clips でサーバに登録する (= v0.1.4 では finalize 無し)。
+ *  所有者は Bearer token の sub でサーバが決めるので、 ここに識別子は載せない (task 13)。 */
 export interface RegisterInput {
   contentHash: string;
   contentSize: number;
-  /** クリップ所有者のアカウント公開鍵 (= Ed25519 base58)。 */
-  accountPubkey: string;
   /** 撮影構成 (= 'ultra_wide' | 'arkit')。 */
   recordingConfig: string;
   /** 録画尺 (ms)。 取れなければ省略。 */
   durationMs?: number | null;
   /** 撮影端末の機種 (= utsname machine)。 */
   deviceModel?: string | null;
+  /** アップロード同意イベント id (= consent_events.id)。 */
+  consentEventId?: string | null;
 }
 export interface RegisterResult {
-  /** server 発番の clip ID */
+  /** クリップ識別子 (= content_hash) */
   clipId: string;
 }
 
-/** GET /api/clips/:id で受け取るサーバ側クリップ状態 (= ClipDto のサブセット)。 */
+/** GET /api/clips で受け取るサーバ側クリップ (= ClipDto のサブセット)。
+ *  サーバ行はアップロード完了後にしか無いので state は持たない (task 13)。 */
 export interface ServerClipStatus {
-  id: string;
-  state: ClipState;
+  /** 識別子 (= content_hash) */
+  contentHash: string;
   /** 行作成時刻 (= ISO 8601、 撮影日時)。 list 取得時に使う。 */
   createdAt?: string;
-  contentHash?: string;
   durationMs?: number | null;
   recordingConfig?: string | null;
   deviceModel?: string | null;
   contentSize?: number | null;
-  errorMessage?: string | null;
+  consentEventId?: string | null;
 }

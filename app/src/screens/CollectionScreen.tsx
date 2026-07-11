@@ -73,10 +73,8 @@ const MOCKS: DesignMock[] = DESIGN_PREVIEW
 const HISTORY_MOCKS: { clip: ServerClipStatus; source: ImageSourcePropType }[] = DESIGN_PREVIEW
   ? [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({
       clip: {
-        id: `hmock_${i}`,
-        state: 'uploaded' as const,
-        createdAt: new Date(Date.now() - (i + 1) * 86_400_000 * 1.3).toISOString(),
         contentHash: `hmock_${i}`,
+        createdAt: new Date(Date.now() - (i + 1) * 86_400_000 * 1.3).toISOString(),
         durationMs: ((i * 97) % 40 + 3) * 60_000,
       },
       source: [
@@ -146,7 +144,7 @@ function useServerClips(localUploadedCount: number): ServerClipStatus[] {
       try {
         const session = getCurrentSession();
         if (!session) return;
-        const fresh = await fetchMyClips(session.pubkey);
+        const fresh = await fetchMyClips();
         if (cancelled) return;
         setClips(fresh);
         AsyncStorage.setItem(CLIPS_CACHE_KEY, JSON.stringify(fresh)).catch(() => {});
@@ -296,7 +294,7 @@ export const CollectionScreen: React.FC = () => {
             >
               {history.map(({ clip, source }) => (
                 <HistoryTile
-                  key={clip.id}
+                  key={clip.contentHash}
                   clip={clip}
                   source={source}
                   selected={selectedDay != null && clip.createdAt != null && dayKey(clip.createdAt) === selectedDay}
@@ -359,7 +357,7 @@ const HistoryTile: React.FC<{
   onPress?: () => void;
 }> = ({ clip, source, selected, onPress }) => {
   // サムネは R2 の mp4 から range リクエストで 1 フレームだけ読む (= 端末に動画は置かない)。
-  const frame = useUploadedClipFrame(clip.contentHash ?? clip.id, source ? null : clip.id);
+  const frame = useUploadedClipFrame(clip.contentHash, source ? null : clip.contentHash);
   const resolved = source ?? (frame ? { uri: frame } : undefined);
   return (
   <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}>

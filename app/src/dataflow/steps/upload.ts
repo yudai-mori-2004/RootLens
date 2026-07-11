@@ -9,6 +9,7 @@
 import * as FileSystem from 'expo-file-system';
 
 import { SERVER_URL } from '../../env';
+import { getAuthHeader } from '../../services/auth/instance';
 import type { EventSink } from '../events';
 import type { UploadInput, UploadResult } from '../types';
 
@@ -28,7 +29,7 @@ async function requestPresignedUrls(
 ): Promise<PresignResponse> {
   const res = await fetch(`${SERVER_URL}/api/v1/raw-uploads`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await getAuthHeader()) },
     body: JSON.stringify({ contentHash, recordingConfig }),
   });
   if (!res.ok) {

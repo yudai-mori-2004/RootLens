@@ -20,13 +20,6 @@ import { computeContentHash } from './steps/hash';
 import { uploadToR2 } from './steps/upload';
 import { registerClip } from './steps/register';
 import { dataflowStore, makeLocalClipId } from './store';
-import { getCurrentSession } from '../services/auth/instance';
-
-function getAccountPubkey(): string {
-  const session = getCurrentSession();
-  if (!session) throw new Error('未認証: session がありません (= AuthGate を通っていない)');
-  return session.pubkey;
-}
 
 function errMsg(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -256,10 +249,10 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
         {
           contentHash: cur.contentHash,
           contentSize: cur.contentSize ?? 0,
-          accountPubkey: getAccountPubkey(),
           recordingConfig: config.id,
           durationMs: cur.durationMs ?? null,
           deviceModel: cur.deviceModel ?? null,
+          consentEventId: cur.consentEventId ?? null,
         },
         progressSink,
       );

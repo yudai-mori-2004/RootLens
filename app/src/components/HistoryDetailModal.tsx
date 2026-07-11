@@ -19,7 +19,6 @@ import { ResizeMode, Video } from 'expo-av';
 
 import { fetchClipMediaUrl, type ServerClipStatus } from '../dataflow';
 import { formatCardDate, formatCardTime, formatDuration, configLabel } from './ClipCard';
-import { getCurrentSession } from '../services/auth/instance';
 import { useUploadedClipFrame } from '../services/clipFrames';
 import { useT } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
@@ -38,8 +37,8 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
   const [mediaError, setMediaError] = useState(false);
   // 動画ロード中のつなぎ表示。 履歴タイルが同じ key で解決済みならキャッシュから即返る。
   const frame = useUploadedClipFrame(
-    clip ? clip.contentHash ?? clip.id : null,
-    clip && !thumbSource ? clip.id : null,
+    clip ? clip.contentHash : null,
+    clip && !thumbSource ? clip.contentHash : null,
   );
   const poster = thumbSource ?? (frame ? { uri: frame } : undefined);
 
@@ -50,16 +49,14 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
     let cancelled = false;
     (async () => {
       try {
-        const session = getCurrentSession();
-        if (!session) throw new Error('no session');
-        const url = await fetchClipMediaUrl(clip.id, session.pubkey);
+        const url = await fetchClipMediaUrl(clip.contentHash);
         if (!cancelled) setMediaUrl(url);
       } catch {
         if (!cancelled) setMediaError(true);
       }
     })();
     return () => { cancelled = true; };
-  }, [visible, clip?.id]);
+  }, [visible, clip?.contentHash]);
 
   if (!clip) return null;
 
