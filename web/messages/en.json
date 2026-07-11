@@ -6,10 +6,10 @@
   },
   "pages": {
     "home": {
-      "closingTitle": "Start recording. Start earning.",
-      "closingDesc": "Join the waitlist for early access. Home robot companies are waiting for data like yours.",
-      "closingCtaWhy": "Learn more",
-      "whyBlockchainLink": "Why we use blockchain →"
+      "closingTitle": "Let's talk.",
+      "closingDesc": "Whether you run a short-staffed store or you're looking for embodied-AI training data, we're one email away.",
+      "ctaContact": "Email us",
+      "ctaSample": "View sample data"
     },
     "sample": {
       "meta": {
@@ -69,55 +69,52 @@
   },
   "lp": {
     "hero": {
-      "title": "Train robots.\nGet paid.",
-      "tagline": "Film your day. Train robots. Get paid.",
-      "description": "A camera app where anyone can film household tasks and get paid when robot companies license the footage.",
-      "ctaDemo": "See how it works",
-      "ctaHow": "Learn more",
-      "ctaSample": "Browse the sample data"
+      "tagline": "Hands-on footage from real workplaces, made robot-ready.",
+      "description": "RootLens is a University of Osaka-born data company. We collect first-person video of people at work and deliver it to teams building physical AI, turning real kitchens and shops into training data robots can learn from.",
+      "ctaStores": "For store owners",
+      "ctaSample": "View sample data"
     },
     "problem": {
-      "title": "Robots learn by watching people. But the footage barely exists.",
-      "p1": "Robot intelligence is evolving at an incredible pace. AI is going beyond language and images into physical action. Robots are learning to move by watching videos of people performing tasks.",
-      "p2": "But high-quality footage of real household tasks is extremely scarce. Collecting robot training data the traditional way requires expensive hardware, physical environments, and human operators.",
-      "p3": "Human action video is the critical bottleneck. That is why we are building RootLens."
+      "title": "Robots learn by watching people. The footage is the bottleneck.",
+      "p1": "Robot intelligence is advancing at a startling pace. AI has moved from language to vision, and now to physical motion. Robots are learning how to move by watching humans work.",
+      "p2": "Yet high-quality footage of real work in real places is scarce. The traditional approach, staging demonstrations in a lab, is expensive, slow, and misses the messiness of reality.",
+      "p3": "Human motion footage is the bottleneck. RootLens collects it where people actually work."
     },
     "appFlow": {
-      "title": "How it works",
+      "title": "The workplace becomes the collection site",
       "step1": {
-        "label": "Record",
-        "text": "Open the app and record yourself doing a household task. RootLens guides you to keep hands and objects in frame."
+        "label": "Work as usual",
+        "text": "Staff wearing a head-mounted camera work normal part-time shifts. Dishwashing, prep work, the usual jobs, unchanged."
       },
       "step2": {
-        "label": "Get verified",
-        "text": "Object detection scores the video automatically. Faces and personal text are blurred. The video is signed to prove it is real."
+        "label": "Data while working",
+        "text": "First-person video plus depth, motion, and hand-pose data from each shift becomes training material for robot manipulation."
       },
       "step3": {
-        "label": "Get paid",
-        "text": "Your verified recording enters the marketplace. Every time a robot company licenses your clip, you earn. Not once. Every time."
-      },
-      "editing": "Every submission is focused, verified, and ready to use — not random video scraped from the web."
+        "label": "Stores get paid back",
+        "text": "We pay stores a filming fee for every recorded hour, so they keep the extra hands while their effective labor cost goes down."
+      }
     },
     "issues": {
-      "title": "Why RootLens data is valuable",
-      "intro1": "Robot companies can't train on random video. They need task-focused, hand-visible footage captured in real environments. And they need a lot of it, from as many different homes as possible.",
-      "intro2": "RootLens collects data from real kitchens, real laundry rooms, and real living spaces. Every home is different. Different layouts, different tools, different habits. This diversity is what helps robots generalize beyond the lab.",
-      "pillarsLead": "Each clip in our dataset is built on four pillars.",
+      "title": "Why this data is valuable",
+      "intro1": "Robotics teams cannot train on random video. They need task-focused, hands-visible footage shot in real environments, across as many different sites as possible.",
+      "intro2": "RootLens data comes from real kitchens, real shops, real homes. Different layouts, different tools, different habits. That diversity is the value.",
+      "pillarsLead": "Every clip in the dataset meets four conditions.",
       "hands": {
-        "label": "Hand-focused capture",
-        "text": "Every video is framed around hands, objects, and actions. How you grip, how you move, how you use a tool. This is the data robots need to learn manipulation."
+        "label": "First-person, hands-first",
+        "text": "How things are grasped, moved, and handled with tools. Head-mounted cameras capture exactly what robots need to learn manipulation."
       },
-      "guidance": {
-        "label": "Real-time filming guidance",
-        "text": "Collecting quality data for AI training is harder than it looks. The phone vibrates when hands drift out of frame. AI checks the scene before recording starts. You don't need to be a trained data collector. The app handles it."
+      "sensors": {
+        "label": "More than video",
+        "text": "RGB video recorded together with LiDAR depth, IMU motion, and hand pose, so space and movement can be reconstructed in 3D."
       },
-      "scoring": {
-        "label": "Auto quality scoring",
-        "text": "Every clip gets an objective quality score. Buyers can filter by score. Creators see exactly what makes a good clip and what doesn't. Better clips get licensed more, so quality improves on its own."
+      "diversity": {
+        "label": "Real-world diversity",
+        "text": "Unstaged workplaces with real lighting and real clutter, a breadth of distribution lab collection cannot reach."
       },
-      "privacy": {
-        "label": "Privacy by default",
-        "text": "When data comes from real homes filmed by real people, privacy isn't optional. Faces and text are automatically masked before anything leaves the device. Creators review and approve the blurred version before upload. Buyers receive clean, compliance-ready data."
+      "consent": {
+        "label": "Consent-backed provenance",
+        "text": "Written agreements with every site, faces blurred, no audio recorded, and a consent record linked to every clip."
       }
     },
     "footer": {

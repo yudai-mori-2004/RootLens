@@ -14,7 +14,7 @@ export default async function SiteFooter() {
           className={s.ctaSecondary}
         >
           <XIcon />
-          Follow @rootlens_sol
+          Follow RootLens
         </a>
         <div className={s.footerBuiltBy}>
           <a href="https://x.com/moodai0119" target="_blank" rel="noopener noreferrer" className={s.footerLink}>

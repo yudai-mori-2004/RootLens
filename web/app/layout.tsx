@@ -43,7 +43,7 @@ export const metadata: Metadata = {
     default: "RootLens",
     template: "%s | RootLens",
   },
-  description: "Egocentric home-chore video for embodied-AI training data.",
+  description: "First-person footage of real work, collected with consent and delivered as embodied-AI training data.",
 };
 
 export default async function RootLayout({
