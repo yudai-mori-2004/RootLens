@@ -95,3 +95,6 @@ rootlens-sample-*.zip
 
 # ローカル raw ダウンロードの scratch (生映像を置く一時場所)
 /raw/
+
+# DB アーカイブ (= 死骸テーブルの退避ダンプ。 コミット禁止)
+backups/

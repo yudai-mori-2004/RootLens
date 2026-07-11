@@ -75,4 +75,14 @@
 
 ## 進捗
 
-- [ ] 未着手
+- [x] web: Bearer JWT 認証 (lib/auth.ts + lib/supabase.ts)、 全ルート置換、 schema.ts / mapper /
+      api-types を task 13 形に、 lib/clipId.ts 撤去 (2026-07-12)
+- [x] app: SupabaseAuthProvider (SecureStore 永続化)、 ログイン画面 (ID + パスワード +
+      発行 QR のディープリンク)、 全 API 呼び出しを Bearer 化、 consent_event_id 配線、
+      死にコード applyServerStatus 撤去 (2026-07-12)
+- [x] ops: scripts/create_account.mjs (発行 + QR)、 scripts/archive_legacy_tables.mjs、
+      drizzle/0004 (アカウント移行) + 0005 (死骸 DROP) (2026-07-12)
+- [ ] 「自宅」アカウント発行 (= 本番 Supabase への書き込み。 GO 待ち)
+- [ ] 0004 適用 (= uuid 置換後に apply_one_migration。 GO 待ち)
+- [ ] アーカイブ取得 → 0005 適用 (GO 待ち)
+- [ ] web push (= Vercel デプロイ) → TestFlight ビルド → 実機ログイン + アップロード確認
