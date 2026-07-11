@@ -7,7 +7,7 @@
   "pages": {
     "home": {
       "closingTitle": "Let's talk.",
-      "closingDesc": "Whether you run a short-staffed store or you're looking for embodied-AI training data, we're one email away.",
+      "closingDesc": "Whether you run a short-staffed store, you're exploring automation for your own workplace, or you're looking for embodied-AI training data, we're one email away.",
       "ctaContact": "Email us",
       "ctaSample": "View sample data"
     },
@@ -69,8 +69,8 @@
   },
   "lp": {
     "hero": {
-      "tagline": "Hands-on footage from real workplaces, made robot-ready.",
-      "description": "RootLens is a University of Osaka-born data company. We collect first-person video of people at work and deliver it to teams building physical AI, turning real kitchens and shops into training data robots can learn from.",
+      "tagline": "Field data from real workplaces, made robot-ready.",
+      "description": "RootLens is a University of Osaka-born data company. We collect work data from real workplaces and deliver it to teams building physical AI, designing what to capture and how around each site.",
       "ctaStores": "For store owners",
       "ctaSample": "View sample data",
       "burst": "JAPAN'S FIRST"
@@ -94,7 +94,9 @@
       "step3": {
         "label": "Stores get paid back",
         "text": "We pay stores a filming fee for every recorded hour, so they keep the extra hands while their effective labor cost goes down."
-      }
+      },
+      "label": "APPROACH 01",
+      "intro": "We haven't locked ourselves into one way of collecting. Two approaches are running today. The first puts our own staff on site, and it fits short-staffed stores especially well."
     },
     "issues": {
       "title": "Why this data is valuable",
@@ -102,12 +104,12 @@
       "intro2": "RootLens data comes from real kitchens, real shops, real homes. Different layouts, different tools, different habits. That diversity is the value.",
       "pillarsLead": "Every clip in the dataset meets four conditions.",
       "hands": {
-        "label": "First-person, hands-first",
-        "text": "How things are grasped, moved, and handled with tools. Head-mounted cameras capture exactly what robots need to learn manipulation."
+        "label": "The worker’s point of view",
+        "text": "How things are grasped, moved, and judged, captured from the perspectives robots need to learn work. Third-person views of the whole site are collected when useful."
       },
       "sensors": {
         "label": "More than video",
-        "text": "RGB video recorded together with LiDAR depth, IMU motion, and hand pose, so space and movement can be reconstructed in 3D."
+        "text": "Today we record RGB, LiDAR depth, IMU motion, and hand pose together. The modalities grow with each site and use case."
       },
       "diversity": {
         "label": "Real-world diversity",
@@ -127,7 +129,7 @@
       },
       "license": "Apache 2.0"
     },
-    "marquee": "Hands-on footage from real workplaces, made robot-ready",
+    "marquee": "Field data from real workplaces, made robot-ready",
     "math": {
       "tag": "THE MATH, PER HOUR",
       "wageLabel": "Wage the store pays",
@@ -140,6 +142,13 @@
       "result": "≈¥700",
       "resultUnit": "/h",
       "note": "Example at a ¥1,200 hourly wage. The fee is paid per recorded hour. ¥500 is the current base rate; we raise it as data sales grow, aiming for zero effective cost."
+    },
+    "enterprise": {
+      "label": "APPROACH 02",
+      "title": "Start with a workplace diagnostic",
+      "p1": "The second is for companies exploring physical AI or robotics. We bring the capture gear and app, record your workflows, and deliver a free diagnostic report: the task flow, which steps are automation candidates, and what adoption would require.",
+      "p2": "Only data that has cleared rights processing and your approval is sold as training data, and that is what funds the free diagnostic. The report costs nothing; the only ask on site is the recording itself.",
+      "cta": "Ask about a diagnostic"
     }
   }
 }

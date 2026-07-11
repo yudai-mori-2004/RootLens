@@ -7,6 +7,7 @@ export default async function HomePage() {
   const tHero = await getTranslations("lp.hero");
   const tProblem = await getTranslations("lp.problem");
   const tFlow = await getTranslations("lp.appFlow");
+  const tEnterprise = await getTranslations("lp.enterprise");
   const tIssues = await getTranslations("lp.issues");
   const tMath = await getTranslations("lp.math");
   const tHome = await getTranslations("pages.home");
@@ -55,7 +56,7 @@ export default async function HomePage() {
             <div className={s.heroMetaLabel}>STATUS</div>
             <div className={s.heroMetaValue}>PILOT LIVE</div>
             <div style={{ height: 12 }} />
-            <div className={s.heroMetaLabel}>DATA</div>
+            <div className={s.heroMetaLabel}>DATA · NOW</div>
             <div className={s.heroMetaValue}>RGB · DEPTH · IMU · HANDS</div>
             <div style={{ height: 12 }} />
             <div className={s.heroMetaLabel}>DELIVERY</div>
@@ -97,17 +98,20 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* §02 How it works (= お店向けの三者モデル説明) */}
+      {/* §02 アプローチ 01 (= お店向けの三者モデル) */}
       <section className={s.section} id="for-stores">
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§02</div>
             <div>
-              <div className={s.sectionLabel}>How it works</div>
+              <div className={s.sectionLabel}>{tFlow("label")}</div>
               <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
             </div>
           </header>
-          <div className={s.steps}>
+          <div className={s.sectionBody}>
+            <p className={s.prose}>{tFlow("intro")}</p>
+          </div>
+          <div className={s.steps} style={{ marginTop: 32 }}>
             {flowSteps.map((key, i) => {
               const icons = ["/lp/step-record.webp", "/lp/step-validate.webp", "/lp/step-earn.webp"];
               return (
@@ -154,11 +158,39 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* §03 Why the data is valuable */}
-      <section className={s.section}>
+      {/* §03 アプローチ 02 (= 企業向けの現場診断) */}
+      <section className={s.section} id="for-companies">
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§03</div>
+            <div>
+              <div className={s.sectionLabel}>{tEnterprise("label")}</div>
+              <h2 className={s.sectionTitle}>{tEnterprise("title")}</h2>
+            </div>
+          </header>
+          <div className={s.sectionBodyWithIllustration}>
+            <div className={s.sectionBodyContentNarrow}>
+              <p className={s.prose}>{tEnterprise("p1")}</p>
+              <p className={s.prose}>{tEnterprise("p2")}</p>
+              <div style={{ marginTop: 28 }}>
+                <a href={`mailto:${CONTACT_EMAIL}`} className={s.ctaSecondary}>
+                  {tEnterprise("cta")}
+                  <span aria-hidden="true">→</span>
+                </a>
+              </div>
+            </div>
+            <div className={s.sectionIllustration}>
+              <img src="/lp/step-validate.webp" alt="" width={800} height={800} loading="lazy" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* §04 Why the data is valuable */}
+      <section className={s.section}>
+        <div className={s.sectionInner}>
+          <header className={s.sectionHeader}>
+            <div className={s.sectionNumber}>§04</div>
             <div>
               <div className={s.sectionLabel}>What buyers want</div>
               <h2 className={s.sectionTitle}>{tIssues("title")}</h2>
@@ -192,13 +224,13 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* §04 Closing CTA */}
+      {/* §05 Closing CTA */}
       <section className={s.closingCta}>
         <div className={s.closingCtaInner}>
           <div className={s.closingCtaVisual}>
             <img src="/lp/cta.webp" alt="" width={600} height={600} loading="lazy" />
           </div>
-          <div className={s.closingCtaNumber}>§04</div>
+          <div className={s.closingCtaNumber}>§05</div>
           <div className={s.closingCtaMain}>
             <div className={s.closingCtaLabel}>Get in touch</div>
             <h2 className={s.closingCtaTitle}>{tHome("closingTitle")}</h2>
