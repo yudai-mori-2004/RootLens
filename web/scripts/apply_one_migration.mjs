@@ -27,7 +27,9 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const sql = postgres(process.env.DATABASE_URL, { prepare: false });
+// max: 1 = 単一コネクション。 migration ファイル内の BEGIN/COMMIT を postgres.js の
+// UNSAFE_TRANSACTION ガードに弾かせないため (トランザクションはファイル側が宣言する)。
+const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
 const script = readFileSync(join(root, "drizzle", file), "utf8");
 const statements = script
   .split("--> statement-breakpoint")

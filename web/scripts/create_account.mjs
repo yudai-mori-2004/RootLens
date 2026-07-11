@@ -41,8 +41,8 @@ function randomToken(len) {
 }
 
 const handle = process.argv[2] ?? randomToken(8);
-if (!/^[a-z0-9-]{3,32}$/.test(handle)) {
-  console.error(`handle は英数小文字 3-32 文字: ${handle}`);
+if (!/^[a-z0-9_-]{3,32}$/.test(handle)) {
+  console.error(`handle は英数小文字 (+ _ -) 3-32 文字: ${handle}`);
   process.exit(1);
 }
 const password = randomToken(20);
