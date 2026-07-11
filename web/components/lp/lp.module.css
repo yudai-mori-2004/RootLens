@@ -116,7 +116,7 @@
   margin-top: 28px;
   font-family: var(--font-lp-heading, sans-serif);
   font-weight: 400;
-  font-size: clamp(3rem, 8.5vw, 6.2rem);
+  font-size: clamp(2.7rem, 7.2vw, 5.2rem);
   line-height: 1.08;
   letter-spacing: 0.01em;
   text-transform: uppercase;
@@ -1080,11 +1080,18 @@
   }
 
   .burst {
-    top: 18px;
-    right: 18px;
-    width: 104px;
-    height: 104px;
-    font-size: 0.95rem;
+    top: 14px;
+    right: 14px;
+    width: 96px;
+    height: 96px;
+    font-size: 0.9rem;
+  }
+
+  /* バーストと被らないようにピルを早めに折り返す */
+  .heroEyebrow {
+    max-width: calc(100% - 104px);
+    flex-wrap: wrap;
+    row-gap: 2px;
   }
 
   .steps {

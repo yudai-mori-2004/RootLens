@@ -3,9 +3,18 @@ import s from "./lp.module.css";
 
 const CONTACT_EMAIL = "contact@rootlens.io";
 
+// 構成 (= 思想の順に語る):
+//   Hero      現場の仕事がロボットを教え、現場が対価を受け取る
+//   §01       問題: ロボットの学習データは現場でしか生まれない
+//   §02       モデル: データの価値を現場のメリットに変換して返す
+//   §03       サービス 01 (お店向け): 併走スタッフ + 撮影協力費
+//   §04       サービス 02 (企業向け): 無償の現場診断
+//   §05       買い手向け: データの価値 4 条件
+//   §06       CTA
 export default async function HomePage() {
   const tHero = await getTranslations("lp.hero");
   const tProblem = await getTranslations("lp.problem");
+  const tModel = await getTranslations("lp.model");
   const tFlow = await getTranslations("lp.appFlow");
   const tEnterprise = await getTranslations("lp.enterprise");
   const tIssues = await getTranslations("lp.issues");
@@ -36,14 +45,18 @@ export default async function HomePage() {
               <span className={s.heroEyebrowDesc}>{tHero("tagline")}</span>
             </div>
             <h1 className={s.heroTitle}>
-              Real work,<br />
-              first person.<br />
-              <span className={s.heroTitleAccent}>Robot-ready.</span>
+              Real work<br />
+              teaches robots.<br />
+              <span className={s.heroTitleAccent}>The floor gets paid.</span>
             </h1>
             <p className={s.heroDescription}>{tHero("description")}</p>
             <div className={s.heroCtas}>
               <a href="#for-stores" className={s.ctaPrimary}>
                 {tHero("ctaStores")}
+                <span aria-hidden="true">→</span>
+              </a>
+              <a href="#for-companies" className={s.ctaSecondary}>
+                {tHero("ctaCompanies")}
                 <span aria-hidden="true">→</span>
               </a>
               <a href="/sample" className={s.ctaSecondary}>
@@ -65,7 +78,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* マーキー帯 (= フライヤーの下端帯) */}
+      {/* マーキー帯 */}
       <div className={s.mq} aria-hidden="true">
         <div className={s.mqTrack}>
           {marqueeRun}
@@ -73,7 +86,7 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* §01 Problem */}
+      {/* §01 問題 */}
       <section className={s.section}>
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
@@ -98,20 +111,37 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* §02 アプローチ 01 (= お店向けの三者モデル) */}
-      <section className={s.section} id="for-stores">
+      {/* §02 モデル */}
+      <section className={s.section}>
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§02</div>
+            <div>
+              <div className={s.sectionLabel}>{tModel("label")}</div>
+              <h2 className={s.sectionTitle}>{tModel("title")}</h2>
+            </div>
+          </header>
+          <div className={s.sectionBody}>
+            <p className={s.prose}>{tModel("p1")}</p>
+            <p className={s.prose}>{tModel("p2")}</p>
+            <p className={s.prose} style={{ marginTop: 28, marginBottom: 0 }}>
+              <span className={s.emphasis}>{tModel("emphasis")}</span>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* §03 サービス 01 (お店向け) */}
+      <section className={s.section} id="for-stores">
+        <div className={s.sectionInner}>
+          <header className={s.sectionHeader}>
+            <div className={s.sectionNumber}>§03</div>
             <div>
               <div className={s.sectionLabel}>{tFlow("label")}</div>
               <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
             </div>
           </header>
-          <div className={s.sectionBody}>
-            <p className={s.prose}>{tFlow("intro")}</p>
-          </div>
-          <div className={s.steps} style={{ marginTop: 32 }}>
+          <div className={s.steps}>
             {flowSteps.map((key, i) => {
               const icons = ["/lp/step-record.webp", "/lp/step-validate.webp", "/lp/step-earn.webp"];
               return (
@@ -158,11 +188,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* §03 アプローチ 02 (= 企業向けの現場診断) */}
+      {/* §04 サービス 02 (企業向け) */}
       <section className={s.section} id="for-companies">
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
-            <div className={s.sectionNumber}>§03</div>
+            <div className={s.sectionNumber}>§04</div>
             <div>
               <div className={s.sectionLabel}>{tEnterprise("label")}</div>
               <h2 className={s.sectionTitle}>{tEnterprise("title")}</h2>
@@ -186,11 +216,11 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* §04 Why the data is valuable */}
+      {/* §05 買い手向け: データの価値 */}
       <section className={s.section}>
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
-            <div className={s.sectionNumber}>§04</div>
+            <div className={s.sectionNumber}>§05</div>
             <div>
               <div className={s.sectionLabel}>What buyers want</div>
               <h2 className={s.sectionTitle}>{tIssues("title")}</h2>
@@ -224,13 +254,13 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* §05 Closing CTA */}
+      {/* §06 Closing CTA */}
       <section className={s.closingCta}>
         <div className={s.closingCtaInner}>
           <div className={s.closingCtaVisual}>
             <img src="/lp/cta.webp" alt="" width={600} height={600} loading="lazy" />
           </div>
-          <div className={s.closingCtaNumber}>§05</div>
+          <div className={s.closingCtaNumber}>§06</div>
           <div className={s.closingCtaMain}>
             <div className={s.closingCtaLabel}>Get in touch</div>
             <h2 className={s.closingCtaTitle}>{tHome("closingTitle")}</h2>

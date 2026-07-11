@@ -69,19 +69,21 @@
   },
   "lp": {
     "hero": {
-      "tagline": "Field data from real workplaces, made robot-ready.",
-      "description": "RootLens is a University of Osaka-born data company. We collect work data from real workplaces and deliver it to teams building physical AI, designing what to capture and how around each site.",
-      "ctaStores": "For store owners",
-      "ctaSample": "View sample data",
+      "tagline": "Field data, made robot-ready.",
+      "description": "RootLens collects work data from real workplaces, sells it to robotics companies, and returns part of the proceeds to the site: wage rebates for stores, free adoption diagnostics for companies. Born at the University of Osaka.",
+      "ctaStores": "For stores",
+      "ctaCompanies": "For companies",
+      "ctaSample": "Sample data",
       "burst": "JAPAN'S FIRST"
     },
     "problem": {
       "title": "Robots learn by watching people. The footage is the bottleneck.",
       "p1": "Robot intelligence is advancing at a startling pace. AI has moved from language to vision, and now to physical motion. Robots are learning how to move by watching humans work.",
-      "p2": "Yet high-quality footage of real work in real places is scarce. The traditional approach, staging demonstrations in a lab, is expensive, slow, and misses the messiness of reality.",
-      "p3": "Human motion footage is the bottleneck. RootLens collects it where people actually work."
+      "p2": "Yet high-quality work data from real places is scarce. The traditional approach, staging demonstrations in a lab, is expensive, slow, and misses the messiness of reality.",
+      "p3": "The missing data lives inside everyday work, on real shop floors."
     },
     "appFlow": {
+      "label": "SERVICE 01 · FOR STORES",
       "title": "The workplace becomes the collection site",
       "step1": {
         "label": "Work as usual",
@@ -89,22 +91,20 @@
       },
       "step2": {
         "label": "Data while working",
-        "text": "First-person video plus depth, motion, and hand-pose data from each shift becomes training material for robot manipulation."
+        "text": "Work data from each shift becomes training material for robot manipulation. Nothing about the store's routine changes."
       },
       "step3": {
         "label": "Stores get paid back",
         "text": "We pay stores a filming fee for every recorded hour, so they keep the extra hands while their effective labor cost goes down."
-      },
-      "label": "APPROACH 01",
-      "intro": "We haven't locked ourselves into one way of collecting. Two approaches are running today. The first puts our own staff on site, and it fits short-staffed stores especially well."
+      }
     },
     "issues": {
       "title": "Why this data is valuable",
-      "intro1": "Robotics teams cannot train on random video. They need task-focused, hands-visible footage shot in real environments, across as many different sites as possible.",
-      "intro2": "RootLens data comes from real kitchens, real shops, real homes. Different layouts, different tools, different habits. That diversity is the value.",
+      "intro1": "Robotics teams cannot train on random video. They need task-focused footage of real work shot in real environments, across as many different sites as possible.",
+      "intro2": "RootLens data is born in real kitchens, real shops, real workplaces. Different layouts, different tools, different habits. That diversity is the value.",
       "pillarsLead": "Every clip in the dataset meets four conditions.",
       "hands": {
-        "label": "The worker’s point of view",
+        "label": "The worker's point of view",
         "text": "How things are grasped, moved, and judged, captured from the perspectives robots need to learn work. Third-person views of the whole site are collected when useful."
       },
       "sensors": {
@@ -144,11 +144,18 @@
       "note": "Example at a ¥1,200 hourly wage. The fee is paid per recorded hour. ¥500 is the current base rate; we raise it as data sales grow, aiming for zero effective cost."
     },
     "enterprise": {
-      "label": "APPROACH 02",
+      "label": "SERVICE 02 · FOR COMPANIES",
       "title": "Start with a workplace diagnostic",
-      "p1": "The second is for companies exploring physical AI or robotics. We bring the capture gear and app, record your workflows, and deliver a free diagnostic report: the task flow, which steps are automation candidates, and what adoption would require.",
-      "p2": "Only data that has cleared rights processing and your approval is sold as training data, and that is what funds the free diagnostic. The report costs nothing; the only ask on site is the recording itself.",
+      "p1": "For companies considering robots or physical AI. We bring the capture gear and app, record the work on your floor, and hand you a free diagnostic report: which steps suit automation, and what adoption would take.",
+      "p2": "It can be free for a simple reason: only the data you approve is sold as training data, and that funds the diagnostic. All we ask of the site is the recording.",
       "cta": "Ask about a diagnostic"
+    },
+    "model": {
+      "label": "THE MODEL",
+      "title": "Collect, sell, give back",
+      "p1": "The data robotics companies want is produced in everyday work. But a shop or a factory can hardly sell it on its own: that takes capture gear, rights handling, and buyers.",
+      "p2": "RootLens takes care of all of it. We sell the collected data to robotics companies and return part of the proceeds to the site, in two services shaped around each workplace.",
+      "emphasis": "The site just does its usual work. The rest is on us."
     }
   }
 }
