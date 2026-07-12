@@ -28,12 +28,7 @@ export default async function ContactPage() {
             <div className={s.sectionBody}>
               <p className={s.prose}>{t("lead")}</p>
             </div>
-            <ContactCard
-              email={CONTACT_EMAIL}
-              copyLabel={t("copy")}
-              copiedLabel={t("copied")}
-              openLabel={t("open")}
-            />
+            <ContactCard email={CONTACT_EMAIL} copyLabel={t("copy")} copiedLabel={t("copied")} />
           </div>
         </section>
       </div>

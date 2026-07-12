@@ -7,10 +7,9 @@ interface Props {
   email: string;
   copyLabel: string;
   copiedLabel: string;
-  openLabel: string;
 }
 
-export default function ContactCard({ email, copyLabel, copiedLabel, openLabel }: Props) {
+export default function ContactCard({ email, copyLabel, copiedLabel }: Props) {
   const [copied, setCopied] = useState(false);
   const emailRef = useRef<HTMLDivElement>(null);
 
@@ -51,9 +50,6 @@ export default function ContactCard({ email, copyLabel, copiedLabel, openLabel }
         <button type="button" onClick={copy} className={s.ctaPrimary}>
           {copied ? copiedLabel : copyLabel}
         </button>
-        <a href={`mailto:${email}`} className={s.contactMailto}>
-          {openLabel} <span aria-hidden="true">→</span>
-        </a>
       </div>
     </div>
   );
