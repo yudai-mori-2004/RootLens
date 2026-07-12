@@ -79,7 +79,7 @@ We may entrust all or part of the handling of personal data to outside providers
 Data **may be provided to companies outside Japan**. Recipients are limited to parties contractually bound by no-re-identification, use limitations, and downstream flow-through obligations.
 
 ## 8. Privacy processing
-Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via body, room, possessions). We do not call it "anonymized." For that reason, we do not treat blurred footage as data that no longer concerns you. It remains handled on the basis of your consent: if you withdraw consent, data not yet used for training is deleted. What remains possible after training use is stated honestly in "11. Your rights."
+Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via body, room, possessions). We do not call it "anonymized." For that reason, we do not treat blurred footage as data that no longer concerns you. It remains handled on the basis of your consent: if you withdraw consent, data not yet used for training is deleted. What remains possible after training use is described in "11. Your rights."
 
 ## 9. Third parties, children, private spaces
 - We assume and require that **only the recording user and adults who consented to being recorded appear**, and limit recording to tasks where customers and other bystanders stay out of frame.
