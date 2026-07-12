@@ -125,10 +125,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // Sensor stream state (non-nil only while recording; output files append incrementally).
   private var sensorsFileHandle: FileHandle?
   private var imuFileHandle: FileHandle?
-  // LiDAR depth (sceneDepth) streams into a single depth.tar as 16-bit PNGs
-  // (millimeters). Lazily created on the first depth frame, so non-LiDAR devices
-  // never produce a depth.tar.
-  private var depthTarHandle: FileHandle?
+  // LiDAR depth (sceneDepth) streams into a single depth.tar (see DepthTarWriter).
+  private var depthTarWriter: DepthTarWriter?
   private var frameIndexCounter: Int = 0
   private let sensorFileQueue = DispatchQueue(label: "io.rootlens.arkit-capture.sensors", qos: .utility)
   private let motionManager = CMMotionManager()
@@ -403,6 +401,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.sensorsFileHandle = sensorsHandle
     self.imuFileHandle = imuHandle
     self.pointCloudFileHandle = pcHandle
+    self.depthTarWriter = DepthTarWriter(sessionDir: sessionDir)
     self.frameIndexCounter = 0
 
     if !sessionRunning { startSession() }
@@ -452,7 +451,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     var sensorCloseError: Error?
     sensorFileQueue.sync {
       do {
-        self.finalizeDepthTar()  // write the tar trailer (2×512 zero blocks) and close (no-op without depth)
+        self.depthTarWriter?.finalize()  // tar trailer (2×512 zero blocks) + close (no-op without depth)
         try self.sensorsFileHandle?.synchronize()
         try self.sensorsFileHandle?.close()
         try self.imuFileHandle?.synchronize()
@@ -466,7 +465,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
     // Export the scene mesh (ARMeshAnchors) to mesh.jsonl (only when enabled and on LiDAR devices).
     if captureSettings.streamMesh {
-      writeMeshJsonl(into: dir)
+      let meshAnchors = (session.currentFrame?.anchors ?? []).compactMap { $0 as? ARMeshAnchor }
+      MeshExporter.writeMeshJsonl(anchors: meshAnchors, into: dir)
     }
 
     stopThermalMonitoring(mergingInto: dir)
@@ -486,7 +486,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.sensorsFileHandle = nil
     self.imuFileHandle = nil
     self.pointCloudFileHandle = nil
-    self.depthTarHandle = nil
+    self.depthTarWriter = nil
     self.frameIndexCounter = 0
     self.copyPool = nil
     self.copyPoolDims = (0, 0, 0)
@@ -845,7 +845,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       let confBuffer = sceneDepth.confidenceMap
       let idx = frameIndex
       sensorFileQueue.async {
-        self.appendDepthFrameToTar(depthMap: buffer, confidenceMap: confBuffer, frameIndex: idx)
+        self.depthTarWriter?.append(depthMap: buffer, confidenceMap: confBuffer, frameIndex: idx)
       }
     }
 
@@ -883,229 +883,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// Encode a CVPixelBuffer (ARKit sceneDepth, kCVPixelFormatType_DepthFloat32)
-  /// as a 16-bit gray PNG (float32 meters → uint16 millimeters), the standard
-  /// RGB-D dataset format.
-  private func depthMapToPngData(_ depthMap: CVPixelBuffer) -> Data? {
-    CVPixelBufferLockBaseAddress(depthMap, .readOnly)
-    defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
-
-    let width = CVPixelBufferGetWidth(depthMap)
-    let height = CVPixelBufferGetHeight(depthMap)
-    let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
-    guard let base = CVPixelBufferGetBaseAddress(depthMap) else { return nil }
-
-    let floatStride = bytesPerRow / MemoryLayout<Float32>.size
-    let floatPtr = base.assumingMemoryBound(to: Float32.self)
-
-    // float32 (meters) → uint16 (millimeters)
-    var u16 = [UInt16](repeating: 0, count: width * height)
-    for y in 0..<height {
-      let srcRow = y * floatStride
-      let dstRow = y * width
-      for x in 0..<width {
-        let m = floatPtr[srcRow + x]
-        let mm = m.isNaN ? 0 : m * 1000.0
-        let clamped = max(0.0, min(65535.0, Double(mm)))
-        u16[dstRow + x] = UInt16(clamped)
-      }
-    }
-
-    let cs = CGColorSpaceCreateDeviceGray()
-    let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue | CGBitmapInfo.byteOrder16Little.rawValue)
-    let data = NSData(bytes: u16, length: u16.count * 2)
-    guard let provider = CGDataProvider(data: data as CFData) else { return nil }
-    guard let cgImage = CGImage(
-      width: width, height: height,
-      bitsPerComponent: 16, bitsPerPixel: 16,
-      bytesPerRow: width * 2,
-      space: cs, bitmapInfo: bitmapInfo,
-      provider: provider,
-      decode: nil, shouldInterpolate: false,
-      intent: .defaultIntent
-    ) else { return nil }
-
-    let out = NSMutableData()
-    guard let dest = CGImageDestinationCreateWithData(out as CFMutableData, "public.png" as CFString, 1, nil) else { return nil }
-    CGImageDestinationAddImage(dest, cgImage, nil)
-    guard CGImageDestinationFinalize(dest) else { return nil }
-    return out as Data
-  }
-
-  // MARK: - depth.tar streaming writer (ustar tar of 16-bit PNGs)
-
-  /// Append one depth frame to depth.tar as a 16-bit PNG entry (on
-  /// sensorFileQueue). When a confidence map exists, confidence/<idx>.png (8-bit)
-  /// follows it into the same tar. The tar is lazily created on the first call,
-  /// so non-LiDAR devices never produce one.
-  private func appendDepthFrameToTar(depthMap: CVPixelBuffer, confidenceMap: CVPixelBuffer?, frameIndex: Int) {
-    guard let png = depthMapToPngData(depthMap) else { return }
-    if depthTarHandle == nil {
-      guard let dir = sessionDirURL else { return }
-      let url = dir.appendingPathComponent("depth.tar")
-      FileManager.default.createFile(atPath: url.path, contents: nil)
-      depthTarHandle = try? FileHandle(forWritingTo: url)
-    }
-    guard let h = depthTarHandle else { return }
-    do {
-      let name = String(format: "depth/%06d.png", frameIndex)
-      try h.write(contentsOf: Self.tarHeader(name: name, size: png.count))
-      try h.write(contentsOf: png)
-      let pad = (512 - (png.count % 512)) % 512
-      if pad > 0 { try h.write(contentsOf: Data(count: pad)) }
-
-      if let conf = confidenceMap, let confPng = confidenceMapToPngData(conf) {
-        let confName = String(format: "confidence/%06d.png", frameIndex)
-        try h.write(contentsOf: Self.tarHeader(name: confName, size: confPng.count))
-        try h.write(contentsOf: confPng)
-        let confPad = (512 - (confPng.count % 512)) % 512
-        if confPad > 0 { try h.write(contentsOf: Data(count: confPad)) }
-      }
-    } catch {
-      NSLog("[ArkitCaptureController] depth.tar write failed: %@", "\(error)")
-    }
-  }
-
-  /// Encode a CVPixelBuffer (ARKit sceneDepth.confidenceMap,
-  /// kCVPixelFormatType_OneComponent8; values 0=low / 1=medium / 2=high) as an
-  /// 8-bit gray PNG.
-  private func confidenceMapToPngData(_ conf: CVPixelBuffer) -> Data? {
-    CVPixelBufferLockBaseAddress(conf, .readOnly)
-    defer { CVPixelBufferUnlockBaseAddress(conf, .readOnly) }
-
-    let width = CVPixelBufferGetWidth(conf)
-    let height = CVPixelBufferGetHeight(conf)
-    let bytesPerRow = CVPixelBufferGetBytesPerRow(conf)
-    guard let base = CVPixelBufferGetBaseAddress(conf) else { return nil }
-
-    var u8 = [UInt8](repeating: 0, count: width * height)
-    for y in 0..<height {
-      let src = base.advanced(by: y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
-      for x in 0..<width {
-        u8[y * width + x] = src[x]
-      }
-    }
-
-    let cs = CGColorSpaceCreateDeviceGray()
-    let data = NSData(bytes: u8, length: u8.count)
-    guard let provider = CGDataProvider(data: data as CFData) else { return nil }
-    guard let cgImage = CGImage(
-      width: width, height: height,
-      bitsPerComponent: 8, bitsPerPixel: 8,
-      bytesPerRow: width,
-      space: cs, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
-      provider: provider,
-      decode: nil, shouldInterpolate: false,
-      intent: .defaultIntent
-    ) else { return nil }
-
-    let out = NSMutableData()
-    guard let dest = CGImageDestinationCreateWithData(out as CFMutableData, "public.png" as CFString, 1, nil) else { return nil }
-    CGImageDestinationAddImage(dest, cgImage, nil)
-    guard CGImageDestinationFinalize(dest) else { return nil }
-    return out as Data
-  }
-
-  /// Export ARKit's scene reconstruction mesh (ARMeshAnchors) as JSONL, one
-  /// anchor per row: vertices as float32 LE xyz × n and faces as uint32 LE
-  /// vertex indices × 3 × m, base64-encoded. transform is a row-major 4×4 into
-  /// world space, the same convention as camera_transform in
-  /// realtime_handpose.jsonl.
-  private func writeMeshJsonl(into dir: URL) {
-    guard let anchors = session.currentFrame?.anchors else { return }
-    let meshAnchors = anchors.compactMap { $0 as? ARMeshAnchor }
-    guard !meshAnchors.isEmpty else {
-      NSLog("[ArkitCaptureController] no mesh anchors to export")
-      return
-    }
-    let url = dir.appendingPathComponent("mesh.jsonl")
-    FileManager.default.createFile(atPath: url.path, contents: nil)
-    guard let handle = try? FileHandle(forWritingTo: url) else { return }
-    defer { try? handle.close() }
-
-    for anchorObj in meshAnchors {
-      let g = anchorObj.geometry
-
-      let vCount = g.vertices.count
-      var verts = [Float]()
-      verts.reserveCapacity(vCount * 3)
-      let vBase = g.vertices.buffer.contents().advanced(by: g.vertices.offset)
-      for i in 0..<vCount {
-        let pv = vBase.advanced(by: i * g.vertices.stride).assumingMemoryBound(to: Float.self)
-        verts.append(pv[0]); verts.append(pv[1]); verts.append(pv[2])
-      }
-
-      let fCount = g.faces.count
-      let idxPer = g.faces.indexCountPerPrimitive
-      var faces = [UInt32]()
-      faces.reserveCapacity(fCount * idxPer)
-      let fBase = g.faces.buffer.contents()
-      let bytesPerIndex = g.faces.bytesPerIndex
-      for i in 0..<(fCount * idxPer) {
-        let off = i * bytesPerIndex
-        if bytesPerIndex == 4 {
-          faces.append(fBase.advanced(by: off).assumingMemoryBound(to: UInt32.self).pointee)
-        } else {
-          faces.append(UInt32(fBase.advanced(by: off).assumingMemoryBound(to: UInt16.self).pointee))
-        }
-      }
-
-      let t = anchorObj.transform
-      let rows: [[Float]] = [
-        [t.columns.0[0], t.columns.1[0], t.columns.2[0], t.columns.3[0]],
-        [t.columns.0[1], t.columns.1[1], t.columns.2[1], t.columns.3[1]],
-        [t.columns.0[2], t.columns.1[2], t.columns.2[2], t.columns.3[2]],
-        [t.columns.0[3], t.columns.1[3], t.columns.2[3], t.columns.3[3]],
-      ]
-      let vData = verts.withUnsafeBufferPointer { Data(buffer: $0) }
-      let fData = faces.withUnsafeBufferPointer { Data(buffer: $0) }
-      let line: [String: Any] = [
-        "identifier": anchorObj.identifier.uuidString,
-        "transform": rows,
-        "vertex_count": vCount,
-        "face_count": fCount,
-        "vertices_b64": vData.base64EncodedString(),
-        "faces_b64": fData.base64EncodedString(),
-      ]
-      if let data = try? JSONSerialization.data(withJSONObject: line, options: []) {
-        try? handle.write(contentsOf: data)
-        try? handle.write(contentsOf: Data("\n".utf8))
-      }
-    }
-    NSLog("[ArkitCaptureController] mesh.jsonl written: %d anchors", meshAnchors.count)
-  }
-
-  private func finalizeDepthTar() {
-    guard let h = depthTarHandle else { return }
-    try? h.write(contentsOf: Data(count: 1024))
-    try? h.synchronize()
-    try? h.close()
-    depthTarHandle = nil
-  }
-
-  /// Build a 512-byte ustar header for a regular file.
-  private static func tarHeader(name: String, size: Int) -> Data {
-    var h = [UInt8](repeating: 0, count: 512)
-    func put(_ s: String, _ offset: Int, _ maxLen: Int) {
-      for (i, b) in Array(s.utf8).prefix(maxLen).enumerated() { h[offset + i] = b }
-    }
-    put(name, 0, 100)                            // name ("depth/NNNNNN.png"; 100-byte cap)
-    put("0000644", 100, 7)                       // mode (octal)
-    put("0000000", 108, 7)                       // uid
-    put("0000000", 116, 7)                       // gid
-    put(String(format: "%011o", size), 124, 11)  // size (octal)
-    put("00000000000", 136, 11)                  // mtime (octal, 0)
-    for i in 148..<156 { h[i] = 0x20 }           // chksum field is 8 spaces before computing
-    h[156] = UInt8(ascii: "0")                   // typeflag '0' = regular file
-    put("ustar", 257, 5)                         // magic "ustar\0"
-    put("00", 263, 2)                            // version
-    var sum = 0
-    for b in h { sum += Int(b) }
-    put(String(format: "%06o", sum), 148, 6)     // chksum (6 octal)
-    h[154] = 0                                   // null
-    h[155] = 0x20                                // space
-    return Data(h)
-  }
 
   private func appendImuLine(motion: CMDeviceMotion) {
     guard let handle = imuFileHandle else { return }
