@@ -1480,7 +1480,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   countdownText: {
-    fontFamily: fonts.mono,
+    fontFamily: fonts.dot,
     fontSize: 116,
     color: '#FFFFFF',
     textShadowColor: 'rgba(0,0,0,0.55)',
@@ -1521,13 +1521,13 @@ const styles = StyleSheet.create({
   recDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#E05548' },
   recBadgeLabel: {
     color: 'rgba(255,255,255,0.92)',
-    fontFamily: fonts.sansMedium,
-    fontSize: 12,
+    fontFamily: fonts.dot,
+    fontSize: 12.5,
   },
   recBadgeTime: {
     color: 'rgba(255,255,255,0.92)',
-    fontFamily: fonts.mono,
-    fontSize: 12.5,
+    fontFamily: fonts.dot,
+    fontSize: 13,
     letterSpacing: 0.5,
   },
 
@@ -1607,7 +1607,7 @@ const styles = StyleSheet.create({
     color: colors.paper,
   },
   pauseRemain: {
-    fontFamily: fonts.mono,
+    fontFamily: fonts.dot,
     fontSize: 40,
     color: colors.emerald,
     letterSpacing: 1,

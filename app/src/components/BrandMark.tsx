@@ -18,7 +18,7 @@ export const BrandMark: React.FC<{ size?: number; withWordmark?: boolean }> = ({
     />
     {withWordmark ? (
       <Text style={[styles.wordmark, { fontSize: size * 0.6 }]} numberOfLines={1}>
-        RootLens
+        Root<Text style={styles.wordmarkAccent}>Lens</Text>
       </Text>
     ) : null}
   </View>
@@ -32,4 +32,6 @@ const styles = StyleSheet.create({
     color: colors.ink,
     flexShrink: 0,
   },
+  // LP のロゴと同じ「Lens」 だけ黄色 (= 差し色は点で使う)
+  wordmarkAccent: { color: colors.lpYellow },
 });

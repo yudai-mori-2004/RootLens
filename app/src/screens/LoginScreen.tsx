@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   heroAccent: {
     fontFamily: fonts.serifMedium,
-    color: colors.emeraldDeep,
+    color: colors.lpPink,
   },
   lede: {
     ...typography.body,
@@ -291,13 +291,13 @@ const styles = StyleSheet.create({
   errorBody: { ...typography.caption, color: colors.danger, marginTop: 4 },
 
   cta: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.lpPink,
     paddingVertical: 16,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaPressed: { backgroundColor: colors.inkSoft },
+  ctaPressed: { opacity: 0.85 },
   ctaDisabled: { opacity: 0.6 },
   ctaLabel: {
     color: colors.textOnInk,

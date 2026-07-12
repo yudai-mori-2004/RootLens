@@ -40,6 +40,12 @@ export const colors = {
   gold: '#E8B339',
   goldSoft: '#332B18',
 
+  // Accent — LP (= rootlens.io の neon zine の差し色。 面ではなく点で使う:
+  // primary CTA = pink、 進捗 = lime、 ワードマークの Lens = yellow)
+  lpPink: '#FF2E93',
+  lpLime: '#C8FF00',
+  lpYellow: '#FFE600',
+
   // Borders / hairlines
   border: '#282C35',
   borderInk: '#F0EDE6',
@@ -114,6 +120,9 @@ export const fonts = {
 
   // 読み出し (= 時刻 / 尺 / hash)
   mono: 'JetBrainsMono_500Medium',
+
+  // 録画 HUD の数字 / インジケータ (= LP のドット文字 DotGothic16。 日本語グリフも持つ)
+  dot: 'DotGothic16_400Regular',
 
   // ブランドワードマーク専用 (= RootLens の文字だけ Fraunces)
   brand: 'Fraunces_700Bold',

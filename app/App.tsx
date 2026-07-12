@@ -19,6 +19,7 @@ import {
   JetBrainsMono_500Medium,
 } from '@expo-google-fonts/jetbrains-mono';
 import { Fraunces_700Bold } from '@expo-google-fonts/fraunces';
+import { DotGothic16_400Regular } from '@expo-google-fonts/dotgothic16';
 
 import { RootNavigator } from './src/app/RootNavigator';
 import { DevSandboxScreen } from './src/devsandbox/DevSandboxScreen';
@@ -76,6 +77,7 @@ export default function App() {
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
     Fraunces_700Bold,
+    DotGothic16_400Regular,
   });
 
   if (!fontsLoaded || !localeReady) {

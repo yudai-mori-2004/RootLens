@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     overflow: 'hidden',
   },
-  progressFill: { height: 3, backgroundColor: colors.emerald },
+  progressFill: { height: 3, backgroundColor: colors.lpLime },
 
   caption: {
     paddingTop: spacing.sm + 2,

@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
 
   primaryBtn: {
     borderRadius: radii.full,
-    backgroundColor: colors.emerald,
+    backgroundColor: colors.lpPink,
     paddingVertical: 12,
     alignItems: 'center',
   },

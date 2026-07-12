@@ -12,6 +12,7 @@
     "gen:legal": "node scripts/gen-legal.mjs"
   },
   "dependencies": {
+    "@expo-google-fonts/dotgothic16": "^0.4.1",
     "@expo-google-fonts/fraunces": "^0.4.1",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
