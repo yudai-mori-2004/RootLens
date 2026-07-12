@@ -79,7 +79,7 @@ We may entrust all or part of the handling of personal data to outside providers
 Data **may be provided to companies outside Japan**. Recipients are limited to parties contractually bound by no-re-identification, use limitations, and downstream flow-through obligations.
 
 ## 8. Privacy processing
-Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via body, room, possessions). We do not call it "anonymized."
+Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via body, room, possessions). We do not call it "anonymized." For that reason, blurred data is still treated as personal data, handled on the basis of your consent, and requests for disclosure, correction, and deletion remain available after blurring (see "11. Your rights").
 
 ## 9. Third parties, children, private spaces
 - We assume and require that **only the recording user and adults who consented to being recorded appear**, and limit recording to tasks where customers and other bystanders stay out of frame.
@@ -140,3 +140,4 @@ contact@rootlens.io
 | 2026-07-12 (4) | Expanded based on a benchmark against comparable services (Shift, Project Aria) and Japanese data businesses (Macromill, Agoop): purposes rewritten per data subject (naming who filming fees are paid to), collected-data list extended (payment, business representatives, requests), new entrustment section (later sections renumbered), on-site notice and in-site consent confirmation plus locker/break rooms added, retention specified per category, third-party provision records and fees added to requests, security measures published per category including the external environment, and the amendment notice method stated |
 | 2026-07-12 (5) | Withdrew the on-site notice and prior coworker-consent-confirmation promises in section 9 (obligations that do not exist in the actual operation or the filming cooperation agreement); replaced with wording matching the agreement (recording within the agreed scope, no recording where the business objects, immediate stop on request) |
 | 2026-07-12 (6) | Removed "currently, the main recipients are located in the United States" from section 7 (not factual) |
+| 2026-07-12 (7) | Added to section 8 that blurred data is still treated as personal data, handled on consent, with requests still available (the section stated only the negative) |
