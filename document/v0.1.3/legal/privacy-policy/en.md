@@ -76,7 +76,7 @@ We use the information we collect for the following purposes, according to whose
 We may entrust all or part of the handling of personal data to outside providers within the scope needed for the purposes above (cloud storage and processing, face blurring, content labeling, etc.). We select providers appropriately, conclude contracts containing data-protection clauses, and supervise them as necessary and appropriate.
 
 ## 7. Provision to third parties outside Japan
-Data **may be provided to companies outside Japan** (currently, the main recipients are located in the United States). Recipients are limited to parties contractually bound by no-re-identification, use limitations, and downstream flow-through obligations.
+Data **may be provided to companies outside Japan**. Recipients are limited to parties contractually bound by no-re-identification, use limitations, and downstream flow-through obligations.
 
 ## 8. Privacy processing
 Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via body, room, possessions). We do not call it "anonymized."
@@ -139,3 +139,4 @@ contact@rootlens.io
 | 2026-07-12 (3) | Japanese original rewritten in the standard register of published Japanese privacy policies (desu/masu style, conventional headings); no change to the substance. English mirror unaffected |
 | 2026-07-12 (4) | Expanded based on a benchmark against comparable services (Shift, Project Aria) and Japanese data businesses (Macromill, Agoop): purposes rewritten per data subject (naming who filming fees are paid to), collected-data list extended (payment, business representatives, requests), new entrustment section (later sections renumbered), on-site notice and in-site consent confirmation plus locker/break rooms added, retention specified per category, third-party provision records and fees added to requests, security measures published per category including the external environment, and the amendment notice method stated |
 | 2026-07-12 (5) | Withdrew the on-site notice and prior coworker-consent-confirmation promises in section 9 (obligations that do not exist in the actual operation or the filming cooperation agreement); replaced with wording matching the agreement (recording within the agreed scope, no recording where the business objects, immediate stop on request) |
+| 2026-07-12 (6) | Removed "currently, the main recipients are located in the United States" from section 7 (not factual) |
