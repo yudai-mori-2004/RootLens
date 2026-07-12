@@ -37,6 +37,8 @@
       "statRegion": "撮影地域",
       "statViewpoint": "視点",
       "statFormat": "形式",
+      "statRegionValue": "日本",
+      "statViewpointValue": "頭部装着・一人称視点",
       "s1Title": "各フレームの内容",
       "s1p1Lead": "RootLens iOSアプリと頭部装着カメラで撮影した家事動画48本です。日本国内にて収録、顔はぼかし処理済み。各フレームには次の情報を収録しています。",
       "s1p1Items": [
@@ -61,7 +63,7 @@
       "episodeDownloadLabel": "MP4をダウンロード",
       "showAll": "全48エピソードを表示",
       "s4Title": "次回リリース予定",
-      "s4p1Lead": "次回のサンプルでは、日本在住のコントリビューター十数名がTestFlightベータ版で収集したデータを追加予定です。",
+      "s4p1Lead": "次回のサンプルでは、実際に営業している現場で収集したデータの追加を予定しています。追加予定の内容:",
       "s4p1Items": [
         "`observation.state` : ARKitワールド座標系のカメラ6-DoF",
         "`observation.imu_orientation`, `observation.imu_angular_velocity`, `observation.imu_linear_acceleration` : 100Hz IMU",
@@ -165,7 +167,7 @@
         "s7v": "全クリップに付属 (RGB・深度)",
         "s8k": "シーン再構成",
         "s8v": "ARKitメッシュアンカー・点群",
-        "s9k": "匿名化",
+        "s9k": "プライバシー処理",
         "s9v": "顔ぼかし (EgoBlur)・音声なし"
       },
       "set02": {

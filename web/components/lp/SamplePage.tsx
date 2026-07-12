@@ -8,7 +8,7 @@ import { SyncedVideoPair } from "./SyncedVideoPair";
 const R2_PUBLIC = "https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev/lp-sample/v0.1";
 const ZIP_URL = `${R2_PUBLIC}/rootlens-sample-v0.1.zip`;
 
-const TAGS = ["robotics", "egocentric", "first-person", "household", "hand-pose", "mano", "c2pa", "lerobot"];
+const TAGS = ["robotics", "egocentric", "first-person", "household", "hand-pose", "mano", "lerobot"];
 
 const DIR_TREE = `<root>/
 ├── meta/
@@ -102,8 +102,8 @@ export default async function SamplePage() {
     [t("statResolution"), "1920 × 1080"],
     [t("statCodec"), "H.264 / AVC"],
     [t("statSize"), "~1 GB"],
-    [t("statRegion"), "Japan"],
-    [t("statViewpoint"), "Head-mounted, first-person"],
+    [t("statRegion"), t("statRegionValue")],
+    [t("statViewpoint"), t("statViewpointValue")],
     [t("statFormat"), "LeRobotDataset v3.0"],
   ];
 

@@ -37,6 +37,8 @@
       "statRegion": "Region",
       "statViewpoint": "Viewpoint",
       "statFormat": "Format",
+      "statRegionValue": "Japan",
+      "statViewpointValue": "Head-mounted, first-person",
       "s1Title": "Per-frame contents",
       "s1p1Lead": "48 clips of household tasks recorded with the RootLens iOS app from a head-mounted camera in Japan. All faces are blurred. Each frame contains:",
       "s1p1Items": [
@@ -61,7 +63,7 @@
       "episodeDownloadLabel": "Download MP4",
       "showAll": "Show all 48 episodes",
       "s4Title": "Planned next release",
-      "s4p1Lead": "The next sample will add captures from roughly a dozen Japan-based TestFlight beta contributors:",
+      "s4p1Lead": "The next sample will add data collected at real working sites:",
       "s4p1Items": [
         "`observation.state` : camera 6-DoF in the ARKit world frame",
         "`observation.imu_orientation`, `observation.imu_angular_velocity`, `observation.imu_linear_acceleration` : 100 Hz IMU",
@@ -165,7 +167,7 @@
         "s7v": "Included with every clip (RGB and depth)",
         "s8k": "Scene",
         "s8v": "ARKit mesh anchors, point cloud",
-        "s9k": "Anonymization",
+        "s9k": "Privacy processing",
         "s9v": "Face blurring (EgoBlur), no audio"
       },
       "set02": {
