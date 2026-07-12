@@ -129,9 +129,9 @@
     },
     "model": {
       "label": "HOW IT WORKS",
-      "title": "Collect, sell, give back",
+      "title": "Collect, sell, give back as services",
       "p1": "Work data has buyers. Robotics companies are searching worldwide for training footage. But it is not realistic for a shop or a factory to sell its own data: that takes capture equipment, rights handling, and sales channels.",
-      "p2": "RootLens takes that part on. We sell the work data collected on site to robotics companies and return a share of the revenue to the workplace, through two services shaped to each site.",
+      "p2": "RootLens takes that part on. We sell the work data collected on site to robotics companies and turn its value into services that fit each workplace.",
       "emphasis": "All we ask of the workplace: keep working as usual."
     },
     "devices": {
