@@ -812,12 +812,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // LiDAR depth (= sceneDepth がある Pro 機のみ)。 標準形式の 16-bit PNG (mm) を
     // depth.tar に streaming 追記する (= 数万 loose PNG を避け 1 ファイルで upload。 中身は標準 PNG)。
     // tar 内パスは depth/<frameIndex:06>.png (= 展開すれば RGB-D 標準の depth/ レイアウト)。
+    // 同じ frame の信頼度マップ (= sceneDepth.confidenceMap、 0=low / 1=medium / 2=high) も
+    // confidence/<frameIndex:06>.png (8-bit) として同じ tar に並べる (= 買い手が低信頼画素を mask できる)。
     // depth レートが RGB より低い設定では書いた frame ベースで間引く (= index は jsonl と共有)。
     if let sceneDepth = frame.sceneDepth, sessionDirURL != nil, frameIndex % depthEveryWritten == 0 {
       let buffer = sceneDepth.depthMap
+      let confBuffer = sceneDepth.confidenceMap
       let idx = frameIndex
       sensorFileQueue.async {
-        self.appendDepthFrameToTar(depthMap: buffer, frameIndex: idx)
+        self.appendDepthFrameToTar(depthMap: buffer, confidenceMap: confBuffer, frameIndex: idx)
       }
     }
 
@@ -905,8 +908,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // MARK: - depth.tar streaming writer (= ustar tar、 中身は 16-bit PNG)
 
   /// 1 depth frame を 16-bit PNG 化して depth.tar に 1 entry として追記する (= sensorFileQueue 上)。
+  /// 信頼度マップがあれば confidence/<idx>.png (8-bit) も同じ tar に続けて書く。
   /// 初回呼び出しで depth.tar を lazy 生成する (= depth が来ない非 LiDAR 機では作られない)。
-  private func appendDepthFrameToTar(depthMap: CVPixelBuffer, frameIndex: Int) {
+  private func appendDepthFrameToTar(depthMap: CVPixelBuffer, confidenceMap: CVPixelBuffer?, frameIndex: Int) {
     guard let png = depthMapToPngData(depthMap) else { return }
     if depthTarHandle == nil {
       guard let dir = sessionDirURL else { return }
@@ -915,15 +919,62 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       depthTarHandle = try? FileHandle(forWritingTo: url)
     }
     guard let h = depthTarHandle else { return }
-    let name = String(format: "depth/%06d.png", frameIndex)
     do {
+      let name = String(format: "depth/%06d.png", frameIndex)
       try h.write(contentsOf: Self.tarHeader(name: name, size: png.count))
       try h.write(contentsOf: png)
       let pad = (512 - (png.count % 512)) % 512
       if pad > 0 { try h.write(contentsOf: Data(count: pad)) }
+
+      if let conf = confidenceMap, let confPng = confidenceMapToPngData(conf) {
+        let confName = String(format: "confidence/%06d.png", frameIndex)
+        try h.write(contentsOf: Self.tarHeader(name: confName, size: confPng.count))
+        try h.write(contentsOf: confPng)
+        let confPad = (512 - (confPng.count % 512)) % 512
+        if confPad > 0 { try h.write(contentsOf: Data(count: confPad)) }
+      }
     } catch {
       NSLog("[ArkitCaptureController] depth.tar write failed: %@", "\(error)")
     }
+  }
+
+  /// CVPixelBuffer (= ARKit sceneDepth.confidenceMap、 kCVPixelFormatType_OneComponent8、
+  /// 値は 0=low / 1=medium / 2=high) を 8-bit gray PNG の Data にして返す。
+  private func confidenceMapToPngData(_ conf: CVPixelBuffer) -> Data? {
+    CVPixelBufferLockBaseAddress(conf, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(conf, .readOnly) }
+
+    let width = CVPixelBufferGetWidth(conf)
+    let height = CVPixelBufferGetHeight(conf)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(conf)
+    guard let base = CVPixelBufferGetBaseAddress(conf) else { return nil }
+
+    var u8 = [UInt8](repeating: 0, count: width * height)
+    for y in 0..<height {
+      let src = base.advanced(by: y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
+      for x in 0..<width {
+        u8[y * width + x] = src[x]
+      }
+    }
+
+    let cs = CGColorSpaceCreateDeviceGray()
+    let data = NSData(bytes: u8, length: u8.count)
+    guard let provider = CGDataProvider(data: data as CFData) else { return nil }
+    guard let cgImage = CGImage(
+      width: width, height: height,
+      bitsPerComponent: 8, bitsPerPixel: 8,
+      bytesPerRow: width,
+      space: cs, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.none.rawValue),
+      provider: provider,
+      decode: nil, shouldInterpolate: false,
+      intent: .defaultIntent
+    ) else { return nil }
+
+    let out = NSMutableData()
+    guard let dest = CGImageDestinationCreateWithData(out as CFMutableData, "public.png" as CFString, 1, nil) else { return nil }
+    CGImageDestinationAddImage(dest, cgImage, nil)
+    guard CGImageDestinationFinalize(dest) else { return nil }
+    return out as Data
   }
 
   /// tar の終端 (= 2×512 byte の zero block) を書いて close する。 depth が無ければ no-op。

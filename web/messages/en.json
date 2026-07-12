@@ -7,7 +7,7 @@
   "pages": {
     "home": {
       "closingTitle": "Let's talk.",
-      "closingDesc": "Whether you run a short-staffed store, you're exploring automation for your own workplace, or you're looking for embodied-AI training data, we're one email away.",
+      "closingDesc": "Short on staff, weighing automation, or looking for training data: either way, we're one email away.",
       "ctaContact": "Email us",
       "ctaSample": "View sample data"
     },
@@ -69,54 +69,32 @@
   },
   "lp": {
     "hero": {
-      "tagline": "Field data, made robot-ready.",
-      "description": "RootLens is a University of Osaka-born data company. We collect work data from real workplaces and sell it to robotics companies, returning part of the proceeds to the workplaces the data came from.",
+      "tagline": "Real human work, made robot-ready.",
+      "description": "RootLens is a physical-AI project born at the University of Osaka. We monetize work data from Japan's commercial workplaces and return the benefits, in many forms, to the workplaces themselves.",
       "ctaSample": "Sample data",
       "burst": "JAPAN'S FIRST",
       "ctaModel": "How it works"
     },
     "problem": {
-      "title": "Robots learn by watching people. The footage is the bottleneck.",
-      "p1": "Robot intelligence is advancing at a startling pace. AI has moved from language to vision, and now to physical motion. Robots are learning how to move by watching humans work.",
-      "p2": "Yet high-quality work data from real places is scarce. The traditional approach, staging demonstrations in a lab, is expensive, slow, and misses the messiness of reality.",
-      "p3": "The missing data lives inside everyday work, on real shop floors."
+      "title": "Robots learn by watching people. The footage is missing.",
+      "p1": "Teaching a robot to work takes video of people actually working. Just as text-generating AI learned from a vast amount of text, robots learn from video of human motion.",
+      "p2": "But usable work footage is in critically short supply. Video collected in prepared settings tends to look nothing like a real workplace, and it costs time and money.",
+      "p3": "The data that works is produced in the course of everyday operations, on site."
     },
     "appFlow": {
       "label": "SERVICE 01 · FOR STORES",
-      "title": "The workplace becomes the collection site",
+      "title": "Part-timers that pay you back",
       "step1": {
         "label": "Work as usual",
-        "text": "Staff wearing a head-mounted camera work normal part-time shifts. Dishwashing, prep work, the usual jobs, unchanged."
+        "text": "Staff wearing a headgear camera work normal part-time shifts. Dishwashing, prep, plating: any job where the headgear isn't in the way."
       },
       "step2": {
-        "label": "Data while working",
-        "text": "Work data from each shift becomes training material for robot manipulation. Nothing about the store's routine changes."
+        "label": "Footage becomes training data",
+        "text": "Video recorded during shifts becomes material robots learn manipulation from. The store's operations don't change at all."
       },
       "step3": {
-        "label": "Stores get paid back",
-        "text": "We pay stores a filming fee for every recorded hour, so they keep the extra hands while their effective labor cost goes down."
-      }
-    },
-    "issues": {
-      "title": "Why this data is valuable",
-      "intro1": "Robotics teams cannot train on random video. They need task-focused footage of real work shot in real environments, across as many different sites as possible.",
-      "intro2": "RootLens data is born in real kitchens, real shops, real workplaces. Different layouts, different tools, different habits. That diversity is the value.",
-      "pillarsLead": "Every clip in the dataset meets four conditions.",
-      "hands": {
-        "label": "The worker's point of view",
-        "text": "How things are grasped, moved, and judged, captured from the perspectives robots need to learn work. Third-person views of the whole site are collected when useful."
-      },
-      "sensors": {
-        "label": "More than video",
-        "text": "Today we record RGB, LiDAR depth, IMU motion, and hand pose together. The modalities grow with each site and use case."
-      },
-      "diversity": {
-        "label": "Real-world diversity",
-        "text": "Unstaged workplaces with real lighting and real clutter, a breadth of distribution lab collection cannot reach."
-      },
-      "consent": {
-        "label": "Consent-backed provenance",
-        "text": "Written agreements with every site, faces blurred, no audio recorded, and a consent record linked to every clip."
+        "label": "Stores get paid",
+        "text": "We pay the store a filming fee for the hours actually recorded, so it keeps the extra hands while holding labor costs down."
       }
     },
     "footer": {
@@ -128,7 +106,7 @@
       },
       "license": "Apache 2.0"
     },
-    "marquee": "Field data from real workplaces, made robot-ready",
+    "marquee": "Real human work, made robot-ready",
     "math": {
       "tag": "THE MATH, PER HOUR",
       "wageLabel": "Wage the store pays",
@@ -145,16 +123,54 @@
     "enterprise": {
       "label": "SERVICE 02 · FOR COMPANIES",
       "title": "Start with a workplace diagnostic",
-      "p1": "For companies considering robots or physical AI. We bring the capture gear and app, record the work on your floor, and hand you a free diagnostic report: which steps suit automation, and what adoption would take.",
-      "p2": "It can be free for a simple reason: only the data you approve is sold as training data, and that funds the diagnostic. All we ask of the site is the recording.",
+      "p1": "For companies considering robots or physical AI. We bring the capture equipment and app, record the work on your floor, and deliver a diagnostic report, free of charge: which steps suit automation and what adoption would take.",
+      "p2": "It can be free because only the data you approve is sold as training data, and that revenue covers the diagnostic. All we ask of the site is the recording.",
       "cta": "Ask about a diagnostic"
     },
     "model": {
-      "label": "THE MODEL",
+      "label": "HOW IT WORKS",
       "title": "Collect, sell, give back",
-      "p1": "The data robotics companies want is produced in everyday work. But a shop or a factory can hardly sell it on its own: that takes capture gear, rights handling, and buyers.",
-      "p2": "RootLens takes care of all of it. We sell the collected data to robotics companies and return part of the proceeds to the site, in two services shaped around each workplace.",
-      "emphasis": "The site just does its usual work. The rest is on us."
+      "p1": "Work data has buyers. Robotics companies are searching worldwide for training footage. But it is not realistic for a shop or a factory to sell its own data: that takes capture equipment, rights handling, and sales channels.",
+      "p2": "RootLens takes that part on. We sell the work data collected on site to robotics companies and return a share of the revenue to the workplace, through two services shaped to each site.",
+      "emphasis": "All we ask of the workplace: keep working as usual."
+    },
+    "devices": {
+      "label": "FOR DATA BUYERS",
+      "title": "Capture rigs and data specs",
+      "intro1": "Robot training can't use just any video. It needs footage focused on the work itself, shot in real environments, from as many different sites as possible. RootLens data is collected in shops and workplaces that are actually in business.",
+      "intro2": "We grow the lineup rig by rig. One set is in operation today.",
+      "set01": {
+        "tag": "SET 01 · IN OPERATION",
+        "name": "iPhone Pro + headgear",
+        "desc": "An iPhone Pro mounted on the worker's head records first-person video while ARKit runs alongside. We use iPhone 15 Pro or later Pro models; specs below are measured on an iPhone 15 Pro.",
+        "s1k": "RGB",
+        "s1v": "1920×1440 at 15 fps (main wide camera)",
+        "s2k": "Depth",
+        "s2v": "LiDAR depth maps, 256×192 at 15 fps, synced with RGB; 16-bit integers, depth values in mm; ARKit confidence maps (3 levels) included",
+        "s3k": "6DoF Pose",
+        "s3v": "Continuous 6DoF camera poses from ARKit visual-inertial odometry (VIO), in a consistent world frame; tracking state and trajectory included",
+        "s4k": "IMU",
+        "s4v": "Accelerometer + gyroscope at approx. 100 Hz (CoreMotion)",
+        "s5k": "Sync",
+        "s5v": "All modalities registered to a common high-resolution timestamp",
+        "s6k": "Intrinsics",
+        "s6v": "Camera intrinsics for RGB and depth; coordinate-frame TF included",
+        "s7k": "Scene",
+        "s7v": "ARKit mesh anchors and point cloud",
+        "s8k": "Volume",
+        "s8v": "Continuous clips from a few minutes up to about 30 min (to date); roughly 0.2 to 0.3 GB per minute as MCAP",
+        "s9k": "Anonymization",
+        "s9v": "Face blurring with EgoBlur; no audio recorded",
+        "s10k": "Rights",
+        "s10v": "Written site agreements; per-clip consent records",
+        "s11k": "Delivery",
+        "s11v": "MCAP format (ROS 2-compatible schemas)"
+      },
+      "set02": {
+        "tag": "SET 02 · IN PREPARATION",
+        "name": "Smart glasses",
+        "desc": "A lightweight glasses-based rig is in preparation, with more sets to follow."
+      }
     }
   }
 }

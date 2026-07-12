@@ -15,6 +15,7 @@
 # トピック構成は stera-sdk の TopicConfig (data/mcap/_reader.py) に一致させる:
 #   /camera/rgb/compressed   sensor_msgs/CompressedImage (JPEG、 --blur 時のみ顔ぼかし適用)
 #   /camera/depth            sensor_msgs/Image 16UC1 (mm)      ← depth.tar がある場合のみ
+#   /camera/depth/confidence sensor_msgs/Image mono8 (0=low/1=med/2=high) ← 新収録 (confidence/ 入り tar) のみ
 #   /camera/camera_info      sensor_msgs/CameraInfo
 #   /camera/depth/camera_info sensor_msgs/CameraInfo           ← 同上
 #   /camera/pose             geometry_msgs/PoseStamped (ARKit world、 ARKit-native 軸)
@@ -505,7 +506,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
     # 顔ぼかし (= blur=True のときだけ初期化)。 既定は EgoBlur (GPU、 Stera-10M と同じ)。
     face_backend = _make_face_backend(face_detector) if blur else None
 
-    stats = {"rgb": 0, "depth": 0, "pose": 0, "imu": 0, "tracking": 0, "point_cloud": 0, "mesh_anchors": 0}
+    stats = {"rgb": 0, "depth": 0, "confidence": 0, "pose": 0, "imu": 0, "tracking": 0, "point_cloud": 0, "mesh_anchors": 0}
 
     with open(out_path, "wb") as out_f:
         writer = Ros2Writer(out_f)
@@ -675,7 +676,10 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         finally:
             cap.release()
 
-        # ── /camera/depth (= depth.tar がある場合のみ。 16-bit PNG mm → 16UC1) ──
+        # ── /camera/depth + /camera/depth/confidence (= depth.tar がある場合のみ) ──
+        # tar 内は depth/<idx>.png (16-bit PNG、 mm → 16UC1)。 新しい収録では同じ index の
+        # confidence/<idx>.png (= ARKit sceneDepth.confidenceMap、 8-bit で 0=low / 1=medium / 2=high)
+        # が並ぶので mono8 で別トピックに出す。 旧収録 (confidence 無し) はそのまま depth だけになる。
         depth_tar = os.path.join(session_dir, "depth.tar")
         if os.path.exists(depth_tar):
             with tarfile.open(depth_tar) as tar:
@@ -684,18 +688,31 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
                         continue
                     idx = int(os.path.splitext(os.path.basename(member.name))[0])
                     buf = tar.extractfile(member).read()
-                    depth = cv2.imdecode(np.frombuffer(buf, np.uint8), cv2.IMREAD_UNCHANGED)
-                    if depth is None or depth.dtype != np.uint16:
+                    img = cv2.imdecode(np.frombuffer(buf, np.uint8), cv2.IMREAD_UNCHANGED)
+                    if img is None:
                         continue
                     ts = int(frames_meta[idx]["timestamp_ns"]) if idx < len(frames_meta) else int(frames_meta[-1]["timestamp_ns"])
-                    h, w = depth.shape[:2]
-                    write("/camera/depth", "sensor_msgs/Image", {
-                        "header": {"stamp": _stamp(ts), "frame_id": "camera_optical_frame"},
-                        "height": int(h), "width": int(w),
-                        "encoding": "16UC1", "is_bigendian": 0, "step": int(w * 2),
-                        "data": np.ascontiguousarray(depth).tobytes(),
-                    }, ts)
-                    stats["depth"] += 1
+                    h, w = img.shape[:2]
+                    if member.name.startswith("confidence/"):
+                        if img.dtype != np.uint8:
+                            continue
+                        write("/camera/depth/confidence", "sensor_msgs/Image", {
+                            "header": {"stamp": _stamp(ts), "frame_id": "camera_optical_frame"},
+                            "height": int(h), "width": int(w),
+                            "encoding": "mono8", "is_bigendian": 0, "step": int(w),
+                            "data": np.ascontiguousarray(img).tobytes(),
+                        }, ts)
+                        stats["confidence"] += 1
+                    else:
+                        if img.dtype != np.uint16:
+                            continue
+                        write("/camera/depth", "sensor_msgs/Image", {
+                            "header": {"stamp": _stamp(ts), "frame_id": "camera_optical_frame"},
+                            "height": int(h), "width": int(w),
+                            "encoding": "16UC1", "is_bigendian": 0, "step": int(w * 2),
+                            "data": np.ascontiguousarray(img).tobytes(),
+                        }, ts)
+                        stats["depth"] += 1
 
         last_ts = int(frames_meta[-1]["timestamp_ns"])
 
