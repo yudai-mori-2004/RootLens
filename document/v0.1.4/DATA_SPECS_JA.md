@@ -128,7 +128,7 @@ subject 識別子の pubkey → account_id (uuid) 置換のみ。
 ## 7. FPV 手渡しパイプライン
 
 `tools/modal/fpvlabs/fpvlabs.py`。 手動運用、 自動起動なし。 詳細は
-`tools/fpvlabs-handoff/RUNBOOK.md`。
+`document/v0.1.4/fpvlabs-handoff/RUNBOOK.md`。
 
 - 入力: `rootlens-raw-arkit/raw/<content_hash>/*`
 - 出力: `rootlens-fpvlabs/<content_hash>/session.mcap` (Stera 互換 ROS2 MCAP)

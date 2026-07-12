@@ -20,14 +20,14 @@
   1. Cloudflare ダッシュボード → R2 → Manage R2 API Tokens → Create API Token。
      Permissions = **Object Read only**、対象バケット = **rootlens-fpvlabs のみ**。
   2. 発行された Access Key ID / Secret を FPV に DM。
-  3. `tools/fpvlabs-handoff/README-for-fpv.md` を渡す。
+  3. `document/v0.1.4/fpvlabs-handoff/README-for-fpv.md` を渡す。
   以後は新セッションを足すだけで、FPV 側は `rclone copy` の再実行で追従する。
 
 ## 毎回 (新しいセッションが上がったら)
 
 1. 未処理を一覧する:
    ```
-   python tools/fpvlabs-handoff/list_pending.py
+   python document/v0.1.4/fpvlabs-handoff/list_pending.py
    ```
    `rootlens-raw-arkit` にあって `rootlens-fpvlabs` に無い hash が「未処理」。
    raw サイズで **本命候補**（>= 0.3GB。そのまま貼れる処理コマンド付き）と

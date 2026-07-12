@@ -22,13 +22,13 @@ root-lens/
 │   ├── modal/          Modal Python パイプライン
 │   │   ├── fpvlabs/    FPV Labs (Stera) 手渡し用 (= EgoBlur + Stera 互換 MCAP。 現運用の中心)
 │   │   └── score-wilor/ 旧 score 3 層 + WiLoR 手ポーズ (= legacy、 現運用外)
-│   ├── fpvlabs-handoff/ 運用手順 (RUNBOOK) + 未処理クリップ一覧 + FPV 向け README
 │   ├── egoblur_probe.py 新クリップで EgoBlur 閾値を検証するローカルハーネス
 │   ├── asset-gen/       LP イラスト / SFX 生成
 │   └── lp-sample/       LP のサンプル動画パイプライン
 │
 └── document/
     └── v0.1.4/         current spec + tasks/
+        └── fpvlabs-handoff/ 運用手順 (RUNBOOK) + 未処理クリップ一覧 + FPV 向け README
 ```
 
 参考リポ: `../rootlens-mobile/` (= v0.0.x Android + Solana Seeker hackathon 系、
@@ -52,7 +52,7 @@ root-lens/
   raw を落として EgoBlur (GPU L4) で顔ぼかし → Stera 互換 MCAP を組み立て → rootlens-fpvlabs に put。
 
 [FPV Labs]
-  rclone で rootlens-fpvlabs から MCAP を pull。 詳細は tools/fpvlabs-handoff/。
+  rclone で rootlens-fpvlabs から MCAP を pull。 詳細は document/v0.1.4/fpvlabs-handoff/。
 ```
 
 ## 動作確認 (production)
@@ -105,7 +105,7 @@ v0.1.3 まで C2PA D1 署名のハッシュを identity として使っていた
 
 `tools/modal/fpvlabs/fpvlabs.py`。 mediapipe は緊急時 fallback。 閾値は 0.8 (stera-sdk 既定)、
 resize は 480 でコスト目標 1 時間あたり ~¥120。 実測で本物の顔は 0.97+、 誤爆は 0.3 以下で
-ケタで分離する。 詳細は `tools/fpvlabs-handoff/RUNBOOK.md`。
+ケタで分離する。 詳細は `document/v0.1.4/fpvlabs-handoff/RUNBOOK.md`。
 
 ### 検証用の --target-bucket
 

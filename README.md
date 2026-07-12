@@ -24,7 +24,7 @@ turn each recording into the format the buyer wants.
   [FPV Labs](https://fpvlabs.ai/stera), with EgoBlur face blur on GPU.
 - `tools/modal/score-wilor/` — earlier score + WiLoR hand-pose pipeline
   (kept as legacy reference, not part of the current production flow).
-- `tools/fpvlabs-handoff/` — operator runbook + a helper that lists raw
+- `document/v0.1.4/fpvlabs-handoff/` — operator runbook + a helper that lists raw
   clips not yet handed off + the README the buyer receives.
 - `tools/egoblur_probe.py` — local calibration harness for the EgoBlur
   detector on new footage.
