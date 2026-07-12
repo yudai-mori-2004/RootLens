@@ -136,7 +136,12 @@ export default async function HomePage() {
               <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
             </div>
           </header>
-          <div className={s.steps}>
+          <div className={s.sectionBody}>
+            <div className={s.sectionBodyContent}>
+              <p className={s.prose}>{tFlow("intro")}</p>
+            </div>
+          </div>
+          <div className={s.steps} style={{ marginTop: 40 }}>
             {flowSteps.map((key, i) => {
               const icons = ["/lp/step-record.webp", "/lp/step-validate.webp", "/lp/step-earn.webp"];
               return (

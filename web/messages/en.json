@@ -86,25 +86,26 @@
       "p3": "The data that works is produced in the course of everyday operations, on site."
     },
     "appFlow": {
-      "label": "SERVICE 01 · FOR STORES",
+      "label": "SERVICE 01 · FOR EMPLOYERS",
       "title": "Part-timers that pay you back",
+      "intro": "For any workplace that hires part-timers: restaurants, retail, light warehouse work. Hire a RootLens staffer wearing a headgear camera as a regular part-timer; we sell the footage recorded on shift as training data and return a filming fee for the hours recorded.",
       "step1": {
         "label": "Work as usual",
-        "text": "Staff wearing a headgear camera work normal part-time shifts. Dishwashing, prep, plating: any job where the headgear isn't in the way."
+        "text": "Staff wearing a headgear camera work normal part-time shifts. Dishwashing, prep, stocking, packing: any job where the headgear isn't in the way."
       },
       "step2": {
         "label": "Footage becomes training data",
-        "text": "Video recorded during shifts becomes material robots learn manipulation from. The store's operations don't change at all."
+        "text": "Video recorded during shifts becomes material robots learn manipulation from. The workplace runs as usual; nothing changes."
       },
       "step3": {
-        "label": "Stores get paid",
-        "text": "We pay the store a filming fee for the hours actually recorded, so it keeps the extra hands while holding labor costs down."
+        "label": "The workplace gets paid",
+        "text": "We pay a filming fee for the hours actually recorded, so you keep the extra hands while holding labor costs down."
       }
     },
     "marquee": "Real human work, made robot-ready",
     "math": {
       "tag": "THE MATH, PER HOUR",
-      "wageLabel": "Wage the store pays",
+      "wageLabel": "Wage the employer pays",
       "wage": "¥1,200",
       "wageUnit": "",
       "feeLabel": "Filming fee back",
