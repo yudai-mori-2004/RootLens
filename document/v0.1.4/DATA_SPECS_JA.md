@@ -32,7 +32,7 @@ C2PA / Title Protocol / Solana / 自動採点は全て撤去済み。
   (`modules/content-hash/` = CryptoKit のストリーム SHA-256。 数 GB でも数秒)。 モジュール未搭載
   ビルド用に 8 MB base64 chunk read + noble/hashes の JS フォールバックを残す (= 同一結果)。
 - R2 の raw キー: `raw/<content_hash>/rgb.mp4` (+ 他ファイル)。
-- DB `clips.content_hash` に格納。 重複排除キーは `(account_pubkey, content_hash)`。
+- DB `clips` の主キー (= 内容アドレスで世界一意。 重複登録は idempotent に既存行を返す)。
 
 旧 v0.1.3 は C2PA D1 署名の SHA-256 を identity にしていたが、 task 12 で C2PA 廃止と同時に
 「生 mp4 のバイト列」 に変更 (= 意味が変わる)。 旧 `raw/<signature_hash>/*` の R2 オブジェクトは
@@ -64,8 +64,12 @@ stage:  pending  → hashed   → registered
 
 ## 5. サーバ REST API
 
+認証は全エンドポイント共通で `Authorization: Bearer <Supabase JWT>` (= task 13)。
+サーバは JWT を検証し、 `auth.users.id` (uuid) を account_id として使う。 クライアント申告の
+識別子は信用しない。 旧 `X-Account-Pubkey` ヘッダ認証は task 13 で廃止。
+
 ### POST /api/clips
-`X-Account-Pubkey: <base58>` 必須。 body:
+body:
 
 ```json
 {
@@ -73,14 +77,15 @@ stage:  pending  → hashed   → registered
   "contentSize": 12345,
   "recordingConfig": "arkit",
   "durationMs": 330200,
-  "deviceModel": "iPhone16,1"
+  "deviceModel": "iPhone16,1",
+  "consentEventId": "evt_..."
 }
 ```
 
-重複排除は `(account_pubkey, content_hash)`。 既存行があれば idempotent に既存 ClipDto を返す。
+`content_hash` が主キー。 既存行があれば idempotent に既存 ClipDto を返す。
 
 ### POST /api/v1/raw-uploads
-`X-Account-Pubkey` 必須。 body:
+body:
 
 ```json
 { "contentHash": "<64 hex>", "recordingConfig": "arkit" }
@@ -89,34 +94,36 @@ stage:  pending  → hashed   → registered
 構成に応じた presigned PUT URL のマップ (`files: Record<filename, {url, key, contentType}>`) を返す。
 
 ### GET /api/clips, GET /api/clips/:id, GET /api/clips/:id/media
-`X-Account-Pubkey` 必須。 撮影者所有のクリップの一覧 / 詳細 / rgb.mp4 の presigned GET URL。
+撮影アカウント所有のクリップの一覧 / 詳細 / rgb.mp4 の presigned GET URL。
 
 ### POST /api/v1/consents
 同意証跡を `consent_events` テーブルに append-only で記録する。 詳細は
-`document/v0.1.3/legal/consent-log-spec/ja.md`。
+`document/v0.1.3/legal/consent-log-spec/ja.md` (= task 13 で subject 識別子を
+pubkey から account_id (uuid) に置換)。
 
 ## 6. DB スキーマ (`web/db/schema.ts`, `web/drizzle/`)
 
+public スキーマは `clips` と `consent_events` の 2 テーブルのみ。 アカウントは Supabase Auth
+(`auth.users`) が持ち、 現場名・契約・振込先などの意味論は DB に置かず運営の台帳で
+uuid ↔ 実世界を対応させる (= 詳細は `tasks/13-supabase-auth-accounts/`)。
+
 ### `clips`
 ```
-id                text  PK
-account_pubkey    text  NOT NULL      -- Ed25519 base58 (Solana 由来ではない)
-content_hash      text  NOT NULL      -- sha256(raw mp4)
-state             text  NOT NULL default 'uploading'
-created_at        timestamptz         (行作成 ≒ 撮影日時)
-updated_at        timestamptz
-error_message     text
+content_hash      text  PK            -- sha256(raw mp4)。 R2 raw キーと 1:1
+account_id        uuid  NOT NULL      -- auth.users.id (= 検証済み JWT の sub)
+consent_event_id  text                -- consent_events.id (= クリップ ⇔ 同意証跡の結合)
+created_at        timestamptz         (行作成 ≒ アップロード完了時刻)
 recording_config  text  NOT NULL      -- 'ultra_wide' | 'arkit'
 duration_ms       integer
 content_size      bigint              -- raw mp4 bytes
 device_model      text
 
-UNIQUE (account_pubkey, content_hash)
-INDEX  (account_pubkey), (content_hash)
+INDEX (account_id)
 ```
 
 ### `consent_events`
-`document/v0.1.3/legal/consent-log-spec/ja.md` 参照。 v0.1.4 で変更なし。
+`document/v0.1.3/legal/consent-log-spec/ja.md` 参照。 v0.1.4 (task 13) での差分は
+subject 識別子の pubkey → account_id (uuid) 置換のみ。
 
 ## 7. FPV 手渡しパイプライン
 
