@@ -1,15 +1,22 @@
 // Login screen (task 13)。
 //
+// 起動のゲートではない: アップロード時の誘導 / 設定 / 発行 QR のディープリンクから開く。
 // SupabaseAuthProvider: 運営発行の ID (= handle) + パスワードでログインする。
 // 発行 QR (io.rootlens.app://login?id=..&pw=..) を iOS カメラで読むとディープリンクで
 // この画面が開き、 資格情報が自動入力されてそのままログインする。
 // DebugAuthProvider (= ローカル検証): 従来どおり「サインイン」 押下で即 authenticated。
+//
+// レイアウトはアプリ全体と同じ横持ち (landscape) 前提の 2 カラム:
+// 左 = ブランド + ワンライナー (LP と同じ)、 右 = 資格情報カード + CTA (スクロール可)。
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,7 +24,6 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as Linking from 'expo-linking';
-import Svg, { Circle, Path } from 'react-native-svg';
 
 import type { RootStackParamList } from '../app/types';
 import { BrandMark } from '../components/BrandMark';
@@ -37,8 +43,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const supportsPassword = typeof provider.loginWithPassword === 'function';
 
-  // ログインは起動のゲートではない (= この画面はアップロード時 / 設定 / QR から開く)。
-  // 成功したら元の画面に戻る。 QR ディープリンクの冷起動などでこの画面が初期画面の場合は Main へ。
+  // 成功したら元の画面に戻る。 QR ディープリンクの冷起動でこの画面が初期画面の場合は Main へ。
   const doLogin = useCallback(
     async (id: string, pw: string) => {
       setLoggingIn(true);
@@ -84,139 +89,165 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.root}>
-      <View style={styles.body}>
-        <View style={styles.markRow}>
-          <BrandMark size={28} />
-        </View>
-
-        <View style={styles.heroBlock}>
-          <Text style={styles.heroLineA}>{t('login.heroLineA')}</Text>
-          <Text style={styles.heroLineB}>
-            {t('login.heroBPrefix')}
-            <Text style={styles.heroLineBAccent}>{t('login.heroBAccent')}</Text>
-            {t('login.heroBSuffix')}
-          </Text>
-        </View>
-
-        <Text style={styles.lede}>
-          {t('login.lede')}
-        </Text>
-
-        {supportsPassword ? (
-          <View style={styles.providerCard}>
-            <Text style={styles.providerEyebrow}>{t('login.accountEyebrow')}</Text>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>{t('login.idLabel')}</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={loginId}
-                onChangeText={setLoginId}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="username"
-                editable={!loggingIn}
-              />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={styles.columns}>
+          {/* ── 左: ブランド + ワンライナー ── */}
+          <View style={styles.left}>
+            <View style={styles.markRow}>
+              <BrandMark size={26} />
             </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>{t('login.passwordLabel')}</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="password"
-                secureTextEntry
-                editable={!loggingIn}
-                onSubmitEditing={onContinue}
-              />
+            <View style={styles.heroBlock}>
+              <Text style={styles.heroLine}>{t('login.heroLineA')}</Text>
+              <Text style={styles.heroLine}>
+                {t('login.heroBPrefix')}
+                <Text style={styles.heroAccent}>{t('login.heroBAccent')}</Text>
+                {t('login.heroBSuffix')}
+              </Text>
             </View>
-            <Text style={styles.providerNote}>{t('login.credNote')}</Text>
+            <Text style={styles.lede}>{t('login.lede')}</Text>
           </View>
-        ) : (
-          <View style={styles.providerCard}>
-            <Text style={styles.providerEyebrow}>{t('login.accountEyebrow')}</Text>
-            <Text style={styles.providerValue}>{providerLabel}</Text>
-            <Text style={styles.providerNote}>
-              {t('login.providerNote')}
-            </Text>
-          </View>
-        )}
 
-        {error && (
-          <View style={styles.errorBlock}>
-            <Text style={styles.errorLabel}>{t('login.signInFailed')}</Text>
-            <Text style={styles.errorBody}>{error}</Text>
-          </View>
-        )}
-      </View>
+          {/* ── 右: 資格情報 + CTA ── */}
+          <ScrollView
+            style={styles.right}
+            contentContainerStyle={styles.rightContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {supportsPassword ? (
+              <View style={styles.providerCard}>
+                <Text style={styles.providerEyebrow}>{t('login.accountEyebrow')}</Text>
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>{t('login.idLabel')}</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    value={loginId}
+                    onChangeText={setLoginId}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="username"
+                    editable={!loggingIn}
+                  />
+                </View>
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>{t('login.passwordLabel')}</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    value={password}
+                    onChangeText={setPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="password"
+                    secureTextEntry
+                    editable={!loggingIn}
+                    onSubmitEditing={onContinue}
+                  />
+                </View>
+                <Text style={styles.providerNote}>{t('login.credNote')}</Text>
+              </View>
+            ) : (
+              <View style={styles.providerCard}>
+                <Text style={styles.providerEyebrow}>{t('login.accountEyebrow')}</Text>
+                <Text style={styles.providerValue}>{providerLabel}</Text>
+                <Text style={styles.providerNote}>{t('login.providerNote')}</Text>
+              </View>
+            )}
 
-      <View style={styles.footer}>
+            {error && (
+              <View style={styles.errorBlock}>
+                <Text style={styles.errorLabel}>{t('login.signInFailed')}</Text>
+                <Text style={styles.errorBody}>{error}</Text>
+              </View>
+            )}
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.cta,
+                !canSubmit && styles.ctaDisabled,
+                pressed && canSubmit && styles.ctaPressed,
+              ]}
+              onPress={onContinue}
+              disabled={!canSubmit}
+            >
+              {loggingIn ? (
+                <ActivityIndicator color={colors.textOnInk} />
+              ) : (
+                <Text style={styles.ctaLabel}>{t('login.signIn')}</Text>
+              )}
+            </Pressable>
+            <Text style={styles.tos}>{t('login.tos')}</Text>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+
+      {/* 閉じる (= push されて来た場合のみ。 スワイプバックの代替) */}
+      {navigation.canGoBack() && (
         <Pressable
-          style={({ pressed }) => [
-            styles.cta,
-            !canSubmit && styles.ctaDisabled,
-            pressed && canSubmit && styles.ctaPressed,
-          ]}
-          onPress={onContinue}
-          disabled={!canSubmit}
+          style={({ pressed }) => [styles.close, pressed && { opacity: 0.5 }]}
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
         >
-          {loggingIn ? (
-            <ActivityIndicator color={colors.textOnInk} />
-          ) : (
-            <Text style={styles.ctaLabel}>{t('login.signIn')}</Text>
-          )}
+          <Text style={styles.closeGlyph}>✕</Text>
         </Pressable>
-        <Text style={styles.tos}>
-          {t('login.tos')}
-        </Text>
-      </View>
+      )}
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.paper, justifyContent: 'space-between' },
-  body: { padding: spacing.xl, gap: spacing.lg },
+  root: { flex: 1, backgroundColor: colors.paper },
+  flex: { flex: 1 },
 
+  columns: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xl,
+    paddingHorizontal: spacing.xl,
+  },
+
+  left: {
+    flex: 1,
+    gap: spacing.md,
+  },
   markRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
   },
-
-  heroBlock: {
-    marginTop: spacing.xxl,
-    gap: 2,
-  },
-  heroLineA: {
+  heroBlock: { gap: 2 },
+  heroLine: {
     fontFamily: fonts.serifLight,
-    fontSize: 44,
-    lineHeight: 50,
-    letterSpacing: -0.8,
+    fontSize: 32,
+    lineHeight: 38,
+    letterSpacing: -0.5,
     color: colors.ink,
   },
-  heroLineB: {
-    fontFamily: fonts.serifLight,
-    fontSize: 44,
-    lineHeight: 50,
-    letterSpacing: -0.8,
-    color: colors.ink,
-  },
-  heroLineBAccent: {
+  heroAccent: {
     fontFamily: fonts.serifMedium,
     color: colors.emeraldDeep,
   },
-
   lede: {
     ...typography.body,
     color: colors.textBody,
-    maxWidth: 360,
+    maxWidth: 380,
+  },
+
+  right: {
+    flexGrow: 0,
+    width: 380,
+    maxHeight: '100%',
+  },
+  rightContent: {
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
   },
 
   providerCard: {
-    marginTop: spacing.lg,
     padding: spacing.lg,
     backgroundColor: colors.card,
     borderRadius: radii.lg,
@@ -240,7 +271,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.md,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     backgroundColor: colors.paper,
   },
   providerNote: {
@@ -250,7 +281,6 @@ const styles = StyleSheet.create({
   },
 
   errorBlock: {
-    marginTop: spacing.md,
     padding: spacing.md,
     borderRadius: radii.md,
     backgroundColor: colors.dangerSoft,
@@ -260,10 +290,9 @@ const styles = StyleSheet.create({
   errorLabel: { ...typography.labelSmall, color: colors.danger },
   errorBody: { ...typography.caption, color: colors.danger, marginTop: 4 },
 
-  footer: { padding: spacing.xl, gap: spacing.md },
   cta: {
     backgroundColor: colors.ink,
-    paddingVertical: 18,
+    paddingVertical: 16,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -281,6 +310,16 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMute,
     textAlign: 'center',
-    paddingHorizontal: spacing.lg,
   },
+
+  close: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.lg,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeGlyph: { fontSize: 18, color: colors.textMute },
 });
