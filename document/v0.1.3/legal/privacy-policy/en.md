@@ -14,7 +14,7 @@
 
 ## 1. Summary (non-binding)
 
-> - **What we collect**: **video** of housework etc. (no audio is recorded), sensor data such as hand motion, device info, and identity-verification info.
+> - **What we collect**: **video** of housework, work tasks, etc. (no audio is recorded), sensor data such as hand motion, device info, and account info.
 > - **What we use it for**: building training data to improve AI and robots, and **providing/selling it to outside companies** (including outside Japan).
 > - **Privacy processing**: faces etc. are blurred before sharing, but you may not become fully unidentifiable (we do not say "anonymized").
 > - **Your rights**: view, correct, delete, and stop (withdraw consent). However, data already used for training cannot be removed from past training.
@@ -36,19 +36,19 @@ All handling of personal data across our app, website, and data-sale service. It
 - **Video** from the head-mounted camera (no audio is recorded)
 - Sensor data per capture configuration (hand pose, IMU, LiDAR, etc.)
 - Device/technical info (model, OS, app version, capture settings)
-- Wallet public key, KYC-related info (KYC held by an external provider; we obtain it when needed)
+- Account information (account identifiers we issue, login credentials)
 - Usage/logs
 
 ## 4. Purposes
 - **Creating training data** for AI/robots (including quality scoring and content labeling)
 - **Licensing/providing/selling** datasets (to outside companies, research institutions, AI companies, including outside Japan)
 - Revenue distribution and transaction records
-- KYC; detection and handling of fraud and illegal content
+- Detection and handling of fraud and illegal content
 - Service provision, improvement, and support
 
 ## 5. Third-party provision, sale, sublicensing
 - We **license/provide/sell** datasets to outside parties (this is the core of the business).
-- Licensing is activated via an off-chain license document, using an on-chain token (NFT) as a **pointer** (the NFT itself has no legal effect; the binding terms are in the license document and our Terms of Service).
+- Licensing is activated via a **license document** between us and the recipient (the binding terms are in the license document and our Terms of Service).
 - Buyers are contractually bound by **no-re-identification, use limitations, and downstream flow-through obligations**.
 
 ## 6. Cross-border transfer
@@ -68,7 +68,6 @@ Retained for as long as necessary for the purposes and as required by law, then 
 ## 10. Your rights
 - You may request access, correction, suspension of use, deletion, and withdrawal of consent.
 - **Deletion scope**: data before training use is deleted. **After training use**, it is excluded from future training, but **past training cannot be undone**. We do not promise "complete deletion anytime."
-- The blockchain retains tokens and transaction records, but the **personal data itself is off-chain**, and deleting it removes substantive value.
 - Requests: contact@rootlens.io
 
 ## 11. Withdrawal of consent and its effect
@@ -94,3 +93,4 @@ contact@rootlens.io
 |------|--------|
 | (initial) | Authoritative draft reflecting the real business (data sale, staking, KYC, third parties). Layered structure. Counsel review before publishing |
 | (rev 2) | Cleaned internal references (section numbers, internal-doc slugs, D-codes) into plain prose for public output; unified contact to contact@rootlens.io |
+| 2026-07-12 | Removed wallet public key, KYC, and blockchain/NFT references (the features were removed from the system in v0.1.4); added account information to the collected-data list |
