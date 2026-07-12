@@ -91,7 +91,7 @@
       "title": "Robots learn by watching people. Nobody is collecting the footage.",
       "p1": "Teaching a robot to work takes a huge amount of video of people actually working. Just as ChatGPT learned language from a vast amount of text, robots learn human motion from a vast amount of video.",
       "p2": "But usable work footage is in critically short supply. Billions of people do this kind of work every day, all over the world, yet there is no infrastructure that collects it as data. A precious resource is being thrown away unused.",
-      "p3": "The data that works is produced in the course of everyday operations, on site."
+      "p3": "The data robots can learn from is produced in the course of everyday operations, on site."
     },
     "services": {
       "title": "Services that help the workplace, concretely"
@@ -130,7 +130,7 @@
     "enterprise": {
       "label": "SERVICE 02 · FOR COMPANIES",
       "title": "Start with a workplace diagnostic",
-      "p1": "For companies considering robots or physical AI. We bring the capture equipment and app, record the work on your floor, and deliver a diagnostic report, free of charge: which steps suit automation and what adoption would take.",
+      "p1": "For companies considering robots or physical AI. We bring the capture equipment and app, record the work at your site, and deliver a diagnostic report, free of charge: which steps suit automation and what adoption would take.",
       "p2": "It can be free because only the data you approve is sold as training data, and that revenue covers the diagnostic. All we ask of the site is the recording.",
       "cta": "Ask about a diagnostic"
     },
