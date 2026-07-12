@@ -99,6 +99,18 @@ function renderBlocks(lines) {
       continue;
     }
 
+    // 番号リスト (連続する "N." 行)。 グループ間で番号が続く場合に備えて start を保持する
+    if (/^\s*\d+[.)]\s+/.test(line)) {
+      const start = Number(line.match(/^\s*(\d+)[.)]/)[1]);
+      const items = [];
+      while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
+        items.push(`<li>${inline(lines[i].replace(/^\s*\d+[.)]\s+/, ''))}</li>`);
+        i++;
+      }
+      out.push(`<ol${start === 1 ? '' : ` start="${start}"`}>${items.join('')}</ol>`);
+      continue;
+    }
+
     // 段落 (空行 or 特殊行まで連結)
     const para = [];
     while (
@@ -108,6 +120,7 @@ function renderBlocks(lines) {
       !lines[i].trim().startsWith('|') &&
       !lines[i].trim().startsWith('>') &&
       !/^\s*[-*]\s+/.test(lines[i]) &&
+      !/^\s*\d+[.)]\s+/.test(lines[i]) &&
       !/^-{3,}$/.test(lines[i].trim())
     ) {
       para.push(lines[i].trim());

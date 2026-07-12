@@ -46,7 +46,7 @@ export default async function PrivacyPolicy() {
         .legalBody h2 { font-weight: 900; font-size: 1.4rem; line-height: 1.4; color: #fff; margin: 44px 0 14px; }
         .legalBody h3 { font-weight: 900; font-size: 1.08rem; line-height: 1.45; color: #fff; margin: 28px 0 8px; }
         .legalBody p { font-size: 1.02rem; line-height: 1.9; color: var(--rl-wt); margin: 0 0 16px; }
-        .legalBody ul { font-size: 1.02rem; line-height: 1.9; color: var(--rl-wt); margin: 0 0 16px; padding-left: 22px; }
+        .legalBody ul, .legalBody ol { font-size: 1.02rem; line-height: 1.9; color: var(--rl-wt); margin: 0 0 16px; padding-left: 22px; }
         .legalBody li { margin: 0 0 8px; }
         .legalBody strong { color: #fff; font-weight: 700; }
         .legalBody a { color: var(--rl-cyan); }
