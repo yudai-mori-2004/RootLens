@@ -94,15 +94,15 @@
       "intro": "For any workplace that hires part-timers: restaurants, retail, light warehouse work. Hire a RootLens staffer wearing a headgear camera as a regular part-timer; we sell the footage recorded on shift as training data and return a filming fee for the hours recorded.",
       "step1": {
         "label": "Work as usual",
-        "text": "Staff wearing a headgear camera work normal part-time shifts. Dishwashing, prep, stocking, packing: any job where the headgear isn't in the way."
+        "text": "Staff wearing a headgear camera work part-time shifts. Dishwashing, prep, stocking, packing: any line of work is fine, as long as the headgear and the filming aren't in the way."
       },
       "step2": {
         "label": "Footage becomes training data",
-        "text": "Video recorded during shifts becomes material robots learn manipulation from. The workplace runs as usual; nothing changes."
+        "text": "The close-up work footage staff record on shift becomes valuable training data that teaches robots how to move. The data is never used for anything outside AI and robotics R&D."
       },
       "step3": {
         "label": "The workplace gets paid",
-        "text": "We pay a filming fee for the hours actually recorded, so you keep the extra hands while holding labor costs down."
+        "text": "We pay a filming fee for the hours recorded: the workplace keeps the extra hands while holding labor costs down. The fee also goes to the staff themselves, adding a few hundred yen to their effective hourly wage."
       }
     },
     "marquee": "Real human work, made robot-ready",
