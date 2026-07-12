@@ -193,7 +193,6 @@ export function formatDuration(ms: number | null | undefined): string | null {
 }
 
 export function configLabel(id: string): string {
-  if (id === 'ultra_wide') return '超広角';
   if (id === 'arkit') return 'ARKit';
   return id;
 }

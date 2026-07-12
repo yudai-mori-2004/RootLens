@@ -31,7 +31,7 @@ import type {
 
 // ARKit 構成の出力ファイル (DATA_SPECS §2.2):
 //   rgb.mp4                    wide (1x) RGB 映像 (30 fps)
-//   realtime_handpose.jsonl    手ランドマーク (= ultra_wide と同形の hands) + カメラポーズ (4×4) + tracking_state + IMU snapshot
+//   realtime_handpose.jsonl    手ランドマーク (hands) + カメラポーズ (4×4) + tracking_state + IMU snapshot
 //   imu.jsonl                  加速度 / ジャイロ / デバイスモーション (~100 Hz)
 //   metadata.json              機種 / OS / アプリ版 / カメラ画角・解像度・intrinsics / 構成 ID 等の静的情報
 //   depth.tar                  LiDAR 深度 (Pro 端末のみ)。 native が 16-bit PNG (mm) / フレームを
@@ -75,7 +75,7 @@ export const arkitConfig: RecordingConfig = {
 
   async startRecording(sink: EventSink): Promise<RecordingSession> {
     sink({ step: 'record', level: 'info', message: '録画開始 (ARKit)' });
-    // durable な Documents 配下に録画 (= app-kill 後の Pipeline 1 再開のため。 ultraWide と同方針)。
+    // durable な Documents 配下に録画 (= app-kill 後の Pipeline 1 再開のため)。
     const dirUri = `${FileSystem.documentDirectory}recordings/rec-${Date.now()}/`;
     const dir = await startArkitRecording(dirUri.replace(/^file:\/\//, ''));
     const sessionDir = ensureTrailingSlash(dir);

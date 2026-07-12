@@ -47,7 +47,7 @@ const MOCKS: DesignMock[] = DESIGN_PREVIEW
       {
         clip: {
           id: 'mock_1', state: 'recorded', createdAt: Date.now() - 8 * 60_000,
-          recordingConfigId: 'ultra_wide', durationMs: 754_000,
+          recordingConfigId: 'arkit', durationMs: 754_000,
         },
         thumb: require('../../assets/decor/home-warm.png'),
       },
@@ -62,7 +62,7 @@ const MOCKS: DesignMock[] = DESIGN_PREVIEW
       {
         clip: {
           id: 'mock_3', state: 'uploading', createdAt: Date.now() - 3 * 60_000,
-          recordingConfigId: 'ultra_wide', durationMs: 361_000, uploadProgress: 0.62,
+          recordingConfigId: 'arkit', durationMs: 361_000, uploadProgress: 0.62,
         },
         thumb: require('../../assets/decor/celebration.png'),
       },

@@ -50,7 +50,7 @@ const sounds: Partial<Record<SfxName, Audio.Sound>> = {};
 let preloaded = false;
 let preloading: Promise<void> | null = null;
 
-/// AudioSession を再生用に許可する。 既に WideCapture native 側で .playAndRecord 系を
+/// AudioSession を再生用に許可する。 既に撮影 native 側で .playAndRecord 系を
 /// 取っているはずだが、 念のため Audio module 側でも mode 設定する (= silent switch でも鳴るように)。
 async function ensureAudioMode(): Promise<void> {
   try {

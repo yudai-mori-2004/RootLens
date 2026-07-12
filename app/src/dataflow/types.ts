@@ -33,7 +33,7 @@ export interface Clip {
   /** 端末で撮影完了した時刻 (ms epoch) */
   createdAt: number;
 
-  /** 採用された撮影構成の ID (= 'ultra_wide' | 'arkit' | ...) */
+  /** 採用された撮影構成の ID (= 'arkit' | ...) */
   recordingConfigId?: string;
   /** 撮影セッション dir (file:// URI)。 Pipeline 1 の入力ファイル群が並ぶ。 */
   sessionDir?: string;
@@ -96,7 +96,7 @@ export interface UploadResult {
 export interface RegisterInput {
   contentHash: string;
   contentSize: number;
-  /** 撮影構成 (= 'ultra_wide' | 'arkit')。 */
+  /** 撮影構成 (= 'arkit')。 */
   recordingConfig: string;
   /** 録画尺 (ms)。 取れなければ省略。 */
   durationMs?: number | null;

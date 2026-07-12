@@ -6,10 +6,8 @@
 // 「session dir に何のファイルが並ぶか」 は構成の outputFiles が一元的に決める。
 //
 // 現状の実装:
-//   - ultra_wide (iOS / Android 共通)  ← wide-capture native module
-// 将来:
-//   - arkit (iOS 限定)                 ← ARKit native module (v0.1.4 で再導入)
-//   - android_mediapipe 等
+//   - arkit (iOS 限定)  ← arkit-capture native module
+// 将来はスマートグラス構成等をここに足す。
 //
 // ⚠ このファイルは Layer 1 (dataflow)。react / react-native を import してはならない。
 
@@ -17,9 +15,9 @@ import type { EventSink } from '../events';
 
 // ─── リアルタイム手検出 (= 撮影構成が提供する、 ジェスチャー層が乗る土台) ───────────
 // ジェスチャー / キャリブレーション UX は「撮影構成の上に薄く乗るソース」 であり、 構成ごとの
-// native (wide-capture / arkit-capture) 差異を意識しない。 そのため手検出イベントの subscribe を
-// 構成抽象が提供し、 UX 層は config.subscribeHandTrack() だけを見る (= 構成非依存)。
-// 型は両 native (wideCapture / arkitCapture) の onHandTrack payload と同形 (= 段階削除中の互換)。
+// native 差異を意識しない。 そのため手検出イベントの subscribe を構成抽象が提供し、
+// UX 層は config.subscribeHandTrack() だけを見る (= 構成非依存)。
+// 型は native (arkitCapture) の onHandTrack payload と同形。
 
 export interface HandLandmark {
   x: number;        // 0..1 (左上原点)
@@ -85,7 +83,7 @@ export interface RecordingSession {
  * UI はこの interface だけを見て録画を駆動でき、 native の詳細を知らない。
  */
 export interface RecordingConfig {
-  /** 一意識別子 (= Clip.recordingConfigId に保存)。 'ultra_wide' | 'arkit' | ... */
+  /** 一意識別子 (= Clip.recordingConfigId に保存)。 'arkit' | ... */
   readonly id: string;
   /** UI 表示名 */
   readonly label: string;

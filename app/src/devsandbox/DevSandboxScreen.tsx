@@ -33,7 +33,6 @@ import {
   type EventLevel,
   type RecordingConfig,
 } from '../dataflow';
-import { WideCapturePreviewView } from '../native/wideCapture';
 import { ArkitCapturePreviewView } from '../native/arkitCapture';
 // console にもミラーする sink (= Metro ログでも追える)
 const sink = teeToConsole(storeEventSink, 'sandbox');
@@ -67,7 +66,7 @@ const LEVEL_COLOR: Record<EventLevel, string> = {
 export const DevSandboxScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
-  // 撮影構成は切替可能 (= ultra_wide ⇄ arkit)。録画待機中のみ切替できる。
+  // 撮影構成は切替可能 (= 構成が複数あるとき)。録画待機中のみ切替できる。
   // selectedConfigId = ユーザーが選んだ構成 (切替の目標)。
   // activeConfigId   = 実際に session が稼働中の構成 (= 切替完了後に更新)。preview / 録画はこちらを使う。
   const [selectedConfigId, setSelectedConfigId] = useState<string>(DEFAULT_RECORDING_CONFIG.id);
@@ -242,12 +241,7 @@ export const DevSandboxScreen: React.FC = () => {
   // 選択直後 (= session 起動前) に arkit の ARSCNView を mount するとカメラ競合になるため、
   // activeConfigId 基準にして session ハンドオフ完了まで preview を貼り替えない。
   // native 未登録 (= 未ビルド) なら null。
-  const PreviewView =
-    activeConfigId === 'arkit'
-      ? ArkitCapturePreviewView
-      : activeConfigId === 'ultra_wide'
-        ? WideCapturePreviewView
-        : null;
+  const PreviewView = activeConfigId === 'arkit' ? ArkitCapturePreviewView : null;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

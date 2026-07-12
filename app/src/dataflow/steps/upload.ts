@@ -2,7 +2,7 @@
 //
 // content_hash + 撮影構成を /api/v1/raw-uploads に投げて presigned PUT URL を取得し、
 // 撮影構成が出力したファイル群を raw/<content_hash>/ に並列 PUT する。
-// アップロード先バケットは構成でサーバが決める (= ultra_wide → raw、 arkit → raw-arkit)。
+// アップロード先バケットは構成でサーバが決める (= arkit → raw-arkit)。
 //
 // ⚠ Layer 1 (dataflow)。react / react-native を import しない。
 

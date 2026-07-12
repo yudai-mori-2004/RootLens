@@ -43,7 +43,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from '../app/types';
-import { WideCapturePreviewView } from '../native/wideCapture';
 import {
   ArkitCapturePreviewView,
   getArkitPowerState,
@@ -277,9 +276,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // available = 現在アクティブな撮影構成が当端末で使えるか。
   const [available, setAvailable] = useState<boolean | null>(null);
 
-  // 撮影構成は録画待機中のみ切替可能 (= ultra_wide ⇄ arkit、 DevSandbox と同じ要領)。
+  // 撮影構成の切替はキャリブレーション待機中のみ可能 (= DevSandbox と同じ要領)。
   // selectedConfigId = ユーザーが選んだ構成 (= 切替目標)。 activeConfigId = 実際に session が
-  // 稼働中の構成 (= preview / hand-track はこちらを使う)。
+  // 稼働中の構成 (= preview / hand-track はこちらを使う)。 現状の構成は arkit のみ。
   const [selectedConfigId, setSelectedConfigId] = useState<string>(DEFAULT_RECORDING_CONFIG.id);
   const [activeConfigId, setActiveConfigId] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
@@ -1139,18 +1138,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     state.kind === 'stopping' ||
     state.kind === 'stopping_confirm';
 
-  // 切替可能なのはキャリブレーション待機中のみ (= 録画フロー中は不可)。
-  const inCaptureFlow = isRecording || state.kind === 'precapture_countdown' || state.kind === 'finalizing';
-  const canSwitchConfig = !switching && !inCaptureFlow;
-  void canSwitchConfig; // スイッチャ UI コメントアウト中も切替ロジックは温存
 
   // プレビューは「実際に稼働中の構成」 の native view を出す (= 切替完了後に swap)。
-  const PreviewView =
-    activeConfigId === 'arkit'
-      ? ArkitCapturePreviewView
-      : activeConfigId === 'ultra_wide'
-        ? WideCapturePreviewView
-        : null;
+  // 構成が増えたらここに config id → native view の対応を足す。
+  const PreviewView = activeConfigId === 'arkit' ? ArkitCapturePreviewView : null;
 
   // ─── HUD (= 画面下の字幕。 今やることを平易な日本語 1 文で) ────────────
   // 頭部装着中は画面が見えない前提: 音声が主チャネル、 画面は「装着前の準備」 と
@@ -1214,42 +1205,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       {/* 録画中の全周枠 (= 遠目でも「録画している」 が一目で分かる、 カメラの文法) */}
       {isRecording ? <View style={styles.recFrame} pointerEvents="none" /> : null}
 
-      {/*
-        撮影構成スイッチャ (ultra_wide ⇄ arkit) は当面 arkit 固定運用のため UI を非表示にする
-        (= DEFAULT_RECORDING_CONFIG が arkit)。 切替処理 (= onSelectConfig + session ハンドオフ
-        effect: カメラ排他のため「旧 session 完全停止 → 解放待ち → 新 session 起動」 を直列化)
-        はデリケートなのでロジックごと温存し、 ここの UI だけ畳む。 復活時はこのコメントを外す:
-
-      {RECORDING_CONFIGS.length > 1 ? (
-        <View
-          style={[styles.configSwitcher, { bottom: safeBottom + 16, left: safeLeft, right: safeRight }]}
-          pointerEvents={canSwitchConfig ? 'auto' : 'none'}
-        >
-          {RECORDING_CONFIGS.map((c) => {
-            const selected = c.id === config.id;
-            const avail = availByConfig[c.id];
-            const disabled = avail === false || !canSwitchConfig || selected;
-            return (
-              <Pressable
-                key={c.id}
-                onPress={() => onSelectConfig(c.id)}
-                disabled={disabled}
-                style={[
-                  styles.configChip,
-                  selected && styles.configChipSel,
-                  (avail === false || !canSwitchConfig) && styles.configChipDim,
-                ]}
-                hitSlop={6}
-              >
-                <Text style={[styles.configChipText, selected && styles.configChipTextSel]}>
-                  {c.id}{avail === false ? ' x' : ''}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-      */}
+      {/* 撮影構成が 2 つ以上に戻ったら、 ここに切替 UI を置く (= onSelectConfig +
+          session ハンドオフ effect は温存済み。 旧 UI は git 履歴の ultra_wide 撤去前を参照)。 */}
 
       {/* 左上: 戻る (録画中は緊急停止) */}
       <View style={[styles.chromeTopLeft, { top: safeTop + 12, left: safeLeft + 12 }]}>
@@ -1451,28 +1408,6 @@ const styles = StyleSheet.create({
     color: colors.ink, fontSize: 14,
     fontFamily: fonts.sansSemibold,
   },
-
-  // 撮影構成スイッチャ (= コメントアウト中の復活用に温存)
-  configSwitcher: {
-    position: 'absolute',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  configChip: {
-    paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999,
-    backgroundColor: 'rgba(11,13,17,0.66)',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
-  },
-  configChipSel: { backgroundColor: 'rgba(232,163,61,0.9)', borderColor: 'rgba(255,255,255,0.25)' },
-  configChipDim: { opacity: 0.4 },
-  configChipText: {
-    color: 'rgba(255,255,255,0.92)',
-    fontFamily: fonts.mono,
-    fontSize: 11,
-    letterSpacing: 1.0,
-  },
-  configChipTextSel: { color: '#131519' },
 
   countdownOverlay: {
     ...StyleSheet.absoluteFillObject,
