@@ -571,6 +571,54 @@
   margin-bottom: 26px;
 }
 
+/* ─── お問い合わせページ (= /contact。 mailto が動かない環境でも成立させる) ── */
+
+.contactCard {
+  margin-top: 40px;
+  max-width: 680px;
+  background: var(--rl-paper);
+  border-radius: 20px;
+  padding: 34px 38px;
+  transform: rotate(-0.6deg);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.4);
+}
+
+.contactLabel {
+  font-family: var(--font-lp-mono, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  color: var(--rl-pink);
+}
+
+.contactEmail {
+  margin-top: 8px;
+  font-weight: 900;
+  font-size: clamp(1.15rem, 3.4vw, 1.9rem);
+  color: var(--rl-ink);
+  word-break: break-all;
+  user-select: all;
+}
+
+.contactActions {
+  margin-top: 26px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 22px;
+}
+
+.contactActions .ctaPrimary {
+  cursor: pointer;
+}
+
+.contactMailto {
+  color: var(--rl-ink);
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 /* ─── 収集デバイスのラインナップ (= スペックカード) ───────── */
 
 .rigGrid {

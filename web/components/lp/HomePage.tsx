@@ -1,8 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import s from "./lp.module.css";
 
-const CONTACT_EMAIL = "contact@rootlens.io";
-
 // 構成 (= 思想の順に語る):
 //   Hero      現場の仕事がロボットを教え、現場が対価を受け取る
 //   §01       問題: ロボットの学習データは現場でしか生まれない
@@ -201,7 +199,7 @@ export default async function HomePage() {
                 <p className={s.prose}>{tEnterprise("p1")}</p>
                 <p className={s.prose}>{tEnterprise("p2")}</p>
                 <div style={{ marginTop: 28 }}>
-                  <a href={`mailto:${CONTACT_EMAIL}`} className={s.ctaSecondary}>
+                  <a href="/contact" className={s.ctaSecondary}>
                     {tEnterprise("cta")}
                     <span aria-hidden="true">→</span>
                   </a>
@@ -275,7 +273,7 @@ export default async function HomePage() {
             <p className={s.closingCtaDesc}>{tHome("closingDesc")}</p>
           </div>
           <div className={s.closingCtaButtons}>
-            <a href={`mailto:${CONTACT_EMAIL}`} className={s.ctaPrimary}>
+            <a href="/contact" className={s.ctaPrimary}>
               {tHome("ctaContact")}
               <span aria-hidden="true">→</span>
             </a>
