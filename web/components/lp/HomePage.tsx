@@ -119,6 +119,7 @@ export default async function HomePage() {
           <div className={s.sectionBody}>
             <p className={s.prose}>{tModel("p1")}</p>
             <p className={s.prose}>{tModel("p2")}</p>
+            <p className={s.prose}>{tModel("p3")}</p>
             <p className={s.prose} style={{ marginTop: 28, marginBottom: 0 }}>
               <span className={s.emphasis}>{tModel("emphasis")}</span>
             </p>
