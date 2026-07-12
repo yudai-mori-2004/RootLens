@@ -5,6 +5,12 @@
 // expo-secure-store (= iOS Keychain) に永続化し、 アクセストークンは getSession() が
 // 必要に応じてリフレッシュする。
 //
+// セッションの寿命 (2026-07-13 判断): 標準の「短命 JWT (1h) + 長命 refresh token」 方式。
+// identity (= アカウント id) は保存済みセッションから常に復元するので、 オフラインで JWT が
+// 期限切れでも「誰か」 は分かったまま (= unauthenticated に落とさない)。 落とすのは明示的な
+// サインアウトとサーバ側の失効 (SIGNED_OUT イベント) だけ。 トークンの鮮度が要るのは
+// アップロードの瞬間だけで、 その時 getSession() がオンラインなら黙ってリフレッシュする。
+//
 // 現場名などの意味論はどこにも持たない (= アプリは「データを取って id に紐づける機械」)。
 
 import { createClient, type SupabaseClient, type Session } from '@supabase/supabase-js';
@@ -14,6 +20,10 @@ import type { AuthProvider, AuthState } from './types';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../env';
 
 const PROVIDER_ID = 'supabase';
+
+/// セッションの保存キー。 supabase-js の既定キー (sb-<ref>-auth-token) に依存せず明示する
+/// (= initialize が同じキーを直接読んで identity を復元するため)。
+const SESSION_STORAGE_KEY = 'rootlens.supabase.session.v1';
 
 /// 合成メールのドメイン (= scripts/create_account.mjs と対)。 handle だけの入力に付与する。
 const LOGIN_EMAIL_DOMAIN = 'rl.local';
@@ -41,13 +51,20 @@ export class SupabaseAuthProvider implements AuthProvider {
     this.client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         storage: secureStorage,
+        storageKey: SESSION_STORAGE_KEY,
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
       },
     });
-    this.client.auth.onAuthStateChange((_event, session) => {
-      this.applySession(session);
+    this.client.auth.onAuthStateChange((event, session) => {
+      // 明示的なサインアウト / サーバ側の失効だけが identity を落とす。
+      // それ以外の session=null (= 期限切れ + オフラインの一時状態) では状態を保つ。
+      if (event === 'SIGNED_OUT') {
+        this.setState({ status: 'unauthenticated' });
+      } else if (session?.user) {
+        this.applySession(session);
+      }
     });
   }
 
@@ -63,12 +80,35 @@ export class SupabaseAuthProvider implements AuthProvider {
   async initialize(): Promise<void> {
     if (this.initialized) return;
     this.initialized = true;
+    // 1) 保存済みセッションから identity を即復元 (= オフラインでも「誰か」 は分かる)。
+    let storedUserId: string | null = null;
+    try {
+      const raw = await SecureStore.getItemAsync(SESSION_STORAGE_KEY);
+      if (raw) {
+        const stored = JSON.parse(raw) as { user?: { id?: string } };
+        if (stored.user?.id) {
+          storedUserId = stored.user.id;
+          this.setState({
+            status: 'authenticated',
+            session: { accountId: storedUserId, providerId: PROVIDER_ID },
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('[SupabaseAuthProvider] stored session restore failed', err);
+    }
+    // 2) 裏でトークンを検証 / リフレッシュ (= オンラインなら新しい JWT に置き換わる)。
+    //    ネットワーク起因で失敗しても 1) の identity は保つ。
     try {
       const { data } = await this.client.auth.getSession();
-      this.applySession(data.session);
+      if (data.session?.user) {
+        this.applySession(data.session);
+      } else if (!storedUserId) {
+        this.setState({ status: 'unauthenticated' });
+      }
     } catch (err) {
-      console.error('[SupabaseAuthProvider] initialize failed', err);
-      this.setState({ status: 'unauthenticated' });
+      console.warn('[SupabaseAuthProvider] session refresh failed (offline?)', err);
+      if (!storedUserId) this.setState({ status: 'unauthenticated' });
     }
   }
 
@@ -87,7 +127,12 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   async logout(): Promise<void> {
-    await this.client.auth.signOut();
+    try {
+      await this.client.auth.signOut();
+    } catch {
+      // オフラインでもローカルのセッションは確実に破棄する
+      await SecureStore.deleteItemAsync(SESSION_STORAGE_KEY).catch(() => {});
+    }
     this.setState({ status: 'unauthenticated' });
   }
 
@@ -98,14 +143,11 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   private applySession(session: Session | null) {
-    if (session?.user) {
-      this.setState({
-        status: 'authenticated',
-        session: { accountId: session.user.id, providerId: PROVIDER_ID },
-      });
-    } else if (this.state.status !== 'loading' || this.initialized) {
-      this.setState({ status: 'unauthenticated' });
-    }
+    if (!session?.user) return; // 落とす判断は SIGNED_OUT イベント / initialize が行う
+    this.setState({
+      status: 'authenticated',
+      session: { accountId: session.user.id, providerId: PROVIDER_ID },
+    });
   }
 
   private setState(state: AuthState) {

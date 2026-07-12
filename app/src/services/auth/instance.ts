@@ -56,9 +56,15 @@ export function requireCurrentSession(): AuthSession {
  * 場合は throw する。 サーバはこのトークンの sub をアカウント id として使う (task 13)。
  */
 export async function getAuthHeader(): Promise<{ Authorization: string }> {
-  const token = await getAuthProvider().getAccessToken();
+  const provider = getAuthProvider();
+  const token = await provider.getAccessToken();
   if (!token) {
-    throw new Error('未認証: アクセストークンがありません (= ログインしてください)');
+    // identity は分かっているがトークンが取れない = ほぼオフライン (リフレッシュ不能)。
+    throw new Error(
+      provider.getState().status === 'authenticated'
+        ? 'アクセストークンを更新できませんでした (= オフライン?)。 通信環境を確認してもう一度お試しください。'
+        : '未認証: アクセストークンがありません (= ログインしてください)',
+    );
   }
   return { Authorization: `Bearer ${token}` };
 }
