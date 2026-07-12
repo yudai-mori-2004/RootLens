@@ -145,7 +145,7 @@
     "devices": {
       "label": "FOR DATA BUYERS",
       "title": "Capture rigs and data specs",
-      "intro1": "Robot training can't use just any video. It needs footage focused on the work itself, shot in real environments, from as many different sites as possible. RootLens data is collected in shops and workplaces that are actually in business. Every clip is checked with the site where it was filmed, and only clips the site has consented to are uploaded.",
+      "intro1": "Robot training can't use just any video. It needs footage focused on the work itself, shot in real environments, from as many different sites as possible. RootLens data is collected in shops and workplaces that are actually in business. All filming takes place under a written agreement with each site, and a consent record is kept for every clip. Every clip is reviewed before delivery.",
       "intro2": "We grow the lineup rig by rig; one set is in operation today. See the sample data for format details.",
       "set01": {
         "tag": "SET 01 · IN OPERATION",
