@@ -68,8 +68,8 @@ We use the information we collect for the following purposes, according to whose
 13. Complying with legal obligations
 
 ## 5. Third-party provision, sale, sublicensing
-- We **license/provide/sell** datasets to outside parties (this is the core of the business).
-- Licensing is activated via a **license document** between us and the recipient (the binding terms are in the license document and our Terms of Service).
+- We **license/provide/sell** datasets to outside parties. This is the core of our business.
+- The terms of a license are set out in the **license document** concluded between us and the recipient, and in our Terms of Service.
 - Buyers are contractually bound by **no-re-identification, use limitations, and downstream flow-through obligations**.
 
 ## 6. Entrusting data handling
@@ -99,11 +99,11 @@ You may request review, suspension of use, or deletion of footage you may appear
 ## 11. Your rights
 - You may request disclosure (including disclosure of third-party provision records), correction, suspension of use, deletion, and withdrawal of consent.
 - **Deletion scope**: data before training use is deleted. **After training use**, it is excluded from future training, but **past training cannot be undone**. We do not promise "complete deletion anytime."
-- Requests are accepted by email and handled within the statutory period after identity verification. No fee is charged (actual costs, such as postage, may apply if you request them).
+- Requests are accepted by email and handled within the statutory period after identity verification. No fee is charged. However, actual costs such as postage may apply if you request delivery by mail.
 - Requests: contact@rootlens.io
 
 ## 12. Withdrawal of consent and its effect
-The user may withdraw consent anytime. After withdrawal, we stop new collection/sale and delete un-trained data. Effects on already-issued licenses and trained models are as described in "11. Your rights" above (the past cannot be undone).
+The user may withdraw consent anytime. After withdrawal, we stop new collection/sale and delete un-trained data. Effects on already-issued licenses and trained models are as described in "11. Your rights" above. Training already performed cannot be undone.
 
 ## 13. Security measures
 To prevent leakage, loss, or damage of personal data, we take the following measures.
@@ -142,3 +142,4 @@ contact@rootlens.io
 | 2026-07-12 (6) | Removed "currently, the main recipients are located in the United States" from section 7 (not factual) |
 | 2026-07-12 (7) | Added to section 8 that blurred data is still treated as personal data, handled on consent, with requests still available (the section stated only the negative) |
 | 2026-07-12 (8) | Rewrote the section 8 addition in plain terms: dropped the boilerplate request list (correction does not fit footage) in favor of what a person can actually do (withdraw, pre-training deletion, honest post-training limits per section 11) |
+| 2026-07-12 (9) | Parenthetical cleanup: promoted main statements disguised as asides (core of the business, license terms, fee exceptions, training irreversibility) into full sentences; simplified account identifiers to account ID in the Japanese original |
