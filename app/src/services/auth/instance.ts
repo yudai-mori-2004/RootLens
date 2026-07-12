@@ -15,9 +15,19 @@ let instance: AuthProvider | null = null;
 
 export function getAuthProvider(): AuthProvider {
   if (!instance) {
-    // 既定は Supabase (task 13)。 env 未設定のビルド (= ローカル検証) だけ debug に落ちる。
-    instance =
-      SUPABASE_URL && SUPABASE_ANON_KEY ? new SupabaseAuthProvider() : new DebugAuthProvider();
+    // 既定は Supabase (task 13)。 debug への fallback は dev ビルド限定。
+    // release で env が欠けたまま debug に落ちると、 ed25519 の野良アカウントで
+    // 撮影できてしまう (= build 25 で実際に起きた)。 release では起動時に即死させて
+    // ビルド設定の欠落を露見させる。
+    if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+      instance = new SupabaseAuthProvider();
+    } else if (__DEV__) {
+      instance = new DebugAuthProvider();
+    } else {
+      throw new Error(
+        'auth: EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY がビルドに焼き込まれていません (eas.json production.env を確認)',
+      );
+    }
   }
   return instance;
 }
