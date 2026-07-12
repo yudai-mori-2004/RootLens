@@ -214,7 +214,7 @@ export default async function HomePage() {
       </section>
 
       {/* §04 買い手向け: 収集デバイスとデータ仕様 (= デバイスセット単位のラインナップ) */}
-      <section className={s.section}>
+      <section className={s.section} id="specs">
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§04</div>

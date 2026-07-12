@@ -70,3 +70,59 @@
 .navLinkActive {
   color: var(--rl-cyan);
 }
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* モバイルはハンバーガー (= MENU/CLOSE のドット文字ボタン + ドロップダウン) */
+.navBurger {
+  display: none;
+  font-family: var(--font-lp-mono, monospace);
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  color: #fff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.navMenu {
+  display: none;
+  flex-direction: column;
+  padding: 6px 24px 16px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(23, 5, 41, 0.94);
+}
+
+.navMenuLink {
+  font-family: var(--font-lp-mono, monospace);
+  font-size: 0.86rem;
+  letter-spacing: 0.14em;
+  color: var(--rl-wt);
+  text-decoration: none;
+  padding: 13px 4px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.navMenuLink:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 860px) {
+  .navLinks {
+    display: none;
+  }
+
+  .navBurger {
+    display: inline-flex;
+  }
+
+  .navMenu {
+    display: flex;
+  }
+}
