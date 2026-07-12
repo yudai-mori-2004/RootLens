@@ -1256,3 +1256,32 @@
     padding: 72px 0 28px;
   }
 }
+
+/* スマホ幅: 見出しを縦積みにしてタイトルに全幅を使わせ、 スペック表もキーと値を積む */
+@media (max-width: 640px) {
+  .sectionHeader {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 36px;
+  }
+
+  .sectionNumber {
+    font-size: 2.6rem;
+    transform: rotate(-3deg);
+  }
+
+  .specRow {
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 0;
+  }
+
+  .specKey {
+    flex-basis: auto;
+  }
+
+  .serviceBlock + .serviceBlock {
+    margin-top: 64px;
+    padding-top: 52px;
+  }
+}
