@@ -1,9 +1,6 @@
-import { getTranslations } from "next-intl/server";
 import s from "../lp/lp.module.css";
 
-export default async function SiteFooter() {
-  const t = await getTranslations("lp.footer");
-
+export default function SiteFooter() {
   return (
     <footer className={s.footer}>
       <div className={s.footerInner}>
@@ -25,7 +22,6 @@ export default async function SiteFooter() {
             Akito Kono
           </a>
         </div>
-        <div className={s.footerLicense}>{t("license")}</div>
       </div>
     </footer>
   );

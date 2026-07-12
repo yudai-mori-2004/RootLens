@@ -60,14 +60,14 @@ export default async function HomePage() {
             </div>
           </div>
           <aside className={s.heroMeta}>
-            <div className={s.heroMetaLabel}>FIELD</div>
-            <div className={s.heroMetaValue}>REAL WORKPLACES, JAPAN</div>
+            <div className={s.heroMetaLabel}>{tHero("metaFieldLabel")}</div>
+            <div className={s.heroMetaValue}>{tHero("metaFieldValue")}</div>
             <div style={{ height: 12 }} />
-            <div className={s.heroMetaLabel}>STATUS</div>
-            <div className={s.heroMetaValue}>PILOT LIVE</div>
+            <div className={s.heroMetaLabel}>{tHero("metaStatusLabel")}</div>
+            <div className={s.heroMetaValue}>{tHero("metaStatusValue")}</div>
             <div style={{ height: 12 }} />
             {/* 実績カウンタ。 売れはじめたら手で更新する (= 盛らない。 0 は 0 と書く) */}
-            <div className={s.heroMetaLabel}>SITES · BUYERS</div>
+            <div className={s.heroMetaLabel}>{tHero("metaCountLabel")}</div>
             <div className={s.heroMetaValue}>0 · 0</div>
           </aside>
         </div>

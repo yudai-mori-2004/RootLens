@@ -72,8 +72,12 @@
       "tagline": "Real human work, made robot-ready.",
       "description": "RootLens is a physical-AI project born at the University of Osaka. We monetize work data from Japan's commercial workplaces and return the benefits, in many forms, to the workplaces themselves.",
       "ctaSample": "Sample data",
-      "burst": "JAPAN'S FIRST",
-      "ctaModel": "How it works"
+      "ctaModel": "How it works",
+      "metaFieldLabel": "FIELD",
+      "metaFieldValue": "REAL WORKPLACES, JAPAN",
+      "metaStatusLabel": "STATUS",
+      "metaStatusValue": "PILOT LIVE",
+      "metaCountLabel": "SITES · BUYERS"
     },
     "problem": {
       "title": "Robots learn by watching people. The footage is missing.",
@@ -96,15 +100,6 @@
         "label": "Stores get paid",
         "text": "We pay the store a filming fee for the hours actually recorded, so it keeps the extra hands while holding labor costs down."
       }
-    },
-    "footer": {
-      "builtBy": "Built by Yudai Mori and Akito Kawano",
-      "links": {
-        "spec": "Specification",
-        "github": "GitHub",
-        "app": "RootLens App"
-      },
-      "license": "Apache 2.0"
     },
     "marquee": "Real human work, made robot-ready",
     "math": {
