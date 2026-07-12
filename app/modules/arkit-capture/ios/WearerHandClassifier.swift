@@ -1,36 +1,40 @@
 import Foundation
 
-// 1 フレーム分の検出結果を分類する純粋関数群。 状態なし、 副作用なし。
+// Pure functions that classify one frame's detections. No state, no side effects.
 //
-// 分類ルール:
+// Classification rules (the body-pose signal is optional; the current caller
+// passes nil, which reduces the rules to 3 and 4):
 //
-//   1. 身体ポーズが他人物 (= 装着者以外) の手首・肘・肩を画面内に検出している場合、
-//      その人物の手首位置の半径 0.18 (= 画像幅の 18%) 以内にある手は他人物の手として除外する。
+//   1. If body pose places another person's wrist, elbow, or shoulder in frame,
+//      any hand within 0.18 (18% of image width) of it is excluded as that
+//      person's hand.
 //
-//   2. 身体ポーズが足首・膝を高 confidence で検出していて、 その位置に近い (画面の
-//      6% 以内) 手は、 足・脚の誤検出として捨てる。
+//   2. A hand within 0.06 of a confidently detected ankle or knee is discarded
+//      as a foot misdetected as a hand.
 //
-//   3. 上記いずれにも該当しない手のうち、 信頼度が高い順に最大 2 つを装着者の手として扱う。
+//   3. Of the remaining hands, at most 2 count as the wearer's, highest
+//      confidence first.
 //
-//   4. ジェスチャ判定は 「装着者と判定された手の全員」 が同じサインを示しているときだけ返す。
-//      片手だけが open_palm を返しているケースでは null。
+//   4. Per-hand gestures are attached here; combining them into a frame-level
+//      gesture (both hands must agree) happens on the TS side.
 
 enum WearerHandClassifier {
 
   static let bodyPointConfThreshold: Float = 0.4
-  /// 遮蔽 fallback 用の wrist 信頼度しきい値 (= 通常より緩い)。
-  /// Vision body pose は手首がたとえ視界の端でも比較的低い confidence で出すことがある。
+  /// Looser wrist-confidence threshold for the occlusion fallback: Vision body
+  /// pose reports wrists at fairly low confidence even at the edge of view.
   static let bodyWristConfThresholdForFallback: Float = 0.25
   static let footMisdetectDistance: Float = 0.06
   static let nonWearerHandDistance: Float = 0.18
   static let maxWearerHands: Int = 2
-  // 装着者の手として採用する最低 confidence。 0.5 だと明瞭に映る手でも Vision の信頼度が一時的に
-  // 割り込んで片手が消える (= パーアイコンが点滅) ため、 0.3 に緩める (= 5/5〜7 の体感に寄せる)。
+  // Minimum confidence for a hand to count as the wearer's. At 0.5 even a
+  // clearly visible hand transiently dips below and flickers out of the UI;
+  // 0.3 keeps detection steady.
   static let minHandScoreForWearer: Float = 0.3
 
-  /// body pose の点が「実際に画面内にあるか」 を判定する。
-  /// 重要: confidence だけだと、 Vision は画面外でも arm から幻覚予測することがあるので
-  /// 正規化座標 [0,1] 範囲チェックも併用する。
+  /// Whether a body-pose point is actually inside the frame. Confidence alone
+  /// is not enough: Vision hallucinates off-screen joints by extrapolating the
+  /// arm, so the normalized [0,1] range check is applied too.
   static func isInFrame(_ p: BodyPoint?, confThreshold: Float) -> Bool {
     guard let p = p else { return false }
     return p.confidence >= confThreshold &&
@@ -39,8 +43,9 @@ enum WearerHandClassifier {
 
   static func classify(hands: [RawHand], body: RawBody?) -> FrameClassification {
 
-    // 他人物の手の spatial proxy を集める。 body の wrist が最も信用できるので優先、
-    // wrist が無い時に肘・肩で代用 (大雑把だが、 他人物が画面の前にいるかを判定する目的)。
+    // Collect spatial proxies for other people's hands. Body wrists are the most
+    // reliable; elbows and shoulders stand in when wrists are missing (coarse,
+    // but the goal is just "is someone else in front of the camera").
     var nonWearerPoints: [(x: Float, y: Float)] = []
     if let b = body {
       let highConfBodyParts: [BodyPoint?] = [
@@ -53,7 +58,7 @@ enum WearerHandClassifier {
       }
     }
 
-    // 足・脚の位置 (= 足の誤検出判定用)。 膝も含める。
+    // Ankle and knee positions, for the foot-misdetection test.
     var footPoints: [(x: Float, y: Float)] = []
     if let b = body {
       for p in [b.leftAnkle, b.rightAnkle, b.leftKnee, b.rightKnee] {
@@ -68,7 +73,7 @@ enum WearerHandClassifier {
       let wristIdx = HandJoint.wrist
       guard hand.landmarks.count > wristIdx else { continue }
 
-      // hand 全体の信頼度が低すぎる物は弾く (= ノイズ抑制)
+      // Reject hands whose overall confidence is too low (noise suppression).
       if hand.confidence < minHandScoreForWearer {
         classified.append(ClassifiedHand(raw: hand, isWearer: false, isFootMisdetect: false))
         continue
@@ -78,7 +83,7 @@ enum WearerHandClassifier {
       let hx = wrist.x
       let hy = wrist.y
 
-      // 足・脚の誤検出判定
+      // Foot / leg misdetection test.
       var isFoot = false
       for a in footPoints {
         if distXY(hx, hy, a.x, a.y) < footMisdetectDistance {
@@ -91,7 +96,7 @@ enum WearerHandClassifier {
         continue
       }
 
-      // 他人物の手かどうか
+      // Another person's hand?
       var isOtherPerson = false
       for w in nonWearerPoints {
         if distXY(hx, hy, w.x, w.y) < nonWearerHandDistance {
@@ -107,8 +112,8 @@ enum WearerHandClassifier {
       classified.append(ClassifiedHand(raw: hand, isWearer: true, isFootMisdetect: false))
     }
 
-    // 「装着者の手」 として採用するのは最大 2 つ (= 信頼度高い順)。 それ以上を装着者扱いすると
-    // 他人物の手まで取り込んでしまうリスクがある。
+    // At most 2 hands count as the wearer's (highest confidence first); accepting
+    // more risks pulling in someone else's hands.
     let wearerCandidates = classified.enumerated()
       .filter { $0.element.isWearer }
       .sorted { a, b in a.element.raw.confidence > b.element.raw.confidence }
@@ -122,9 +127,10 @@ enum WearerHandClassifier {
       }
     }
 
-    // 遮蔽 fallback: hand pose で 2 手未満しか取れなかった時、 body pose の wrist で補う。
-    // 装着者の身体特徴 = 肩 / 肘が画面に映ってない (= ヘッドマウントだと自分の上半身はカメラ外)。
-    // この前提で、 body 側の wrist が画面内に居れば、 hand pose が拾えなかった遮蔽中の手と判定する。
+    // Occlusion fallback: when hand pose found fewer than 2 hands, fill in from
+    // body-pose wrists. The wearer's own shoulders and elbows are never in frame
+    // on a head-mounted camera, so if no shoulder/elbow is visible, an in-frame
+    // body wrist is taken to be a wearer hand that hand pose lost to occlusion.
     var augmentedClassified = finalClassified
     let currentWearerHands = finalClassified.filter { $0.isWearer }
     if currentWearerHands.count < 2, let b = body {
@@ -132,7 +138,7 @@ enum WearerHandClassifier {
                             (b.rightShoulder?.confidence ?? 0) >= bodyPointConfThreshold
       let elbowInFrame    = (b.leftElbow?.confidence ?? 0) >= bodyPointConfThreshold ||
                             (b.rightElbow?.confidence ?? 0) >= bodyPointConfThreshold
-      // 装着者の身体は 肩 / 肘 が画面内に映らない、 という条件
+      // The "this body is the wearer" condition: no shoulder or elbow in frame.
       if !shoulderInFrame && !elbowInFrame {
         let bodyWrists: [BodyPoint] = [b.leftWrist, b.rightWrist].compactMap { $0 }
           .filter { p in
@@ -140,13 +146,13 @@ enum WearerHandClassifier {
             p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1
           }
         for bw in bodyWrists {
-          // 既存の装着者の手と十分離れていれば、 新しい synthetic な手として追加
+          // Add as a synthetic hand only if far enough from every existing wearer hand.
           let alreadyMatched = currentWearerHands.contains { hand in
             let hWrist = hand.raw.landmarks[HandJoint.wrist]
             return distXY(bw.x, bw.y, hWrist.x, hWrist.y) < 0.15
           }
           if !alreadyMatched {
-            // 21 関節中 wrist のみを高 confidence で埋め、 残りは confidence 0 (= 未検出)
+            // Only the wrist is filled in; the other 20 joints stay at confidence 0 (undetected).
             var lms: [HLandmark] = Array(repeating: HLandmark(x: 0, y: 0, confidence: 0), count: 21)
             lms[HandJoint.wrist] = HLandmark(x: bw.x, y: bw.y, confidence: bw.confidence)
             let synthetic = RawHand(handedness: "unknown", confidence: bw.confidence, landmarks: lms)
@@ -157,22 +163,28 @@ enum WearerHandClassifier {
       }
     }
 
-    // augmented を最終結果に
+    // The augmented set is the final result.
     let finalAll = augmentedClassified
     let wearerHands = finalAll.filter { $0.isWearer }
     let wearerCount = wearerHands.count
 
-    // gesture の集約 (= 両手の合議 / 単フレーム nil 許容) は TS 側で行う。 native は per-hand の
-    // detectGesture を payload に載せるだけ (= wide と同方針、 判定ポリシーを再ビルド不要で詰める)。
+    // Frame-level gesture aggregation (both-hands agreement, tolerant of single
+    // nil frames) lives on the TS side; native only attaches per-hand results,
+    // so the aggregation policy can be tuned without a native rebuild.
     return FrameClassification(hands: finalAll, wearerHandCount: wearerCount)
   }
 
-  // MARK: - サイン判定 (= wide-capture と同一ロジックに統一)
+  // MARK: - Gesture detection
   //
-  // ヘッドマウント下向き視点での 2 大誤りを構造的に潰す形状ベース判定 (= wide と同一)。 詳細は wide 側コメント。
-  //   ・タイピング → thumbs_up 誤検出: 画像 y を使わず、 握りのコンパクトさ + 親指の突き出しで判定。
-  //   ・全力パー → 未検出: 5 本 AND をやめ N-of-known + 低信頼度の指は「不明」扱い。
-  //   ・伸展/屈曲は関節角度、 距離は掌幅で正規化。
+  // Shape-based rules built to kill the two failure modes of a downward-looking
+  // head-mounted view:
+  //   - Typing misread as thumbs_up: never use image-space y; decide from the
+  //     compactness of the fist plus the thumb sticking out of it.
+  //   - A full open palm going undetected: no 5-finger AND; require a majority
+  //     of the fingers whose joints are confidently visible, treating
+  //     low-confidence fingers as "unknown" rather than "folded".
+  //   - Extension / curl come from joint angles; distances are normalized by
+  //     palm width, so the rules are scale-free.
   static func detectGesture(hand: RawHand) -> HandGesture? {
     let lm = hand.landmarks
     guard lm.count >= 21 else { return nil }
@@ -228,7 +240,7 @@ enum WearerHandClassifier {
     return nil
   }
 
-  /// 親指が伸びているか。 CMC→TIP が CMC→MCP の 1.4 倍以上 (= 掌幅非依存の比)。
+  /// Whether the thumb is extended: CMC→TIP at least 1.4× CMC→MCP (a scale-free ratio).
   private static func isThumbExtended(_ lm: [HLandmark]) -> Bool {
     let cmc = lm[HandJoint.thumbCmc]
     let mcp = lm[HandJoint.thumbMcp]
@@ -240,7 +252,7 @@ enum WearerHandClassifier {
     return dTip / dMid > 1.4
   }
 
-  /// 3 点 a-b-c の b における角の cos。 直線 (b が中点で a,c が一直線) で -1、 屈曲で 0 / 正へ。
+  /// Cosine of the angle at b in a-b-c: -1 when straight (a, b, c collinear), toward 0 and positive as it bends.
   private static func angleCos(_ a: HLandmark, _ b: HLandmark, _ c: HLandmark) -> Float {
     let v1x = a.x - b.x, v1y = a.y - b.y
     let v2x = c.x - b.x, v2y = c.y - b.y
@@ -254,7 +266,7 @@ enum WearerHandClassifier {
     distXY(a.x, a.y, b.x, b.y)
   }
 
-  /// tips の最大ペア間距離 (= 開き/コンパクトさの指標)。
+  /// Largest pairwise distance among tips (a spread / compactness measure).
   private static func maxPairwiseDist(_ pts: [HLandmark]) -> Float {
     var mx: Float = 0
     var i = 0

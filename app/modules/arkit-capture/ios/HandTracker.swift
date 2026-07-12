@@ -3,51 +3,52 @@ import Vision
 import CoreVideo
 import CoreImage
 
-// ARKit のフレームを受け取り、 以下を計算する:
+// Consumes ARKit frames and computes, per frame:
 //
-//   1. ジェスチャ判定用: Vision HandPose (= 21 関節) を実行
-//   2. フレーミング判定用: ARKit personSegmentation の buffer から
-//      「人」 ピクセルの全体に対する割合と「画面端 (8% 余白外)」 にどれくらいあるかの統計
+//   1. For gesture detection: Vision hand pose (21 joints per hand).
+//   2. For framing feedback: statistics over ARKit's personSegmentation buffer,
+//      i.e. what fraction of the frame is "person" pixels and how much of that
+//      sits at the frame edge.
 //
-// 旧版にあった BodyPose は撤去 (= egocentric POV で torso が映らないと検出しないので fallback として
-// 効かなかった + segmentation で代替できる)。
+// Vision body pose is deliberately not used for wearer classification: from an
+// egocentric point of view the torso is rarely in frame, so it fails exactly
+// when it is needed; person segmentation covers the framing signal instead.
 //
-// HandPose のレートは録画状態で変えられる:
-//   - 録画前 = 15 Hz (= start ジェスチャを素早く反応)
-//   - 録画中 = 5 Hz (= stop ジェスチャは多少遅延しても問題ない)
+// Rate control (running hand pose at ~15 Hz before recording and lower during)
+// is the caller's job; this class processes every frame it is handed.
 //
-// 呼び出しスレッド: ArSessionController の frameQueue 上で順次。
+// Threading: called sequentially on ArSessionController's frameQueue.
 
 final class HandTracker {
 
-  /// 1 フレーム分の出力
+  /// Output for one frame.
   struct Output {
     let timestampNs: UInt64
     let imageWidth: Int
     let imageHeight: Int
     let classification: FrameClassification
-    /// 画面全体に占める 「人」 ピクセルの割合 (= 0..1)
+    /// Fraction of the whole frame covered by "person" pixels (0..1).
     let segmentationCoverage: Float
-    /// 「人」 ピクセルのうち、 画面の外周 frameSafeMargin に居る割合 (= 0..1)
+    /// Fraction of person pixels inside the outer frameSafeMargin band (0..1).
     let segmentationEdgeRatio: Float
   }
 
-  /// 「人ピクセルが画面端に居る」 と判定する余白割合 (= 上下左右からこの割合内側を「端」 とみなす)
+  /// Margin fraction that counts as "the frame edge" (this far inward from each side).
   let frameSafeMargin: Float = 0.08
 
-  /// maximumHandCount は 2 に絞る (旧 hand-pose 実装と合わせる。 4 だと内部的に余分な探索が
-  /// 走って detect が遅くなる + 誤検出も増えるトレードオフがある)。
+  /// Capped at 2: allowing more makes Vision search longer per frame and
+  /// increases false positives, with no benefit for a single wearer.
   private let maximumHandCount: Int = 2
 
   init() {}
 
-  /// 録画状態の引数は将来のため保持 (= 現状は何もしない)
+  /// Hook for recording-state-dependent behavior; currently a no-op.
   func setRecordingMode(_ isRecording: Bool) {
     _ = isRecording
   }
 
-  /// 1 フレーム分の処理。 呼び出し側 (= ArSessionController) が ARFrame 毎の throttle を持つので
-  /// ここでは追加の throttle はせず、 呼ばれる度に hand pose を実行する。
+  /// Process one frame. The caller (ArSessionController) throttles ARFrames, so
+  /// no additional throttling happens here; hand pose runs on every call.
   func process(pixelBuffer: CVPixelBuffer,
                segmentationBuffer: CVPixelBuffer?,
                orientation: CGImagePropertyOrientation,
@@ -59,13 +60,13 @@ final class HandTracker {
 
     let hands = runHandPose(pixelBuffer: pixelBuffer, orientation: orientation)
 
-    // Wearer 分類 (= body pose 撤去のため、 単純に hand pose 結果を全部 wearer 扱い)
+    // Wearer classification (with no body pose signal, every detected hand counts as the wearer's).
     let classification = WearerHandClassifier.classify(hands: hands, body: nil)
 
-    // Segmentation 統計 (= フレーミング状態の主信号)
+    // Segmentation statistics (the primary framing signal).
     let (coverage, edgeRatio) = computeSegmentationStats(segmentationBuffer)
 
-    _ = timestamp  // 引数未使用、 ABI 維持
+    _ = timestamp  // unused; kept for call-site stability
     return Output(
       timestampNs: timestampNs,
       imageWidth: imageWidth,
@@ -79,9 +80,9 @@ final class HandTracker {
   // MARK: - Hand pose
 
   private func runHandPose(pixelBuffer: CVPixelBuffer, orientation: CGImagePropertyOrientation) -> [RawHand] {
-    // 旧 hand-pose 実装と同じ pattern: 毎回新しい request + VNImageRequestHandler。
-    // VNSequenceRequestHandler は理論的には連続フレームで安定するはずだが、 実機検証では
-    // 単発 request + 単発 handler のほうが「検出されないゾーン」 にハマる頻度が低かった。
+    // A fresh request + VNImageRequestHandler every frame. VNSequenceRequestHandler
+    // should in theory be more stable across consecutive frames, but on real
+    // devices the one-shot pattern fell into "nothing detected" dead zones less often.
     let request = VNDetectHumanHandPoseRequest()
     request.maximumHandCount = maximumHandCount
     if VNDetectHumanHandPoseRequest.supportedRevisions.contains(VNDetectHumanHandPoseRequestRevision1) {
@@ -151,13 +152,14 @@ final class HandTracker {
     return RawHand(handedness: handednessStr, confidence: Float(obs.confidence), landmarks: landmarks)
   }
 
-  // MARK: - Segmentation 統計
+  // MARK: - Segmentation statistics
 
-  /// personSegmentation buffer の各ピクセル値が >0 なら「人」 と扱う (= ARKit 規約)。
-  /// 全ピクセル数に対する人ピクセルの割合と、 人ピクセルのうち外周マージン内に居る割合を返す。
-  /// 引数 nil なら (0, 0)。
+  /// A pixel value > 0 in the personSegmentation buffer means "person" (ARKit's
+  /// convention). Returns the person fraction of all pixels and the fraction of
+  /// person pixels inside the edge margin. nil input returns (0, 0).
   ///
-  /// ARKit の segmentation buffer は通常 192×256 程度の小さい解像度 (= 計算は速い、 stride 1 で OK)。
+  /// ARKit's segmentation buffer is small (typically ~192×256), so a full
+  /// stride-1 scan is cheap.
   private func computeSegmentationStats(_ buffer: CVPixelBuffer?) -> (coverage: Float, edgeRatio: Float) {
     guard let buf = buffer else { return (0, 0) }
     CVPixelBufferLockBaseAddress(buf, .readOnly)
@@ -176,7 +178,7 @@ final class HandTracker {
 
     var totalPersonPixels = 0
     var edgePersonPixels = 0
-    // 解像度が低いので stride 1 で問題ない
+    // Low resolution; stride 1 is fine.
     for y in 0..<h {
       let row = ptr.advanced(by: y * bytesPerRow)
       let inEdgeY = (y < edgeYLo) || (y >= edgeYHi)

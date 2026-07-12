@@ -1,10 +1,11 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-// content_hash 計算 (ContentHashModule) の薄ラッパー。
+// Thin wrapper around the native content-hash module.
 //
-// ネイティブ側はファイルを順次読みながら CryptoKit SHA256 で計算する (= 数 GB でも数秒)。
-// モジュール未搭載のビルド (旧ビルド / Android) では null を返し、 呼び出し側
-// (dataflow/steps/hash.ts) が JS chunked 実装へフォールバックする。
+// The native side reads the file sequentially and digests it with CryptoKit
+// SHA-256, so a multi-GB file takes seconds. Builds without the module
+// (Android, older builds) get null and the caller (dataflow/steps/hash.ts)
+// falls back to the chunked JS implementation.
 
 interface ContentHashNativeModule {
   sha256File(path: string): Promise<string>;
@@ -12,14 +13,14 @@ interface ContentHashNativeModule {
 
 const native = requireOptionalNativeModule<ContentHashNativeModule>('ContentHash');
 
-/** ネイティブ SHA-256 が使えるビルドか。 */
+/** Whether this build has the native SHA-256 module. */
 export function isNativeHashAvailable(): boolean {
   return native != null;
 }
 
 /**
- * 生ファイルの SHA-256 (64 文字 hex) をネイティブで計算する。
- * モジュール未搭載なら null (= フォールバックせよ)。 計算失敗は throw。
+ * Compute the SHA-256 (64-char hex) of a file natively.
+ * null when the module is absent (caller should fall back). Failures throw.
  */
 export async function nativeSha256File(uri: string): Promise<string | null> {
   if (!native) return null;

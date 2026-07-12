@@ -8,36 +8,34 @@ import ImageIO
 import UIKit
 import simd
 
-// ARKit のセッションを 1 つだけ保持し、 2 つの責務を並走させる:
+// Owns the single ARSession and runs two jobs on it concurrently:
 //
-//   1. プレビュー (= ARSCNView に session を attach、 撮影開始前から動かす)
-//   2. 録画 (= AVAssetWriter で ARFrame.capturedImage を H.264 MP4 に書き出す)
+//   1. Preview (an ARSCNView attaches to the session; runs before recording starts).
+//   2. Recording (AVAssetWriter encodes ARFrame.capturedImage to an H.264 MP4,
+//      while sensor streams write alongside: per-frame poses and hand landmarks,
+//      IMU, LiDAR depth + confidence, feature points, scene mesh, metadata).
 //
-// さらに、 全 ARFrame に対して HandTracker を 15 fps で走らせて、 装着者の手の状態を
-// React Native 側にイベントとして emit する。 これは録画中・録画前関係なく動く。
-// 端末側では永続化しない (= サーバが MP4 から再抽出する、 SPECS §2.4)。
-//
-// SPECS_JA §2.10 段階 1: 端末は MP4 を吐くだけ。 C2PA 署名 (= 「署名 S」) はサーバ受領後に
-// サーバ証明書で付与する。 段階 2 で端末 TEE 署名 (= 「署名 D」) を追加するが MVP では未実装。
+// Independently of recording, HandTracker runs on ARFrames at ~15 fps and emits
+// the wearer's hand state to React Native as events; that drives the gesture UX.
 
 protocol ArkitCaptureControllerDelegate: AnyObject {
   func arkitCapture(didTrackHand output: HandTracker.Output)
-  /// 録画中に端末の熱状態 (= ProcessInfo.thermalState) が変わった。 "nominal" | "fair" | "serious" | "critical"。
+  /// The device thermal state (ProcessInfo.thermalState) changed while recording. "nominal" | "fair" | "serious" | "critical".
   func arkitCapture(didChangeThermalState state: String)
 }
 
 extension Notification.Name {
-  /// 画面消灯 (= 長時間録画の省電力・発熱対策)。 userInfo["dimmed"]: Bool。
-  /// PreviewView が購読してプレビュー描画を止める / 再開する。
+  /// Screen dim for long recordings (power / heat relief). userInfo["dimmed"]: Bool.
+  /// PreviewView observes this to pause / resume preview rendering.
   static let rootlensPreviewDim = Notification.Name("io.rootlens.preview.dim")
 }
 
-/// 表示 orientation。 RN 側の ScreenOrientation listener から動的に渡される。
-/// HandTracker / snapshot / 録画 MP4 の transform に使う。
+/// Display orientation, pushed in dynamically from the RN ScreenOrientation
+/// listener. Used by HandTracker, snapshots, and the recorded MP4's transform.
 enum DisplayOrientation {
   case portrait        // UIInterfaceOrientation.portrait
-  case landscapeLeft   // home/usb-c が左、 sensor 比 180° 回転
-  case landscapeRight  // home/usb-c が右、 sensor と同じ向き
+  case landscapeLeft   // usb-c on the left; 180° from the sensor orientation
+  case landscapeRight  // usb-c on the right; same as the sensor orientation
 
   var cgImageOrientation: CGImagePropertyOrientation {
     switch self {
@@ -47,8 +45,9 @@ enum DisplayOrientation {
     }
   }
 
-  /// AVAssetWriterInput.transform に渡す行列。 byte 列を sensor のまま保持し、
-  /// プレイヤーに「再生時に回転して」 と伝える (= per-frame の CI render を避けて省電力)。
+  /// Matrix for AVAssetWriterInput.transform. The bytes stay in sensor
+  /// orientation and the player is told to rotate at playback time, which avoids
+  /// a per-frame CoreImage render and its power cost.
   var videoTransform: CGAffineTransform {
     switch self {
     case .landscapeRight: return .identity
@@ -68,7 +67,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private let frameQueue = DispatchQueue(label: "io.rootlens.arkit-capture.frame", qos: .userInitiated)
   private let handTracker = HandTracker()
 
-  // 表示 orientation
+  // Display orientation.
   private var displayOrientation: DisplayOrientation = .portrait
   private let displayOrientationLock = NSLock()
 
@@ -85,32 +84,36 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return o
   }
 
-  // 直近 pixelBuffer (= captureSnapshot 用)
+  // Latest pixel buffer (for captureSnapshot).
   private var latestPixelBuffer: CVPixelBuffer?
   private var latestImageSize: CGSize = .zero
   private let latestBufferLock = NSLock()
 
-  // HandTracker は別 queue + 「処理中なら drop」 pattern (= backlog 防止)
+  // HandTracker runs on its own queue with a drop-while-busy pattern (no backlog).
   private let handTrackerQueue = DispatchQueue(label: "io.rootlens.arkit-capture.handtracker", qos: .userInitiated)
   private let handTrackerBusyLock = NSLock()
   private var handTrackerBusy = false
   private var handTrackerSkipCount: Int = 0
-  private let handTrackerInterval: Int = 4  // ARKit 60Hz / 4 ≈ 15 Hz
+  private let handTrackerInterval: Int = 4  // ARKit 60 Hz / 4 ≈ 15 Hz
 
-  // 直近の HandTracker 出力 (= realtime_handpose.jsonl の per-frame 行に hands を埋めるため保持)。
-  // HandTracker は ~15Hz、 行書き出しは ARFrame 全数 (~60Hz) なので、 連続行は直近の hands を共有する。
+  // Latest HandTracker output, kept to fill the hands field of each
+  // realtime_handpose.jsonl row. HandTracker runs at ~15 Hz while rows are
+  // written for every kept frame, so consecutive rows share the latest hands.
   private var latestHandOutput: HandTracker.Output?
   private let latestHandOutputLock = NSLock()
 
-  // 録画 state (recording 中のみ非 nil)
-  // 停止中フラグ: stopRecording が finishWriting を始める前に frameQueue バリア越しに true にする。
-  // 以降 frameQueue 上の映像追記は必ず bail するので、 追記と finishWriting が別スレッドで競合して
-  // writer が .failed に落ちる (= "The operation couldn't be completed") のを構造的に防ぐ。
+  // Recording state (non-nil only while recording).
+  // Stop flag: stopRecording sets this to true across a frameQueue barrier before
+  // calling finishWriting. Every later video append on frameQueue bails, so an
+  // append can never race finishWriting on another thread and drop the writer
+  // into .failed ("The operation couldn't be completed").
   private var finishingWriter = false
-  // 録画中に adaptor.append が false を返した回数 (= 診断用。 エンコーダが録画中に死んだかの切り分け)。
+  // How many times adaptor.append returned false while recording (diagnostic:
+  // did the encoder die mid-recording?).
   private var appendFailCount = 0
-  // capturedImage のコピー先プール (= ARKit の使い回しバッファを非同期 append に掴ませないため。
-  // 初回フレームの解像度・フォーマットで lazy 生成し、 録画終了で解放する)。
+  // Pool for copies of capturedImage, so async appends never hold ARKit's
+  // recycled buffers. Lazily created from the first frame's resolution and
+  // format, released when recording ends.
   private var copyPool: CVPixelBufferPool?
   private var copyPoolDims: (w: Int, h: Int, fmt: OSType) = (0, 0, 0)
   private var assetWriter: AVAssetWriter?
@@ -120,24 +123,25 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var sessionDirURL: URL?
   private var rgbMp4URL: URL?
 
-  // sensor stream state (= recording 中のみ非 nil、 Pipeline 1 出力ファイル群を逐次 append)
+  // Sensor stream state (non-nil only while recording; output files append incrementally).
   private var sensorsFileHandle: FileHandle?
   private var imuFileHandle: FileHandle?
-  // LiDAR depth (= sceneDepth) を 16-bit PNG (mm) として 1 本の depth.tar に streaming 追記する。
-  // 初回 depth frame で lazy 生成 (= 非 LiDAR 機では nil のまま = depth.tar を作らない)。
+  // LiDAR depth (sceneDepth) streams into a single depth.tar as 16-bit PNGs
+  // (millimeters). Lazily created on the first depth frame, so non-LiDAR devices
+  // never produce a depth.tar.
   private var depthTarHandle: FileHandle?
   private var frameIndexCounter: Int = 0
   private let sensorFileQueue = DispatchQueue(label: "io.rootlens.arkit-capture.sensors", qos: .utility)
   private let motionManager = CMMotionManager()
   private let motionQueue = OperationQueue()
 
-  // MARK: - Capture settings (= JS 側の撮影設定。 次の startSession / startRecording から適用)
+  // MARK: - Capture settings (set from JS; apply from the next startSession / startRecording)
 
   struct CaptureSettings {
-    var resolution = "1440p"        // "1440p" (4:3 最大画角) | "1080p" | "720p"
+    var resolution = "1440p"        // "1440p" (4:3, widest FoV) | "1080p" | "720p"
     var autoFocus = true
-    var recordingRate = 30          // RGB / depth / point cloud の書き出し Hz (15/30/60)
-    var syncRate = true             // false なら depthRate / pointCloudRate を個別適用 (≤ recordingRate)
+    var recordingRate = 30          // output Hz for RGB / depth / point cloud (15/30/60)
+    var syncRate = true             // false applies depthRate / pointCloudRate individually (≤ recordingRate)
     var depthRate = 30
     var pointCloudRate = 30
     var imuRateHz = 100             // 50 / 100 / 200
@@ -149,7 +153,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   private(set) var captureSettings = CaptureSettings()
 
-  /// JS からの撮影設定 (JSON)。 次の startSession / startRecording から適用される。
+  /// Capture settings from JS (JSON). Apply from the next startSession / startRecording.
   func applyCaptureSettings(json: String) {
     guard let data = json.data(using: .utf8),
           let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
@@ -172,29 +176,31 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     NSLog("[ArkitCaptureController] capture settings applied: %@", json)
   }
 
-  // 書き出しの間引き。
-  // ⚠ RGB は「時間ベース」 で間引く (recTargetInterval / nextKeepTs)。 固定枚数 stride だと、
-  //    端末が熱で serious になり iOS がカメラを 60→30fps に絞ったとき、 出力が 15fps に半減する
-  //    (2026-07-07 実測)。 実撮影時刻で間引けば、 源が 60fps でも 30fps でも出力は目標に追従する。
-  private var recTargetInterval: Double = 1.0 / 30.0  // 採用間隔 (秒) = 1 / recordingRate
-  private var nextKeepTs: Double = 0                  // 次に採用する最小 timestamp (0 = 初回未採用)
-  private var recFrameStride = 1        // metadata 表示用の公称 stride (= sessionFps / recordingRate)
-  private var depthEveryWritten = 1     // 書いた frame M 枚に 1 枚 depth
-  private var pcEveryWritten = 1        // 書いた frame M 枚に 1 枚 point cloud
+  // Output decimation.
+  // ⚠ RGB decimates by time (recTargetInterval / nextKeepTs), not by a fixed
+  //    frame stride. With a fixed stride, when thermal pressure makes iOS drop
+  //    the camera from 60 to 30 fps the output would halve to 15 fps; keeping
+  //    frames by wall-clock interval tracks the target rate whether the source
+  //    runs at 60 or 30 fps (observed on device).
+  private var recTargetInterval: Double = 1.0 / 30.0  // keep interval (seconds) = 1 / recordingRate
+  private var nextKeepTs: Double = 0                  // earliest timestamp to keep next (0 = nothing kept yet)
+  private var recFrameStride = 1        // nominal stride for metadata (sessionFps / recordingRate)
+  private var depthEveryWritten = 1     // one depth frame per M written frames
+  private var pcEveryWritten = 1        // one point cloud per M written frames
   private var recArFrameCounter = 0
   private var pointCloudFileHandle: FileHandle?
 
-  // セッション稼働状態
+  // Session running state.
   private var sessionRunning = false
 
-  // 熱状態の記録 (= 録画中のみ)。 events は sensorFileQueue 上でだけ触る。
+  // Thermal-state log (recording only). events is touched only on sensorFileQueue.
   private var thermalObserver: NSObjectProtocol?
   private var thermalEvents: [[String: Any]] = []
-  // 録画開始時の電池残量 (= 0..1、 不明 -1)。 stop で残量と共に metadata.json に記録し、
-  // 「この撮影で何 % 使ったか」 の実測を蓄積する。
+  // Battery level at recording start (0..1, -1 unknown). Recorded with the end
+  // level into metadata.json at stop, accumulating real per-recording drain data.
   private var batteryStartLevel: Float = -1
 
-  // 画面消灯前の輝度 (= 復帰時に戻す)。 main thread でだけ触る。
+  // Brightness before dimming (restored on undim). Main thread only.
   private var brightnessBeforeDim: CGFloat?
 
   private override init() {
@@ -206,7 +212,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   var arSession: ARSession { session }
 
-  /// 現在 ARKit が使用している videoFormat の sensor 解像度。 PreviewView の aspect-fill で使う。
+  /// Sensor resolution of the videoFormat ARKit is using. PreviewView uses it for aspect fitting.
   func currentSensorResolution() -> CGSize {
     if let cf = session.currentFrame { return cf.camera.imageResolution }
     if let cfg = session.configuration as? ARWorldTrackingConfiguration {
@@ -244,19 +250,20 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     session.run(config, options: [.resetTracking, .removeExistingAnchors])
     sessionRunning = true
-    // ⚠ 自動ロック無効化 (keep-awake) と画面消灯 (dim) はここでは触らない。 これらは ARSession の
-    //    on/off ではなく「撮影画面が開いている間ずっと」 に紐付けるべきもの。 自動サイクルの休止では
-    //    ARKit を止めても画面はロックさせたくない (= ロック → app サスペンド → サイクル停止)。
-    //    制御は setKeepAwake / setScreenDimmed を JS 側の撮影画面ライフサイクルから呼んで行う。
+    // ⚠ Keep-awake and screen dim are deliberately not touched here. They belong
+    //    to "while the capture screen is open", not to the ARSession's on/off:
+    //    during an automatic cycle pause ARKit stops but the screen must not
+    //    lock (lock → app suspends → the cycle timers freeze). JS drives them
+    //    through setKeepAwake / setScreenDimmed from the capture screen lifecycle.
   }
 
   func stopSession() {
     if !sessionRunning { return }
     session.pause()
     sessionRunning = false
-    // 構成切替 (arkit → ultra_wide) で AVCaptureSession が同じ ultra-wide カメラを掴む前に、
-    // ARKit frame の IOSurface を宙に浮かせないよう、 in-flight の HandTracker (= Vision/ANE) を
-    // drain し、 保持中の pixel buffer / hand output を解放する (= wide-capture 側と対称)。
+    // Drain any in-flight HandTracker work (Vision / ANE) and release the held
+    // pixel buffer and hand output, so no ARKit frame IOSurface stays alive
+    // after the session pauses and the camera can be re-acquired cleanly.
     handTrackerQueue.sync {}
     latestBufferLock.lock()
     latestPixelBuffer = nil
@@ -266,14 +273,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     latestHandOutputLock.unlock()
   }
 
-  // MARK: - Recording lifecycle (Pipeline 1 全 sensor 出力)
+  // MARK: - Recording lifecycle (all sensor outputs)
 
-  /// 1 セッション分のキャプチャを開始する。 引数 sessionDir 配下に以下を並走出力する:
-  ///   rgb.mp4               H.264 AVAssetWriter 出力 (= ARFrame.capturedImage)
-  ///   realtime_handpose.jsonl         per-frame の camera transform / intrinsics / tracking / IMU 軽量 sample
-  ///   imu.jsonl   CMMotionManager 100 Hz サンプル
-  ///   metadata.json デバイス + 解像度 + intrinsics の 1 回書き出し
-  /// stopRecording で全 handle を flush + close + return。
+  /// Start one capture session. Writes concurrently under sessionDir:
+  ///   rgb.mp4                  H.264 via AVAssetWriter (ARFrame.capturedImage)
+  ///   realtime_handpose.jsonl  per-frame camera transform / intrinsics / tracking / hands / IMU snapshot
+  ///   imu.jsonl                CMMotionManager samples (~100 Hz)
+  ///   metadata.json            device + resolution + intrinsics, written once
+  ///   depth.tar / pointcloud.jsonl / mesh.jsonl  on supported devices / settings
+  /// stopRecording flushes and closes every handle.
   func startRecording(sessionDir: URL) throws -> URL {
     if assetWriter != nil {
       throw NSError(domain: "ArkitCaptureController", code: 1,
@@ -282,7 +290,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
     try FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
 
-    // sensor 解像度を取得して AVAssetWriter を構成
+    // Configure the AVAssetWriter from the sensor resolution.
     let sensorRes = currentSensorResolution()
     let sensorW = Int(sensorRes.width)
     let sensorH = Int(sensorRes.height)
@@ -295,8 +303,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     try removeIfExists(at: mp4URL)
 
     let writer = try AVAssetWriter(outputURL: mp4URL, fileType: .mp4)
-    // 12 Mbps target (= 1920x1440 フルセンサー録画に合わせて増額。 5 分動画で ~450 MB)。
-    // サーバ側で再 encode するので深く詰めない。
+    // 12 Mbps target (sized for full-sensor 1920x1440; ~450 MB per 5 minutes).
+    // Downstream processing re-encodes anyway, so this is not tuned aggressively.
     let videoSettings: [String: Any] = [
       AVVideoCodecKey: AVVideoCodecType.h264,
       AVVideoWidthKey: sensorW,
@@ -307,9 +315,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
       ],
     ]
-    // fragmented MP4 (= 10 秒ごとに moof を確定)。 通常の MP4 は moov を最後にしか書かないので、
-    // 長時間録画の途中でアプリが死ぬと全編が読めなくなる。 fragment 化すると直前の確定分までは
-    // 再生・変換できる (= 100 分録画の 99 分目クラッシュでも 10 秒しか失わない)。
+    // Fragmented MP4 (a moof finalizes every 10 seconds). A regular MP4 only
+    // writes its moov at the end, so dying mid-recording loses the whole file;
+    // with fragments everything up to the last finalized chunk stays playable
+    // (a crash at minute 99 of 100 loses at most 10 seconds).
     writer.movieFragmentInterval = CMTimeMakeWithSeconds(10.0, preferredTimescale: 600)
 
     let input = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
@@ -332,7 +341,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     writer.startWriting()
     writer.startSession(atSourceTime: .zero)
 
-    // sensor stream の出力 file を準備 (= IMU / point cloud は設定 ON のときだけ作る)
+    // Prepare the sensor stream files (IMU / point cloud only when enabled in settings).
     let sensorsURL = sessionDir.appendingPathComponent("realtime_handpose.jsonl")
     let imuURL = sessionDir.appendingPathComponent("imu.jsonl")
     let pcURL = sessionDir.appendingPathComponent("pointcloud.jsonl")
@@ -353,23 +362,23 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       pcHandle = try FileHandle(forWritingTo: pcURL)
     }
 
-    // depth は録画中に depth.tar へ streaming 追記する (= 初回 depth frame で lazy 生成)。
-    // ここでは旧 depth/ dir を念のため除去するだけ。
+    // Depth streams into depth.tar during recording (lazily created on the first
+    // depth frame). Here we only clear any leftovers from a previous run.
     try removeIfExists(at: sessionDir.appendingPathComponent("depth.tar"))
     try removeIfExists(at: sessionDir.appendingPathComponent("depth"))
 
-    // 書き出しレートの間引き幅を確定 (= session fps と設定から)。
+    // Fix the decimation factors from the session fps and the settings.
     let sessionFps: Double = {
       if let cfg = session.configuration as? ARWorldTrackingConfiguration {
         return Double(cfg.videoFormat.framesPerSecond)
       }
       return 30.0
     }()
-    // RGB は時間ベース間引き: 目標 recordingRate の間隔で採用する (熱スロットリングに追従)。
+    // RGB decimates by time: keep frames at the target recordingRate interval (tracks thermal throttling).
     recTargetInterval = 1.0 / Double(max(1, captureSettings.recordingRate))
     nextKeepTs = 0
-    recFrameStride = max(1, Int((sessionFps / Double(max(1, captureSettings.recordingRate))).rounded())) // metadata 用の公称値
-    // depth / point cloud は「書いた frame (= 目標レートで採用済み)」 基準でさらに間引く。
+    recFrameStride = max(1, Int((sessionFps / Double(max(1, captureSettings.recordingRate))).rounded())) // nominal value for metadata
+    // Depth / point cloud decimate further, counted in written (already rate-kept) frames.
     let effectiveRate = Double(max(1, captureSettings.recordingRate))
     let dRate = captureSettings.syncRate ? captureSettings.recordingRate
       : min(captureSettings.depthRate, captureSettings.recordingRate)
@@ -379,8 +388,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     pcEveryWritten = max(1, Int((effectiveRate / Double(max(1, pRate))).rounded()))
     recArFrameCounter = 0
 
-    // metadata.json は intrinsics 確定するまで待ちたいので、 初回 frame で書く
-    // (= ARFrame の camera.intrinsics は最初の didUpdate まで埋まらない可能性)
+    // metadata.json waits for the intrinsics to settle, so it is written on the
+    // first frame (camera.intrinsics may be empty until the first didUpdate).
 
     self.finishingWriter = false
     self.appendFailCount = 0
@@ -405,7 +414,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return sessionDir
   }
 
-  /// 1 セッションを終了。 全ファイルを flush + close する。 返値は sessionDir URL。
+  /// End the session. Flushes and closes every file. Returns the sessionDir URL.
   func stopRecording() throws -> URL {
     guard let writer = assetWriter, let input = videoInput, let dir = sessionDirURL else {
       throw NSError(domain: "ArkitCaptureController", code: 2,
@@ -414,13 +423,14 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     handTracker.setRecordingMode(false)
     stopMotionUpdates()
 
-    // 進行中の映像追記を frameQueue (シリアル) 上で流し切り、 以後の追記を止めてから writer を閉じる。
-    // frameQueue.sync は enqueue 済みの append をすべて完了させてからフラグを立てるので、
-    // これ以降に append が finishWriting と重なることはない。
+    // Drain in-flight video appends on the serial frameQueue and stop any further
+    // appends before closing the writer. frameQueue.sync completes every enqueued
+    // append before the flag flips, so no append can overlap finishWriting.
     frameQueue.sync { self.finishingWriter = true }
 
-    // 診断: finishWriting を呼ぶ前の writer 状態を控える。 ここが既に .failed(3) なら
-    // 「録画中にエンコーダが死んだ」、 .writing(1) なら「finishWriting 自体が失敗」 と切り分けられる。
+    // Diagnostics: note the writer status before finishWriting. If it is already
+    // .failed(3) the encoder died mid-recording; if .writing(1) then finishWriting
+    // itself is what failed.
     let preFinishStatus = writer.status.rawValue
     NSLog("[ArkitCaptureController] stopRecording begin: writer.status=%ld framesWritten=%d appendFails=%d free=%lld error=%@",
           preFinishStatus, frameIndexCounter, appendFailCount, Self.freeDiskBytes(),
@@ -437,12 +447,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     NSLog("[ArkitCaptureController] finishWriting done: status=%ld error=%@",
           Int(writer.status.rawValue), Self.describeNSError(writer.error))
 
-    // sensor file は sensorFileQueue 上で書いてるので、 そこでの flush を待ってから close する。
-    // sync を欠かすと データが途中で切れる (= 不正データ) ので、 失敗時は必ず throw して呼び出し元に伝える。
+    // Sensor files are written on sensorFileQueue, so wait for its flush before
+    // closing. Skipping the sync truncates data mid-line (corrupt output), so a
+    // failure here always throws to the caller.
     var sensorCloseError: Error?
     sensorFileQueue.sync {
       do {
-        self.finalizeDepthTar()  // depth.tar の終端 (= 2×512 zero blocks) を書いて close (= depth が無ければ no-op)
+        self.finalizeDepthTar()  // write the tar trailer (2×512 zero blocks) and close (no-op without depth)
         try self.sensorsFileHandle?.synchronize()
         try self.sensorsFileHandle?.close()
         try self.imuFileHandle?.synchronize()
@@ -454,15 +465,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // シーンメッシュ (= ARMeshAnchor) を mesh.jsonl に書き出す (= 設定 ON かつ LiDAR 機のみ)。
+    // Export the scene mesh (ARMeshAnchors) to mesh.jsonl (only when enabled and on LiDAR devices).
     if captureSettings.streamMesh {
       writeMeshJsonl(into: dir)
     }
 
     stopThermalMonitoring(mergingInto: dir)
 
-    // リセット前に診断値を控える (= 失敗時にエラーメッセージへ載せる。 NSLog は unified log で
-    // <private> に伏せられるため、 真因の OSStatus は throw メッセージに含めて JS / 画面に出す)。
+    // Capture diagnostics before resetting (they go into the error message on
+    // failure; the unified log redacts NSLog as <private>, so the real OSStatus
+    // must travel in the thrown message to reach JS and the screen).
     let framesWritten = self.frameIndexCounter
     let freeMB = Self.freeDiskBytes() / 1_000_000
 
@@ -481,8 +493,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.copyPoolDims = (0, 0, 0)
 
     if writer.status == .failed {
-      // 真因 (AVFoundation code + underlying OSStatus) と frame 数・空き容量。 稀な -16341
-      // (= VideoToolbox/MediaToolbox エンコーダの finalize フレーク) の切り分け用に残す。
+      // Root cause (AVFoundation code + underlying OSStatus) plus frame count and
+      // free disk, kept for triaging the rare -16341 encoder finalize flake.
       let e = writer.error as NSError?
       let u = e?.userInfo[NSUnderlyingErrorKey] as? NSError
       let diag = "av=\(e.map { "\($0.domain):\($0.code)" } ?? "nil")"
@@ -490,10 +502,12 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         + " pre=\(preFinishStatus) appFail=\(appendFailCount)"
         + " frames=\(framesWritten) free=\(freeMB)MB"
 
-      // フラグメント化 MP4 (movieFragmentInterval=10s) なので、 finalize が失敗しても直近フラグメント
-      // までの映像はディスク上に確定済み。 十分な frame が書けていてファイルが実在するなら、 録画全体を
-      // 捨てずに救う (= エンコーダの稀な finalize フレークで長時間録画を失わない。 末尾数秒の欠けは
-      // サーバ再エンコードで吸収され、 ユーザーはアップロード前にプレビューで確認できる)。
+      // The MP4 is fragmented (movieFragmentInterval = 10s), so even when finalize
+      // fails, everything up to the last fragment is already committed to disk.
+      // If enough frames were written and the file exists, salvage the recording
+      // instead of discarding it: a rare encoder finalize flake must not cost a
+      // long recording. The missing final seconds are absorbed by downstream
+      // re-encoding, and the user previews the clip before uploading anyway.
       let mp4Path = dir.appendingPathComponent("rgb.mp4").path
       let mp4Size = ((try? FileManager.default.attributesOfItem(atPath: mp4Path))?[.size] as? Int) ?? 0
       if framesWritten > 30, mp4Size > 1_000_000 {
@@ -501,7 +515,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
               mp4Size, diag)
         return dir
       }
-      // 救えるだけの中身が無い (= ほぼ空) 場合のみ失敗として返す。
+      // Only report failure when there is nothing worth salvaging (nearly empty).
       NSLog("[ArkitCaptureController] finishWriting failed, unsalvageable. %@", diag)
       throw NSError(domain: "ArkitCaptureController", code: 5,
                     userInfo: [NSLocalizedDescriptionKey: diag])
@@ -516,7 +530,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return dir
   }
 
-  // MARK: - 熱状態の監視 (= 長時間録画の安全弁)
+  // MARK: - Thermal monitoring (the long-recording safety valve)
 
   static func thermalStateString(_ s: ProcessInfo.ThermalState) -> String {
     switch s {
@@ -528,7 +542,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// ARFrame.timestamp と同じ時間軸 (= systemUptime) の ns。 熱イベントを frame 列と突き合わせられる。
+  /// Nanoseconds on the same clock as ARFrame.timestamp (systemUptime), so thermal events align with the frame stream.
   private static func uptimeNs() -> Int64 {
     Int64(ProcessInfo.processInfo.systemUptime * 1_000_000_000.0)
   }
@@ -556,8 +570,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// 監視を止め、 熱遷移列 (thermal_events) と電池実測 (battery) を metadata.json に合流させる
-  /// (= metadata.json は初回 frame で書かれているので read-modify-write)。
+  /// Stop monitoring and merge the thermal transitions (thermal_events) and the
+  /// measured battery drain into metadata.json (which was written on the first
+  /// frame, hence read-modify-write).
   private func stopThermalMonitoring(mergingInto dir: URL) {
     if let obs = thermalObserver {
       NotificationCenter.default.removeObserver(obs)
@@ -581,10 +596,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  // MARK: - 画面消灯 (= 長時間録画の省電力・発熱対策。 main thread から呼ぶ)
+  // MARK: - Screen dim (power / heat relief for long recordings; call on the main thread)
 
-  /// 輝度を 0 にし、 プレビュー描画を止める (= 復帰で元の輝度に戻す)。 OLED では黒 = 消灯。
-  /// 録画・センサ書き出し・音声は一切影響を受けない。
+  /// Brightness to zero and preview rendering paused (undim restores the previous
+  /// brightness). On OLED, black means the pixels are off. Recording, sensor
+  /// writing, and audio are unaffected.
   func setScreenDimmed(_ dimmed: Bool) {
     if dimmed {
       if brightnessBeforeDim == nil { brightnessBeforeDim = UIScreen.main.brightness }
@@ -596,17 +612,21 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     NotificationCenter.default.post(name: .rootlensPreviewDim, object: nil, userInfo: ["dimmed": dimmed])
   }
 
-  /// 自動ロック (idle timer) の抑止。 撮影画面が開いている間 (= 録画・キャリブ・休止すべて含む) true。
-  /// ⚠ ARSession の on/off とは独立。 休止で ARKit を止めても、 撮影画面にいる限りロックさせない
-  ///    (ロック → app サスペンド → 自動サイクルの休止タイマーが凍結して止まる、 を防ぐ)。
+  /// Suppress auto-lock (the idle timer). true for the whole time the capture
+  /// screen is open, including recording, calibration, and cycle pauses.
+  /// ⚠ Independent of the ARSession: even when a pause stops ARKit, the screen
+  ///    must not lock while the capture screen is up (lock → app suspends → the
+  ///    cycle's pause timers freeze).
   func setKeepAwake(_ on: Bool) {
     UIApplication.shared.isIdleTimerDisabled = on
   }
 
-  /// capturedImage (= ARKit の使い回しバッファ) を独立メモリへ deep copy する。
-  /// ⚠ これを呼ぶのは delegate queue 上、 バッファがまだ有効なうち。 コピーを非同期 append に渡すことで、
-  ///    ARKit のプール buffer を非同期境界をまたいで掴まず、 プール枯渇 → session 破綻 → writer が
-  ///    -11800 / -163xx で落ちる、 を根本から断つ (2026-07-06 調査で確定した -16341 の原因)。
+  /// Deep-copy capturedImage (one of ARKit's recycled buffers) into independent
+  /// memory.
+  /// ⚠ Called on the delegate queue while the buffer is still valid. Handing the
+  ///    copy to the async append means ARKit's pooled buffer is never held across
+  ///    an async boundary; holding it starves the pool, breaks the session, and
+  ///    fails the writer with -11800 / -163xx (confirmed root cause of -16341).
   private func copyPixelBuffer(_ src: CVPixelBuffer) -> CVPixelBuffer? {
     let w = CVPixelBufferGetWidth(src)
     let h = CVPixelBufferGetHeight(src)
@@ -662,8 +682,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return dst
   }
 
-  /// NSError を診断用に丸ごと文字列化する (= domain / code / underlying / failure reason)。
-  /// 汎用の localizedDescription ("The operation couldn't be completed") だけだと真因が分からないため。
+  /// Stringify an NSError for diagnostics (domain / code / underlying / failure
+  /// reason). The generic localizedDescription ("The operation couldn't be
+  /// completed") hides the real cause.
   static func describeNSError(_ error: Error?) -> String {
     guard let e = error as NSError? else { return "nil" }
     var s = "domain=\(e.domain) code=\(e.code) desc=\(e.localizedDescription)"
@@ -676,13 +697,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return s
   }
 
-  /// アプリのホーム以下の空き容量 (バイト)。 disk full 由来かを切り分ける診断用。
+  /// Free space (bytes) under the app home. Diagnoses whether a failure is disk-full.
   private static func freeDiskBytes() -> Int64 {
     let attrs = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
     return (attrs?[.systemFreeSize] as? NSNumber)?.int64Value ?? -1
   }
 
-  /// 存在しなければ no-op、 存在すれば throw 込みで削除する。 try? の代わりに使う。
+  /// No-op when absent, throwing removal when present. Used instead of try?.
   private func removeIfExists(at url: URL) throws {
     if FileManager.default.fileExists(atPath: url.path) {
       try FileManager.default.removeItem(at: url)
@@ -691,7 +712,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   // MARK: - sensor JSONL writers
 
-  /// CMMotionManager を 100 Hz で起動、 imu.jsonl に append。
+  /// Start CMMotionManager at the configured rate, appending to imu.jsonl.
   private func startMotionUpdates() {
     guard motionManager.isDeviceMotionAvailable else {
       NSLog("[ArkitCaptureController] CMDeviceMotion unavailable, skipping imu_high_rate")
@@ -711,8 +732,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// 直近 HandTracker 出力から hands 配列を作る (= wide-capture の makeFrameRow と同形)。
-  /// `[{handedness, confidence, landmarks:[{x,y,confidence}×21]}]`。 検出無しなら空配列。
+  /// Build the hands array from the latest HandTracker output:
+  /// `[{handedness, confidence, landmarks:[{x,y,confidence}×21]}]`. Empty when nothing is detected.
   private func buildHandsArray() -> [[String: Any]] {
     latestHandOutputLock.lock()
     let out = latestHandOutput
@@ -732,8 +753,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return hands
   }
 
-  /// 1 frame ぶんの realtime_handpose.jsonl 行を書き出す (= sensorFileQueue 上)。
-  /// metadata.json が未書きならここで 1 回だけ書く (= 初回 frame で intrinsics が確定する)。
+  /// Write one realtime_handpose.jsonl row (on sensorFileQueue).
+  /// Also writes metadata.json exactly once, on the first frame, when the
+  /// intrinsics have settled.
   private func writeSensorsLine(frame: ARFrame) {
     guard let handle = sensorsFileHandle else { return }
     let frameIndex = frameIndexCounter
@@ -743,28 +765,28 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let t = frame.camera.transform        // simd_float4x4 (= column-major)
     let k = frame.camera.intrinsics       // simd_float3x3
     let trackingPair = describeTrackingState(frame.camera.trackingState)
-    // 正規スキーマ (= tools/gen-dummy-sensors.py + tools/modal/gtsam_eval.py が期待):
-    //   timestamp_ns: int (= ts 秒 × 1e9)
-    //   tracking_state: int (= ARKit enum 値、 normal=2)
+    // Row schema:
+    //   timestamp_ns: int (seconds × 1e9)
+    //   tracking_state: int (ARKit enum value; normal = 2)
     let tsNs: Int64 = Int64(ts * 1_000_000_000.0)
     let trackingStateInt = arkitTrackingStateInt(frame.camera.trackingState)
 
-    // row-major 4×4 → [[Float; 4]; 4]
+    // Column-major simd → row-major [[Float; 4]; 4].
     let row0 = [t.columns.0[0], t.columns.1[0], t.columns.2[0], t.columns.3[0]]
     let row1 = [t.columns.0[1], t.columns.1[1], t.columns.2[1], t.columns.3[1]]
     let row2 = [t.columns.0[2], t.columns.1[2], t.columns.2[2], t.columns.3[2]]
     let row3 = [t.columns.0[3], t.columns.1[3], t.columns.2[3], t.columns.3[3]]
     let transformRows: [[Float]] = [row0, row1, row2, row3]
 
-    // row-major 3×3 を 9 要素 flat に
+    // Row-major 3×3 flattened to 9 elements.
     let intr: [Float] = [
       k.columns.0[0], k.columns.1[0], k.columns.2[0],
       k.columns.0[1], k.columns.1[1], k.columns.2[1],
       k.columns.0[2], k.columns.1[2], k.columns.2[2],
     ]
 
-    // IMU snapshot (= 直近 CMDeviceMotion)。 schema は imu.jsonl と揃える:
-    //   accel = userAccel + gravity, gyro = rotationRate, mag は zero placeholder
+    // IMU snapshot (latest CMDeviceMotion), same schema as imu.jsonl:
+    //   accel = userAccel + gravity, gyro = rotationRate.
     let mot = motionManager.deviceMotion
     let imuDict: [String: Any]
     if let m = mot {
@@ -788,15 +810,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "camera_transform": transformRows,
       "camera_intrinsics": intr,
       "imu": imuDict,
-      "hands": buildHandsArray(),  // 直近 HandTracker 出力 (= ultra_wide と同形)
+      "hands": buildHandsArray(),  // latest HandTracker output
     ]
 
     sensorFileQueue.async {
       do {
         let data = try JSONSerialization.data(withJSONObject: line, options: [])
-        // NSFileHandle.write(_:) は EAGAIN 等で ObjC 例外 (NSFileHandleOperationException)
-        // を投げ、 Swift do/try/catch では捕まらず即クラッシュする。 iOS 13.4+ の
-        // throwing 版 write(contentsOf:) を使うと Swift error として catch できる。
+        // NSFileHandle.write(_:) throws an ObjC exception on EAGAIN and friends
+        // (NSFileHandleOperationException), which Swift do/try/catch cannot catch,
+        // crashing outright. The throwing write(contentsOf:) (iOS 13.4+) surfaces
+        // it as a catchable Swift error.
         try handle.write(contentsOf: data)
         try handle.write(contentsOf: Data("\n".utf8))
       } catch {
@@ -804,17 +827,20 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // 初回 frame で metadata.json を 1 回書く
+    // Write metadata.json once, on the first frame.
     if frameIndex == 0, let dir = sessionDirURL {
       writeMetadataJson(into: dir, frame: frame)
     }
 
-    // LiDAR depth (= sceneDepth がある Pro 機のみ)。 標準形式の 16-bit PNG (mm) を
-    // depth.tar に streaming 追記する (= 数万 loose PNG を避け 1 ファイルで upload。 中身は標準 PNG)。
-    // tar 内パスは depth/<frameIndex:06>.png (= 展開すれば RGB-D 標準の depth/ レイアウト)。
-    // 同じ frame の信頼度マップ (= sceneDepth.confidenceMap、 0=low / 1=medium / 2=high) も
-    // confidence/<frameIndex:06>.png (8-bit) として同じ tar に並べる (= 買い手が低信頼画素を mask できる)。
-    // depth レートが RGB より低い設定では書いた frame ベースで間引く (= index は jsonl と共有)。
+    // LiDAR depth (devices with sceneDepth only). Each frame becomes a standard
+    // 16-bit PNG (millimeters) stream-appended into depth.tar; one tar uploads in
+    // place of tens of thousands of loose PNGs, and extracting it yields the
+    // conventional RGB-D depth/ layout (depth/<frameIndex:06>.png). The same
+    // frame's confidence map (sceneDepth.confidenceMap: 0=low / 1=medium /
+    // 2=high) sits beside it as confidence/<frameIndex:06>.png (8-bit), so a
+    // consumer can mask low-confidence pixels. When the depth rate is set below
+    // the RGB rate, decimation counts written frames (the index stays shared
+    // with the jsonl).
     if let sceneDepth = frame.sceneDepth, sessionDirURL != nil, frameIndex % depthEveryWritten == 0 {
       let buffer = sceneDepth.depthMap
       let confBuffer = sceneDepth.confidenceMap
@@ -824,8 +850,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // 特徴点群 (= ARKit VIO の rawFeaturePoints)。 xyz は float32 LE、 id は uint64 LE を base64 で
-    // 1 frame 1 行 (= pointcloud.jsonl)。 world 座標なので蓄積すれば map になる。
+    // Feature points (ARKit VIO's rawFeaturePoints), one row per frame in
+    // pointcloud.jsonl: xyz as float32 LE and ids as uint64 LE, base64-encoded.
+    // Coordinates are in world space, so accumulating rows yields a map.
     if let pcHandle = pointCloudFileHandle,
        frameIndex % pcEveryWritten == 0,
        let cloud = frame.rawFeaturePoints,
@@ -857,8 +884,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// CVPixelBuffer (= ARKit sceneDepth、 kCVPixelFormatType_DepthFloat32) を
-  /// 16-bit gray PNG (= float32 m → uint16 mm) の Data にして返す。 RGB-D データセット標準形式。
+  /// Encode a CVPixelBuffer (ARKit sceneDepth, kCVPixelFormatType_DepthFloat32)
+  /// as a 16-bit gray PNG (float32 meters → uint16 millimeters), the standard
+  /// RGB-D dataset format.
   private func depthMapToPngData(_ depthMap: CVPixelBuffer) -> Data? {
     CVPixelBufferLockBaseAddress(depthMap, .readOnly)
     defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
@@ -871,7 +899,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let floatStride = bytesPerRow / MemoryLayout<Float32>.size
     let floatPtr = base.assumingMemoryBound(to: Float32.self)
 
-    // float32 (= m) → uint16 (= mm)
+    // float32 (meters) → uint16 (millimeters)
     var u16 = [UInt16](repeating: 0, count: width * height)
     for y in 0..<height {
       let srcRow = y * floatStride
@@ -905,11 +933,12 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return out as Data
   }
 
-  // MARK: - depth.tar streaming writer (= ustar tar、 中身は 16-bit PNG)
+  // MARK: - depth.tar streaming writer (ustar tar of 16-bit PNGs)
 
-  /// 1 depth frame を 16-bit PNG 化して depth.tar に 1 entry として追記する (= sensorFileQueue 上)。
-  /// 信頼度マップがあれば confidence/<idx>.png (8-bit) も同じ tar に続けて書く。
-  /// 初回呼び出しで depth.tar を lazy 生成する (= depth が来ない非 LiDAR 機では作られない)。
+  /// Append one depth frame to depth.tar as a 16-bit PNG entry (on
+  /// sensorFileQueue). When a confidence map exists, confidence/<idx>.png (8-bit)
+  /// follows it into the same tar. The tar is lazily created on the first call,
+  /// so non-LiDAR devices never produce one.
   private func appendDepthFrameToTar(depthMap: CVPixelBuffer, confidenceMap: CVPixelBuffer?, frameIndex: Int) {
     guard let png = depthMapToPngData(depthMap) else { return }
     if depthTarHandle == nil {
@@ -938,8 +967,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// CVPixelBuffer (= ARKit sceneDepth.confidenceMap、 kCVPixelFormatType_OneComponent8、
-  /// 値は 0=low / 1=medium / 2=high) を 8-bit gray PNG の Data にして返す。
+  /// Encode a CVPixelBuffer (ARKit sceneDepth.confidenceMap,
+  /// kCVPixelFormatType_OneComponent8; values 0=low / 1=medium / 2=high) as an
+  /// 8-bit gray PNG.
   private func confidenceMapToPngData(_ conf: CVPixelBuffer) -> Data? {
     CVPixelBufferLockBaseAddress(conf, .readOnly)
     defer { CVPixelBufferUnlockBaseAddress(conf, .readOnly) }
@@ -977,10 +1007,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return out as Data
   }
 
-  /// tar の終端 (= 2×512 byte の zero block) を書いて close する。 depth が無ければ no-op。
-  /// ARKit のシーン再構成メッシュ (ARMeshAnchor) を 1 anchor = 1 行の JSONL で書き出す。
-  /// vertices = float32 LE xyz × n、 faces = uint32 LE 頂点 index × 3 × m を base64 で持つ。
-  /// transform は row-major 4x4 (= realtime_handpose.jsonl の camera_transform と同じ流儀、 world 座標へ)。
+  /// Export ARKit's scene reconstruction mesh (ARMeshAnchors) as JSONL, one
+  /// anchor per row: vertices as float32 LE xyz × n and faces as uint32 LE
+  /// vertex indices × 3 × m, base64-encoded. transform is a row-major 4×4 into
+  /// world space, the same convention as camera_transform in
+  /// realtime_handpose.jsonl.
   private func writeMeshJsonl(into dir: URL) {
     guard let anchors = session.currentFrame?.anchors else { return }
     let meshAnchors = anchors.compactMap { $0 as? ARMeshAnchor }
@@ -1053,19 +1084,19 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     depthTarHandle = nil
   }
 
-  /// ustar 形式の 512-byte ヘッダを組む (= regular file)。
+  /// Build a 512-byte ustar header for a regular file.
   private static func tarHeader(name: String, size: Int) -> Data {
     var h = [UInt8](repeating: 0, count: 512)
     func put(_ s: String, _ offset: Int, _ maxLen: Int) {
       for (i, b) in Array(s.utf8).prefix(maxLen).enumerated() { h[offset + i] = b }
     }
-    put(name, 0, 100)                            // name (= "depth/NNNNNN.png"、 100 byte 上限)
+    put(name, 0, 100)                            // name ("depth/NNNNNN.png"; 100-byte cap)
     put("0000644", 100, 7)                       // mode (octal)
     put("0000000", 108, 7)                       // uid
     put("0000000", 116, 7)                       // gid
     put(String(format: "%011o", size), 124, 11)  // size (octal)
-    put("00000000000", 136, 11)                  // mtime (octal、 0)
-    for i in 148..<156 { h[i] = 0x20 }           // chksum 欄は計算前は space 8 個
+    put("00000000000", 136, 11)                  // mtime (octal, 0)
+    for i in 148..<156 { h[i] = 0x20 }           // chksum field is 8 spaces before computing
     h[156] = UInt8(ascii: "0")                   // typeflag '0' = regular file
     put("ustar", 257, 5)                         // magic "ustar\0"
     put("00", 263, 2)                            // version
@@ -1079,12 +1110,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   private func appendImuLine(motion: CMDeviceMotion) {
     guard let handle = imuFileHandle else { return }
-    // 正規スキーマ (= gen-dummy-sensors.py + gtsam_eval.py が期待):
+    // Row schema:
     //   timestamp_ns: int
-    //   accel: {x, y, z}    (= userAccel + gravity、 重力込みの absolute 加速度)
-    //   gyro:  {x, y, z}    (= rotationRate)
-    //   mag (optional): {x, y, z}
-    //   device_motion (optional): {attitude, user_accel, gravity, rotation_rate}
+    //   accel: {x, y, z}    userAccel + gravity (absolute acceleration, gravity included)
+    //   gyro:  {x, y, z}    rotationRate
+    //   device_motion: {attitude, user_accel, gravity, rotation_rate}
     let tsNs: Int64 = Int64(motion.timestamp * 1_000_000_000.0)
     let line: [String: Any] = [
       "timestamp_ns": tsNs,
@@ -1113,7 +1143,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     sensorFileQueue.async {
       do {
         let data = try JSONSerialization.data(withJSONObject: line, options: [])
-        // 同様: ObjC 例外を Swift error 化するため throwing 版を使う。
+        // Same as above: the throwing write turns ObjC exceptions into Swift errors.
         try handle.write(contentsOf: data)
         try handle.write(contentsOf: Data("\n".utf8))
       } catch {
@@ -1122,10 +1152,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// metadata.json (DATA_SPECS §2.2): セッション中不変の静的情報。 超広角構成 (wide-capture) と
-  /// 同形 (recording_config / device_model / os / app_version / camera / calibration_baseline) に
-  /// 揃えつつ、 ARKit 固有の intrinsics (fx/fy/cx/cy) + depth を camera に足す。
-  /// calibration_baseline は撮影 UI のキャリブレーション工程で確定するため null (UI/dataflow が後で merge)。
+  /// metadata.json: static facts that never change within a session
+  /// (recording_config / device_model / os / app_version / camera / capture
+  /// settings), with the camera intrinsics (fx/fy/cx/cy) and, on LiDAR devices,
+  /// the depth intrinsics. calibration_baseline is reserved for the capture UI's
+  /// calibration step and stays null here.
   private func writeMetadataJson(into dir: URL, frame: ARFrame) {
     let url = dir.appendingPathComponent("metadata.json")
     let k = frame.camera.intrinsics
@@ -1137,7 +1168,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       return 30.0
     }()
     let fx = k.columns.0[0]
-    // 水平 FOV (度) = 2·atan(width / (2·fx))
+    // Horizontal FoV (degrees) = 2·atan(width / (2·fx))
     let fovDeg = res.width > 0 && fx > 0
       ? Double(2.0 * atan(Float(res.width) / (2.0 * fx)) * 180.0 / .pi)
       : 0.0
@@ -1153,7 +1184,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "fps": fps,
       "fx": fx, "fy": k.columns.1[1], "cx": k.columns.2[0], "cy": k.columns.2[1],
     ]
-    // LiDAR 機なら depth 解像度 + intrinsics も載せる (= ARFrame.sceneDepth が存在する場合のみ)。
+    // On LiDAR devices, include the depth resolution and intrinsics (only when ARFrame.sceneDepth exists).
     if let depth = frame.sceneDepth {
       let dW = CVPixelBufferGetWidth(depth.depthMap)
       let dH = CVPixelBufferGetHeight(depth.depthMap)
@@ -1166,7 +1197,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       ]
     }
 
-    // 書き出し fps は間引き後の実効値 (= mp4 / jsonl の実レート)。 sensor fps は camera.fps。
+    // recording_fps is the effective post-decimation rate (what the mp4 / jsonl actually carry); camera.fps is the sensor rate.
     camera["recording_fps"] = fps / Double(max(1, recFrameStride))
 
     let cs = captureSettings
@@ -1204,8 +1235,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
   }
 
-  /// ARCamera.TrackingState を Pipeline 2 メタデータ採点が期待する整数値に写像。
-  /// gen-dummy-sensors.py が `tracking_state: 2` (normal) を使うのに揃える。
+  /// Map ARCamera.TrackingState to an integer:
   ///   0 = notAvailable, 1 = limited, 2 = normal
   private func arkitTrackingStateInt(_ s: ARCamera.TrackingState) -> Int {
     switch s {
@@ -1242,7 +1272,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return identifier
   }
 
-  // MARK: - Snapshot (VLM 用)
+  // MARK: - Snapshot
 
   func captureSnapshot(quality: CGFloat = 0.8) throws -> URL {
     latestBufferLock.lock()
@@ -1283,7 +1313,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     latestImageSize = imageRes
     latestBufferLock.unlock()
 
-    // HandTracker (= 別 queue + drop pattern)
+    // HandTracker (own queue, drop-while-busy).
     self.handTrackerSkipCount += 1
     if self.handTrackerSkipCount >= self.handTrackerInterval {
       self.handTrackerSkipCount = 0
@@ -1315,27 +1345,32 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // 録画 (= AVAssetWriter に pixelBuffer を append + realtime_handpose.jsonl 行 append)。 録画中のみ。
-    // ⚠ didUpdate は既定でメインスレッド。 encode は frameQueue に逃がすが、 ARKit の capturedImage は
-    //    使い回しバッファなので「ここでコピー → コピーを非同期 append」 とする (copyPixelBuffer 参照)。
+    // Recording (append the pixelBuffer to the AVAssetWriter and a row to
+    // realtime_handpose.jsonl). Only while recording.
+    // ⚠ didUpdate runs on the main thread by default. Encoding moves to
+    //    frameQueue, but capturedImage is one of ARKit's recycled buffers, so it
+    //    is copied here and the copy is what gets appended asynchronously (see
+    //    copyPixelBuffer).
     if !finishingWriter, let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter,
        let input = self.videoInput {
-      // 時間ベース間引き: 前回採用から目標間隔以上経過したフレームだけ採用する。 熱でカメラが
-      // 60→30fps に絞られても、 源フレームをそのまま拾って目標レート (30fps) に追従する
-      // (固定 stride だと同じ状況で 15fps に半減していた。 2026-07-07 実測)。
-      // マージン (0.25 * 間隔) で源のジッターを吸収し、 60fps 源から綺麗に 30fps を拾う。
+      // Time-based decimation: keep a frame only when the target interval has
+      // passed since the last kept one. When thermal pressure drops the camera
+      // from 60 to 30 fps, the output still tracks the target rate (a fixed
+      // stride halved to 15 fps in that situation). The 0.25-interval margin
+      // absorbs source jitter, so a 60 fps source decimates cleanly to 30.
       if nextKeepTs == 0 { nextKeepTs = timestamp }
       guard timestamp >= nextKeepTs - recTargetInterval * 0.25 else { return }
       nextKeepTs += recTargetInterval
-      if nextKeepTs <= timestamp { nextKeepTs = timestamp + recTargetInterval } // 大きな間欠で溜め込まない
-      // realtime_handpose.jsonl は書き出す frame に 1 行ずつ。 RGB frame と frame_index を揃える。
+      if nextKeepTs <= timestamp { nextKeepTs = timestamp + recTargetInterval } // a long gap must not bank frames
+      // realtime_handpose.jsonl gets one row per written frame; frame_index stays aligned with the RGB frames.
       self.writeSensorsLine(frame: frame)
 
-      // encoder が受け付けない / 停止処理中はスキップ (= バッファもコピーも作らない)。
+      // Skip while the encoder cannot accept input or a stop is in progress (no buffer, no copy).
       guard writer.status == .writing, input.isReadyForMoreMediaData else { return }
 
-      // ARKit のバッファがまだ有効なこの場 (メインスレッド) で独立メモリへコピーし、 ARKit のバッファは
-      // 即解放する。 PTS もここで単調に確定 (= 非同期化による並び替えを排除)。
+      // Copy into independent memory here (main thread), while ARKit's buffer is
+      // still valid, and release it immediately. The PTS is also fixed here,
+      // monotonically, so asynchrony cannot reorder frames.
       guard let copy = self.copyPixelBuffer(pixelBuffer) else { return }
       let pts = CMTimeMakeWithSeconds(timestamp, preferredTimescale: 1_000_000_000)
       if self.recordingStartTime == .invalid { self.recordingStartTime = pts }
@@ -1343,7 +1378,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
       frameQueue.async { [weak self] in
         guard let self = self else { return }
-        // 停止に入ったら追記しない (= 権威的なゲート。 フラグは frameQueue 上で立つので順序保証がある)。
+        // No appends once stopping has begun (the authoritative gate; the flag is set on frameQueue, so ordering is guaranteed).
         guard !self.finishingWriter, writer.status == .writing, input.isReadyForMoreMediaData else { return }
         if !adaptor.append(copy, withPresentationTime: adjPts) {
           self.appendFailCount += 1
@@ -1360,11 +1395,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   // MARK: - format pick
 
-  /// 選択優先順:
-  ///   1. 広角 (= builtInUltraWideCamera) かつ 720 系
-  ///   2. 広角 + 任意の解像度
-  ///   3. 通常広角 + 720 系
-  ///   4. ARKit の default
+  /// Pick the video format for the requested resolution, preferring the 1x wide
+  /// camera and the full-sensor 4:3 formats (widest field of view).
   private func pickPreferredFormat(resolution: String) -> ARConfiguration.VideoFormat? {
     let supported = ARWorldTrackingConfiguration.supportedVideoFormats
 
@@ -1381,15 +1413,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // 1x (wide) カメラのみを候補にする (= 0.5x は別の撮影構成 ultra_wide が担う)。
+    // Only 1x (wide) camera formats are candidates.
     var pool = supported
     if #available(iOS 16.0, *) {
       let wides = supported.filter { $0.captureDeviceType == .builtInWideAngleCamera }
       if !wides.isEmpty { pool = wides }
     }
 
-    // 解像度設定。 "720p" / "1080p" は 16:9 の切り出し (= 画角は狭くなる)、 該当が無ければ
-    // デフォルト (= 4:3 フルセンサー最大画角) に落ちる。
+    // Resolution setting. "720p" / "1080p" are 16:9 crops (narrower FoV); when no
+    // match exists, fall through to the default (full-sensor 4:3, widest FoV).
     switch resolution {
     case "720p":
       if let f = pool.min(by: { abs($0.imageResolution.height - 720) < abs($1.imageResolution.height - 720) }),
@@ -1400,8 +1432,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
          abs(f.imageResolution.height - 1080) <= 120 { return f }
       fallthrough
     default:
-      // "1440p": フルセンサー 4:3 を優先 (= 最大画角)。 同じアスペクトなら画角は同じなので
-      // 最小解像度で十分 (= 1920x1440。 4K はファイルが 4 倍)。 同解像度なら高 fps。
+      // "1440p": prefer full-sensor 4:3 (widest FoV). Same aspect means the same
+      // FoV, so the smallest such resolution is enough (1920x1440; 4K quadruples
+      // the file size). At equal resolution, prefer higher fps.
       return pool.min { a, b in
         let aspectA = a.imageResolution.height / a.imageResolution.width
         let aspectB = b.imageResolution.height / b.imageResolution.width

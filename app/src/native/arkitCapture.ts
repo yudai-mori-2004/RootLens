@@ -2,18 +2,19 @@ import { requireNativeViewManager, requireOptionalNativeModule } from 'expo-modu
 import type { ComponentType } from 'react';
 import type { ViewProps } from 'react-native';
 
-// ARKit ベース撮影モジュールの薄ラッパー。
+// Thin wrapper around the ARKit capture native module (modules/arkit-capture).
 //
-// startRecording は session ディレクトリ URL を引数に取り、 その配下に Pipeline 1 の
-// 出力ファイル群 (= rgb.mp4 / realtime_handpose.jsonl / imu.jsonl / metadata.json /
-// depth/ (Pro 機のみ)) を並走出力する。 詳細は document/v0.1.2/tasks/15-capture-baseline/README.md。
+// startRecording takes a session directory and writes the recording outputs
+// into it concurrently: rgb.mp4, realtime_handpose.jsonl, imu.jsonl,
+// metadata.json, and depth.tar on LiDAR devices.
 //
-// 加えて 15 Hz でリアルタイムの手の検出結果を onHandTrack イベントで通知する。
+// The module also emits realtime hand-detection results at ~15 Hz through the
+// onHandTrack event.
 
 export interface ArkitCapturePreviewProps extends ViewProps {}
 
-// native (ArkitCapture) が未登録 (= まだ iOS ビルドに含まれていない) でも import 時に
-// 落ちないよう try/catch する。 null の場合は UI 側でプレースホルダを出す。
+// Guarded so importing this file does not crash when the native module is not
+// in the build (e.g. Expo Go). When null, the UI shows a placeholder instead.
 export const ArkitCapturePreviewView: ComponentType<ArkitCapturePreviewProps> | null = (() => {
   try {
     return requireNativeViewManager<ArkitCapturePreviewProps>('ArkitCapture');
@@ -22,44 +23,45 @@ export const ArkitCapturePreviewView: ComponentType<ArkitCapturePreviewProps> | 
   }
 })();
 
-/** 21 関節 (MediaPipe 順) の手のランドマーク 1 個 */
+/** One hand landmark out of the 21 joints (MediaPipe order). */
 export interface HandLandmark {
-  x: number;        // 0..1 (左上原点)
+  x: number;        // 0..1, top-left origin
   y: number;        // 0..1
   confidence: number;
 }
 
-/** 1 つの手の検出結果 */
+/** Detection result for one hand. */
 export interface WearerHandObservation {
   handedness: 'left' | 'right' | 'unknown';
   confidence: number;
-  landmarks: HandLandmark[];   // 必ず 21 要素
-  /// この手単体のジェスチャー (= native per-hand 判定。 検出不能は null)。 集約は TS 側。
+  landmarks: HandLandmark[];   // always 21 entries
+  /** Per-hand gesture (native geometric heuristic; null when undecidable).
+   *  Combining hands into a frame-level gesture happens on the TS side. */
   gesture: 'open_palm' | 'thumbs_up' | null;
 }
 
-/** 検出された 1 つのフレームの手の状態。 frame-level gesture は廃止 (= per-hand を TS で集約)。 */
+/** Hand state for one frame. */
 export interface HandTrackEvent {
-  timestampNs: string;            // ARFrame.timestamp 由来 ns (= bigint 互換のため string)
+  timestampNs: string;            // nanoseconds derived from ARFrame.timestamp (string for bigint safety)
   imageWidth: number;
   imageHeight: number;
-  wearerHandCount: number;        // 0 / 1 / 2 (= ジェスチャ判定のみで使う)
+  wearerHandCount: number;        // 0 / 1 / 2 (used only for gesture decisions)
   wearerHands: WearerHandObservation[];
-  /// フレーミング判定の主信号: ARKit personSegmentation で「人」 と判定されたピクセル割合
-  /// segmentationCoverage = 画面全体に対する人ピクセルの割合 (= 0..1)
-  /// segmentationEdgeRatio = 人ピクセルのうち画面外周 8% 内側に居る割合 (= 0..1)
+  /** Fraction of the frame covered by "person" pixels, from ARKit person segmentation (0..1). */
   segmentationCoverage: number;
+  /** Fraction of person pixels inside the outer 8% band of the frame (0..1). */
   segmentationEdgeRatio: number;
 }
 
-/** 現在の表示 orientation。 native (ARKit / Vision) はこの値に従って frame の解釈と
- *  ジョイント座標系の補正をする。 録画中は変更しない (= MCAP intrinsics が固定でないと困る)。 */
+/** Display orientation. The native side (ARKit / Vision) interprets frames and
+ *  corrects joint coordinates according to this value. Never change it while
+ *  recording: the recorded camera intrinsics must stay valid for the whole clip. */
 export type DisplayOrientation = 'portrait' | 'landscapeLeft' | 'landscapeRight';
 
-/** 端末の熱状態 (= ProcessInfo.thermalState)。 critical は撮影を安全に畳むべき水準。 */
+/** Device thermal state (ProcessInfo.thermalState). At 'critical' the recording should be wound down. */
 export type ThermalState = 'nominal' | 'fair' | 'serious' | 'critical' | 'unknown';
 
-/** 電池残量 (= 0..1、 不明なら -1) と充電中か。 */
+/** Battery level (0..1, -1 when unknown) and whether the device is charging. */
 export interface PowerState {
   level: number;
   charging: boolean;
@@ -69,11 +71,11 @@ interface ArkitCaptureNativeModule {
   isAvailable(): Promise<boolean>;
   startSession(): Promise<void>;
   stopSession(): Promise<void>;
-  /** sessionDir 配下に rgb.mp4 + realtime_handpose.jsonl + imu.jsonl + metadata.json
-   *  を並走出力する。 空文字なら temp 配下に session ディレクトリを生成する。
-   *  返値は session ディレクトリの file:// URI。 */
+  /** Write rgb.mp4 + realtime_handpose.jsonl + imu.jsonl + metadata.json
+   *  concurrently under sessionDir. An empty string creates a session dir under
+   *  temp. Resolves to the session dir's file:// URI. */
   startRecording(sessionDir: string): Promise<string>;
-  /** 返値は startRecording の sessionDir をそのまま返す。 */
+  /** Resolves to the same sessionDir passed to startRecording. */
   stopRecording(): Promise<string>;
   setCaptureSettings(json: string): Promise<void>;
   captureSnapshot(): Promise<string>;
@@ -105,9 +107,10 @@ export async function stopArkitSession(): Promise<void> {
   return nativeModule.stopSession();
 }
 
-/** sessionDir 配下に rgb.mp4 + realtime_handpose.jsonl + imu.jsonl + metadata.json
- *  (+ Pro 機の depth/) を並走出力する。 空文字なら native 側で temp 配下に新規ディレクトリを生成。
- *  返値は session ディレクトリの file:// URI。 */
+/** Write rgb.mp4 + realtime_handpose.jsonl + imu.jsonl + metadata.json (plus
+ *  depth.tar on LiDAR devices) concurrently under sessionDir. An empty string
+ *  lets the native side create a fresh dir under temp. Resolves to the session
+ *  dir's file:// URI. */
 export async function startArkitRecording(sessionDir = ''): Promise<string> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
   return nativeModule.startRecording(sessionDir);
@@ -118,64 +121,68 @@ export async function stopArkitRecording(): Promise<string> {
   return nativeModule.stopRecording();
 }
 
-/** 撮影設定 (JSON 文字列) を native へ渡す。 次の startSession / startRecording から適用される。 */
+/** Pass capture settings (a JSON string) to the native side. They apply from
+ *  the next startSession / startRecording. */
 export async function setArkitCaptureSettings(json: string): Promise<void> {
   if (!nativeModule) return;
   return nativeModule.setCaptureSettings(json);
 }
 
-/** 現在の ARFrame を JPEG として temp に書き出して file:// URI を返す (VLM 用) */
+/** Write the current ARFrame to a temp JPEG and return its file:// URI. */
 export async function captureArkitSnapshot(): Promise<string> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
   return nativeModule.captureSnapshot();
 }
 
-/** MP4 を faststart 化 (= moov を先頭へ、 再エンコード無し) して outputUri に書き出し、 その file:// URI を返す。
- *  */
+/** Faststart an MP4 (move the moov atom to the front, no re-encode), write it
+ *  to outputUri, and return that file:// URI. */
 export async function faststartMp4(inputUri: string, outputUri: string): Promise<string> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
   return nativeModule.faststartMp4(inputUri, outputUri);
 }
 
-/** ARKit / Vision に伝える表示 orientation を更新。
- *  capture screen から ScreenOrientation listener を介して呼ぶ。
- *  録画開始前に最新値を確定させ、 録画中は変更しないこと (= MCAP intrinsics 固定のため)。 */
+/** Update the display orientation ARKit / Vision should assume. Called from the
+ *  capture screen's ScreenOrientation listener. Settle the value before
+ *  recording starts and never change it mid-recording (the recorded intrinsics
+ *  must stay valid for the whole clip). */
 export async function setArkitDisplayOrientation(orientation: DisplayOrientation): Promise<void> {
   if (!nativeModule) return;
   return nativeModule.setDisplayOrientation(orientation);
 }
 
-/** 画面消灯 (= 長時間録画の省電力・発熱対策): 輝度 0 + プレビュー描画停止。 false で復帰。 */
+/** Screen off (power / heat relief for long recordings): brightness to zero and
+ *  preview rendering paused. false restores. */
 export async function setArkitScreenDimmed(dimmed: boolean): Promise<void> {
   if (!nativeModule) return;
   return nativeModule.setScreenDimmed(dimmed);
 }
 
-/** 自動ロック抑止 (= 撮影画面が開いている間 true)。 ARSession の on/off とは独立に制御する。 */
+/** Suppress auto-lock (true while the capture screen is open). Controlled
+ *  independently of the ARSession itself. */
 export async function setArkitKeepAwake(on: boolean): Promise<void> {
   if (!nativeModule) return;
   return nativeModule.setKeepAwake(on);
 }
 
-/** 現在の熱状態。 録画中の変化は subscribeThermalState で届く。 */
+/** Current thermal state. Changes during recording arrive via subscribeThermalState. */
 export async function getArkitThermalState(): Promise<ThermalState> {
   if (!nativeModule) return 'unknown';
   return nativeModule.getThermalState();
 }
 
-/** 計測用: アプリのメモリ使用量 (phys_footprint MB)。 取得不能なら -1。 */
+/** Diagnostics: the app's memory footprint (phys_footprint, MB). -1 when unavailable. */
 export async function getArkitMemoryFootprintMB(): Promise<number> {
   if (!nativeModule) return -1;
   return nativeModule.getMemoryFootprintMB();
 }
 
-/** 電池残量と充電状態。 長時間録画の自動終了判定に使う。 */
+/** Battery level and charging state. Drives the long-recording auto-stop. */
 export async function getArkitPowerState(): Promise<PowerState> {
   if (!nativeModule) return { level: -1, charging: false };
   return nativeModule.getPowerState();
 }
 
-/** 熱状態の変化 (= 録画中のみ発火)。 */
+/** Thermal-state changes (fires while recording). */
 export function subscribeThermalState(listener: (e: { state: ThermalState }) => void): { remove: () => void } {
   if (!nativeModule) return { remove: () => {} };
   const sub = (nativeModule as any).addListener?.('onThermalState', listener);
@@ -183,12 +190,12 @@ export function subscribeThermalState(listener: (e: { state: ThermalState }) => 
   return { remove: () => (nativeModule as any).removeListeners?.(1) };
 }
 
-/** イベント購読: 15 Hz で発火 */
+/** Subscribe to hand tracking (fires at ~15 Hz). */
 export function subscribeHandTrack(listener: (e: HandTrackEvent) => void): { remove: () => void } {
   if (!nativeModule) return { remove: () => {} };
-  // expo-modules-core の Module は EventEmitter インタフェースを継承している
+  // expo-modules-core Modules implement the EventEmitter interface.
   const sub = (nativeModule as any).addListener?.('onHandTrack', listener);
   if (sub && typeof sub.remove === 'function') return sub;
-  // フォールバック (古い API)
+  // Fallback for the older API shape.
   return { remove: () => (nativeModule as any).removeListeners?.(1) };
 }

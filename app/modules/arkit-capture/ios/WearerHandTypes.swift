@@ -1,25 +1,25 @@
 import Foundation
 
-// 装着者の手の分類に使う型群。
+// Types used to classify the wearer's hands.
 //
-// 座標系: すべて normalized [0,1]、 left-top 原点。
-// (Vision API の左下原点からの変換は HandTracker / BodyPoseDetector 内で行う)
+// Coordinates are all normalized [0,1] with a top-left origin. (The conversion
+// from Vision's bottom-left origin happens inside HandTracker.)
 
-/// 21 関節の手のランドマーク 1 個分。
+/// One of the 21 hand landmarks.
 struct HLandmark {
   let x: Float
   let y: Float
   let confidence: Float
 }
 
-/// 1 フレームで検出された手 1 つ分の生データ。
+/// Raw data for one hand detected in one frame.
 struct RawHand {
   let handedness: String      // "left" | "right" | "unknown"
-  let confidence: Float        // 観察全体の信頼度
-  let landmarks: [HLandmark]   // 21 関節
+  let confidence: Float        // confidence of the whole observation
+  let landmarks: [HLandmark]   // 21 joints
 }
 
-/// 21 関節の MediaPipe 順インデックス。
+/// MediaPipe-order indices of the 21 joints.
 enum HandJoint {
   static let wrist     = 0
   static let thumbCmc  = 1
@@ -44,21 +44,22 @@ enum HandJoint {
   static let pinkyTip  = 20
 }
 
-/// 身体ポーズで使う関節 1 個分の位置。 confidence < しきい値なら inFrame=false 扱い。
+/// One body-pose joint position. Below-threshold confidence is treated as out of frame.
 struct BodyPoint {
   let x: Float
   let y: Float
   let confidence: Float
 }
 
-/// 身体ポーズの 1 観察分。 装着者判定で使うフィールドだけ持つ (= 肩・肘・手首・足首・膝)。
+/// One body-pose observation. Carries only the joints the wearer test needs
+/// (shoulders, elbows, wrists, knees, ankles).
 struct RawBody {
   let confidence: Float
   let leftShoulder:  BodyPoint?
   let rightShoulder: BodyPoint?
   let leftElbow:     BodyPoint?
   let rightElbow:    BodyPoint?
-  let leftWrist:     BodyPoint?     // 他人物の手の位置を直接示すので最重要
+  let leftWrist:     BodyPoint?     // most important: points straight at another person's hand
   let rightWrist:    BodyPoint?
   let leftKnee:      BodyPoint?
   let rightKnee:     BodyPoint?
@@ -66,22 +67,22 @@ struct RawBody {
   let rightAnkle:    BodyPoint?
 }
 
-/// 分類結果。 1 つの手につき 1 個。
+/// Classification result, one per hand.
 struct ClassifiedHand {
   let raw: RawHand
-  let isWearer: Bool       // 装着者本人の手か (= true なら UI 表示・効果音判定の対象)
-  let isFootMisdetect: Bool // 足首位置と近すぎる = 足の誤検出
+  let isWearer: Bool        // whether this is the wearer's own hand (drives UI and sound cues)
+  let isFootMisdetect: Bool // too close to an ankle: a foot misdetected as a hand
 }
 
-/// 手のサイン。
+/// Hand gestures.
 enum HandGesture: String {
   case openPalm  = "open_palm"
   case thumbsUp  = "thumbs_up"
 }
 
-/// 1 フレーム分の最終結果 (= UI に出す前の単一フレーム判定)。
+/// Final single-frame result handed to the UI layer.
 struct FrameClassification {
   let hands: [ClassifiedHand]
-  let wearerHandCount: Int     // = 0, 1, 2 (本人の手だけ数える)
-  // gesture の集約 (= 両手の合議 / nil 許容) は TS 側で per-hand gesture から行う (= wide と同方針)。
+  let wearerHandCount: Int     // 0, 1, or 2 (only the wearer's hands count)
+  // Aggregating per-hand gestures into a frame-level gesture happens on the TS side.
 }

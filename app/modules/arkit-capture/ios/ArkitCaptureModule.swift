@@ -4,17 +4,17 @@ import ExpoModulesCore
 import Foundation
 import UIKit
 
-// ARKit ベース撮影モジュールの Expo ブリッジ。
+// Expo bridge of the ARKit capture module.
 //
-// 提供:
-//   View: <ArkitCapturePreviewView />     ARSession のプレビュー描画
-//   Event: onHandTrack                    15 Hz で手の検出結果を流す
-//   AsyncFunction("startRecording", path) MP4 録画開始 (= AVAssetWriter H.264)、 返値 file:// URI
-//   AsyncFunction("stopRecording")        MP4 録画停止、 返値 file:// URI
-//   AsyncFunction("captureSnapshot")      最新フレームを JPEG 化して URI を返す (VLM 用)
-//   AsyncFunction("startSession")         ARSession 起動 (プレビュー描画 + HandTracker)
-//   AsyncFunction("stopSession")          ARSession 停止
-//   AsyncFunction("isAvailable")          ARWorldTrackingConfiguration 対応か
+// Surface:
+//   View: <ArkitCapturePreviewView />     renders the ARSession preview
+//   Event: onHandTrack                    hand-detection results at ~15 Hz
+//   AsyncFunction("startRecording", path) start MP4 recording (AVAssetWriter H.264); resolves to a file:// URI
+//   AsyncFunction("stopRecording")        stop recording; resolves to a file:// URI
+//   AsyncFunction("captureSnapshot")      write the latest frame as JPEG and return its URI
+//   AsyncFunction("startSession")         start the ARSession (preview + HandTracker)
+//   AsyncFunction("stopSession")          stop the ARSession
+//   AsyncFunction("isAvailable")          whether ARWorldTrackingConfiguration is supported
 
 public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
 
@@ -43,8 +43,9 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
     }
 
-    // sessionDir を引数に取り、 そこに rgb.mp4 + realtime_handpose.jsonl + imu.jsonl
-    // + camera_intrinsics.json を並走出力する。 空文字なら temp 配下に session ディレクトリを生成する。
+    // Takes a session dir and writes the recording outputs (rgb.mp4,
+    // realtime_handpose.jsonl, imu.jsonl, metadata.json, depth.tar on LiDAR
+    // devices) into it concurrently. An empty string creates a dir under temp.
     AsyncFunction("startRecording") { (sessionDirPath: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
         do {
@@ -65,8 +66,9 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
     }
 
     AsyncFunction("stopRecording") { (promise: Promise) in
-      // バックグラウンド移行中の停止 (= JS の AppState handler 発) でもファイルを閉じ切れるよう、
-      // 実行猶予を取る。 writer close 後も 5 秒残す (= JS 側の台帳登録が走る時間)。
+      // Take background execution time so files still close cleanly when the stop
+      // comes from the JS AppState handler during backgrounding. Keep 5 extra
+      // seconds after the writer closes for the JS-side ledger registration.
       var bgTask: UIBackgroundTaskIdentifier = .invalid
       bgTask = UIApplication.shared.beginBackgroundTask(withName: "rootlens-stop-recording") {
         if bgTask != .invalid { UIApplication.shared.endBackgroundTask(bgTask); bgTask = .invalid }
@@ -99,7 +101,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
     }
 
-    // 撮影設定 (JSON)。 次の startSession / startRecording から適用される。
+    // Capture settings (JSON). Apply from the next startSession / startRecording.
     AsyncFunction("setCaptureSettings") { (json: String, promise: Promise) in
       ArkitCaptureController.shared.applyCaptureSettings(json: json)
       promise.resolve(nil)
@@ -109,9 +111,9 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       return ARWorldTrackingConfiguration.isSupported
     }
 
-    // MP4 を faststart 化 (= moov を先頭へ) して outputPath に書く。 再エンコード無し (passthrough)。
-    // これで署名前に faststart しておけば、 C2PA が box 順を保つので署名済み mp4 も faststart になり、
-    // アップロード後の再生が尺に依存せず即開始する (2026-07-07 実測で確認)。
+    // Rewrite an MP4 with faststart (moov atom to the front), no re-encode
+    // (passthrough). A faststarted upload begins streaming playback immediately,
+    // regardless of clip length.
     AsyncFunction("faststartMp4") { (inputPath: String, outputPath: String, promise: Promise) in
       let inURL = URL(fileURLWithPath: inputPath.replacingOccurrences(of: "file://", with: ""))
       let outURL = URL(fileURLWithPath: outputPath.replacingOccurrences(of: "file://", with: ""))
@@ -123,7 +125,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
       export.outputURL = outURL
       export.outputFileType = .mp4
-      export.shouldOptimizeForNetworkUse = true  // moov を先頭へ = faststart
+      export.shouldOptimizeForNetworkUse = true  // moov to the front = faststart
       export.exportAsynchronously {
         switch export.status {
         case .completed:
@@ -135,7 +137,8 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
     }
 
-    // 計測用: 現在のアプリのメモリ使用量 (phys_footprint MB)。 アップロード OOM の切り分けに使う。
+    // Diagnostics: the app's current memory footprint (phys_footprint, MB). Used
+    // to investigate upload OOMs.
     AsyncFunction("getMemoryFootprintMB") { () -> Double in
       var info = task_vm_info_data_t()
       var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size) / 4
@@ -147,7 +150,8 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       return kr == KERN_SUCCESS ? Double(info.phys_footprint) / 1_000_000.0 : -1
     }
 
-    // 画面消灯 (= 長時間録画の省電力・発熱対策): 輝度 0 + プレビュー描画停止。 false で復帰。
+    // Screen off (power / heat relief for long recordings): brightness to zero
+    // and preview rendering paused. false restores.
     AsyncFunction("setScreenDimmed") { (dimmed: Bool, promise: Promise) in
       DispatchQueue.main.async {
         ArkitCaptureController.shared.setScreenDimmed(dimmed)
@@ -155,7 +159,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
     }
 
-    // 自動ロック抑止 (= 撮影画面が開いている間 true。 ARSession の on/off とは独立)。
+    // Suppress auto-lock (true while the capture screen is open; independent of the ARSession).
     AsyncFunction("setKeepAwake") { (on: Bool, promise: Promise) in
       DispatchQueue.main.async {
         ArkitCaptureController.shared.setKeepAwake(on)
@@ -163,12 +167,12 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       }
     }
 
-    // 現在の熱状態。 録画中の変化は onThermalState イベントで届く。
+    // Current thermal state. Changes during recording arrive via the onThermalState event.
     AsyncFunction("getThermalState") { () -> String in
       return ArkitCaptureController.thermalStateString(ProcessInfo.processInfo.thermalState)
     }
 
-    // 電池残量 (= 0..1、 不明なら -1) と充電中か。 長時間録画の自動終了判定に使う。
+    // Battery level (0..1, -1 when unknown) and charging state. Drives the long-recording auto-stop.
     AsyncFunction("getPowerState") { (promise: Promise) in
       DispatchQueue.main.async {
         UIDevice.current.isBatteryMonitoringEnabled = true
@@ -216,7 +220,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
           "handedness": ch.raw.handedness,
           "confidence": ch.raw.confidence,
           "landmarks": lms,
-          // per-hand のジェスチャー (= 集約は TS 側)。 検出不能は null。
+          // Per-hand gesture (aggregation happens on the TS side). null when undecidable.
           "gesture": WearerHandClassifier.detectGesture(hand: ch.raw)?.rawValue ?? NSNull(),
         ]
       }
@@ -226,7 +230,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       "imageHeight": out.imageHeight,
       "wearerHandCount": out.classification.wearerHandCount,
       "wearerHands": wearerHands,
-      // セグメンテーションで計算した「人」 ピクセル割合 (= フレーミング判定の主信号)
+      // Person-pixel fractions from segmentation (the primary framing signal).
       "segmentationCoverage": out.segmentationCoverage,
       "segmentationEdgeRatio": out.segmentationEdgeRatio,
     ]
