@@ -53,7 +53,7 @@ async function hydrate(): Promise<void> {
         ...c,
         sessionDir: toAbsoluteUri(c.sessionDir),
       };
-      // uploading (= Pipeline 1 が中断) は error にする。 段 (stage) は保持されるので、
+      // uploading (= アップロード中断) は error にする。 段 (stage) は保持されるので、
       // 「もう一度試す」 で advanceClip が成功済みの段から再開できる。
       if (clip.state === 'uploading') {
         return { ...clip, state: 'error' as const, errorMessage: 'アプリ再起動中に中断されました' };

@@ -122,11 +122,8 @@ const ja = {
   'settings.signOutMessage': 'サインアウトします。',
 
   // ── Clip card ──
-  'clip.recorded': 'アップロード待ち',
   'clip.uploading': 'アップロード中',
   'clip.errorEyebrow': 'アップロード失敗',
-  'clip.errorDefault': 'サーバ処理が失敗しました。タップで詳細を確認。',
-  'clip.tryAgain': 'もう一度試す',
 
   // ── Capture flow: ガード / UI ──
   'capture.preparing': '準備中…',
@@ -292,11 +289,8 @@ const en: Record<TranslationKey, string> = {
   'settings.signOutMessage': 'You will be signed out.',
 
   // ── Clip card ──
-  'clip.recorded': 'Waiting to upload',
   'clip.uploading': 'Uploading',
   'clip.errorEyebrow': 'Upload failed',
-  'clip.errorDefault': 'Server processing failed. Tap for details.',
-  'clip.tryAgain': 'Try again',
 
   // ── Capture flow: guards / UI ──
   'capture.preparing': 'Preparing…',

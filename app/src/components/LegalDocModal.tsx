@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 40, height: 4,
     borderRadius: 2,
-    backgroundColor: colors.borderStrong,
+    backgroundColor: colors.border,
     marginBottom: spacing.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },

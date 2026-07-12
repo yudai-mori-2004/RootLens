@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  divider: { height: 1, backgroundColor: colors.borderLight, marginLeft: spacing.lg },
+  divider: { height: 1, backgroundColor: colors.border, marginLeft: spacing.lg },
 
   row: {
     flexDirection: 'row',
