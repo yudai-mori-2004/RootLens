@@ -42,7 +42,7 @@ orphan として残置し、 新データは新キーで再アップロードす
 
 | 構成 ID | 端末 | 出力ファイル | R2 バケット |
 |---|---|---|---|
-| `arkit` | iPhone Pro (LiDAR 有) | rgb.mp4 (H.264, 1920x1440, 15 Hz) + realtime_handpose.jsonl + imu.jsonl (~100 Hz) + metadata.json + depth.tar (depth/ = 256x192 16bit mm、 confidence/ = 同 index の 8bit 3段階) + pointcloud.jsonl + mesh.jsonl | `rootlens-raw-arkit` |
+| `arkit` | iPhone Pro (LiDAR 有) | rgb.mp4 (H.264, 1920x1440, 30 Hz) + realtime_handpose.jsonl + imu.jsonl (~100 Hz) + metadata.json + depth.tar (depth/ = 256x192 16bit mm、 confidence/ = 同 index の 8bit 3段階) + pointcloud.jsonl + mesh.jsonl | `rootlens-raw-arkit` |
 | `ultra_wide` | 非 LiDAR 機 | rgb.mp4 + realtime_handpose.jsonl + metadata.json | `rootlens-raw` |
 
 現行運用では `arkit` のみを FPV Labs に渡す。
