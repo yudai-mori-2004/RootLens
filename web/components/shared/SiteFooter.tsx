@@ -1,6 +1,16 @@
+import { getLocale } from "next-intl/server";
 import s from "../lp/lp.module.css";
 
-export default function SiteFooter() {
+// 法務・コンプライアンス系ページ (プライバシー / 児童保護) への導線はフッターに置く
+// (= Web の慣習。 ストア審査もフッターの URL を見る)。 ヘッダーは本編の導線専用。
+export default async function SiteFooter() {
+  const locale = await getLocale();
+  const ja = locale === "ja";
+  const legalLinks = [
+    { href: "/privacy", label: ja ? "プライバシーポリシー" : "Privacy Policy" },
+    { href: "/safety", label: ja ? "児童保護基準" : "Child Safety" },
+  ];
+
   return (
     <footer className={s.footer}>
       <div className={s.footerInner}>
@@ -22,6 +32,13 @@ export default function SiteFooter() {
             Akito Kono
           </a>
         </div>
+        <nav className={s.footerNav}>
+          {legalLinks.map((link) => (
+            <a key={link.href} href={link.href} className={s.footerNavLink}>
+              {link.label}
+            </a>
+          ))}
+        </nav>
       </div>
     </footer>
   );

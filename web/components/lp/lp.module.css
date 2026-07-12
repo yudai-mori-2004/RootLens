@@ -859,6 +859,27 @@
   color: rgba(255, 255, 255, 0.4);
 }
 
+/* 法務ページへのリンク列 (= プライバシー / 児童保護) */
+.footerNav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.footerNavLink {
+  font-family: var(--font-lp-mono, monospace);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: var(--rl-wt-dim);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footerNavLink:hover {
+  color: var(--rl-cyan);
+}
+
 /* ─── Sample (dataset) ページ ────────────────────────────── */
 
 .datasetHero {
