@@ -7,14 +7,14 @@ const CONTACT_EMAIL = "contact@rootlens.io";
 //   Hero      現場の仕事がロボットを教え、現場が対価を受け取る
 //   §01       問題: ロボットの学習データは現場でしか生まれない
 //   §02       モデル: データの価値を現場のメリットに変換して返す
-//   §03       サービス 01 (お店向け): 併走スタッフ + 撮影協力費
-//   §04       サービス 02 (企業向け): 無償の現場診断
-//   §05       買い手向け: データの価値 4 条件
-//   §06       CTA
+//   §03       サービスカタログ (01 雇う現場向け / 02 企業向け。 増えたらブロックを足す)
+//   §04       買い手向け: 収集デバイスとデータ仕様
+//   §05       CTA
 export default async function HomePage() {
   const tHero = await getTranslations("lp.hero");
   const tProblem = await getTranslations("lp.problem");
   const tModel = await getTranslations("lp.model");
+  const tServices = await getTranslations("lp.services");
   const tFlow = await getTranslations("lp.appFlow");
   const tEnterprise = await getTranslations("lp.enterprise");
   const tDevices = await getTranslations("lp.devices");
@@ -126,101 +126,100 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* §03 サービス 01 (お店向け) */}
-      <section className={s.section} id="for-stores">
+      {/* §03 サービスカタログ (= 還元の形。 増えたら serviceBlock を足す) */}
+      <section className={s.section} id="services">
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§03</div>
             <div>
-              <div className={s.sectionLabel}>{tFlow("label")}</div>
-              <h2 className={s.sectionTitle}>{tFlow("title")}</h2>
+              <div className={s.sectionLabel}>{tServices("label")}</div>
+              <h2 className={s.sectionTitle}>{tServices("title")}</h2>
             </div>
           </header>
-          <div className={s.sectionBody}>
-            <div className={s.sectionBodyContent}>
-              <p className={s.prose}>{tFlow("intro")}</p>
+
+          {/* サービス 01: アルバイトを雇う現場向け */}
+          <div className={s.serviceBlock} id="for-stores">
+            <div className={s.sectionLabel}>{tFlow("label")}</div>
+            <h3 className={s.serviceTitle}>{tFlow("title")}</h3>
+            <div className={s.sectionBody}>
+              <div className={s.sectionBodyContent}>
+                <p className={s.prose}>{tFlow("intro")}</p>
+              </div>
             </div>
-          </div>
-          <div className={s.steps} style={{ marginTop: 40 }}>
-            {flowSteps.map((key, i) => {
-              const icons = ["/lp/step-record.webp", "/lp/step-validate.webp", "/lp/step-earn.webp"];
-              return (
-                <div key={key} className={s.step}>
-                  <div className={s.stepIcon}>
-                    <img src={icons[i]} alt="" width={400} height={400} loading="lazy" />
+            <div className={s.steps} style={{ marginTop: 40 }}>
+              {flowSteps.map((key, i) => {
+                const icons = ["/lp/step-record.webp", "/lp/step-validate.webp", "/lp/step-earn.webp"];
+                return (
+                  <div key={key} className={s.step}>
+                    <div className={s.stepIcon}>
+                      <img src={icons[i]} alt="" width={400} height={400} loading="lazy" />
+                    </div>
+                    <div className={s.stepNumber}>0{i + 1} / 03</div>
+                    <div className={s.stepLabel}>{tFlow(`${key}.label`)}</div>
+                    <div className={s.stepText}>{tFlow(`${key}.text`)}</div>
                   </div>
-                  <div className={s.stepNumber}>0{i + 1} / 03</div>
-                  <div className={s.stepLabel}>{tFlow(`${key}.label`)}</div>
-                  <div className={s.stepText}>{tFlow(`${key}.text`)}</div>
+                );
+              })}
+            </div>
+
+            {/* 計算ストリップ (= フライヤーの白カード) */}
+            <div className={s.mathStrip}>
+              <div className={s.mathTag}>{tMath("tag")}</div>
+              <div className={s.mathCell}>
+                <div className={s.mathLb}>{tMath("wageLabel")}</div>
+                <div className={s.mathVal}>
+                  {tMath("wage")}
+                  <span className={s.mathValUnit}>{tMath("wageUnit")}</span>
                 </div>
-              );
-            })}
+              </div>
+              <div className={s.mathOp}>−</div>
+              <div className={`${s.mathCell} ${s.mathGive}`}>
+                <div className={s.mathLb}>{tMath("feeLabel")}</div>
+                <div className={s.mathVal}>
+                  {tMath("fee")}
+                  <span className={s.mathValUnit}>{tMath("feeUnit")}</span>
+                </div>
+              </div>
+              <div className={s.mathOp}>=</div>
+              <div className={`${s.mathCell} ${s.mathResult}`}>
+                <div className={s.mathLb}>{tMath("resultLabel")}</div>
+                <div className={s.mathVal}>
+                  {tMath("result")}
+                  <span className={s.mathValUnit}>{tMath("resultUnit")}</span>
+                </div>
+              </div>
+            </div>
+            <p className={s.mathNote}>{tMath("note")}</p>
           </div>
 
-          {/* 計算ストリップ (= フライヤーの白カード) */}
-          <div className={s.mathStrip}>
-            <div className={s.mathTag}>{tMath("tag")}</div>
-            <div className={s.mathCell}>
-              <div className={s.mathLb}>{tMath("wageLabel")}</div>
-              <div className={s.mathVal}>
-                {tMath("wage")}
-                <span className={s.mathValUnit}>{tMath("wageUnit")}</span>
+          {/* サービス 02: 企業向け現場診断 */}
+          <div className={s.serviceBlock} id="for-companies">
+            <div className={`${s.sectionLabel} ${s.serviceChipAlt}`}>{tEnterprise("label")}</div>
+            <h3 className={s.serviceTitle}>{tEnterprise("title")}</h3>
+            <div className={s.sectionBodyWithIllustration}>
+              <div className={s.sectionBodyContentNarrow}>
+                <p className={s.prose}>{tEnterprise("p1")}</p>
+                <p className={s.prose}>{tEnterprise("p2")}</p>
+                <div style={{ marginTop: 28 }}>
+                  <a href={`mailto:${CONTACT_EMAIL}`} className={s.ctaSecondary}>
+                    {tEnterprise("cta")}
+                    <span aria-hidden="true">→</span>
+                  </a>
+                </div>
               </div>
-            </div>
-            <div className={s.mathOp}>−</div>
-            <div className={`${s.mathCell} ${s.mathGive}`}>
-              <div className={s.mathLb}>{tMath("feeLabel")}</div>
-              <div className={s.mathVal}>
-                {tMath("fee")}
-                <span className={s.mathValUnit}>{tMath("feeUnit")}</span>
+              <div className={s.sectionIllustration}>
+                <img src="/lp/step-validate.webp" alt="" width={800} height={800} loading="lazy" />
               </div>
-            </div>
-            <div className={s.mathOp}>=</div>
-            <div className={`${s.mathCell} ${s.mathResult}`}>
-              <div className={s.mathLb}>{tMath("resultLabel")}</div>
-              <div className={s.mathVal}>
-                {tMath("result")}
-                <span className={s.mathValUnit}>{tMath("resultUnit")}</span>
-              </div>
-            </div>
-          </div>
-          <p className={s.mathNote}>{tMath("note")}</p>
-        </div>
-      </section>
-
-      {/* §04 サービス 02 (企業向け) */}
-      <section className={s.section} id="for-companies">
-        <div className={s.sectionInner}>
-          <header className={s.sectionHeader}>
-            <div className={s.sectionNumber}>§04</div>
-            <div>
-              <div className={s.sectionLabel}>{tEnterprise("label")}</div>
-              <h2 className={s.sectionTitle}>{tEnterprise("title")}</h2>
-            </div>
-          </header>
-          <div className={s.sectionBodyWithIllustration}>
-            <div className={s.sectionBodyContentNarrow}>
-              <p className={s.prose}>{tEnterprise("p1")}</p>
-              <p className={s.prose}>{tEnterprise("p2")}</p>
-              <div style={{ marginTop: 28 }}>
-                <a href={`mailto:${CONTACT_EMAIL}`} className={s.ctaSecondary}>
-                  {tEnterprise("cta")}
-                  <span aria-hidden="true">→</span>
-                </a>
-              </div>
-            </div>
-            <div className={s.sectionIllustration}>
-              <img src="/lp/step-validate.webp" alt="" width={800} height={800} loading="lazy" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* §05 買い手向け: 収集デバイスとデータ仕様 (= デバイスセット単位のラインナップ) */}
+      {/* §04 買い手向け: 収集デバイスとデータ仕様 (= デバイスセット単位のラインナップ) */}
       <section className={s.section}>
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
-            <div className={s.sectionNumber}>§05</div>
+            <div className={s.sectionNumber}>§04</div>
             <div>
               <div className={s.sectionLabel}>{tDevices("label")}</div>
               <h2 className={s.sectionTitle}>{tDevices("title")}</h2>
@@ -263,13 +262,13 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* §06 Closing CTA */}
+      {/* §05 Closing CTA */}
       <section className={s.closingCta}>
         <div className={s.closingCtaInner}>
           <div className={s.closingCtaVisual}>
             <img src="/lp/cta.webp" alt="" width={600} height={600} loading="lazy" />
           </div>
-          <div className={s.closingCtaNumber}>§06</div>
+          <div className={s.closingCtaNumber}>§05</div>
           <div className={s.closingCtaMain}>
             <div className={s.closingCtaLabel}>Get in touch</div>
             <h2 className={s.closingCtaTitle}>{tHome("closingTitle")}</h2>

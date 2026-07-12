@@ -550,6 +550,27 @@
   color: var(--rl-wt-dim);
 }
 
+/* ─── サービスブロック (= §03 内のカタログ項目。 今後サービスが増えたら足す) ── */
+
+.serviceBlock + .serviceBlock {
+  margin-top: 88px;
+  padding-top: 68px;
+  border-top: 2px dashed rgba(255, 255, 255, 0.16);
+}
+
+.serviceChipAlt {
+  background: var(--rl-cyan);
+  color: var(--rl-ink);
+}
+
+.serviceTitle {
+  font-size: clamp(1.3rem, 2.6vw, 1.8rem);
+  font-weight: 900;
+  line-height: 1.4;
+  color: #fff;
+  margin-bottom: 26px;
+}
+
 /* ─── 収集デバイスのラインナップ (= スペックカード) ───────── */
 
 .rigGrid {

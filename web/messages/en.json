@@ -73,8 +73,8 @@
       "description": "RootLens is a physical-AI project born at the University of Osaka. We monetize work data from Japan's commercial workplaces and return the benefits, in many forms, to the workplaces themselves.",
       "ctaSample": "Sample data",
       "ctaModel": "How it works",
-      "metaFieldLabel": "FIELD",
-      "metaFieldValue": "REAL WORKPLACES, JAPAN",
+      "metaFieldLabel": "TARGETS",
+      "metaFieldValue": "FOOD · RETAIL · FACTORIES, JAPAN",
       "metaStatusLabel": "STATUS",
       "metaStatusValue": "PILOT LIVE",
       "metaCountLabel": "SITES · BUYERS"
@@ -84,6 +84,10 @@
       "p1": "Teaching a robot to work takes video of people actually working. Just as text-generating AI learned from a vast amount of text, robots learn from video of human motion.",
       "p2": "But usable work footage is in critically short supply. Video collected in prepared settings tends to look nothing like a real workplace, and it costs time and money.",
       "p3": "The data that works is produced in the course of everyday operations, on site."
+    },
+    "services": {
+      "label": "FOR WORKPLACES AND COMPANIES",
+      "title": "Our services"
     },
     "appFlow": {
       "label": "SERVICE 01 · FOR EMPLOYERS",
