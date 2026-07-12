@@ -80,7 +80,7 @@
       "metaCountLabel": "SITES · BUYERS"
     },
     "problem": {
-      "title": "Robots learn by watching people. The footage is missing.",
+      "title": "Robots learn by watching people. Nobody is collecting the footage.",
       "p1": "Teaching a robot to work takes a huge amount of video of people actually working. Just as ChatGPT learned language from a vast amount of text, robots learn human motion from a vast amount of video.",
       "p2": "But usable work footage is in critically short supply. Billions of people do this kind of work every day, all over the world, yet there is no infrastructure that collects it as data. A precious resource is being thrown away unused.",
       "p3": "The data that works is produced in the course of everyday operations, on site."
@@ -129,8 +129,8 @@
     "model": {
       "label": "HOW IT WORKS",
       "title": "We sell the work data collected on site, and the revenue funds services that help the workplace.",
-      "p1": "Work data has buyers. Robotics companies are searching worldwide for training footage. But it is not realistic for a shop or a factory to sell its own data: that takes capture equipment, rights handling, and sales channels.",
-      "p2": "RootLens takes that part on.",
+      "p1": "Work data has buyers. Robotics companies are searching worldwide for training footage. But it is not realistic for a shop or a factory to sell its own data. Setting up cameras, clearing rights, finding buyers: none of that is their trade.",
+      "p2": "So RootLens takes it all on, from filming to the sale. The revenue then goes back to the workplace as services that genuinely help it: extra hands, or a free workplace diagnostic.",
       "emphasis": "All we ask of the workplace: keep working as usual."
     },
     "devices": {
