@@ -116,6 +116,7 @@ const ja = {
   'settings.languageEn': 'English',
 
   'settings.signOut': 'サインアウト',
+  'settings.signIn': 'ログイン',
   'settings.signingOut': 'サインアウト中…',
   'settings.signOutDebugMessage': 'デバッグアカウントの鍵を削除して再生成します。アップロード済みの動画は新しいアカウントからは見えなくなります。',
   'settings.signOutMessage': 'サインアウトします。',
@@ -180,6 +181,10 @@ const ja = {
   'upload.consentAndUpload': '同意してアップロード',
   'upload.consentSending': '送信しています…',
   'upload.consentError': '送信できませんでした。通信環境を確認して、もう一度お試しください。',
+  'upload.loginRequiredTitle': 'ログインが必要です',
+  'upload.loginRequiredMessage':
+    'アップロードと同意の記録には、運営発行アカウントへのログインが必要です。撮影済みの動画は端末に保存されたままなので、ログイン後にアップロードできます。',
+  'upload.loginRequiredCta': 'ログインする',
   'history.duration': '長さ',
   'history.config': '撮影モード',
   'history.size': '容量',
@@ -300,6 +305,7 @@ const en: Record<TranslationKey, string> = {
   'settings.languageEn': 'English',
 
   'settings.signOut': 'Sign out',
+  'settings.signIn': 'Sign in',
   'settings.signingOut': 'Signing out…',
   'settings.signOutDebugMessage': 'Deletes and regenerates the debug account key. Uploaded videos will no longer be visible from the new account.',
   'settings.signOutMessage': 'You will be signed out.',
@@ -361,6 +367,10 @@ const en: Record<TranslationKey, string> = {
   'upload.consentAndUpload': 'Agree and upload',
   'upload.consentSending': 'Sending…',
   'upload.consentError': 'Could not send. Check your connection and try again.',
+  'upload.loginRequiredTitle': 'Sign-in required',
+  'upload.loginRequiredMessage':
+    'Uploading and recording consent require signing in to an issued account. Your videos stay on this device and can be uploaded after you sign in.',
+  'upload.loginRequiredCta': 'Sign in',
   'history.duration': 'Length',
   'history.config': 'Capture mode',
   'history.size': 'Size',

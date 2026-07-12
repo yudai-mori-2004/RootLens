@@ -85,4 +85,8 @@
 - [x] アカウント発行 (developer_iphone_12 / developer_iphone_15_pro / bakery_01。 2026-07-12)
 - [x] 0004 適用 (旧残骸35本削除、 41本を2アカウントへ、 PK content_hash 化。 2026-07-12)
 - [x] アーカイブ取得 → 0005 適用 (public は clips + consent_events の2テーブルに。 2026-07-12)
-- [ ] TestFlight build 24 → 実機ログイン + アップロード確認 (web は 4b7f21c でデプロイ済み)
+- [x] build 24/25 は EAS に Supabase env が無く DebugAuthProvider に落ちていた →
+      eas.json production.env に焼き込み + release の debug fallback 廃止 (build 26、 2026-07-12)
+- [x] ログインを起動ゲートから外す (2026-07-12 判断): 撮影はログイン不要 (完全オフライン可)、
+      アップロード + 同意記録の時だけ必須。 QR ディープリンクは linking config でどこからでも Login へ
+- [ ] TestFlight build 27 → 実機ログイン + アップロード確認 (web は 4b7f21c でデプロイ済み)

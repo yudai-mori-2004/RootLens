@@ -21,7 +21,11 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path, Polygon } from 'react-native-svg';
 import { ResizeMode, Video } from 'expo-av';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import type { RootStackParamList } from '../app/types';
+import { getCurrentSession } from '../services/auth/instance';
 import { dataflowStore, type Clip } from '../dataflow';
 import { localVideoUri, formatDuration, formatCardDate, formatCardTime, configLabel } from './ClipCard';
 import { LegalDocBody } from './LegalDocModal';
@@ -48,6 +52,7 @@ const INITIAL_CHECKS: UploadConsentChecks = {
 export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUpload, onRemove }) => {
   const t = useT();
   const locale = useLocale();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [checks, setChecks] = useState<UploadConsentChecks>(INITIAL_CHECKS);
   const [sending, setSending] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
@@ -71,6 +76,20 @@ export const ClipPreviewModal: React.FC<Props> = ({ visible, clip, onClose, onUp
 
   const onConsentAndUpload = async () => {
     if (!allChecked || sending) return;
+    // ログインはここが初めて必要になる瞬間 (= 撮影はログイン不要)。 未ログインなら誘導する。
+    if (!getCurrentSession()) {
+      Alert.alert(t('upload.loginRequiredTitle'), t('upload.loginRequiredMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('upload.loginRequiredCta'),
+          onPress: () => {
+            onClose();
+            navigation.navigate('Login');
+          },
+        },
+      ]);
+      return;
+    }
     setSending(true);
     setConsentError(null);
     try {

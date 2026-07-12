@@ -44,6 +44,13 @@ const navTheme = {
   },
 };
 
+// 発行 QR (io.rootlens.app://login?id=..&pw=..) をどの画面にいても Login に届ける。
+// 資格情報の取り出しは LoginScreen 側の Linking.useURL が行う (= ここは画面遷移だけ)。
+const linking = {
+  prefixes: ['io.rootlens.app://'],
+  config: { screens: { Login: 'login' } },
+};
+
 export default function App() {
   // 画面の向きは RootNavigator の native-stack `orientation` オプションが screen 単位で管理する
   // (= タブ portrait、 撮影だけ landscape)。 expo-screen-orientation の lockAsync は
@@ -88,7 +95,7 @@ export default function App() {
             <StatusBar style="light" />
           </>
         ) : (
-          <NavigationContainer theme={navTheme}>
+          <NavigationContainer theme={navTheme} linking={linking}>
             <RootNavigator />
             <StatusBar style="light" />
           </NavigationContainer>

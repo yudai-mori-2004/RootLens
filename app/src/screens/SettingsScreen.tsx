@@ -22,8 +22,12 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
+
+import type { RootStackParamList } from '../app/types';
 
 import { config } from '../config';
 import { useAuth } from '../services/auth';
@@ -47,6 +51,7 @@ export const SettingsScreen: React.FC = () => {
   const t = useT();
   const insets = useSafeAreaInsets();
   const locale = useLocale();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const ownerStr = state.status === 'authenticated' ? state.session.accountId : null;
   const [signingOut, setSigningOut] = useState(false);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
@@ -158,12 +163,16 @@ export const SettingsScreen: React.FC = () => {
             value={ownerStr ? shortBase58(ownerStr) : t('settings.unauthenticated')}
             mono
           />
-          <ActionRow
-            label={signingOut ? t('settings.signingOut') : t('settings.signOut')}
-            onPress={onLogout}
-            kind="danger"
-            disabled={signingOut || state.status !== 'authenticated'}
-          />
+          {state.status === 'authenticated' ? (
+            <ActionRow
+              label={signingOut ? t('settings.signingOut') : t('settings.signOut')}
+              onPress={onLogout}
+              kind="danger"
+              disabled={signingOut}
+            />
+          ) : (
+            <ActionRow label={t('settings.signIn')} onPress={() => navigation.navigate('Login')} />
+          )}
         </Section>
 
         <Section title={t('settings.section.app')}>

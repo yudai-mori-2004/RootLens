@@ -28,7 +28,7 @@ import { colors, fonts, radii, spacing, typography } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { provider, state } = useAuth();
+  const { provider } = useAuth();
   const t = useT();
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,13 +37,8 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const supportsPassword = typeof provider.loginWithPassword === 'function';
 
-  // すでに authenticated なら Main に飛ぶ (= AuthGate の初期化が間に合った場合)
-  useEffect(() => {
-    if (state.status === 'authenticated') {
-      navigation.replace('Main');
-    }
-  }, [state.status, navigation]);
-
+  // ログインは起動のゲートではない (= この画面はアップロード時 / 設定 / QR から開く)。
+  // 成功したら元の画面に戻る。 QR ディープリンクの冷起動などでこの画面が初期画面の場合は Main へ。
   const doLogin = useCallback(
     async (id: string, pw: string) => {
       setLoggingIn(true);
@@ -54,13 +49,18 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         } else {
           await provider.login();
         }
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.replace('Main');
+        }
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
         setLoggingIn(false);
       }
     },
-    [provider, supportsPassword],
+    [provider, supportsPassword, navigation],
   );
 
   // 発行 QR のディープリンク (= 初回起動 URL とフォアグラウンド中の受信の両方を拾う)。

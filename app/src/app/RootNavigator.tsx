@@ -3,7 +3,6 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
 import { colors, navigationHeaderOptions } from '../theme';
-import { useAuth } from '../services/auth';
 
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
@@ -13,14 +12,15 @@ import { OnboardingScreen, isOnboardingCompleted } from '../screens/OnboardingSc
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 // 起動時の判定:
-//   onboarding 未完了        → Onboarding screen (ウェルカム + ToS)
-//   onboarding 済 + 未認証   → Login screen
-//   onboarding 済 + 認証済   → MainTabs
+//   onboarding 未完了 → Onboarding screen (ウェルカム + ToS)、 済なら MainTabs。
+//
+// ログインは起動のゲートにしない (2026-07-12 判断): 撮影は完全ローカルで、 アカウントが
+// 必要なのはアップロード + 同意記録の瞬間だけ。 オフラインの現場でトークン復元に失敗しても
+// 撮影は止めない。 Login はアップロード時 / 設定 / 発行 QR のディープリンクから開く。
 //
 // CaptureMode は MainTabs の上に push する fullscreen modal (UI_SPECS §4 + §5)。
 
 export const RootNavigator: React.FC = () => {
-  const { state } = useAuth();
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingDone, setOnboardingDone] = useState(false);
 
@@ -36,7 +36,7 @@ export const RootNavigator: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  if (state.status === 'loading' || !onboardingChecked) {
+  if (!onboardingChecked) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.ink} />
@@ -44,9 +44,7 @@ export const RootNavigator: React.FC = () => {
     );
   }
 
-  const initialRoute: keyof RootStackParamList =
-    !onboardingDone ? 'Onboarding' :
-    state.status === 'authenticated' ? 'Main' : 'Login';
+  const initialRoute: keyof RootStackParamList = !onboardingDone ? 'Onboarding' : 'Main';
 
   return (
     <Stack.Navigator
@@ -61,7 +59,7 @@ export const RootNavigator: React.FC = () => {
           <OnboardingScreen
             onCompleted={() => {
               setOnboardingDone(true);
-              navigation.replace(state.status === 'authenticated' ? 'Main' : 'Login');
+              navigation.replace('Main');
             }}
           />
         )}
