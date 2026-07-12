@@ -13,11 +13,3 @@ func arkitTimestampToNs(_ seconds: TimeInterval) -> UInt64 {
   if ns >= Double(UInt64.max) { return UInt64.max }
   return UInt64(ns)
 }
-
-/// ROS-style header.stamp is uint32 sec + uint32 nanosec; split it out of ns.
-@inline(__always)
-func splitNsToRosTime(_ ns: UInt64) -> (sec: UInt32, nsec: UInt32) {
-  let sec = ns / 1_000_000_000
-  let nsec = ns % 1_000_000_000
-  return (UInt32(truncatingIfNeeded: sec), UInt32(truncatingIfNeeded: nsec))
-}

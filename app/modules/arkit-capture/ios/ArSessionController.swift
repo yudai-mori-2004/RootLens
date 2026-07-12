@@ -86,7 +86,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   // Latest pixel buffer (for captureSnapshot).
   private var latestPixelBuffer: CVPixelBuffer?
-  private var latestImageSize: CGSize = .zero
   private let latestBufferLock = NSLock()
 
   // HandTracker runs on its own queue with a drop-while-busy pattern (no backlog).
@@ -1305,12 +1304,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   func session(_ session: ARSession, didUpdate frame: ARFrame) {
     let pixelBuffer = frame.capturedImage
     let timestamp = frame.timestamp
-    let imageRes = frame.camera.imageResolution
     let segmentationBuffer = frame.segmentationBuffer
 
     latestBufferLock.lock()
     latestPixelBuffer = pixelBuffer
-    latestImageSize = imageRes
     latestBufferLock.unlock()
 
     // HandTracker (own queue, drop-while-busy).

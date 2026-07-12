@@ -71,10 +71,6 @@ export interface Clip {
 // the store are the caller's job.
 
 /** hash step: raw MP4 → SHA-256 (the content hash). */
-export interface HashInput {
-  /** Raw MP4 written by the capture native module (file:// URI). */
-  rawMp4Uri: string;
-}
 export interface HashResult {
   /** SHA-256 hex, 64 chars, over the raw mp4 bytes. */
   contentHash: string;

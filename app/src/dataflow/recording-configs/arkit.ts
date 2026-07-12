@@ -33,7 +33,7 @@ import type {
 // Files the ARKit config writes into the session dir:
 //   rgb.mp4                    wide (1x) RGB video
 //   realtime_handpose.jsonl    per-frame hand landmarks + camera pose (4×4) + tracking state + IMU snapshot
-//   imu.jsonl                  accelerometer / gyro / device motion (~100 Hz)
+//   imu.jsonl                  accelerometer / gyro / device motion (at the configured rate; 100 Hz default)
 //   metadata.json              static facts: device model, OS, app version, camera FoV / resolution / intrinsics, config id
 //   depth.tar                  LiDAR depth (Pro devices only): one 16-bit PNG (millimeters) per frame,
 //                              stream-appended into a single tar, plus per-frame confidence maps.

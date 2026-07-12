@@ -3,7 +3,7 @@
 //
 // ⚠ Dataflow layer: must not import react / react-native.
 
-export { hashClip, computeContentHash } from './hash';
+export { computeContentHash } from './hash';
 export { uploadToR2 } from './upload';
 export { registerClip } from './register';
 export { fetchMyClips, fetchClipMediaUrl } from './list';

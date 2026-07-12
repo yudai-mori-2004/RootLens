@@ -12,7 +12,6 @@ export type {
   ClipState,
   UploadStage,
   ServerClipStatus,
-  HashInput,
   HashResult,
   UploadInput,
   UploadResult,
@@ -45,7 +44,6 @@ export {
 
 // Individual steps
 export {
-  hashClip,
   computeContentHash,
   uploadToR2,
   registerClip,
