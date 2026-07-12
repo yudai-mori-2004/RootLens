@@ -25,7 +25,10 @@ import { getLocale, t } from '../i18n';
 /// .4: 店舗運用向けに整理 (2026-07-12): 年齢確認を撤去 (= 年齢条項は正本側に委ねる)、 場所の撮影許可を
 ///     独立チェック化、 第三者文言を「同意していない人物は映り込んでいない」 に形式化、 規約リンクを
 ///     チェック文言内のインラインリンクへ。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-12.4';
+/// .5: 第三者文言を「意図して撮影していない + 偶発映り込みは提供前にぼかし」 へ
+///     (= privacy-policy §8 の偶発映り込み条項の追加と対、 2026-07-12)。 絶対断定をやめ、
+///     スタッフが正直にチェックできる形にする。
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-12.5';
 
 /// アップロード同意のスコープ (= terms-of-service §6: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;

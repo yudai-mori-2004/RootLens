@@ -26,7 +26,7 @@
 ## 2. Operator & scope
 
 ### 2.1 Operator (personal-data handler / controller)
-RootLens ("we"; entity formation in progress; until then the operating individual is the handler). Contact: contact@rootlens.io.
+RootLens ("we"; entity formation in progress; until then the operating individual is the handler). Contact: contact@rootlens.io. The operator's name and address are provided without delay upon request.
 > Audit note: the existing page's contact `contact@titleprotocol.org` is incorrect; this document standardizes on `contact@rootlens.io`.
 
 ### 2.2 Scope
@@ -52,15 +52,18 @@ All handling of personal data across our app, website, and data-sale service. It
 - Buyers are contractually bound by **no-re-identification, use limitations, and downstream flow-through obligations**.
 
 ## 6. Cross-border transfer
-Data **may be provided to companies outside Japan**. Recipients and destinations are limited by our internal transfer rules; excluded regions (US all-party-consent states, mainland China, EU, etc., until ready) are not served.
+Data **may be provided to companies outside Japan** (currently, the main recipients are located in the United States). Recipients are limited to parties contractually bound by no-re-identification, use limitations, and downstream flow-through obligations.
 
 ## 7. Privacy processing
 - Faces etc. are auto-blurred before sharing, but this is **not full anonymization** (identifiable via body, room, possessions). We do not call it "anonymized."
 
 ## 8. Third parties, children, private spaces
-- We assume and require that **only the recording user and adults who consented to being recorded appear**.
-- **Clips containing a non-consenting third party are not sold** (detection then exclusion).
-- **Children, illegal content, and private spaces (bathroom/bedroom/toilet, etc.) are blocked**; detected illegal material is handled and reported as required by law.
+- We assume and require that **only the recording user and adults who consented to being recorded appear**, and limit recording to tasks where customers and other bystanders stay out of frame.
+- **Incidental, momentary captures** that still occur (someone passing by) are **face-blurred before delivery**. Clips in which a non-consenting person remains **identifiable are not delivered**.
+- Every clip is **reviewed one by one before delivery**; clips containing children, illegal content, or private spaces (bathroom/bedroom/toilet, etc.) are excluded and deleted. Confirmed illegal material is handled and reported as required by law.
+
+### 8.1 If you may appear in a recording
+You may request review, suspension of use, or deletion of footage you may appear in. Requests: contact@rootlens.io (please tell us the location and date).
 
 ## 9. Retention
 Retained for as long as necessary for the purposes and as required by law, then deleted or rendered non-distributable (specific periods to be added once fixed).
@@ -68,13 +71,14 @@ Retained for as long as necessary for the purposes and as required by law, then 
 ## 10. Your rights
 - You may request access, correction, suspension of use, deletion, and withdrawal of consent.
 - **Deletion scope**: data before training use is deleted. **After training use**, it is excluded from future training, but **past training cannot be undone**. We do not promise "complete deletion anytime."
+- Requests are accepted by email and handled within the statutory period after identity verification.
 - Requests: contact@rootlens.io
 
 ## 11. Withdrawal of consent and its effect
 The user may withdraw consent anytime. After withdrawal, we stop new collection/sale and delete un-trained data. Effects on already-issued licenses and trained models are as described in "Your rights" above (the past cannot be undone).
 
 ## 12. Security
-Because video is sensitive, we apply encryption, access control, and retention management. Breaches are notified per law.
+Because video is sensitive, we apply encryption, access control, and retention management. Data is stored and processed on servers of external cloud providers in the United States and elsewhere. Breaches are notified per law.
 
 ## 13. Children's information
 We do not allow children as subjects. The recording user must be 18 or older.
@@ -94,3 +98,4 @@ contact@rootlens.io
 | (initial) | Authoritative draft reflecting the real business (data sale, staking, KYC, third parties). Layered structure. Counsel review before publishing |
 | (rev 2) | Cleaned internal references (section numbers, internal-doc slugs, D-codes) into plain prose for public output; unified contact to contact@rootlens.io |
 | 2026-07-12 | Removed wallet public key, KYC, and blockchain/NFT references (the features were removed from the system in v0.1.4); added account information to the collected-data list |
+| 2026-07-12 (2) | Revised for the closed on-site operation: section 8 states the out-of-frame task limitation and the handling of incidental captures (blur, exclude if identifiable), with a new 8.1 for people who may appear; section 6 drops the audio-era state exclusion list in favor of recipient country (US) and contractual criteria; operator name/address on request, request procedure, and foreign cloud storage added; detection/blocking wording aligned to the per-clip manual review |
