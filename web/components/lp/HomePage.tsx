@@ -17,13 +17,13 @@ export default async function HomePage() {
   const tModel = await getTranslations("lp.model");
   const tFlow = await getTranslations("lp.appFlow");
   const tEnterprise = await getTranslations("lp.enterprise");
-  const tIssues = await getTranslations("lp.issues");
+  const tDevices = await getTranslations("lp.devices");
   const tMath = await getTranslations("lp.math");
   const tHome = await getTranslations("pages.home");
   const t = await getTranslations("lp");
 
   const flowSteps = ["step1", "step2", "step3"] as const;
-  const issues = ["hands", "sensors", "diversity", "consent"] as const;
+  const specRows = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"] as const;
 
   // マーキー1周ぶん (= トラックに2周入れて -50% でシームレスにループ)
   const marqueeRun = Array.from({ length: 6 }, (_, i) => (
@@ -36,7 +36,6 @@ export default async function HomePage() {
     <div className={s.page}>
       {/* Hero */}
       <section className={s.hero}>
-        <div className={s.burst}>{tHero("burst")}</div>
         <div className={s.heroInner}>
           <div className={s.heroMain}>
             <div className={s.heroEyebrow}>
@@ -45,7 +44,7 @@ export default async function HomePage() {
               <span className={s.heroEyebrowDesc}>{tHero("tagline")}</span>
             </div>
             <h1 className={s.heroTitle}>
-              Real work is<br />
+              Real human work is<br />
               <span className={s.heroTitleAccent}>training data.</span>
             </h1>
             <p className={s.heroDescription}>{tHero("description")}</p>
@@ -61,14 +60,15 @@ export default async function HomePage() {
             </div>
           </div>
           <aside className={s.heroMeta}>
+            <div className={s.heroMetaLabel}>FIELD</div>
+            <div className={s.heroMetaValue}>REAL WORKPLACES, JAPAN</div>
+            <div style={{ height: 12 }} />
             <div className={s.heroMetaLabel}>STATUS</div>
             <div className={s.heroMetaValue}>PILOT LIVE</div>
             <div style={{ height: 12 }} />
-            <div className={s.heroMetaLabel}>DATA · NOW</div>
-            <div className={s.heroMetaValue}>RGB · DEPTH · IMU · HANDS</div>
-            <div style={{ height: 12 }} />
-            <div className={s.heroMetaLabel}>DELIVERY</div>
-            <div className={s.heroMetaValue}>MCAP</div>
+            {/* 実績カウンタ。 売れはじめたら手で更新する (= 盛らない。 0 は 0 と書く) */}
+            <div className={s.heroMetaLabel}>SITES · BUYERS</div>
+            <div className={s.heroMetaValue}>0 · 0</div>
           </aside>
         </div>
       </section>
@@ -87,7 +87,7 @@ export default async function HomePage() {
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§01</div>
             <div>
-              <div className={s.sectionLabel}>The problem</div>
+              <div className={s.sectionLabel}>課題</div>
               <h2 className={s.sectionTitle}>{tProblem("title")}</h2>
             </div>
           </header>
@@ -211,32 +211,41 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* §05 買い手向け: データの価値 */}
+      {/* §05 買い手向け: 収集デバイスとデータ仕様 (= デバイスセット単位のラインナップ) */}
       <section className={s.section}>
         <div className={s.sectionInner}>
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§05</div>
             <div>
-              <div className={s.sectionLabel}>What buyers want</div>
-              <h2 className={s.sectionTitle}>{tIssues("title")}</h2>
+              <div className={s.sectionLabel}>{tDevices("label")}</div>
+              <h2 className={s.sectionTitle}>{tDevices("title")}</h2>
             </div>
           </header>
           <div className={s.sectionBody}>
             <div className={s.sectionBodyContent}>
-              <p className={s.prose}>{tIssues("intro1")}</p>
-              <p className={s.prose}>{tIssues("intro2")}</p>
-              <p className={s.prose} style={{ marginTop: 28, marginBottom: 0 }}>
-                <span className={s.emphasis}>{tIssues("pillarsLead")}</span>
-              </p>
+              <p className={s.prose}>{tDevices("intro1")}</p>
+              <p className={s.prose}>{tDevices("intro2")}</p>
             </div>
           </div>
-          <div className={s.issuesGrid} style={{ marginTop: 40 }}>
-            {issues.map((key) => (
-              <div key={key} className={s.issueItem}>
-                <div className={s.issueLabel}>{tIssues(`${key}.label`)}</div>
-                <div className={s.issueText}>{tIssues(`${key}.text`)}</div>
-              </div>
-            ))}
+          <div className={s.rigGrid} style={{ marginTop: 40 }}>
+            <div className={s.rigCard}>
+              <div className={s.rigTag}>{tDevices("set01.tag")}</div>
+              <div className={s.rigName}>{tDevices("set01.name")}</div>
+              <p className={s.rigDesc}>{tDevices("set01.desc")}</p>
+              <dl className={s.specList}>
+                {specRows.map((row) => (
+                  <div key={row} className={s.specRow}>
+                    <dt className={s.specKey}>{tDevices(`set01.${row}k`)}</dt>
+                    <dd className={s.specVal}>{tDevices(`set01.${row}v`)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+            <div className={s.rigGhost}>
+              <div className={s.rigTag}>{tDevices("set02.tag")}</div>
+              <div className={s.rigName}>{tDevices("set02.name")}</div>
+              <p className={s.rigDesc}>{tDevices("set02.desc")}</p>
+            </div>
           </div>
         </div>
       </section>

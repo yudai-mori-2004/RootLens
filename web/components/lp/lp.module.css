@@ -550,51 +550,97 @@
   color: var(--rl-wt-dim);
 }
 
-/* ─── 価値ピラー (= 白ステッカーカード) ──────────────────── */
+/* ─── 収集デバイスのラインナップ (= スペックカード) ───────── */
 
-.issuesGrid {
+.rigGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1.4fr 1fr;
   gap: 26px;
+  align-items: start;
 }
 
-.issueItem {
+.rigCard {
   background: var(--rl-paper);
   color: var(--rl-ink);
-  border-radius: 16px;
-  padding: 24px 26px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
-  transition: transform 0.18s ease;
+  border-radius: 18px;
+  padding: 26px 28px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  transform: rotate(-0.5deg);
 }
 
-.issueItem:nth-child(1) { transform: rotate(-1.1deg); }
-.issueItem:nth-child(2) { transform: rotate(0.9deg); }
-.issueItem:nth-child(3) { transform: rotate(0.7deg); }
-.issueItem:nth-child(4) { transform: rotate(-0.8deg); }
-
-.issueItem:hover {
-  transform: rotate(0deg) translateY(-5px);
+.rigGhost {
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  border-radius: 18px;
+  padding: 26px 28px;
+  color: var(--rl-wt-dim);
+  transform: rotate(0.6deg);
 }
 
-.issueLabel {
+.rigTag {
   display: inline-block;
-  font-size: 0.95rem;
-  font-weight: 900;
-  color: var(--rl-ink);
+  background: var(--rl-ink);
+  color: var(--rl-lime);
+  font-family: var(--font-lp-mono, monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
   padding: 5px 14px;
   border-radius: 999px;
-  margin-bottom: 14px;
+  transform: rotate(-1.2deg);
 }
 
-.issueItem:nth-child(1) .issueLabel { background: var(--rl-cyan); }
-.issueItem:nth-child(2) .issueLabel { background: var(--rl-yellow); }
-.issueItem:nth-child(3) .issueLabel { background: var(--rl-pink); color: #fff; }
-.issueItem:nth-child(4) .issueLabel { background: var(--rl-lime); }
+.rigGhost .rigTag {
+  background: transparent;
+  border: 1.5px dashed rgba(255, 255, 255, 0.4);
+  color: var(--rl-wt-dim);
+}
 
-.issueText {
-  font-size: 0.92rem;
-  line-height: 1.95;
+.rigName {
+  margin-top: 14px;
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.rigGhost .rigName {
+  color: var(--rl-wt);
+}
+
+.rigDesc {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  line-height: 1.9;
   color: #31184f;
+}
+
+.rigGhost .rigDesc {
+  color: var(--rl-wt-dim);
+}
+
+.specList {
+  margin-top: 18px;
+  border-top: 2px dashed rgba(27, 7, 51, 0.18);
+}
+
+.specRow {
+  display: flex;
+  gap: 18px;
+  padding: 9px 0;
+  border-bottom: 2px dashed rgba(27, 7, 51, 0.18);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.specKey {
+  flex: 0 0 136px;
+  font-family: var(--font-lp-mono, monospace);
+  font-size: 0.78rem;
+  padding-top: 2px;
+  color: var(--rl-purple);
+}
+
+.specVal {
+  margin: 0;
+  font-weight: 700;
+  color: var(--rl-ink);
 }
 
 /* ─── クロージング CTA (= フライヤーの cyan→lime カード) ─── */
@@ -1109,7 +1155,7 @@
     align-self: center;
   }
 
-  .issuesGrid {
+  .rigGrid {
     grid-template-columns: 1fr;
   }
 
