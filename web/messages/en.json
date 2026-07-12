@@ -137,7 +137,7 @@
     "devices": {
       "label": "FOR DATA BUYERS",
       "title": "Capture rigs and data specs",
-      "intro1": "Robot training can't use just any video. It needs footage focused on the work itself, shot in real environments, from as many different sites as possible. RootLens data is collected in shops and workplaces that are actually in business.",
+      "intro1": "Robot training can't use just any video. It needs footage focused on the work itself, shot in real environments, from as many different sites as possible. RootLens data is collected in shops and workplaces that are actually in business, always under written agreements with each site, with a consent record kept per clip.",
       "intro2": "We grow the lineup rig by rig; one set is in operation today. See the sample data for format details.",
       "set01": {
         "tag": "SET 01 · IN OPERATION",
@@ -160,11 +160,7 @@
         "s8k": "Scene",
         "s8v": "ARKit mesh anchors, point cloud",
         "s9k": "Anonymization",
-        "s9v": "Face blurring (EgoBlur), no audio",
-        "s10k": "Rights",
-        "s10v": "Written site agreements, per-clip consent records",
-        "s11k": "Delivery",
-        "s11v": "MCAP format (ROS 2-compatible schemas), coordinate-frame TF included"
+        "s9v": "Face blurring (EgoBlur), no audio"
       },
       "set02": {
         "tag": "SET 02 · IN PREPARATION",

@@ -23,7 +23,7 @@ export default async function HomePage() {
   const t = await getTranslations("lp");
 
   const flowSteps = ["step1", "step2", "step3"] as const;
-  const specRows = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11"] as const;
+  const specRows = ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9"] as const;
 
   // マーキー1周ぶん (= トラックに2周入れて -50% でシームレスにループ)
   const marqueeRun = Array.from({ length: 6 }, (_, i) => (
