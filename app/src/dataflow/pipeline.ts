@@ -1,21 +1,22 @@
-// Pipeline 1 の段レジューム型ランナー (= 「送る」 と 「もう一度試す」 を統一する単一の前進関数)。
+// Stage-resumable upload runner: one "advance" function shared by the first
+// upload attempt and every retry.
 //
-// v0.1.4 (task 12 適用後): 段は以下の 3 つ:
+//   pending    → SHA-256 of the raw MP4      → 'hashed'     (the content hash is born;
+//                                                            the clip is re-keyed from its local id to the hash)
+//   hashed     → R2 upload + POST /api/clips → 'registered' (state='uploaded')
+//   registered → nothing more happens on the device
 //
-//   pending    → 生 MP4 の SHA-256 計算  → 'hashed'   (= content_hash 誕生、 local id → hash に re-key)
-//   hashed     → upload + POST /api/clips → 'registered' (= state='uploaded')
-//   registered → (端末側はここまで)
+// Idempotency: from 'hashed' on, the same content hash is reused, and the
+// server dedupes on (account, content hash), so retries can never create
+// duplicate clip rows.
 //
-// 冪等性: 'hashed' 以降は同じ content_hash を使い回す。 サーバ側の重複排除
-// (= (account, content_hash)) が効いて二重 clip 行を防ぐ。
-//
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+// ⚠ Dataflow layer: must not import react / react-native.
 
 import * as FileSystem from 'expo-file-system';
 
 import type { EventSink, DataflowEventInput } from './events';
 import { getRecordingConfig, type RecordingConfig, type RecordingSession } from './recording-configs';
-import type { Pipeline1Stage } from './types';
+import type { UploadStage } from './types';
 import { computeContentHash } from './steps/hash';
 import { uploadToR2 } from './steps/upload';
 import { registerClip } from './steps/register';
@@ -27,18 +28,19 @@ function errMsg(e: unknown): string {
   try { return JSON.stringify(e); } catch { return String(e); }
 }
 
-/** clip dir 配下のゴミを掃除する (アップロード完了 or 破棄時)。 */
+/** Remove a clip dir and everything under it (after upload completes or on discard). */
 async function cleanupClipDir(dir: string): Promise<void> {
   try {
     await FileSystem.deleteAsync(dir, { idempotent: true });
   } catch {
-    // 失敗は致命ではない
+    // Not fatal.
   }
 }
 
-/** Pipeline 1 の step 名 → uploadProgress (0..1) の段階写像。
- *  content-hash 区間 (0→0.35) と r2-upload 区間 (0.4→0.97) はここでは固定値にせず (= null)、
- *  それぞれの onProgress の実進捗で滑らかに埋める (数 GB のハッシュ計算が数十分無言にならないように)。 */
+/** Maps a step name to a fixed uploadProgress value (0..1).
+ *  The hashing span (0→0.35) and the upload span (0.4→0.97) are not fixed here
+ *  (null); they are filled smoothly from each step's own byte progress, so
+ *  hashing a multi-GB video does not sit silent for minutes. */
 function stepProgress(step: string): number | null {
   switch (step) {
     case 'register-clip': return 1.0;
@@ -46,25 +48,27 @@ function stepProgress(step: string): number | null {
   }
 }
 
-/** ハッシュ計算の実バイト進捗 (0..1) を uploadProgress の 0→0.35 区間に写す。 */
+/** Maps real hashing byte progress (0..1) onto the 0→0.35 span of uploadProgress. */
 function hashFractionToProgress(f: number): number {
   return Math.max(0, Math.min(1, f)) * 0.35;
 }
 
-/** アップロードの実バイト進捗 (0..1) を uploadProgress の 0.4→0.97 区間に写す。 */
+/** Maps real upload byte progress (0..1) onto the 0.4→0.97 span of uploadProgress. */
 function uploadFractionToProgress(f: number): number {
   return 0.4 + Math.max(0, Math.min(1, f)) * 0.57;
 }
 
 /**
- * 撮影完了時にクリップを起こす (= state 'recorded' + stage 'pending' で local id 採番)。
- * v0.1.4: ここでは自動アップロードしない。 ユーザーが一覧 (マイビデオ) でプレビューを確認し
- * 「アップロード」 を押した時に advanceClip が hash → R2 → 登録 を進める。
+ * Create the clip record when recording finishes (state 'recorded', stage
+ * 'pending', keyed by a fresh local id).
+ *
+ * Nothing uploads automatically. The user reviews the preview in the clip list
+ * and taps upload; advanceClip() then walks hash → R2 → register.
  */
 export async function enqueueRecording(input: {
   config: RecordingConfig;
   session: RecordingSession;
-  /** 撮影ファクト (= UI 層で計測)。 録画尺 (ms、 stop−start) と端末機種。 */
+  /** Facts measured by the UI layer: duration (ms, stop − start) and device model. */
   durationMs?: number | null;
   deviceModel?: string | null;
 }): Promise<string> {
@@ -84,26 +88,31 @@ export async function enqueueRecording(input: {
   return localId;
 }
 
-// ─── 孤児録画の回収 (= 起動時に 1 回) ─────────────────────────────────
+// ─── Orphan recording recovery (runs once at startup) ─────────────────
 //
-// 台帳登録 (enqueueRecording) は正常な停止フローでしか走らないので、 電池切れ・クラッシュ・
-// OS kill で死んだ録画は Documents/recordings/ にファイルだけ残って一覧に出ない。 rgb.mp4 は
-// fragmented MP4 (= 10 秒粒度で確定) なので途中死でも読める → 起動時に走査して台帳に戻す。
-// 逆に録画として成立していない残骸 (mp4 が無い / 小さすぎる) はここで掃除する。
+// Ledger registration (enqueueRecording) only happens on a clean stop, so a
+// recording killed by a dead battery, a crash, or the OS leaves files under
+// Documents/recordings/ that never appear in the list. rgb.mp4 is a fragmented
+// MP4 (finalized in ~10-second chunks), so it is readable even after a mid-write
+// death. At startup we scan the directory and put such recordings back into the
+// ledger. Leftovers that never became a recording (no mp4, or too small) are
+// deleted here instead.
 //
-// ⚠ アップロード完了済みクリップは dir ごと掃除される (= cleanupTmpDir) 前提。 もし掃除に失敗した
-//    dir が残っていると再回収して二重になるが、 それは掃除失敗というバグの顕在化であって隠さない。
+// ⚠ Clips that finished uploading are expected to have had their dir removed
+//    (cleanupClipDir). If a cleanup failed and the dir survived, it will be
+//    re-recovered and show up twice. That duplication is a cleanup bug made
+//    visible on purpose, not something to paper over.
 
-const MIN_RECOVERABLE_MP4_BYTES = 3 * 1024 * 1024; // ~2 秒未満の録画は回収する価値が無い
+const MIN_RECOVERABLE_MP4_BYTES = 3 * 1024 * 1024; // recordings under ~2 seconds are not worth recovering
 
-/** file:// URI → Documents 起点の相対 path (= コンテナ UUID / private prefix の揺れを無視して比較する)。 */
+/** file:// URI → path relative to Documents (ignores container-UUID / private-prefix variance). */
 function docRelative(uri: string | undefined): string | null {
   if (!uri) return null;
   const i = uri.indexOf('/Documents/');
   return i >= 0 ? uri.slice(i + '/Documents/'.length).replace(/\/+$/, '') : null;
 }
 
-/** 台帳に無い録画 dir を走査して回収する。 返値は回収した本数。 hydrate 完了後に呼ぶこと。 */
+/** Scan for recording dirs missing from the ledger and recover them. Returns the count. Call after hydrate. */
 export async function recoverOrphanRecordings(): Promise<number> {
   const doc = FileSystem.documentDirectory;
   if (!doc) return 0;
@@ -112,7 +121,7 @@ export async function recoverOrphanRecordings(): Promise<number> {
   try {
     names = await FileSystem.readDirectoryAsync(recRoot);
   } catch {
-    return 0; // recordings/ 未作成 (= まだ一度も録画していない)
+    return 0; // recordings/ does not exist yet (nothing recorded so far)
   }
   const known = new Set<string>();
   for (const c of Object.values(dataflowStore.getState().clips)) {
@@ -129,8 +138,9 @@ export async function recoverOrphanRecordings(): Promise<number> {
       await FileSystem.deleteAsync(dir, { idempotent: true }).catch(() => {});
       continue;
     }
-    // 撮影構成と機種は metadata.json (= 初回 frame で書かれる) から復元。 録画尺は不明のまま
-    // (= 申告値が無いだけで、 実尺はサーバが mp4 から測れる)。
+    // Recording config and device model come back from metadata.json (written with
+    // the first frame). Duration stays unknown; only the self-reported value is
+    // lost, the server can measure the real length from the mp4.
     let configId = 'arkit';
     let deviceModel: string | null = null;
     try {
@@ -138,7 +148,7 @@ export async function recoverOrphanRecordings(): Promise<number> {
       if (typeof meta.recording_config === 'string') configId = meta.recording_config;
       if (typeof meta.device_model === 'string') deviceModel = meta.device_model;
     } catch {
-      // metadata 無しでも mp4 があれば回収する (= 既定の arkit として扱う)
+      // No metadata is fine; recover as the default arkit config as long as the mp4 exists.
     }
     const config = getRecordingConfig(configId);
     if (!config) continue;
@@ -158,20 +168,20 @@ export async function recoverOrphanRecordings(): Promise<number> {
 }
 
 /**
- * クリップの現在 stage から実際に再開できる stage を返す。
- * content_hash が store から消えていれば 'pending' に降格して再計算する。
+ * Resolve the stage a clip can actually resume from.
+ * If the content hash has vanished from the store, demote to 'pending' and re-hash.
  */
-function effectiveStage(stage: Pipeline1Stage, contentHash: string | undefined): Pipeline1Stage {
+function effectiveStage(stage: UploadStage, contentHash: string | undefined): UploadStage {
   if (stage === 'registered') return 'registered';
   if (stage === 'hashed' && contentHash) return 'hashed';
   return 'pending';
 }
 
 /**
- * クリップを現在 stage から前進させる (= submit / retry 共通)。
+ * Advance a clip from its current stage (shared by submit and retry).
  *
- *   pending → computeContentHash → 'hashed' (= content_hash 誕生、 local id → hash に re-key)
- *   hashed  → upload + register  → 'registered' (= state='uploaded')
+ *   pending → computeContentHash → 'hashed'     (the clip is re-keyed from its local id to the hash)
+ *   hashed  → upload + register  → 'registered' (state='uploaded')
  */
 export async function advanceClip(clipId: string, sink: EventSink): Promise<void> {
   const initial = dataflowStore.getState().clips[clipId];
@@ -202,7 +212,7 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
   try {
     let stage = effectiveStage(initial.stage ?? 'pending', initial.contentHash);
 
-    // ─── pending → hashed (content_hash 誕生) ─────────────────────────
+    // ─── pending → hashed (the content hash is born) ──────────────────
     if (stage === 'pending') {
       const rawMp4Uri = config.primaryVideoUri(session);
       const hashed = await computeContentHash(rawMp4Uri, progressSink, (f) => {
@@ -225,8 +235,8 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
       const cur = dataflowStore.getState().clips[clipId];
       if (!cur?.contentHash) throw new Error('content_hash 未確定で登録段に進めません');
 
-      // 撮影構成が出力したファイル群を R2 に並列 PUT。 v0.1.4 (task 12 適用後) は署名を挟まないので、
-      // 主な動画も session dir の生 mp4 をそのまま送る。
+      // PUT the recording config's output files to R2 in parallel. The primary
+      // video is the raw mp4 from the session dir, sent as is.
       const files: Record<string, string> = {};
       for (const spec of config.outputFiles) {
         const localUri = `${session.sessionDir}${spec.name}`;
@@ -262,19 +272,21 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
         state: 'uploaded',
         uploadProgress: 1,
       });
-      // アップロード完了。 durable な clip dir を片付ける (サムネは以後サーバの動画から都度起こす)。
+      // Upload complete. Remove the durable clip dir (thumbnails are regenerated
+      // from the server-side video from now on).
       await cleanupClipDir(session.sessionDir);
       return;
     }
 
-    // ─── 登録済み: 端末側 Pipeline 1 は完了。
+    // ─── registered: nothing more happens on the device.
   } catch (e) {
     dataflowStore.getState().patchClip(clipId, { state: 'error', errorMessage: errMsg(e) });
   }
 }
 
 /**
- * クリップを破棄する (= ローカル削除)。 durable な clip dir も掃除して Documents にゴミを残さない。
+ * Discard a clip (local delete). Also removes the durable clip dir so nothing
+ * lingers under Documents.
  */
 export async function discardClip(clipId: string): Promise<void> {
   const clip = dataflowStore.getState().clips[clipId];

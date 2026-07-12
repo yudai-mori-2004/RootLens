@@ -1,10 +1,11 @@
-// サーバのクリップ一覧取得 (= GET /api/clips)。
+// Fetch the account's clips from the server (GET /api/clips).
 //
-// v0.1.4 では「これまでの撮影時間」 の集計に使う (= uploaded 済みクリップの durationMs 合算)。
-// 一覧 UI そのものはローカル store が真実 (= アップロード待ちのみ表示) なので、
-// この step は統計用の読み取り専用。 アカウントは Bearer token でサーバが決める (task 13)。
+// Used for the "total recorded time" statistic (summing durationMs over
+// uploaded clips). The clip list UI itself trusts the local store (it only
+// shows clips waiting to upload), so this step is a read-only side channel.
+// The account comes from the Bearer token on the server side.
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+// ⚠ Dataflow layer: must not import react / react-native.
 
 import { SERVER_URL } from '../../env';
 import { getAuthHeader } from '../../services/auth/instance';
@@ -22,8 +23,8 @@ export async function fetchMyClips(): Promise<ServerClipStatus[]> {
   return clips;
 }
 
-/** 履歴再生用: クリップの rgb.mp4 presigned GET URL を取得する (= R2 からストリーミング再生)。
- *  識別子は content_hash。 */
+/** For history playback: fetch a presigned GET URL for the clip's rgb.mp4
+ *  (streams straight from R2). The identifier is the content hash. */
 export async function fetchClipMediaUrl(contentHash: string): Promise<string> {
   const res = await fetch(`${SERVER_URL}/api/clips/${contentHash}/media`, {
     headers: await getAuthHeader(),

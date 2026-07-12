@@ -1,10 +1,11 @@
-// Pipeline 1 step: R2 アップロード (DATA_SPECS §2.4)。
+// Upload step: PUT the recording's files to R2.
 //
-// content_hash + 撮影構成を /api/v1/raw-uploads に投げて presigned PUT URL を取得し、
-// 撮影構成が出力したファイル群を raw/<content_hash>/ に並列 PUT する。
-// アップロード先バケットは構成でサーバが決める (= arkit → raw-arkit)。
+// POST the content hash + recording config to /api/v1/raw-uploads to get
+// presigned PUT URLs, then send the recording config's output files under
+// raw/<content_hash>/. The server derives the target bucket from the config
+// (arkit → the raw ARKit bucket).
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+// ⚠ Dataflow layer: must not import react / react-native.
 
 import * as FileSystem from 'expo-file-system';
 
@@ -39,10 +40,11 @@ async function requestPresignedUrls(
   return (await res.json()) as PresignResponse;
 }
 
-// R2 は大きい単発 PUT で一過性の 500 InternalError を返すことがある (2026-07-11 実測)。
-// 5xx とネットワーク断は自動リトライし、 4xx (= presign 失効・contract 不一致) は即座に諦めて
-// 外側の手動リトライ (= presign 再発行から) に委ねる。 単発 PUT は途中再開できないので、
-// リトライはそのファイルの送り直しになる。
+// R2 occasionally answers a large single-shot PUT with a transient 500
+// InternalError (observed in production). 5xx and network drops are retried
+// automatically; 4xx (expired presign, contract mismatch) gives up immediately
+// and defers to the user-level retry, which starts over from a fresh presign.
+// A single-shot PUT cannot resume midway, so each retry resends the whole file.
 const MAX_PUT_ATTEMPTS = 4;
 const PUT_RETRY_DELAYS_MS = [2_000, 5_000, 15_000];
 
@@ -80,7 +82,7 @@ async function putWithRetry(
     if (res && res.status >= 200 && res.status < 300) return;
     if (res) {
       lastErr = new Error(`R2 PUT ${name} ${res.status}: ${res.body?.slice(0, 200) ?? ''}`);
-      if (res.status < 500) break; // 4xx はリトライ無意味
+      if (res.status < 500) break; // retrying a 4xx is pointless
     }
     if (attempt < MAX_PUT_ATTEMPTS) {
       const wait = PUT_RETRY_DELAYS_MS[attempt - 1];
@@ -96,13 +98,14 @@ async function putWithRetry(
 }
 
 /**
- * content_hash の presigned URL を取得し、 files マップ (= 名前 → ローカル URI) を R2 に並列 PUT。
- * presigned に存在しない名前のファイルが渡された場合は fail-loud (= 構成と server contract のズレ検出)。
+ * Get presigned URLs for the content hash and PUT the files map (name → local
+ * URI) to R2. A file whose name has no presigned URL fails loudly, which is how
+ * a drift between the recording config and the server contract gets caught.
  */
 export async function uploadToR2(
   input: UploadInput,
   sink: EventSink,
-  /** 実バイト進捗 (0..1、 全ファイル合計)。 UI のプログレスバーを滑らかにするため。 */
+  /** Real byte progress (0..1 across all files), to keep the UI progress bar smooth. */
   onProgress?: (fraction: number) => void,
 ): Promise<UploadResult> {
   sink({ step: 'r2-upload', level: 'info', message: `presigned URL を取得 (構成 ${input.recordingConfig})` });
@@ -110,7 +113,7 @@ export async function uploadToR2(
 
   const names = Object.keys(input.files);
 
-  // 進捗を実バイトで出すため、 先に全ファイルの合計サイズを測る。
+  // Measure every file first so progress can be reported in real bytes.
   const sizes: Record<string, number> = {};
   let totalBytes = 0;
   for (const name of names) {
@@ -127,14 +130,17 @@ export async function uploadToR2(
     message: `${names.length} ファイルを順次 PUT${presigned.bucket ? ` → ${presigned.bucket}` : ''} (${(totalBytes / 1e9).toFixed(1)} GB)`,
   });
 
-  // ⚠ 逐次 + foreground セッションで送る (2026-07-07 実測で確定した OOM 対策)。
-  //   既定の background セッションは、 タスク起動時に iOS がファイルを nsurlsessiond の
-  //   コンテナへコピーする。 大容量 (rgb 4GB + depth 数 GB …) を並列 (Promise.all) で 7 本
-  //   同時起動すると、 このコピーが一斉に走ってメモリが数百 MB → 3.7GB に瞬時に跳ね jetsam kill。
-  //   foreground はファイルから直接ストリーム (コピーなし) なので、 1 本ずつ順に送ればメモリは平坦。
-  //   代償: 送信中はアプリを foreground に保つ必要がある (background に落ちると reject)。
-  //   createUploadTask は uploadAsync と違い送信バイトの進捗コールバックを持つので、 これでバー
-  //   を滑らかにする (= 一番長いアップロード区間が飛び飛びにならない)。
+  // ⚠ Send sequentially over a foreground session; this is an OOM fix confirmed
+  //   on real devices. With the default background session, iOS copies each file
+  //   into the nsurlsessiond container when the task starts. Launching several
+  //   multi-GB uploads in parallel (a 4 GB rgb.mp4 plus a similar depth.tar and
+  //   friends) makes those copies run at once and memory jumps from a few
+  //   hundred MB to ~3.7 GB, at which point jetsam kills the app. A foreground
+  //   session streams straight from the file with no copy, so sending one file
+  //   at a time keeps memory flat. The trade-off: the app must stay foregrounded
+  //   while sending (backgrounding rejects the task). createUploadTask, unlike
+  //   uploadAsync, has a sent-bytes callback, which keeps the bar smooth through
+  //   the longest span of the upload.
   const uploadedKeys: string[] = [];
   let sentBytes = 0;
   for (const name of names) {

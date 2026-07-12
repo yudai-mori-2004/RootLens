@@ -1,11 +1,11 @@
-// dataflow の状態ストア (Zustand vanilla)。
+// State store for the dataflow layer (Zustand vanilla).
 //
-// クリップコレクション・録画ライフサイクル・イベントログを一元管理する Layer 1 の単一の真実。
-// vanilla store なので React に依存しない (= React 外の step / orchestrator からも触れる)。
-// React 側は UI 層の hooks (src/clips/hooks.ts) が useStore(dataflowStore, selector) で購読する。
+// The single source of truth for the clip collection, the recording lifecycle,
+// and the event log. Being a vanilla store it has no React dependency, so
+// steps and orchestrators outside React can read and write it too. The UI
+// subscribes through hooks (src/clips/hooks.ts) via useStore(dataflowStore, selector).
 //
-//
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない (zustand/vanilla は React 非依存)。
+// ⚠ Dataflow layer: must not import react / react-native (zustand/vanilla is React-free).
 
 import { createStore } from 'zustand/vanilla';
 
@@ -13,51 +13,51 @@ import { makeEvent, type DataflowEvent, type DataflowEventInput, type EventSink 
 import type { Clip } from './types';
 import type { RecordingSession } from './recording-configs';
 
-/** 録画ライフサイクル。 */
+/** Recording lifecycle. */
 export type RecordingPhase =
-  | 'idle'            // session 未開始
-  | 'session-active'  // プレビュー稼働、 録画前
-  | 'recording'       // 録画中
-  | 'recorded';       // 録画停止済み、 Pipeline 1 未投入
+  | 'idle'            // no session yet
+  | 'session-active'  // preview running, not recording
+  | 'recording'       // recording
+  | 'recorded';       // stopped, not yet handed to the upload pipeline
 
 const MAX_EVENTS = 500;
 
 let localIdSeq = 0;
-/** 端末発番のローカル clip id (= hash 完了で content_hash へ renameClipId する)。 */
+/** Device-issued local clip id (renamed to the content hash via renameClipId once hashing completes). */
 export function makeLocalClipId(): string {
   localIdSeq += 1;
   return `local_${Date.now().toString(36)}_${localIdSeq.toString(36)}`;
 }
 
 export interface DataflowState {
-  // ─── 録画セッションのライフサイクル (= 同時に 1 つ) ──────────────────
+  // ─── Recording session lifecycle (one at a time) ────────────────────
   recording: RecordingPhase;
   configId: string | null;
   session: RecordingSession | null;
 
-  // ─── クリップコレクション (= 複数、 単一の真実) ──────────────────────
+  // ─── Clip collection (many; the single source of truth) ─────────────
   clips: Record<string, Clip>;
-  /** 録画 → P1 で進行中のクリップ id (= 撮影画面 / sandbox の進行表示対象)。 */
+  /** Id of the clip currently moving through recording → upload (what progress UIs watch). */
   currentClipId: string | null;
 
-  /** 実行中アクションのラベル (= ボタン二度押し防止 + スピナー表示)。 null なら待機。 */
+  /** Label of the action in flight (blocks double taps, drives spinners). null when idle. */
   busy: string | null;
   events: DataflowEvent[];
 
-  // ─── 録画 actions ───────────────────────────────────────────────────
+  // ─── Recording actions ───────────────────────────────────────────────
   setRecording(phase: RecordingPhase): void;
   setSession(session: RecordingSession | null): void;
   setConfigId(id: string | null): void;
 
-  // ─── クリップコレクション actions ────────────────────────────────────
+  // ─── Clip collection actions ─────────────────────────────────────────
   upsertClip(clip: Clip): void;
   patchClip(id: string, patch: Partial<Clip>): void;
   removeClip(id: string): void;
-  /** local id → content_hash へ key を貼り替える (= hash 完了で identity 誕生)。 */
+  /** Re-key a clip from its local id to the content hash (identity is born when hashing completes). */
   renameClipId(localId: string, contentHash: string): void;
-  /** 永続化アダプタからの一括 hydrate (= 起動時に保存済みクリップを流し込む)。 */
+  /** Bulk hydrate from the persistence adapter (pours saved clips in at startup). */
   replaceClips(clips: Clip[]): void;
-  /** 進行表示対象のクリップ id を設定する。 */
+  /** Set which clip progress UIs should watch. */
   setCurrentClipId(id: string | null): void;
 
   // ─── events / busy ──────────────────────────────────────────────────
@@ -65,9 +65,9 @@ export interface DataflowState {
   clearEvents(): void;
   setBusy(label: string | null): void;
 
-  /** 進行中クリップの追跡だけ解除する (= 新しい録画を撮るとき用、 コレクションは残す)。 */
+  /** Stop tracking the in-flight clip only (for starting a new recording; the collection stays). */
   resetCurrent(): void;
-  /** 全リセット (= sandbox の「リセット」)。 */
+  /** Full reset (the dev sandbox's "reset" button). */
   reset(): void;
 }
 
@@ -136,27 +136,27 @@ export const dataflowStore = createStore<DataflowState>((set, get) => ({
   reset() { set({ ...INITIAL, clips: {}, events: [] }); },
 }));
 
-// ─── selectors (= 純粋。 UI 層 hooks から useMemo 越しに使う) ──────────────
+// ─── Selectors (pure; UI hooks wrap them in useMemo) ───────────────────
 
-/** クリップ一覧 (= 新しい順)。 呼び出し側は s.clips を dep にした useMemo で包むこと。 */
+/** Clip list, newest first. Callers should memoize with s.clips as the dependency. */
 export function clipList(clips: Record<string, Clip>): Clip[] {
   return Object.values(clips).sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/** id でクリップを引く (= 無ければ null)。 */
+/** Look up a clip by id (null when absent). */
 export function selectClip(state: DataflowState, id: string | null | undefined): Clip | null {
   if (!id) return null;
   return state.clips[id] ?? null;
 }
 
-/** 進行中クリップ (= currentClipId が指すもの)。 */
+/** The in-flight clip (whatever currentClipId points at). */
 export function selectCurrentClip(state: DataflowState): Clip | null {
   return state.currentClipId ? state.clips[state.currentClipId] ?? null : null;
 }
 
 /**
- * store にイベントを流し込む EventSink。 step / orchestrator にこれを渡す。
- * console にもミラーしたい場合は events.ts の teeToConsole で包む。
+ * EventSink that appends into the store. Hand this to steps / orchestrators.
+ * Wrap it with teeToConsole from events.ts to also mirror to the console.
  */
 export const storeEventSink: EventSink = (e) => {
   dataflowStore.getState().appendEvent(e);

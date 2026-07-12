@@ -1,15 +1,16 @@
-// dataflow 層 (Layer 1) の公開 API。
+// Public API of the dataflow layer.
 //
-// UI (Layer 3) はここから import する。 React binding は含まない (= 純粋データ層)。
-// React からの購読は zustand の useStore(dataflowStore, selector) を UI 層で行う。
+// The UI imports from here. No React bindings are included (this is a pure data
+// layer); React subscribes via zustand's useStore(dataflowStore, selector) in
+// the UI layer.
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+// ⚠ Dataflow layer: must not import react / react-native.
 
-// 型
+// Types
 export type {
   Clip,
   ClipState,
-  Pipeline1Stage,
+  UploadStage,
   ServerClipStatus,
   HashInput,
   HashResult,
@@ -19,11 +20,11 @@ export type {
   RegisterResult,
 } from './types';
 
-// イベント
+// Events
 export type { DataflowEvent, DataflowEventInput, EventSink, EventLevel } from './events';
 export { makeEvent, noopSink, teeToConsole } from './events';
 
-// 撮影構成
+// Recording configs
 export type {
   RecordingConfig,
   RecordingSession,
@@ -42,7 +43,7 @@ export {
   listAvailableConfigs,
 } from './recording-configs';
 
-// 個別 step
+// Individual steps
 export {
   hashClip,
   computeContentHash,
@@ -52,10 +53,10 @@ export {
   fetchClipMediaUrl,
 } from './steps';
 
-// 段レジューム型ランナー (= 「送る」「もう一度試す」 統一。 撮影 → hash → アップ + 登録)
+// Stage-resumable upload runner (shared by "upload" and "try again": record → hash → upload + register)
 export { enqueueRecording, advanceClip, discardClip, recoverOrphanRecordings } from './pipeline';
 
-// store
+// Store
 export {
   dataflowStore,
   storeEventSink,

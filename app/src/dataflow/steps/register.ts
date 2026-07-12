@@ -1,10 +1,11 @@
-// Pipeline 1 step: サーバ登録 (DATA_SPECS §2.5)。
+// Upload step: register the clip with the server.
 //
-// v0.1.4: POST /api/clips でクリップ行を作るだけ。 R2 アップロード完了後に呼ぶ。
-// 所有者は Bearer token の sub でサーバが決める (task 13)。 同意イベント id も
-// ここで行に保存される (= クリップ ⇔ 同意証跡の結合)。
+// Creates the clip row with POST /api/clips, called after the R2 upload
+// completes. The server derives the owner from the Bearer token's subject.
+// The consent event id is stored on the row here, which is what ties a clip
+// to its consent record.
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+// ⚠ Dataflow layer: must not import react / react-native.
 
 import { SERVER_URL } from '../../env';
 import { getAuthHeader } from '../../services/auth/instance';

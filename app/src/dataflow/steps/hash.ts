@@ -1,14 +1,16 @@
-// Pipeline 1 step: 生 MP4 の content_hash 計算 (= SHA-256 of raw bytes)。
+// Upload step: compute the clip's content hash (SHA-256 over the raw MP4 bytes).
 //
-// v0.1.4 で C2PA D1 署名を廃止し、 クリップの識別子は「生 mp4 のバイト内容の SHA-256」 に置換。
-// 端末で計算し、 その 64 文字 hex を R2 キー / DB PK として使う。
+// The 64-char hex is the clip's identity everywhere: the R2 object key prefix
+// and the server DB primary key. It is computed on the device.
 //
-// 計算は 2 経路:
-//   1. ネイティブ (ContentHashModule = CryptoKit)。 順次読みで数 GB でも数秒。 これが本線。
-//   2. JS フォールバック (モジュール未搭載ビルド用): 8MB ずつ base64 chunk read →
-//      noble/hashes で incremental update。 OOM しないが Hermes では 1GB あたり数分かかる。
+// Two paths:
+//   1. Native (ContentHashModule, CryptoKit). Sequential reads; a multi-GB file
+//      takes seconds. This is the main path.
+//   2. JS fallback (for builds without the module): read 8 MB base64 chunks and
+//      feed an incremental noble/hashes digest. Never OOMs, but Hermes takes
+//      minutes per GB.
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+// ⚠ Dataflow layer: must not import react / react-native.
 
 import * as FileSystem from 'expo-file-system';
 import { sha256 } from '@noble/hashes/sha256';
@@ -20,10 +22,10 @@ import { nativeSha256File } from '../../native/contentHash';
 
 const HEX64 = /^[0-9a-f]{64}$/;
 
-const CHUNK_BYTES = 8 * 1024 * 1024; // 8 MB。 iOS / Android どちらも余裕。
+const CHUNK_BYTES = 8 * 1024 * 1024; // 8 MB; comfortable on iOS and Android alike.
 
 /**
- * 生 MP4 の SHA-256 を chunked に計算して 64 文字 hex を返す。
+ * Compute the SHA-256 of the raw MP4 in chunks and return the 64-char hex.
  */
 export async function computeContentHash(
   rawMp4Uri: string,
@@ -37,7 +39,7 @@ export async function computeContentHash(
 
   sink({ step: 'content-hash', level: 'info', message: `SHA-256 計算開始 (${(size / 1e6).toFixed(1)} MB)` });
 
-  // ── 本線: ネイティブ計算 (順次読み + CryptoKit) ─────────────────────
+  // ── Main path: native (sequential reads + CryptoKit) ────────────────
   try {
     const nativeHex = await nativeSha256File(rawMp4Uri);
     if (nativeHex != null) {
@@ -51,14 +53,15 @@ export async function computeContentHash(
       });
       return { contentHash: nativeHex, contentSize: size };
     }
-    // null = モジュール未搭載ビルド → JS フォールバックへ
+    // null means the build has no native module; fall through to JS.
   } catch (e) {
-    // ネイティブ計算の失敗は握りつぶさず知らせた上で、 JS 実装で続行する (結果は同一のはず)
+    // Report the native failure rather than swallowing it, then continue with
+    // the JS implementation (the result must be identical).
     const msg = e instanceof Error ? e.message : String(e);
     sink({ step: 'content-hash', level: 'info', message: `ネイティブ計算に失敗、 JS 実装へフォールバック: ${msg}` });
   }
 
-  // ── フォールバック: JS chunked 計算 ─────────────────────────────────
+  // ── Fallback: chunked JS hashing ────────────────────────────────────
   const hasher = sha256.create();
   let read = 0;
   while (read < size) {
@@ -68,7 +71,7 @@ export async function computeContentHash(
       position: read,
       length,
     });
-    // Hermes は atob をグローバル提供する (RN 0.74+)。 追加依存を避けるためこれを使う。
+    // Hermes provides atob globally (RN 0.74+); using it avoids an extra dependency.
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -87,7 +90,7 @@ export async function computeContentHash(
   return { contentHash, contentSize: size };
 }
 
-/** 単発実行用ラッパ。 純粋関数なので tmpDir 等は不要。 */
+/** One-shot wrapper. Pure, so it needs no working directory or other context. */
 export async function hashClip(
   input: HashInput,
   sink: EventSink,

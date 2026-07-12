@@ -1,6 +1,7 @@
-// dataflow steps の re-export。 各 step は単独実行可能な純粋関数。
+// Re-exports of the dataflow steps. Each step is a pure function that can run
+// on its own.
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
+// ⚠ Dataflow layer: must not import react / react-native.
 
 export { hashClip, computeContentHash } from './hash';
 export { uploadToR2 } from './upload';

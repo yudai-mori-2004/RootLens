@@ -1,11 +1,12 @@
-// ARKit 構成 (DATA_SPECS §2.2「ARKit 構成」)。iOS 限定。
+// The ARKit recording config (iOS).
 //
-// ARKit world tracking + 背面 wide camera (1x)。6DoF カメラポーズ・IMU・LiDAR 深度 (Pro 端末のみ) を
-// 同期取得する。超広角構成より画角が狭く発熱が大きい。native は arkit-capture module。
+// ARKit world tracking on the rear wide (1x) camera, capturing RGB video, 6DoF
+// camera poses, IMU, and LiDAR depth (on Pro devices) on a shared clock. The
+// native side lives in the arkit-capture module.
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない。
-//    native module wrapper (../../native/arkitCapture) は内部で react-native を使うが、
-//    ここが import するのは関数 export のみ (= React component は触らない)。
+// ⚠ Dataflow layer: must not import react / react-native. The native wrapper
+//   (../../native/arkitCapture) uses react-native internally, but only its
+//   function exports are imported here (never the React preview component).
 
 import * as FileSystem from 'expo-file-system';
 
@@ -29,14 +30,14 @@ import type {
   RecordingSession,
 } from './types';
 
-// ARKit 構成の出力ファイル (DATA_SPECS §2.2):
-//   rgb.mp4                    wide (1x) RGB 映像 (30 fps)
-//   realtime_handpose.jsonl    手ランドマーク (hands) + カメラポーズ (4×4) + tracking_state + IMU snapshot
-//   imu.jsonl                  加速度 / ジャイロ / デバイスモーション (~100 Hz)
-//   metadata.json              機種 / OS / アプリ版 / カメラ画角・解像度・intrinsics / 構成 ID 等の静的情報
-//   depth.tar                  LiDAR 深度 (Pro 端末のみ)。 native が 16-bit PNG (mm) / フレームを
-//                              1 本の tar に streaming 追記したもの (= RGB-D 標準形式を単一ファイル化)。
-//                              非 LiDAR 機では生成されない → required:false で「あれば上げる」。
+// Files the ARKit config writes into the session dir:
+//   rgb.mp4                    wide (1x) RGB video
+//   realtime_handpose.jsonl    per-frame hand landmarks + camera pose (4×4) + tracking state + IMU snapshot
+//   imu.jsonl                  accelerometer / gyro / device motion (~100 Hz)
+//   metadata.json              static facts: device model, OS, app version, camera FoV / resolution / intrinsics, config id
+//   depth.tar                  LiDAR depth (Pro devices only): one 16-bit PNG (millimeters) per frame,
+//                              stream-appended into a single tar, plus per-frame confidence maps.
+//                              Non-LiDAR devices produce none, hence required:false ("upload when present").
 const OUTPUT_FILES: OutputFileSpec[] = [
   { name: 'rgb.mp4', contentType: 'video/mp4', required: true, isPrimaryVideo: true },
   { name: 'realtime_handpose.jsonl', contentType: 'application/x-ndjson', required: true },
@@ -75,7 +76,7 @@ export const arkitConfig: RecordingConfig = {
 
   async startRecording(sink: EventSink): Promise<RecordingSession> {
     sink({ step: 'record', level: 'info', message: '録画開始 (ARKit)' });
-    // durable な Documents 配下に録画 (= app-kill 後の Pipeline 1 再開のため)。
+    // Record under durable Documents so the upload can resume after an app kill.
     const dirUri = `${FileSystem.documentDirectory}recordings/rec-${Date.now()}/`;
     const dir = await startArkitRecording(dirUri.replace(/^file:\/\//, ''));
     const sessionDir = ensureTrailingSlash(dir);

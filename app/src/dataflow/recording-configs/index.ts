@@ -1,14 +1,14 @@
-// 撮影構成のレジストリ (DATA_SPECS §2.2)。
+// Registry of recording configs.
 //
-// 「プラットフォームごとに利用可能な撮影構成のリストがある」という抽象。
-// 新しいパス (= 例: スマートグラス構成) はいつでも 1 つ差し込めばよい。現状の実体:
+// Each platform declares the list of configs available on it; a new capture rig
+// (smart glasses, ...) plugs in by adding one entry. Currently:
 //   ios     → [arkit]
-//   android → [] (未対応)
-// 旧 ultra_wide 構成 (= LiDAR 非搭載端末向けの超広角パス) は 2026-07-13 に撤去した。
+//   android → [] (unsupported)
 //
-// UI / orchestrator はこのレジストリから構成を選ぶだけで、 native の差異を知らない。
+// UI and orchestrators pick a config from this registry and never see native
+// differences.
 //
-// ⚠ Layer 1 (dataflow)。react / react-native を import しない (= Platform は env から判定)。
+// ⚠ Dataflow layer: must not import react / react-native.
 
 import { arkitConfig } from './arkit';
 import type { RecordingConfig } from './types';
@@ -27,32 +27,32 @@ export type {
 
 export type DevicePlatform = 'ios' | 'android';
 
-/** プラットフォームごとに使える撮影構成のリスト。 新パスはここに 1 つ足すだけ。 */
+/** Configs available per platform. A new rig is one entry here. */
 export const RECORDING_CONFIGS_BY_PLATFORM: Record<DevicePlatform, readonly RecordingConfig[]> = {
   ios: [arkitConfig],
   android: [],
 };
 
-/** 全プラットフォーム横断の構成一覧 (= 重複排除)。 */
+/** All configs across platforms, deduplicated. */
 export const RECORDING_CONFIGS: readonly RecordingConfig[] = Array.from(
   new Set([...RECORDING_CONFIGS_BY_PLATFORM.ios, ...RECORDING_CONFIGS_BY_PLATFORM.android]),
 );
 
-/** 既定の撮影構成 (= v0.1.4: 深度 + 6DoF が取れる arkit)。 */
+/** The default config: arkit, which captures depth and 6DoF poses. */
 export const DEFAULT_RECORDING_CONFIG: RecordingConfig = arkitConfig;
 
 export function getRecordingConfig(id: string): RecordingConfig | undefined {
   return RECORDING_CONFIGS.find((c) => c.id === id);
 }
 
-/** 指定プラットフォームで定義されている構成一覧。 */
+/** Configs defined for a platform. */
 export function configsForPlatform(platform: DevicePlatform): readonly RecordingConfig[] {
   return RECORDING_CONFIGS_BY_PLATFORM[platform];
 }
 
 /**
- * 指定プラットフォームで「定義されていて、 かつ当該端末で実際に使える」構成だけを返す。
- * (= 定義はあるが native 未実装/非対応のものは isAvailable() が false で落ちる)
+ * Configs that are defined for the platform AND actually usable on this device
+ * (defined-but-unsupported ones drop out via isAvailable()).
  */
 export async function listAvailableConfigs(platform: DevicePlatform): Promise<RecordingConfig[]> {
   const defined = configsForPlatform(platform);
