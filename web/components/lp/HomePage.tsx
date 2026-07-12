@@ -132,7 +132,6 @@ export default async function HomePage() {
           <header className={s.sectionHeader}>
             <div className={s.sectionNumber}>§03</div>
             <div>
-              <div className={s.sectionLabel}>{tServices("label")}</div>
               <h2 className={s.sectionTitle}>{tServices("title")}</h2>
             </div>
           </header>

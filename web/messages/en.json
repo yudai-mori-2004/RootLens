@@ -86,8 +86,7 @@
       "p3": "The data that works is produced in the course of everyday operations, on site."
     },
     "services": {
-      "label": "FOR WORKPLACES AND COMPANIES",
-      "title": "Our services"
+      "title": "Services that help the workplace, concretely"
     },
     "appFlow": {
       "label": "SERVICE 01 · FOR EMPLOYERS",
@@ -129,9 +128,9 @@
     },
     "model": {
       "label": "HOW IT WORKS",
-      "title": "Collect, sell, give back as services",
+      "title": "We sell the work data collected on site, and the revenue funds services that help the workplace.",
       "p1": "Work data has buyers. Robotics companies are searching worldwide for training footage. But it is not realistic for a shop or a factory to sell its own data: that takes capture equipment, rights handling, and sales channels.",
-      "p2": "RootLens takes that part on. We sell the work data collected on site to robotics companies and turn its value into services that fit each workplace.",
+      "p2": "RootLens takes that part on.",
       "emphasis": "All we ask of the workplace: keep working as usual."
     },
     "devices": {
