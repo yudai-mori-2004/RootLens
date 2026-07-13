@@ -92,19 +92,20 @@ export const typography = {
   // Title — used for screen headers and card titles
   title: { fontFamily: fonts.serifMedium, fontSize: 20, lineHeight: 26, letterSpacing: -0.2 },
   titleSans: { fontFamily: fonts.sansSemibold, fontSize: 17, lineHeight: 24, letterSpacing: -0.1 },
-  // Body
-  body: { fontFamily: fonts.sansRegular, fontSize: 15, lineHeight: 22 },
-  bodyMedium: { fontFamily: fonts.sansMedium, fontSize: 15, lineHeight: 22 },
+  // Body (= Noto Sans JP は上下の空きが多いので lineHeight を余裕を持たせる)
+  body: { fontFamily: fonts.sansRegular, fontSize: 15, lineHeight: 24 },
+  bodyMedium: { fontFamily: fonts.sansMedium, fontSize: 15, lineHeight: 24 },
   // Caption
-  caption: { fontFamily: fonts.sansRegular, fontSize: 13, lineHeight: 18 },
-  captionMedium: { fontFamily: fonts.sansMedium, fontSize: 13, lineHeight: 18 },
-  // Labels (= セクション見出し / チップ。 LP のドット文字ラベルの文法)
+  caption: { fontFamily: fonts.sansRegular, fontSize: 13, lineHeight: 20 },
+  captionMedium: { fontFamily: fonts.sansMedium, fontSize: 13, lineHeight: 20 },
+  // Labels (= セクション見出し / チップ。 LP のドット文字ラベルの文法。
+  // DotGothic は上下の間延びがあるので lineHeight を fontSize の 1.5 倍以上確保)
   label: {
-    fontFamily: fonts.dot, fontSize: 12, lineHeight: 15,
+    fontFamily: fonts.dot, fontSize: 12, lineHeight: 18,
     letterSpacing: 1.0, textTransform: 'uppercase' as const,
   },
   labelSmall: {
-    fontFamily: fonts.dot, fontSize: 11, lineHeight: 15,
+    fontFamily: fonts.dot, fontSize: 11, lineHeight: 17,
     letterSpacing: 1.1, textTransform: 'uppercase' as const,
   },
   // Mono — readouts, hashes, prices
