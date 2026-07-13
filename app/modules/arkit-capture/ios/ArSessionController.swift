@@ -110,6 +110,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // How many times adaptor.append returned false while recording (diagnostic:
   // did the encoder die mid-recording?).
   private var appendFailCount = 0
+  private var writerFailureLogged = false
   // Pool for copies of capturedImage, so async appends never hold ARKit's
   // recycled buffers. Lazily created from the first frame's resolution and
   // format, released when recording ends.
@@ -311,6 +312,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         AVVideoAverageBitRateKey: 12_000_000,
         AVVideoMaxKeyFrameIntervalKey: 60,
         AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+        AVVideoAllowFrameReorderingKey: false,
       ],
     ]
     // Fragmented MP4 (a moof finalizes every 10 seconds). A regular MP4 only
@@ -490,12 +492,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.pointCloudFileHandle = nil
     self.depthTarWriter = nil
     self.frameIndexCounter = 0
+    self.writerFailureLogged = false
     self.copyPool = nil
     self.copyPoolDims = (0, 0, 0)
 
     if writer.status == .failed {
       // Root cause (AVFoundation code + underlying OSStatus) plus frame count and
-      // free disk, kept for triaging the rare -16341 encoder finalize flake.
+      // free disk, for triaging fragment-boundary encoder failures (-16341 etc.).
       let e = writer.error as NSError?
       let u = e?.userInfo[NSUnderlyingErrorKey] as? NSError
       let diag = "av=\(e.map { "\($0.domain):\($0.code)" } ?? "nil")"
@@ -503,12 +506,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         + " pre=\(preFinishStatus) appFail=\(appendFailCount)"
         + " frames=\(framesWritten) free=\(freeMB)MB"
 
-      // The MP4 is fragmented (movieFragmentInterval = 10s), so even when finalize
-      // fails, everything up to the last fragment is already committed to disk.
+      // The MP4 is fragmented (movieFragmentInterval = 10s), so even when the
+      // writer fails, everything up to the last fragment is committed to disk.
       // If enough frames were written and the file exists, salvage the recording
-      // instead of discarding it: a rare encoder finalize flake must not cost a
-      // long recording. The missing final seconds are absorbed by downstream
-      // re-encoding, and the user previews the clip before uploading anyway.
+      // instead of discarding it. The missing tail is absorbed by downstream
+      // re-encoding, and the user previews the clip before uploading.
       let mp4Path = dir.appendingPathComponent("rgb.mp4").path
       let mp4Size = ((try? FileManager.default.attributesOfItem(atPath: mp4Path))?[.size] as? Int) ?? 0
       if framesWritten > 30, mp4Size > 1_000_000 {
@@ -1175,6 +1177,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       if nextKeepTs <= timestamp { nextKeepTs = timestamp + recTargetInterval } // a long gap must not bank frames
 
       // Skip while the encoder cannot accept input or a stop is in progress (no buffer, no copy).
+      if writer.status == .failed, !writerFailureLogged {
+        writerFailureLogged = true
+        let e = writer.error as NSError?
+        let u = e?.userInfo[NSUnderlyingErrorKey] as? NSError
+        NSLog("[ArkitCaptureController] ⚠ writer died mid-recording: av=%@ under=%@ frames=%d",
+              e.map { "\($0.domain):\($0.code)" } ?? "nil",
+              u.map { "\($0.domain):\($0.code)" } ?? "-",
+              self.frameIndexCounter)
+      }
       guard writer.status == .writing, input.isReadyForMoreMediaData else { return }
 
       // Copy into independent memory here (main thread), while ARKit's buffer is
