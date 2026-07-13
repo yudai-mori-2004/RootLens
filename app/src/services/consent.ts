@@ -7,7 +7,7 @@
 //   - スコープ / チェック結果 / locale / 取得方式 / アプリ・端末情報
 //
 // 記録が成功するまでアップロードを開始しない (= 証跡なしの同意を作らない)。
-// 同意記録の要件は document/v0.1.3/legal/consent-log-spec/ja.md。
+// 同意記録の要件は document/legal/consent-log-spec/ja.md。
 
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';

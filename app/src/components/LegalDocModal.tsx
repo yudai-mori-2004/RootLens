@@ -1,6 +1,6 @@
 // 利用規約 / プライバシーポリシーの全文ビューア。
 //
-// 正本は document/v0.1.3/legal/<doc>/<locale>.md。 ビルド時に scripts/gen-legal.mjs が
+// 正本は document/legal/<doc>/<locale>.md。 ビルド時に scripts/gen-legal.mjs が
 // HTML 化したものを WebView で表示する (= 単一ソース、 オフライン可)。
 // オンボーディング・設定の両方から開ける共通モーダル。
 

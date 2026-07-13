@@ -48,7 +48,7 @@ export const clips = pgTable(
 export type Clip = typeof clips.$inferSelect;
 export type NewClip = typeof clips.$inferInsert;
 
-/// 同意イベントログ (= document/v0.1.3/legal/consent-log-spec/ja.md が正典。
+/// 同意イベントログ (= document/legal/consent-log-spec/ja.md が正典。
 /// task 13 での差分: subject の識別子を pubkey から account_id (uuid) に置換)。
 ///
 /// append-only: 同意・再同意・撤回のたびに 1 行追記する。 UPDATE / DELETE は行わない

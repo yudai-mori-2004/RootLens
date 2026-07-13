@@ -4,7 +4,7 @@ import SiteLayout from "../../components/shared/SiteLayout";
 import { getLegalDoc } from "../../content/legalDocs.generated";
 import s from "../../components/lp/lp.module.css";
 
-// /privacy — 正本 (document/v0.1.3/legal/privacy-policy) を単一ソースとして表示する。
+// /privacy — 正本 (document/legal/privacy-policy) を単一ソースとして表示する。
 // 本文は scripts/gen-legal.mjs が正本 md から生成 (公開向けに内部注記は除外済み)。
 // 言語は next-intl の locale に追従 (ja/en)。レイアウトは他ページと同じ
 // lp.module.css (.page/.section/.sectionHeader) に合わせる。
