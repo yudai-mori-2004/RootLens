@@ -186,7 +186,10 @@ const ja = {
   'history.config': '撮影モード',
   'history.size': '容量',
   'history.device': '撮影した端末',
-  'history.videoUnavailable': '動画を読み込めませんでした。電波の良いところでもう一度お試しください。',
+  'history.videoNotFound': 'この動画はサーバから見つかりませんでした。 削除されているか、まだ処理中の可能性があります。',
+  'history.videoUnauthorized': 'この動画を読み込めませんでした。もう一度ログインしてお試しください。',
+  'history.videoNetwork': '動画を読み込めませんでした。電波の良いところでもう一度お試しください。',
+  'history.videoServer': '動画を読み込めませんでした。しばらく経ってからもう一度お試しください。',
   'upload.deleteTitle': 'この動画を削除しますか？',
   'upload.deleteMessage': '削除した動画は元に戻せません。',
   'upload.deleteConfirm': '削除する',
@@ -216,7 +219,7 @@ const ja = {
   'tab.captureA11y': '撮影モードを開始',
 
   // ── マイビデオ (= 旧 Collection / ポートフォリオ。 主婦向けに平易語) ──
-  // 温かい挨拶 (= 家事感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
+  // 温かい挨拶 (= 作業感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
   'portfolio.mission': 'ロボットが世界を学び、くらしを支えるパートナーになる。その未来を実現するために、あなたの毎日の作業風景が必要です。',
   'portfolio.totalTime': '総撮影時間',
   'portfolio.uploadedLabel': '履歴',
@@ -350,7 +353,10 @@ const en: Record<TranslationKey, string> = {
   'history.config': 'Capture mode',
   'history.size': 'Size',
   'history.device': 'Device',
-  'history.videoUnavailable': 'Could not load the video. Please try again with a better connection.',
+  'history.videoNotFound': 'This video isn\'t available on the server. It may have been deleted or is still being processed.',
+  'history.videoUnauthorized': 'Could not load the video. Please sign in again and try.',
+  'history.videoNetwork': 'Could not load the video. Please try again with a better connection.',
+  'history.videoServer': 'Could not load the video. Please try again in a moment.',
   'upload.deleteTitle': 'Delete this video?',
   'upload.deleteMessage': 'This cannot be undone.',
   'upload.deleteConfirm': 'Delete',

@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { ResizeMode, Video } from 'expo-av';
 
-import { fetchClipMediaUrl, type ServerClipStatus } from '../dataflow';
+import { fetchClipMediaUrl, ClipMediaError, type ServerClipStatus } from '../dataflow';
 import { formatCardDate, formatCardTime, formatDuration, configLabel } from './ClipCard';
 import { useUploadedClipFrame } from '../services/clipFrames';
 import { useT } from '../i18n';
@@ -34,7 +34,7 @@ interface Props {
 export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource, onClose }) => {
   const t = useT();
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [mediaError, setMediaError] = useState(false);
+  const [mediaError, setMediaError] = useState<null | ClipMediaError['kind']>(null);
   // 動画ロード中のつなぎ表示。 履歴タイルが同じ key で解決済みならキャッシュから即返る。
   const frame = useUploadedClipFrame(
     clip ? clip.contentHash : null,
@@ -44,15 +44,17 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
 
   useEffect(() => {
     setMediaUrl(null);
-    setMediaError(false);
+    setMediaError(null);
     if (!visible || !clip) return;
     let cancelled = false;
     (async () => {
       try {
         const url = await fetchClipMediaUrl(clip.contentHash);
         if (!cancelled) setMediaUrl(url);
-      } catch {
-        if (!cancelled) setMediaError(true);
+      } catch (e) {
+        if (cancelled) return;
+        const kind = e instanceof ClipMediaError ? e.kind : 'server';
+        setMediaError(kind);
       }
     })();
     return () => { cancelled = true; };
@@ -86,7 +88,17 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
                 ) : null}
                 <View style={styles.videoOverlay}>
                   {mediaError ? (
-                    <Text style={styles.videoErrorText}>{t('history.videoUnavailable')}</Text>
+                    <Text style={styles.videoErrorText}>
+                      {t(
+                        mediaError === 'not-found'
+                          ? 'history.videoNotFound'
+                          : mediaError === 'unauthorized'
+                            ? 'history.videoUnauthorized'
+                            : mediaError === 'network'
+                              ? 'history.videoNetwork'
+                              : 'history.videoServer',
+                      )}
+                    </Text>
                   ) : (
                     <ActivityIndicator color={colors.paper} />
                   )}
