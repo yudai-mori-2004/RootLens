@@ -25,7 +25,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Polygon } from 'react-native-svg';
 
 import { BrandMark } from '../components/BrandMark';
-import { MarqueeBand } from '../components/MarqueeBand';
 import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import { HistoryDetailModal } from '../components/HistoryDetailModal';
@@ -337,9 +336,6 @@ export const CollectionScreen: React.FC = () => {
 
     </View>
 
-      {/* 下端: LP のマーキー帯 */}
-      <MarqueeBand />
-
       <ClipPreviewModal
         visible={previewTarget !== null}
         clip={previewTarget}
@@ -481,7 +477,7 @@ const GraphPanel: React.FC<{
 
 const ASIDE_WIDTH = 236;
 const HISTORY_TILE_PITCH = 124 + 12; // tile width + historyRow gap
-const CARD_WIDTH = 228;
+const CARD_WIDTH = 260;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
@@ -529,7 +525,7 @@ const styles = StyleSheet.create({
   // ── 右面 ──
   main: {
     flex: 1,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
     gap: spacing.lg,
   },

@@ -18,7 +18,12 @@ export const BrandMark: React.FC<{ size?: number; withWordmark?: boolean }> = ({
       resizeMode="cover"
     />
     {withWordmark ? (
-      <Text style={[styles.wordmark, { fontSize: size * 0.6 }]} numberOfLines={1}>
+      <Text
+        style={[styles.wordmark, { fontSize: size * 0.58 }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
         Root<Text style={styles.wordmarkAccent}>Lens</Text>
       </Text>
     ) : null}
