@@ -1,59 +1,55 @@
-// RootLens design system — "Film Studio" (Dark Cinema).
+// RootLens design system — LP (rootlens.io) の neon zine をアプリに移植した暗室。
 //
-// カメラアプリらしい炭色の闇に、 琥珀のアクセント。 動画サムネイルが一番美しく浮く。
-// 日本語は M PLUS 1、 時刻・尺の読み出しは JetBrains Mono。
-//
-// Aesthetic intent:
-//   • 撮影スタジオの照明を落とした空気 — 主役は映像、 UI は黒子
-//   • hairline は炭上のわずかな明度差、 アクセントは琥珀 1 色
-//   • 数値 (時刻 / 尺 / 容量) は mono で「機材の読み出し」 感を出す
+// ベースは LP と同じ紫黒。 差し色は LP の文法をそのまま使う:
+//   黄 = マーク / 強調 (ワードマークの Lens と同系)
+//   ピンク = 行動 (録画・アップロード・サインイン)
+//   ライム = 進捗・蓄積 (アップロード進捗、 日別グラフ)
+// 日本語は M PLUS 1、 数値の読み出しは DotGothic (= LP のドット文字)、 hash 類は JetBrains Mono。
+// 主役は映像、 UI は黒子 — 面はあくまで紫黒、 色は点で置く。
 
 import { Platform } from 'react-native';
 
 // ── Palette ──────────────────────────────────────────────────────────────
-// Surfaces and chrome. `paper` is the dominant warm cream, `card` is the
-// clean white that floats above it. `inkSoft` is a navy tone for hover/press.
 export const colors = {
-  // Surfaces
-  paper: '#131519',          // dominant charcoal (= スタジオの闇)
-  paperDeep: '#1B1E24',      // inset surface
-  card: '#1C2027',           // raised surface
-  ink: '#F0EDE6',            // primary light text (= warm white)
+  // Surfaces (= LP の #170529 系を端末向けにわずかに沈めた紫黒)
+  paper: '#150B24',          // dominant violet-black
+  paperDeep: '#1D1132',      // inset surface
+  card: '#211539',           // raised surface
+  ink: '#F4F1FA',            // primary light text (= violet-tinted white)
   inkSoft: '#FFFFFF',
-  inkMute: '#B9BDC6',
-  scrim: 'rgba(6, 7, 9, 0.6)',
+  inkMute: '#B9B3CC',
+  scrim: 'rgba(10, 4, 20, 0.6)',
 
   // Text
-  textInk: '#F0EDE6',
-  textBody: '#C7CAD1',
-  textMute: '#878C98',
-  textFaint: '#565B66',
-  textOnInk: '#131519',
+  textInk: '#F4F1FA',
+  textBody: '#C9C3DC',
+  textMute: '#8D86A6',
+  textFaint: '#5C5478',
+  textOnInk: '#150B24',
 
-  // Accent — 琥珀 (= タングステン照明)
-  emerald: '#E8A33D',
-  emeraldDeep: '#C9822A',
-  emeraldSoft: '#33291A',
-  emeraldFaint: '#241F15',
+  // Accent — 黄 (= LP のマーク色。 確定・強調・選択)
+  emerald: '#FFE600',
+  emeraldDeep: '#E8D200',
+  emeraldSoft: '#332D10',
+  emeraldFaint: '#26210D',
 
   // Highlight
-  gold: '#E8B339',
-  goldSoft: '#332B18',
+  gold: '#FFE600',
+  goldSoft: '#332D10',
 
-  // Accent — LP (= rootlens.io の neon zine の差し色。 面ではなく点で使う:
-  // primary CTA = pink、 進捗 = lime、 ワードマークの Lens = yellow)
+  // Accent — LP の残り 2 色 (ピンク = 行動 / ライム = 進捗)
   lpPink: '#FF2E93',
   lpLime: '#C8FF00',
   lpYellow: '#FFE600',
 
   // Borders / hairlines
-  border: '#282C35',
-  borderInk: '#F0EDE6',
-  borderEmerald: '#6B5426',
+  border: '#2E2249',
+  borderInk: '#F4F1FA',
+  borderEmerald: '#8F7F1A',
 
   // Status
-  success: '#57B98A',
-  successSoft: '#1D2B24',
+  success: '#A5E22B',
+  successSoft: '#26320D',
   warn: '#D99A3D',
   warnSoft: '#2F2718',
   danger: '#E05548',
