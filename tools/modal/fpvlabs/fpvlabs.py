@@ -51,7 +51,7 @@ import tarfile
 import tempfile
 import time
 
-PIPELINE_VERSION = "fpvlabs-3"  # v3: 顔検出器を EgoBlur (GPU) に切替。 mediapipe は fallback。
+PIPELINE_VERSION = "fpvlabs-4"  # v4: フレーム数と pose 行数の不一致で fail-loud (タイムスタンプ補外の捏造フォールバック撤去)。 v3: EgoBlur (GPU) 切替。
 
 # ─── EgoBlur (既定) ──────────────────────────────────────────────
 # Stera-10M と同じ検出器 (Meta gen2 EgoBlur、 arXiv:2308.13093)。
@@ -630,11 +630,15 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         # backend=None (ぼかしオフ) や mediapipe (batch_size=1) では実質 1 フレームずつと同じ。
         batch_size = face_backend.batch_size if face_backend is not None else 1
 
+        # RGB フレームのタイムスタンプは jsonl 行とのインデックス 1:1 対応が前提。
+        # 範囲外 = 端末側で行と mp4 フレームがずれた不整合データなので、 捏造せず即失敗する。
         def _timestamp_for(idx: int) -> int:
-            if idx < len(frames_meta):
-                return int(frames_meta[idx]["timestamp_ns"])
-            fps_local = float(cam.get("fps", 30.0)) or 30.0
-            return int(frames_meta[-1]["timestamp_ns"]) + int((idx - len(frames_meta) + 1) * 1e9 / fps_local)
+            if idx >= len(frames_meta):
+                raise RuntimeError(
+                    f"rgb.mp4 has more frames than realtime_handpose.jsonl rows "
+                    f"(frame index {idx} >= {len(frames_meta)} rows); refusing to fabricate timestamps"
+                )
+            return int(frames_meta[idx]["timestamp_ns"])
 
         def _flush_batch(bgr_batch, i_batch):
             # ぼかしを掛けて (or そのまま RGB 化して) JPEG 化 → MCAP 書き込み
@@ -676,6 +680,15 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         finally:
             cap.release()
 
+        # 検品: mp4 のフレーム数と pose 行数は端末側の設計で厳密に一致する。 ずれていたら
+        # RGB のタイムスタンプ / pose 対応が壊れたデータなので、 納品せずここで止める。
+        if i != len(frames_meta):
+            raise RuntimeError(
+                f"frame/pose count mismatch: rgb.mp4 decoded {i} frames but "
+                f"realtime_handpose.jsonl has {len(frames_meta)} rows; "
+                f"RGB timestamps would be misaligned, aborting"
+            )
+
         # ── /camera/depth + /camera/depth/confidence (= depth.tar がある場合のみ) ──
         # tar 内は depth/<idx>.png (16-bit PNG、 mm → 16UC1)。 新しい収録では同じ index の
         # confidence/<idx>.png (= ARKit sceneDepth.confidenceMap、 8-bit で 0=low / 1=medium / 2=high)
@@ -691,7 +704,11 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
                     img = cv2.imdecode(np.frombuffer(buf, np.uint8), cv2.IMREAD_UNCHANGED)
                     if img is None:
                         continue
-                    ts = int(frames_meta[idx]["timestamp_ns"]) if idx < len(frames_meta) else int(frames_meta[-1]["timestamp_ns"])
+                    if idx >= len(frames_meta):
+                        raise RuntimeError(
+                            f"depth.tar entry index {idx} out of range ({len(frames_meta)} pose rows)"
+                        )
+                    ts = int(frames_meta[idx]["timestamp_ns"])
                     h, w = img.shape[:2]
                     if member.name.startswith("confidence/"):
                         if img.dtype != np.uint8:
