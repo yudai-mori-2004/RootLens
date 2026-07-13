@@ -65,7 +65,7 @@
 本番と完全に同一。 テスト用バケットは自分で R2 に作成しておく (例: `rootlens-fpvlabs-scratch`)。
 
 ```
-modal run tools/modal/fpvlabs/fpvlabs.py --content-hash <hash> --target-bucket rootlens-fpvlabs-scratch
+modal run tools/modal/fpvlabs/fpvlabs.py --content-hash <hash> --target-bucket rootlens-public
 ```
 
 結果を rclone や boto3 で落として目視 → 良ければ `--target-bucket` を外して本番に反映。
