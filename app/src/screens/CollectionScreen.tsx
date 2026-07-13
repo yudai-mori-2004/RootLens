@@ -12,6 +12,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   AppState,
   Image,
   type ImageSourcePropType,
@@ -30,7 +31,7 @@ import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import { HistoryDetailModal } from '../components/HistoryDetailModal';
 import {
-  storeEventSink, advanceClip, discardClip, fetchMyClips,
+  storeEventSink, advanceClip, discardClip, fetchMyClips, ClipApiError,
   type Clip, type ServerClipStatus,
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
@@ -134,10 +135,22 @@ function historyDateLabel(iso: string | undefined): string {
 
 const clipsCacheKey = (accountId: string) => `@rootlens/server-clips/v2/${accountId}`;
 
-function useServerClips(accountId: string | null, localUploadedCount: number): ServerClipStatus[] {
+/** サーバ取得の見える状態。 UI はこれで「読み込み中 / 空 / 失敗 / 未ログイン」 を出し分ける。 */
+interface ServerClips {
+  clips: ServerClipStatus[];
+  phase: 'signedOut' | 'loading' | 'ready' | 'error';
+  errorKind: 'network' | 'unauthorized' | 'server' | null;
+  refresh: () => void;
+}
+
+function useServerClips(accountId: string | null, localUploadedCount: number): ServerClips {
   const [clips, setClips] = useState<ServerClipStatus[]>([]);
+  const [phase, setPhase] = useState<ServerClips['phase']>('signedOut');
+  const [errorKind, setErrorKind] = useState<ServerClips['errorKind']>(null);
   const [tick, setTick] = useState(0);
   const prevAccountRef = useRef<string | null>(null);
+
+  const refresh = useCallback(() => setTick((n) => n + 1), []);
 
   // ページは mount しっぱなし (= MainTabs がタブを隠すだけ) なので、 アプリが前面に
   // 戻った時を再取得の合図にする。 これが無いと初回の取得に失敗した画面が回復しない。
@@ -157,8 +170,12 @@ function useServerClips(accountId: string | null, localUploadedCount: number): S
 
     if (!accountId) {
       setClips([]);
+      setPhase('signedOut');
+      setErrorKind(null);
       return;
     }
+    setPhase('loading');
+    setErrorKind(null);
     if (accountChanged) {
       setClips([]); // 前アカウントの表示を残さない
       // キャッシュは「サーバ取得がまだのとき」 だけのつなぎ (= 遅延して届いても新鮮値を潰さない)
@@ -174,13 +191,18 @@ function useServerClips(accountId: string | null, localUploadedCount: number): S
         if (cancelled) return;
         gotFresh = true;
         setClips(fresh);
+        setPhase('ready');
+        setErrorKind(null);
         AsyncStorage.setItem(clipsCacheKey(accountId), JSON.stringify(fresh)).catch(() => {});
       } catch (e) {
-        // 失敗は握りつぶさない: ログを残し、 表示は保持したまま少し待って再試行する
-        // (= ログイン直後や電波の谷で 1 回目が落ちても画面が置き去りにならない)。
+        // 失敗は握りつぶさない: ログに残し、 リトライが尽きたら error として UI に見せる。
         console.warn(`[collection] fetchMyClips failed (attempt ${attempt})`, e);
-        if (!cancelled && attempt < 2) {
+        if (cancelled) return;
+        if (attempt < 2) {
           retryTimer = setTimeout(() => void load(attempt + 1), 4000);
+        } else {
+          setPhase('error');
+          setErrorKind(e instanceof ClipApiError ? (e.kind === 'not-found' ? 'server' : e.kind) : 'server');
         }
       }
     };
@@ -189,10 +211,10 @@ function useServerClips(accountId: string | null, localUploadedCount: number): S
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-    // アカウント切替 / アップロード完了 / フォアグラウンド復帰 で再取得する
+    // アカウント切替 / アップロード完了 / フォアグラウンド復帰 / 手動の再試行 で再取得する
   }, [accountId, localUploadedCount, tick]);
 
-  return clips;
+  return { clips, phase, errorKind, refresh };
 }
 
 const DAY_MS = 86_400_000;
@@ -237,7 +259,8 @@ export const CollectionScreen: React.FC = () => {
     [allClips],
   );
 
-  const serverClips = useServerClips(accountId, localUploadedCount);
+  const server = useServerClips(accountId, localUploadedCount);
+  const serverClips = server.clips;
   const historyScrollRef = React.useRef<ScrollView>(null);
 
   // 履歴 (= uploaded 済み、 新しい順 = サーバ返却順)。 モックは先頭に足す。
@@ -304,9 +327,14 @@ export const CollectionScreen: React.FC = () => {
         </View>
 
         {/* 中央: 合計撮影時間 (= 常時表示)。 数字は素で置き、 ラベル「総撮影時間」 の裏に
-            斜めのテープを敷いて LP の署名を出す。 */}
+            斜めのテープを敷いて LP の署名を出す。 値が確定するまでは -- を出す
+            (= 読み込み前の 0分 と「本当に 0 分」 を混ぜない)。 */}
         <View style={styles.counter}>
-          <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
+          <Text style={styles.counterNumber}>
+            {MOCK_STATS || serverClips.length > 0 || server.phase === 'ready'
+              ? formatTotal(totalMs)
+              : '--'}
+          </Text>
           <View style={styles.counterLabelWrap}>
             <View style={styles.counterTape} />
             <Text style={styles.counterLabel}>{t('portfolio.totalTime')}</Text>
@@ -318,11 +346,11 @@ export const CollectionScreen: React.FC = () => {
 
       {/* ── 右: 履歴 (上) + 待ち or グラフ (下) ── */}
       <View style={styles.main}>
-        {history.length > 0 ? (
-          <View>
-            <View style={styles.pill}>
-              <Text style={styles.pillText}>{t('portfolio.uploadedLabel')}</Text>
-            </View>
+        <View>
+          <View style={styles.pill}>
+            <Text style={styles.pillText}>{t('portfolio.uploadedLabel')}</Text>
+          </View>
+          {history.length > 0 ? (
             <ScrollView
               ref={historyScrollRef}
               horizontal
@@ -343,8 +371,37 @@ export const CollectionScreen: React.FC = () => {
                 </View>
               ))}
             </ScrollView>
-          </View>
-        ) : null}
+          ) : (
+            // サーバの状態を隠さない: 読み込み中 / 通信失敗 (再試行) / 空アカウント / 未ログイン
+            <View style={styles.serverStatusRow}>
+              {server.phase === 'loading' ? (
+                <>
+                  <ActivityIndicator size="small" color={colors.textMute} />
+                  <Text style={styles.serverStatusText}>{t('portfolio.serverLoading')}</Text>
+                </>
+              ) : server.phase === 'error' ? (
+                <>
+                  <Text style={styles.serverStatusText}>
+                    {t(
+                      server.errorKind === 'network'
+                        ? 'portfolio.serverErrorNetwork'
+                        : server.errorKind === 'unauthorized'
+                          ? 'portfolio.serverErrorAuth'
+                          : 'portfolio.serverErrorServer',
+                    )}
+                  </Text>
+                  <Pressable onPress={server.refresh} hitSlop={8}>
+                    <Text style={styles.serverRetry}>{t('portfolio.retry')}</Text>
+                  </Pressable>
+                </>
+              ) : server.phase === 'signedOut' ? (
+                <Text style={styles.serverStatusText}>{t('portfolio.signedOutNote')}</Text>
+              ) : (
+                <Text style={styles.serverStatusText}>{t('portfolio.serverEmpty')}</Text>
+              )}
+            </View>
+          )}
+        </View>
 
         <View style={styles.bottomBlock}>
           {rows.length > 0 ? (
@@ -593,6 +650,24 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-1.5deg' }],
   },
   pillInline: { marginLeft: spacing.xl, marginBottom: 0 },
+  // サーバの取得状態の一行 (= 履歴タイルが無いときにピルの下へ出す)
+  serverStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+  },
+  serverStatusText: {
+    ...typography.caption,
+    color: colors.textMute,
+    flexShrink: 1,
+  },
+  serverRetry: {
+    ...typography.captionMedium,
+    color: colors.lpYellow,
+    textDecorationLine: 'underline',
+  },
   pillText: {
     fontFamily: fonts.sansBold,
     fontSize: 10,

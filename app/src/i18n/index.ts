@@ -226,6 +226,13 @@ const ja = {
   'portfolio.dailyLabel': '毎日の記録',
   'portfolio.pendingNotice': 'データの確認と同意が必要です。',
   'portfolio.recordInvite': '右の丸いボタンから、きょうの作業を撮ってみましょう。',
+  'portfolio.serverLoading': 'サーバから読み込んでいます…',
+  'portfolio.serverEmpty': 'アップロード済みの動画はまだありません。',
+  'portfolio.serverErrorNetwork': '通信できませんでした。電波の良いところで再試行してください。',
+  'portfolio.serverErrorAuth': '読み込みには、もう一度ログインが必要です。',
+  'portfolio.serverErrorServer': 'サーバから読み込めませんでした。しばらくして再試行してください。',
+  'portfolio.retry': '再試行',
+  'portfolio.signedOutNote': 'ログインすると、アカウントの履歴と合計時間が表示されます。',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
@@ -386,12 +393,19 @@ const en: Record<TranslationKey, string> = {
   'tab.captureA11y': 'Start capture mode',
 
   // ── My Videos (= former Collection / Portfolio。 plain language) ──
-  'portfolio.mission': 'Robots will learn the world and become partners in daily life. To make that future real, we need the scenes of your everyday housework.',
+  'portfolio.mission': 'Robots will learn the world and become partners in daily life. To make that future real, we need the scenes of your everyday work.',
   'portfolio.totalTime': 'Total capture time',
   'portfolio.uploadedLabel': 'History',
   'portfolio.dailyLabel': 'Daily record',
   'portfolio.pendingNotice': 'These videos need your review and consent.',
   'portfolio.recordInvite': 'Tap the round button on the right and capture today’s work.',
+  'portfolio.serverLoading': 'Loading from server…',
+  'portfolio.serverEmpty': 'No uploaded videos yet.',
+  'portfolio.serverErrorNetwork': 'Could not connect. Try again with a better signal.',
+  'portfolio.serverErrorAuth': 'Please sign in again to load.',
+  'portfolio.serverErrorServer': 'Could not load from the server. Try again shortly.',
+  'portfolio.retry': 'Retry',
+  'portfolio.signedOutNote': 'Sign in to see this account’s history and total time.',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { ja, en };

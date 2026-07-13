@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { ResizeMode, Video } from 'expo-av';
 
-import { fetchClipMediaUrl, ClipMediaError, type ServerClipStatus } from '../dataflow';
+import { fetchClipMediaUrl, ClipApiError, type ServerClipStatus } from '../dataflow';
 import { formatCardDate, formatCardTime, formatDuration, configLabel } from './ClipCard';
 import { useUploadedClipFrame } from '../services/clipFrames';
 import { useT } from '../i18n';
@@ -34,7 +34,7 @@ interface Props {
 export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource, onClose }) => {
   const t = useT();
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
-  const [mediaError, setMediaError] = useState<null | ClipMediaError['kind']>(null);
+  const [mediaError, setMediaError] = useState<null | ClipApiError['kind']>(null);
   // 動画ロード中のつなぎ表示。 履歴タイルが同じ key で解決済みならキャッシュから即返る。
   const frame = useUploadedClipFrame(
     clip ? clip.contentHash : null,
@@ -53,7 +53,7 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
         if (!cancelled) setMediaUrl(url);
       } catch (e) {
         if (cancelled) return;
-        const kind = e instanceof ClipMediaError ? e.kind : 'server';
+        const kind = e instanceof ClipApiError ? e.kind : 'server';
         setMediaError(kind);
       }
     })();

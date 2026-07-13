@@ -49,7 +49,7 @@ export {
   registerClip,
   fetchMyClips,
   fetchClipMediaUrl,
-  ClipMediaError,
+  ClipApiError,
 } from './steps';
 
 // Stage-resumable upload runner (shared by "upload" and "try again": record → hash → upload + register)
