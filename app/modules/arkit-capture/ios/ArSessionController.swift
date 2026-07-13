@@ -182,6 +182,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var recTargetInterval: Double = 1.0 / 30.0  // keep interval (seconds) = 1 / recordingRate
   private var nextKeepTs: Double = 0                  // earliest timestamp to keep next (0 = nothing kept yet)
   private var recFrameStride = 1        // nominal stride for metadata (sessionFps / recordingRate)
+  private var recordingSessionFps: Double = 30.0  // sensor fps captured at startRecording (for metadata)
   private var depthEveryWritten = 1     // one depth frame per M written frames
   private var pcEveryWritten = 1        // one point cloud per M written frames
   private var recArFrameCounter = 0
@@ -371,6 +372,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
       return 30.0
     }()
+    recordingSessionFps = sessionFps
     // RGB decimates by time: keep frames at the target recordingRate interval (tracks thermal throttling).
     recTargetInterval = 1.0 / Double(max(1, captureSettings.recordingRate))
     nextKeepTs = 0
@@ -752,30 +754,37 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return hands
   }
 
-  /// Write one realtime_handpose.jsonl row (on sensorFileQueue).
-  /// Also writes metadata.json exactly once, on the first frame, when the
-  /// intrinsics have settled.
-  private func writeSensorsLine(frame: ARFrame) {
-    guard let handle = sensorsFileHandle else { return }
-    let frameIndex = frameIndexCounter
-    frameIndexCounter += 1
+  /// Everything one realtime_handpose.jsonl row needs, captured from the ARFrame
+  /// on the delegate thread while the frame is valid. Holding this instead of
+  /// the ARFrame keeps ARKit's pooled camera buffers out of async code; only the
+  /// small depth buffers and the immutable feature-point snapshot ride along
+  /// (the same objects the previous code already passed across queues).
+  private struct FrameRowData {
+    let tsNs: Int64
+    let transformRows: [[Float]]
+    let intrinsics: [Float]
+    let trackingStateInt: Int
+    let trackingReason: String
+    let imu: [String: Any]
+    let imageResolution: CGSize
+    let depthMap: CVPixelBuffer?
+    let confidenceMap: CVPixelBuffer?
+    let depthDims: (w: Int, h: Int)?
+    let pointCloud: ARPointCloud?
+  }
 
+  /// Capture the row data on the delegate thread (the ARFrame must still be valid).
+  private func makeFrameRowData(frame: ARFrame) -> FrameRowData {
     let ts = frame.timestamp
     let t = frame.camera.transform        // simd_float4x4 (= column-major)
     let k = frame.camera.intrinsics       // simd_float3x3
     let trackingPair = describeTrackingState(frame.camera.trackingState)
-    // Row schema:
-    //   timestamp_ns: int (seconds × 1e9)
-    //   tracking_state: int (ARKit enum value; normal = 2)
-    let tsNs: Int64 = Int64(ts * 1_000_000_000.0)
-    let trackingStateInt = arkitTrackingStateInt(frame.camera.trackingState)
 
     // Column-major simd → row-major [[Float; 4]; 4].
     let row0 = [t.columns.0[0], t.columns.1[0], t.columns.2[0], t.columns.3[0]]
     let row1 = [t.columns.0[1], t.columns.1[1], t.columns.2[1], t.columns.3[1]]
     let row2 = [t.columns.0[2], t.columns.1[2], t.columns.2[2], t.columns.3[2]]
     let row3 = [t.columns.0[3], t.columns.1[3], t.columns.2[3], t.columns.3[3]]
-    let transformRows: [[Float]] = [row0, row1, row2, row3]
 
     // Row-major 3×3 flattened to 9 elements.
     let intr: [Float] = [
@@ -786,9 +795,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
     // IMU snapshot (latest CMDeviceMotion), same schema as imu.jsonl:
     //   accel = userAccel + gravity, gyro = rotationRate.
-    let mot = motionManager.deviceMotion
     let imuDict: [String: Any]
-    if let m = mot {
+    if let m = motionManager.deviceMotion {
       imuDict = [
         "accel": [
           "x": m.userAcceleration.x + m.gravity.x,
@@ -801,14 +809,48 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       imuDict = [:]
     }
 
+    let depth = frame.sceneDepth
+    let depthDims: (w: Int, h: Int)? = depth.map {
+      (CVPixelBufferGetWidth($0.depthMap), CVPixelBufferGetHeight($0.depthMap))
+    }
+
+    return FrameRowData(
+      tsNs: Int64(ts * 1_000_000_000.0),
+      transformRows: [row0, row1, row2, row3],
+      intrinsics: intr,
+      trackingStateInt: arkitTrackingStateInt(frame.camera.trackingState),
+      trackingReason: trackingPair.reason,
+      imu: imuDict,
+      imageResolution: frame.camera.imageResolution,
+      depthMap: depth?.depthMap,
+      confidenceMap: depth?.confidenceMap,
+      depthDims: depthDims,
+      pointCloud: frame.rawFeaturePoints
+    )
+  }
+
+  /// Write one realtime_handpose.jsonl row plus the depth / point-cloud entries
+  /// that share its frame index. Called on frameQueue, strictly after the
+  /// matching video frame was appended to the mp4: the converter pairs mp4
+  /// frames with rows by index, so a row whose frame never made it into the
+  /// video would silently shift every later RGB timestamp.
+  /// Also writes metadata.json exactly once, on the first row.
+  private func writeSensorsLine(_ row: FrameRowData) {
+    guard let handle = sensorsFileHandle else { return }
+    let frameIndex = frameIndexCounter
+    frameIndexCounter += 1
+
+    // Row schema:
+    //   timestamp_ns: int (seconds × 1e9)
+    //   tracking_state: int (ARKit enum value; normal = 2)
     let line: [String: Any] = [
       "frame_index": frameIndex,
-      "timestamp_ns": tsNs,
-      "tracking_state": trackingStateInt,
-      "tracking_reason": trackingPair.reason,
-      "camera_transform": transformRows,
-      "camera_intrinsics": intr,
-      "imu": imuDict,
+      "timestamp_ns": row.tsNs,
+      "tracking_state": row.trackingStateInt,
+      "tracking_reason": row.trackingReason,
+      "camera_transform": row.transformRows,
+      "camera_intrinsics": row.intrinsics,
+      "imu": row.imu,
       "hands": buildHandsArray(),  // latest HandTracker output
     ]
 
@@ -826,9 +868,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // Write metadata.json once, on the first frame.
+    // Write metadata.json once, on the first row.
     if frameIndex == 0, let dir = sessionDirURL {
-      writeMetadataJson(into: dir, frame: frame)
+      writeMetadataJson(into: dir, row: row)
     }
 
     // LiDAR depth (devices with sceneDepth only). Each frame becomes a standard
@@ -840,12 +882,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // consumer can mask low-confidence pixels. When the depth rate is set below
     // the RGB rate, decimation counts written frames (the index stays shared
     // with the jsonl).
-    if let sceneDepth = frame.sceneDepth, sessionDirURL != nil, frameIndex % depthEveryWritten == 0 {
-      let buffer = sceneDepth.depthMap
-      let confBuffer = sceneDepth.confidenceMap
+    if let depthMap = row.depthMap, frameIndex % depthEveryWritten == 0 {
+      let confBuffer = row.confidenceMap
       let idx = frameIndex
       sensorFileQueue.async {
-        self.depthTarWriter?.append(depthMap: buffer, confidenceMap: confBuffer, frameIndex: idx)
+        self.depthTarWriter?.append(depthMap: depthMap, confidenceMap: confBuffer, frameIndex: idx)
       }
     }
 
@@ -854,7 +895,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // Coordinates are in world space, so accumulating rows yields a map.
     if let pcHandle = pointCloudFileHandle,
        frameIndex % pcEveryWritten == 0,
-       let cloud = frame.rawFeaturePoints,
+       let cloud = row.pointCloud,
        !cloud.points.isEmpty {
       var pts = [Float]()
       pts.reserveCapacity(cloud.points.count * 3)
@@ -866,7 +907,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       let idsData = ids.withUnsafeBufferPointer { Data(buffer: $0) }
       let pcLine: [String: Any] = [
         "frame_index": frameIndex,
-        "timestamp_ns": tsNs,
+        "timestamp_ns": row.tsNs,
         "count": cloud.points.count,
         "points_b64": ptsData.base64EncodedString(),
         "ids_b64": idsData.base64EncodedString(),
@@ -933,17 +974,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   /// settings), with the camera intrinsics (fx/fy/cx/cy) and, on LiDAR devices,
   /// the depth intrinsics. calibration_baseline is reserved for the capture UI's
   /// calibration step and stays null here.
-  private func writeMetadataJson(into dir: URL, frame: ARFrame) {
+  private func writeMetadataJson(into dir: URL, row: FrameRowData) {
     let url = dir.appendingPathComponent("metadata.json")
-    let k = frame.camera.intrinsics
-    let res = frame.camera.imageResolution
-    let fps: Double = {
-      if let cfg = session.configuration as? ARWorldTrackingConfiguration {
-        return Double(cfg.videoFormat.framesPerSecond)
-      }
-      return 30.0
-    }()
-    let fx = k.columns.0[0]
+    // Row-major flat intrinsics: [fx 0 cx / 0 fy cy / 0 0 1].
+    let fx = row.intrinsics[0]
+    let fy = row.intrinsics[4]
+    let cx = row.intrinsics[2]
+    let cy = row.intrinsics[5]
+    let res = row.imageResolution
+    let fps = recordingSessionFps
     // Horizontal FoV (degrees) = 2·atan(width / (2·fx))
     let fovDeg = res.width > 0 && fx > 0
       ? Double(2.0 * atan(Float(res.width) / (2.0 * fx)) * 180.0 / .pi)
@@ -958,18 +997,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "width": Int(res.width),
       "height": Int(res.height),
       "fps": fps,
-      "fx": fx, "fy": k.columns.1[1], "cx": k.columns.2[0], "cy": k.columns.2[1],
+      "fx": fx, "fy": fy, "cx": cx, "cy": cy,
     ]
-    // On LiDAR devices, include the depth resolution and intrinsics (only when ARFrame.sceneDepth exists).
-    if let depth = frame.sceneDepth {
-      let dW = CVPixelBufferGetWidth(depth.depthMap)
-      let dH = CVPixelBufferGetHeight(depth.depthMap)
+    // On LiDAR devices, include the depth resolution and intrinsics.
+    if let (dW, dH) = row.depthDims {
       let sx = Float(dW) / Float(res.width)
       let sy = Float(dH) / Float(res.height)
       camera["depth"] = [
         "width": dW, "height": dH,
-        "fx": k.columns.0[0] * sx, "fy": k.columns.1[1] * sy,
-        "cx": k.columns.2[0] * sx, "cy": k.columns.2[1] * sy,
+        "fx": fx * sx, "fy": fy * sy,
+        "cx": cx * sx, "cy": cy * sy,
       ]
     }
 
@@ -1136,8 +1173,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       guard timestamp >= nextKeepTs - recTargetInterval * 0.25 else { return }
       nextKeepTs += recTargetInterval
       if nextKeepTs <= timestamp { nextKeepTs = timestamp + recTargetInterval } // a long gap must not bank frames
-      // realtime_handpose.jsonl gets one row per written frame; frame_index stays aligned with the RGB frames.
-      self.writeSensorsLine(frame: frame)
 
       // Skip while the encoder cannot accept input or a stop is in progress (no buffer, no copy).
       guard writer.status == .writing, input.isReadyForMoreMediaData else { return }
@@ -1150,11 +1185,20 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       if self.recordingStartTime == .invalid { self.recordingStartTime = pts }
       let adjPts = CMTimeSubtract(pts, self.recordingStartTime)
 
+      // Snapshot everything the sensor row needs while the frame is valid. The
+      // row is written only after the video append succeeds (below), so
+      // realtime_handpose.jsonl rows and mp4 frames stay strictly 1:1. A row
+      // without its frame would silently shift every later RGB timestamp in the
+      // delivered data, so a dropped frame must also drop its row.
+      let rowData = self.makeFrameRowData(frame: frame)
+
       frameQueue.async { [weak self] in
         guard let self = self else { return }
         // No appends once stopping has begun (the authoritative gate; the flag is set on frameQueue, so ordering is guaranteed).
         guard !self.finishingWriter, writer.status == .writing, input.isReadyForMoreMediaData else { return }
-        if !adaptor.append(copy, withPresentationTime: adjPts) {
+        if adaptor.append(copy, withPresentationTime: adjPts) {
+          self.writeSensorsLine(rowData)
+        } else {
           self.appendFailCount += 1
           NSLog("[ArkitCaptureController] adaptor.append failed (#%d): status=%ld error=%@",
                 self.appendFailCount, Int(writer.status.rawValue), Self.describeNSError(writer.error))
