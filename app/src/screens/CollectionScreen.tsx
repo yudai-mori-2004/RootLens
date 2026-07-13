@@ -34,7 +34,7 @@ import {
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
 import { useUploadedClipFrame } from '../services/clipFrames';
-import { getCurrentSession } from '../services/auth/instance';
+import { useAuth } from '../services/auth';
 import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
 
@@ -127,32 +127,37 @@ function historyDateLabel(iso: string | undefined): string {
 }
 
 // ─── サーバのクリップ一覧 (= 履歴 + 統計の元データ) ─────────────────────
-// AsyncStorage にキャッシュしてオフラインでも即表示。 バックグラウンドで更新する。
+// 2 層モデル: 履歴・合計時間・グラフは「いまログインしているアカウントのサーバデータ」 だけ。
+// ローカルのアップロード待ちは端末共通の層で、 アカウントには属さない (= アップロードの瞬間に
+// 初めて紐づく)。 だからキャッシュもアカウント別に持ち、 切替時は即座に載せ替える。
 
-const CLIPS_CACHE_KEY = '@rootlens/server-clips/v1';
+const clipsCacheKey = (accountId: string) => `@rootlens/server-clips/v2/${accountId}`;
 
-function useServerClips(localUploadedCount: number): ServerClipStatus[] {
+function useServerClips(accountId: string | null, localUploadedCount: number): ServerClipStatus[] {
   const [clips, setClips] = useState<ServerClipStatus[]>([]);
 
   useEffect(() => {
     let cancelled = false;
+    if (!accountId) {
+      setClips([]);
+      return;
+    }
+    setClips([]); // 前アカウントの表示を残さない (= キャッシュ読み込みまでの一瞬も)
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(CLIPS_CACHE_KEY);
+        const raw = await AsyncStorage.getItem(clipsCacheKey(accountId));
         if (raw && !cancelled) setClips(JSON.parse(raw) as ServerClipStatus[]);
       } catch {}
       try {
-        const session = getCurrentSession();
-        if (!session) return;
         const fresh = await fetchMyClips();
         if (cancelled) return;
         setClips(fresh);
-        AsyncStorage.setItem(CLIPS_CACHE_KEY, JSON.stringify(fresh)).catch(() => {});
+        AsyncStorage.setItem(clipsCacheKey(accountId), JSON.stringify(fresh)).catch(() => {});
       } catch {}
     })();
     return () => { cancelled = true; };
-    // アップロード完了のタイミングで再取得する
-  }, [localUploadedCount]);
+    // アカウント切替とアップロード完了のタイミングで再取得する
+  }, [accountId, localUploadedCount]);
 
   return clips;
 }
@@ -176,6 +181,8 @@ export const CollectionScreen: React.FC = () => {
   const t = useT();
   const insets = useSafeAreaInsets();
   const allClips = useClips();
+  const { state: authState } = useAuth();
+  const accountId = authState.status === 'authenticated' ? authState.session.accountId : null;
 
   // 扉カラムの時計 (= 30 秒ごとに更新)
   const [nowMs, setNowMs] = useState(Date.now());
@@ -197,7 +204,7 @@ export const CollectionScreen: React.FC = () => {
     [allClips],
   );
 
-  const serverClips = useServerClips(localUploadedCount);
+  const serverClips = useServerClips(accountId, localUploadedCount);
   const historyScrollRef = React.useRef<ScrollView>(null);
 
   // 履歴 (= uploaded 済み、 新しい順 = サーバ返却順)。 モックは先頭に足す。
@@ -209,18 +216,14 @@ export const CollectionScreen: React.FC = () => {
     [serverClips],
   );
 
-  // 合計撮影時間 = サーバ uploaded 分 + ローカル待ち分
+  // 合計撮影時間 = アカウントのサーバ uploaded 分だけ (= ローカル待ちは端末の層なので混ぜない)
   const uploadedTotalMs = useMemo(
     () => serverClips.reduce((sum, c) => sum + (c.durationMs ?? 0), 0),
     [serverClips],
   );
-  const pendingMs = useMemo(
-    () => rows.reduce((sum, r) => sum + (r.clip.durationMs ?? 0), 0),
-    [rows],
-  );
-  const totalMs = (MOCK_STATS ? 11_460_000 : uploadedTotalMs) + pendingMs;
+  const totalMs = MOCK_STATS ? 11_460_000 : uploadedTotalMs;
 
-  // 日別グラフ用: サーバ uploaded 分にローカル待ち分も足す
+  // 日別グラフもアカウントのサーバデータだけで描く
   const mergedDaily = useMemo(() => {
     const d: Record<string, number> = {};
     for (const c of serverClips) {
@@ -229,16 +232,12 @@ export const CollectionScreen: React.FC = () => {
       const k = dayKey(c.createdAt);
       d[k] = (d[k] ?? 0) + ms;
     }
-    for (const r of rows) {
-      const ms = r.clip.durationMs ?? 0;
-      if (ms <= 0) continue;
-      const k = dayKey(r.clip.createdAt);
-      d[k] = (d[k] ?? 0) + ms;
-    }
     return d;
-  }, [serverClips, rows]);
+  }, [serverClips]);
 
-  const [previewTarget, setPreviewTarget] = useState<Clip | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<Clip | null>(
+    DESIGN_PREVIEW ? (MOCKS[0].clip as Clip) : null,
+  );
   const [historyTarget, setHistoryTarget] = useState<{ clip: ServerClipStatus; source?: ImageSourcePropType } | null>(null);
   // グラフで選択中の日 (= バーtap)。 履歴の該当日タイルもハイライトされる。
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -490,12 +489,12 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.textMute,
   },
-  counter: { gap: 2 },
+  counter: { gap: 4 },
+  // 合計時間は LP のドット文字で「機材の読み出し」 に (= DotGothic は日本語グリフも持つ)
   counterNumber: {
-    fontFamily: fonts.serifLight,
-    fontSize: 38,
-    lineHeight: 44,
-    letterSpacing: -1,
+    fontFamily: fonts.dot,
+    fontSize: 34,
+    lineHeight: 40,
     color: colors.ink,
   },
   counterLabel: {
@@ -580,7 +579,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.sm,
   },
-  chartScroll: { flexGrow: 0 },
+  // 横 ScrollView は中身の高さに追従せず縦に膨らむことがあるので、 高さを明示して固定する
+  chartScroll: { flexGrow: 0, height: 150 },
   chart: {
     alignItems: 'flex-end',
     gap: 7,
@@ -599,8 +599,8 @@ const styles = StyleSheet.create({
     width: '100%',
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
-    backgroundColor: colors.emerald,
-    opacity: 0.85,
+    backgroundColor: colors.lpLime,
+    opacity: 0.9,
   },
   chartDay: { ...typography.labelSmall, fontSize: 9, letterSpacing: 0.4, color: colors.textFaint },
   chartMonth: { color: colors.textMute },
