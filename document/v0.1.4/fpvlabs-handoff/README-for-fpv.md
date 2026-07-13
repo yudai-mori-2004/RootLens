@@ -33,4 +33,4 @@ has not been created yet (step 1).
 ## Notes
 
 - Each `session.mcap` is validated with stera-sdk's format check before handoff.
-- Faces are not blurred, and everyone appearing has consented to being filmed.
+- Faces are blurred, and everyone appearing has consented to being filmed.
