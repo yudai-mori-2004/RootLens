@@ -293,9 +293,9 @@ export const CollectionScreen: React.FC = () => {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.historyRow}
             >
-              {history.map(({ clip, source }) => (
+              {history.map(({ clip, source }, i) => (
                 <HistoryTile
-                  key={clip.contentHash}
+                  key={`${clip.contentHash}-${i}`}
                   clip={clip}
                   source={source}
                   selected={selectedDay != null && clip.createdAt != null && dayKey(clip.createdAt) === selectedDay}
