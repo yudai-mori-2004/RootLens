@@ -270,15 +270,13 @@ export const CollectionScreen: React.FC = () => {
           <Text style={styles.date}>{todayLabel(nowMs)}</Text>
         </View>
 
-        {/* 中央: 合計撮影時間 (= 常時表示)。 LP h1 と同じ、 数字の裏にスキューした
-            シアンのハイライトボックスを敷く。 ラベルは ink 地 + lime のピル。 */}
+        {/* 中央: 合計撮影時間 (= 常時表示)。 数字は素で置き、 ラベル「総撮影時間」 の裏に
+            斜めのテープを敷いて LP の署名を出す。 */}
         <View style={styles.counter}>
-          <View style={styles.counterNumberWrap}>
-            <View style={styles.counterHighlight} />
-            <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
-          </View>
-          <View style={styles.counterPill}>
-            <Text style={styles.counterPillText}>{t('portfolio.totalTime')}</Text>
+          <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
+          <View style={styles.counterLabelWrap}>
+            <View style={styles.counterTape} />
+            <Text style={styles.counterLabel}>{t('portfolio.totalTime')}</Text>
           </View>
         </View>
 
@@ -509,36 +507,32 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.textMute,
   },
-  counter: { gap: 10, alignItems: 'flex-start' },
-  counterNumberWrap: { position: 'relative', paddingHorizontal: 10, paddingVertical: 4 },
-  // LP h1 のハイライト: skew(-6°) したシアンの箱を数字の裏に敷く。
-  counterHighlight: {
-    position: 'absolute',
-    left: -2, right: -2, top: 6, bottom: 4,
-    backgroundColor: '#00E5FF',
-    borderRadius: 2,
-    transform: [{ skewX: '-6deg' }],
-  },
+  counter: { gap: 6, alignItems: 'flex-start' },
   counterNumber: {
     fontFamily: fonts.dot,
     fontSize: 34,
     lineHeight: 40,
-    color: colors.textOnInk, // 明度反転 (シアン地には濃い ink)
+    color: colors.ink,
   },
-  // ピル: ink 地 + lime の caps。 わずかに -1.5° 傾ける。
-  counterPill: {
-    backgroundColor: '#0A0416',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 999,
-    transform: [{ rotate: '-1.5deg' }],
+  // 総撮影時間ラベルの下に敷く LP のテープ (= 半透明の黄、 わずかにスキュー)
+  counterLabelWrap: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    marginTop: 2,
   },
-  counterPillText: {
+  counterTape: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 230, 0, 0.22)',
+    borderRadius: 2,
+    transform: [{ skewX: '-8deg' }],
+  },
+  counterLabel: {
     fontFamily: fonts.sansBold,
     fontSize: 10,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.lpLime,
+    color: colors.ink,
   },
   mission: {
     ...typography.caption,
@@ -571,7 +565,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.lpLime,
+    color: colors.ink,
   },
   sectionLabel: {
     ...typography.labelSmall,

@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.lpLime,
+    color: colors.ink,
   },
   sectionCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
