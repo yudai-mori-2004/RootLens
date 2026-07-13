@@ -10,8 +10,9 @@
 // キャッシュしてオフラインでも即表示) + ローカルのアップロード待ち分。
 // 履歴サムネは R2 の mp4 から range リクエストで 1 フレームだけ読む (services/clipFrames)。
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   Image,
   type ImageSourcePropType,
   Pressable,
@@ -135,29 +136,61 @@ const clipsCacheKey = (accountId: string) => `@rootlens/server-clips/v2/${accoun
 
 function useServerClips(accountId: string | null, localUploadedCount: number): ServerClipStatus[] {
   const [clips, setClips] = useState<ServerClipStatus[]>([]);
+  const [tick, setTick] = useState(0);
+  const prevAccountRef = useRef<string | null>(null);
+
+  // ページは mount しっぱなし (= MainTabs がタブを隠すだけ) なので、 アプリが前面に
+  // 戻った時を再取得の合図にする。 これが無いと初回の取得に失敗した画面が回復しない。
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') setTick((n) => n + 1);
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    let gotFresh = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const accountChanged = prevAccountRef.current !== accountId;
+    prevAccountRef.current = accountId;
+
     if (!accountId) {
       setClips([]);
       return;
     }
-    setClips([]); // 前アカウントの表示を残さない (= キャッシュ読み込みまでの一瞬も)
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(clipsCacheKey(accountId));
-        if (raw && !cancelled) setClips(JSON.parse(raw) as ServerClipStatus[]);
-      } catch {}
+    if (accountChanged) {
+      setClips([]); // 前アカウントの表示を残さない
+      // キャッシュは「サーバ取得がまだのとき」 だけのつなぎ (= 遅延して届いても新鮮値を潰さない)
+      AsyncStorage.getItem(clipsCacheKey(accountId))
+        .then((raw) => {
+          if (raw && !cancelled && !gotFresh) setClips(JSON.parse(raw) as ServerClipStatus[]);
+        })
+        .catch(() => {});
+    }
+    const load = async (attempt: number) => {
       try {
         const fresh = await fetchMyClips();
         if (cancelled) return;
+        gotFresh = true;
         setClips(fresh);
         AsyncStorage.setItem(clipsCacheKey(accountId), JSON.stringify(fresh)).catch(() => {});
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-    // アカウント切替とアップロード完了のタイミングで再取得する
-  }, [accountId, localUploadedCount]);
+      } catch (e) {
+        // 失敗は握りつぶさない: ログを残し、 表示は保持したまま少し待って再試行する
+        // (= ログイン直後や電波の谷で 1 回目が落ちても画面が置き去りにならない)。
+        console.warn(`[collection] fetchMyClips failed (attempt ${attempt})`, e);
+        if (!cancelled && attempt < 2) {
+          retryTimer = setTimeout(() => void load(attempt + 1), 4000);
+        }
+      }
+    };
+    void load(0);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+    // アカウント切替 / アップロード完了 / フォアグラウンド復帰 で再取得する
+  }, [accountId, localUploadedCount, tick]);
 
   return clips;
 }
