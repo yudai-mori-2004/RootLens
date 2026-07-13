@@ -27,6 +27,7 @@ import * as Linking from 'expo-linking';
 
 import type { RootStackParamList } from '../app/types';
 import { BrandMark } from '../components/BrandMark';
+import { BackgroundGlow } from '../components/BackgroundGlow';
 import { useAuth } from '../services/auth';
 import { useT } from '../i18n';
 import { colors, fonts, radii, spacing, typography } from '../theme';
@@ -89,6 +90,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.root}>
+      <BackgroundGlow />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -198,7 +200,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.paper },
+  root: { flex: 1 },
   flex: { flex: 1 },
 
   columns: {

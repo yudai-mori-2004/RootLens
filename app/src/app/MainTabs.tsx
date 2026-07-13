@@ -18,6 +18,7 @@ import type { RootStackParamList } from './types';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { HomeIcon, SettingsIcon } from '../components/TabIcons';
+import { BackgroundGlow } from '../components/BackgroundGlow';
 import { useT } from '../i18n';
 import { colors, fonts, spacing } from '../theme';
 
@@ -34,6 +35,8 @@ export const MainTabs: React.FC = () => {
 
   return (
     <View style={styles.root}>
+      {/* LP と同じ紫黒 + 色付きグラデ + grain の背景 (= 全画面の下地) */}
+      <BackgroundGlow />
       {/* コンテンツ (= 画面は mount したまま表示切替。 スクロール位置等の state を保つ) */}
       <View style={styles.content}>
         <View style={[styles.page, tab !== 'home' && styles.pageHidden]} pointerEvents={tab === 'home' ? 'auto' : 'none'}>
@@ -97,15 +100,14 @@ const RailItem: React.FC<{
 );
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: colors.paper },
+  root: { flex: 1, flexDirection: 'row' },
   content: { flex: 1 },
   page: { ...StyleSheet.absoluteFillObject },
   pageHidden: { opacity: 0, zIndex: -1 },
 
   rail: {
     borderLeftWidth: 1,
-    borderLeftColor: colors.border,
-    backgroundColor: colors.paper,
+    borderLeftColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xxl,

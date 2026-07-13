@@ -357,7 +357,9 @@ const Section: React.FC<{ title: string; tone?: 'normal' | 'muted'; children: Re
   const items = React.Children.toArray(children).filter(Boolean);
   return (
     <View>
-      <Text style={[styles.sectionTitle, tone === 'muted' && { color: colors.textFaint }]}>{title}</Text>
+      <View style={styles.sectionPill}>
+        <Text style={[styles.sectionPillText, tone === 'muted' && { color: colors.textMute }]}>{title}</Text>
+      </View>
       <View style={styles.sectionCard}>
         {items.map((child, i) => (
           <React.Fragment key={i}>
@@ -528,7 +530,7 @@ function formatBytes(bytes: number): string {
 // ─── styles ─────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: colors.paper },
+  root: { flex: 1, flexDirection: 'row' },
 
   aside: {
     width: 236,
@@ -555,17 +557,28 @@ const styles = StyleSheet.create({
     width: '100%',
   },
 
-  sectionTitle: {
-    ...typography.labelSmall,
-    color: colors.textMute,
+  // LP のピル (= ink 地 + lime caps、 わずかに傾き)
+  sectionPill: {
+    alignSelf: 'flex-start',
     marginBottom: spacing.sm,
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#0A0416',
+    transform: [{ rotate: '-1.5deg' }],
+  },
+  sectionPillText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.lpLime,
   },
   sectionCard: {
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.10)',
     overflow: 'hidden',
   },
   divider: { height: 1, backgroundColor: colors.border, marginLeft: spacing.lg },
@@ -650,24 +663,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radii.sm,
+    // 影 / elevation を使わない (= 選択の切替でボタンが 1px 縦にズレる原因になる)
   },
   segmentBtnActive: {
     backgroundColor: colors.card,
-    shadowColor: '#0E1F44',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
   },
   segmentBtnPressed: { opacity: 0.6 },
+  // 選択のたびに font family が Medium → Semibold へ切り替わると Noto の縦メトリクスが
+  // 変わって行がズレる。 両方 Semibold に固定して色だけ切り替える。
   segmentLabel: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sansSemibold,
     fontSize: 12.5,
     color: colors.textMute,
   },
   segmentLabelActive: {
     color: colors.ink,
-    fontFamily: fonts.sansSemibold,
   },
 
   footnote: {

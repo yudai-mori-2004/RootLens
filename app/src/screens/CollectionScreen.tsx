@@ -270,12 +270,15 @@ export const CollectionScreen: React.FC = () => {
           <Text style={styles.date}>{todayLabel(nowMs)}</Text>
         </View>
 
-        {/* 中央: 合計撮影時間 (= 常時表示。 ラベルの下に LP のテープ) */}
+        {/* 中央: 合計撮影時間 (= 常時表示)。 LP h1 と同じ、 数字の裏にスキューした
+            シアンのハイライトボックスを敷く。 ラベルは ink 地 + lime のピル。 */}
         <View style={styles.counter}>
-          <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
-          <View style={styles.counterLabelWrap}>
-            <View style={styles.counterTape} />
-            <Text style={styles.counterLabel}>{t('portfolio.totalTime')}</Text>
+          <View style={styles.counterNumberWrap}>
+            <View style={styles.counterHighlight} />
+            <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
+          </View>
+          <View style={styles.counterPill}>
+            <Text style={styles.counterPillText}>{t('portfolio.totalTime')}</Text>
           </View>
         </View>
 
@@ -286,7 +289,9 @@ export const CollectionScreen: React.FC = () => {
       <View style={styles.main}>
         {history.length > 0 ? (
           <View>
-            <Text style={styles.sectionLabel}>{t('portfolio.uploadedLabel')}</Text>
+            <View style={styles.pill}>
+              <Text style={styles.pillText}>{t('portfolio.uploadedLabel')}</Text>
+            </View>
             <ScrollView
               ref={historyScrollRef}
               horizontal
@@ -294,13 +299,17 @@ export const CollectionScreen: React.FC = () => {
               contentContainerStyle={styles.historyRow}
             >
               {history.map(({ clip, source }, i) => (
-                <HistoryTile
+                <View
                   key={`${clip.contentHash}-${i}`}
-                  clip={clip}
-                  source={source}
-                  selected={selectedDay != null && clip.createdAt != null && dayKey(clip.createdAt) === selectedDay}
-                  onPress={() => setHistoryTarget({ clip, source })}
-                />
+                  style={{ transform: [{ rotate: HISTORY_TILT[i % HISTORY_TILT.length] }] }}
+                >
+                  <HistoryTile
+                    clip={clip}
+                    source={source}
+                    selected={selectedDay != null && clip.createdAt != null && dayKey(clip.createdAt) === selectedDay}
+                    onPress={() => setHistoryTarget({ clip, source })}
+                  />
+                </View>
               ))}
             </ScrollView>
           </View>
@@ -423,7 +432,9 @@ const GraphPanel: React.FC<{
   return (
     <View style={styles.graph}>
       <View style={styles.graphHeader}>
-        <Text style={[styles.sectionLabel, styles.sectionLabelInline]}>{t('portfolio.dailyLabel')}</Text>
+        <View style={[styles.pill, styles.pillInline]}>
+          <Text style={styles.pillText}>{t('portfolio.dailyLabel')}</Text>
+        </View>
         {selected ? (
           <Text style={styles.graphReadout}>
             {formatGraphDate(selected.key)} · {formatTotal(selected.ms)}
@@ -478,9 +489,11 @@ const GraphPanel: React.FC<{
 const ASIDE_WIDTH = 236;
 const HISTORY_TILE_PITCH = 124 + 12; // tile width + historyRow gap
 const CARD_WIDTH = 260;
+// LP のフライヤー QA カードと同じ、 わずかな回転を交互に適用
+const HISTORY_TILT = ['-1.1deg', '0.9deg', '-0.7deg', '0.6deg'] as const;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.paper },
+  root: { flex: 1 },
   rootRow: { flex: 1, flexDirection: 'row' },
 
   aside: {
@@ -496,24 +509,36 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.textMute,
   },
-  counter: { gap: 4 },
-  // 合計時間は LP のドット文字で「機材の読み出し」 に (= DotGothic は日本語グリフも持つ)
+  counter: { gap: 10, alignItems: 'flex-start' },
+  counterNumberWrap: { position: 'relative', paddingHorizontal: 10, paddingVertical: 4 },
+  // LP h1 のハイライト: skew(-6°) したシアンの箱を数字の裏に敷く。
+  counterHighlight: {
+    position: 'absolute',
+    left: -2, right: -2, top: 6, bottom: 4,
+    backgroundColor: '#00E5FF',
+    borderRadius: 2,
+    transform: [{ skewX: '-6deg' }],
+  },
   counterNumber: {
     fontFamily: fonts.dot,
     fontSize: 34,
     lineHeight: 40,
-    color: colors.ink,
+    color: colors.textOnInk, // 明度反転 (シアン地には濃い ink)
   },
-  counterLabelWrap: { alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2 },
-  // ラベルの下に敷く LP のテープ (= 半透明の黄、 わずかに傾く)
-  counterTape: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 230, 0, 0.16)',
-    transform: [{ rotate: '-1.6deg' }],
+  // ピル: ink 地 + lime の caps。 わずかに -1.5° 傾ける。
+  counterPill: {
+    backgroundColor: '#0A0416',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    transform: [{ rotate: '-1.5deg' }],
   },
-  counterLabel: {
-    ...typography.labelSmall,
-    color: colors.ink,
+  counterPillText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.lpLime,
   },
   mission: {
     ...typography.caption,
@@ -529,6 +554,25 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.lg,
   },
+  // LP のピル (= ink 地 + lime caps、 わずかに傾き)
+  pill: {
+    alignSelf: 'flex-start',
+    marginLeft: spacing.xl,
+    marginBottom: spacing.sm + 2,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#0A0416',
+    transform: [{ rotate: '-1.5deg' }],
+  },
+  pillInline: { marginLeft: spacing.xl, marginBottom: 0 },
+  pillText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.lpLime,
+  },
   sectionLabel: {
     ...typography.labelSmall,
     color: colors.textMute,
@@ -541,13 +585,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     gap: spacing.md,
   },
+  // 履歴タイルはフライヤーの qa カードに揃えて、 交互にわずかに傾ける
+  // (実装は HistoryTile 側で index に応じて設定する)
   tile: { width: 124 },
   tileThumb: {
     width: '100%',
     aspectRatio: 16 / 9,
     borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderWidth: 1.4,
+    borderColor: 'rgba(255,255,255,0.14)',
     overflow: 'hidden',
     backgroundColor: colors.paperDeep,
   },
