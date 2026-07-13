@@ -96,7 +96,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private let handTrackerInterval: Int = 4  // ARKit 60 Hz / 4 ≈ 15 Hz
 
   // Latest HandTracker output, kept to fill the hands field of each
-  // realtime_handpose.jsonl row. HandTracker runs at ~15 Hz while rows are
+  // frames.jsonl row. HandTracker runs at ~15 Hz while rows are
   // written for every kept frame, so consecutive rows share the latest hands.
   private var latestHandOutput: HandTracker.Output?
   private let latestHandOutputLock = NSLock()
@@ -275,7 +275,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   /// Start one capture session. Writes concurrently under sessionDir:
   ///   rgb.mp4                  H.264 via AVAssetWriter (ARFrame.capturedImage)
-  ///   realtime_handpose.jsonl  per-frame camera transform / intrinsics / tracking / hands / IMU snapshot
+  ///   frames.jsonl  per-frame camera transform / intrinsics / tracking / hands / IMU snapshot
   ///   imu.jsonl                CMMotionManager samples (~100 Hz)
   ///   metadata.json            device + resolution + intrinsics, written once
   ///   depth.tar / pointcloud.jsonl / mesh.jsonl  on supported devices / settings
@@ -340,7 +340,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     writer.startSession(atSourceTime: .zero)
 
     // Prepare the sensor stream files (IMU / point cloud only when enabled in settings).
-    let sensorsURL = sessionDir.appendingPathComponent("realtime_handpose.jsonl")
+    let sensorsURL = sessionDir.appendingPathComponent("frames.jsonl")
     let imuURL = sessionDir.appendingPathComponent("imu.jsonl")
     let pcURL = sessionDir.appendingPathComponent("pointcloud.jsonl")
     try removeIfExists(at: sensorsURL)
@@ -754,7 +754,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return hands
   }
 
-  /// Everything one realtime_handpose.jsonl row needs, captured from the ARFrame
+  /// Everything one frames.jsonl row needs, captured from the ARFrame
   /// on the delegate thread while the frame is valid. Holding this instead of
   /// the ARFrame keeps ARKit's pooled camera buffers out of async code; only the
   /// small depth buffers and the immutable feature-point snapshot ride along
@@ -829,7 +829,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     )
   }
 
-  /// Write one realtime_handpose.jsonl row plus the depth / point-cloud entries
+  /// Write one frames.jsonl row plus the depth / point-cloud entries
   /// that share its frame index. Called on frameQueue, strictly after the
   /// matching video frame was appended to the mp4: the converter pairs mp4
   /// frames with rows by index, so a row whose frame never made it into the
@@ -864,7 +864,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         try handle.write(contentsOf: data)
         try handle.write(contentsOf: Data("\n".utf8))
       } catch {
-        NSLog("[ArkitCaptureController] realtime_handpose.jsonl write failed: %@", "\(error)")
+        NSLog("[ArkitCaptureController] frames.jsonl write failed: %@", "\(error)")
       }
     }
 
@@ -1157,7 +1157,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
 
     // Recording (append the pixelBuffer to the AVAssetWriter and a row to
-    // realtime_handpose.jsonl). Only while recording.
+    // frames.jsonl). Only while recording.
     // ⚠ didUpdate runs on the main thread by default. Encoding moves to
     //    frameQueue, but capturedImage is one of ARKit's recycled buffers, so it
     //    is copied here and the copy is what gets appended asynchronously (see
@@ -1187,7 +1187,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
       // Snapshot everything the sensor row needs while the frame is valid. The
       // row is written only after the video append succeeds (below), so
-      // realtime_handpose.jsonl rows and mp4 frames stay strictly 1:1. A row
+      // frames.jsonl rows and mp4 frames stay strictly 1:1. A row
       // without its frame would silently shift every later RGB timestamp in the
       // delivered data, so a dropped frame must also drop its row.
       let rowData = self.makeFrameRowData(frame: frame)

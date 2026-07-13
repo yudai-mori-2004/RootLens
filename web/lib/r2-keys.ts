@@ -19,7 +19,8 @@ export type RecordingConfigId = "ultra_wide" | "arkit";
 /// 撮影構成が出力するファイル名 (DATA_SPECS §2.2)。 構成が増えたら固有ファイルを足す。
 export type RawSessionFilename =
   | "rgb.mp4"
-  | "realtime_handpose.jsonl"
+  | "frames.jsonl"            // per-frame の pose / intrinsics / tracking / hands (旧名 realtime_handpose.jsonl)
+  | "realtime_handpose.jsonl" // 旧ビルド (= build 30 以前) 互換。 新規アップロードが frames.jsonl に揃ったら削除
   | "metadata.json"
   | "imu.jsonl"           // ARKit 構成のみ
   | "depth.tar"           // ARKit + LiDAR (Pro) のみ optional
@@ -39,6 +40,7 @@ export const RAW_SESSION_MANIFEST: Record<
   ],
   arkit: [
     { filename: "rgb.mp4", contentType: "video/mp4" },
+    { filename: "frames.jsonl", contentType: "application/x-ndjson" },
     { filename: "realtime_handpose.jsonl", contentType: "application/x-ndjson" },
     { filename: "imu.jsonl", contentType: "application/x-ndjson" },
     { filename: "metadata.json", contentType: "application/json" },

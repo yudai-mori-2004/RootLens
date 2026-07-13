@@ -32,7 +32,7 @@ import type {
 
 // Files the ARKit config writes into the session dir:
 //   rgb.mp4                    wide (1x) RGB video
-//   realtime_handpose.jsonl    per-frame hand landmarks + camera pose (4×4) + tracking state + IMU snapshot
+//   frames.jsonl    per-frame hand landmarks + camera pose (4×4) + tracking state + IMU snapshot
 //   imu.jsonl                  accelerometer / gyro / device motion (at the configured rate; 100 Hz default)
 //   metadata.json              static facts: device model, OS, app version, camera FoV / resolution / intrinsics, config id
 //   depth.tar                  LiDAR depth (Pro devices only): one 16-bit PNG (millimeters) per frame,
@@ -40,7 +40,7 @@ import type {
 //                              Non-LiDAR devices produce none, hence required:false ("upload when present").
 const OUTPUT_FILES: OutputFileSpec[] = [
   { name: 'rgb.mp4', contentType: 'video/mp4', required: true, isPrimaryVideo: true },
-  { name: 'realtime_handpose.jsonl', contentType: 'application/x-ndjson', required: true },
+  { name: 'frames.jsonl', contentType: 'application/x-ndjson', required: true },
   { name: 'imu.jsonl', contentType: 'application/x-ndjson', required: true },
   { name: 'metadata.json', contentType: 'application/json', required: true },
   { name: 'depth.tar', contentType: 'application/x-tar', required: false },

@@ -44,7 +44,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
     }
 
     // Takes a session dir and writes the recording outputs (rgb.mp4,
-    // realtime_handpose.jsonl, imu.jsonl, metadata.json, depth.tar on LiDAR
+    // frames.jsonl, imu.jsonl, metadata.json, depth.tar on LiDAR
     // devices) into it concurrently. An empty string creates a dir under temp.
     AsyncFunction("startRecording") { (sessionDirPath: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {

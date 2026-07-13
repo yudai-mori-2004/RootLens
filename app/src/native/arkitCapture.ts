@@ -5,7 +5,7 @@ import type { ViewProps } from 'react-native';
 // Thin wrapper around the ARKit capture native module (modules/arkit-capture).
 //
 // startRecording takes a session directory and writes the recording outputs
-// into it concurrently: rgb.mp4, realtime_handpose.jsonl, imu.jsonl,
+// into it concurrently: rgb.mp4, frames.jsonl, imu.jsonl,
 // metadata.json, and depth.tar on LiDAR devices.
 //
 // The module also emits realtime hand-detection results at ~15 Hz through the
@@ -71,7 +71,7 @@ interface ArkitCaptureNativeModule {
   isAvailable(): Promise<boolean>;
   startSession(): Promise<void>;
   stopSession(): Promise<void>;
-  /** Write rgb.mp4 + realtime_handpose.jsonl + imu.jsonl + metadata.json
+  /** Write rgb.mp4 + frames.jsonl + imu.jsonl + metadata.json
    *  concurrently under sessionDir. An empty string creates a session dir under
    *  temp. Resolves to the session dir's file:// URI. */
   startRecording(sessionDir: string): Promise<string>;
@@ -107,7 +107,7 @@ export async function stopArkitSession(): Promise<void> {
   return nativeModule.stopSession();
 }
 
-/** Write rgb.mp4 + realtime_handpose.jsonl + imu.jsonl + metadata.json (plus
+/** Write rgb.mp4 + frames.jsonl + imu.jsonl + metadata.json (plus
  *  depth.tar on LiDAR devices) concurrently under sessionDir. An empty string
  *  lets the native side create a fresh dir under temp. Resolves to the session
  *  dir's file:// URI. */

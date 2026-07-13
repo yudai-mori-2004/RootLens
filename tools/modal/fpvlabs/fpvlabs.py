@@ -9,7 +9,8 @@
 # GPU で batch 推論、 短辺リサイズを効かせて 1 時間あたり数十円を狙う (詳細は EGOBLUR_* 定数)。
 # 検出器の切替: --face-detector egoblur|mediapipe (mediapipe は CPU 動作の fallback)。
 #
-#   入力: raw/<hash>/{rgb.mp4, realtime_handpose.jsonl, imu.jsonl, metadata.json[, depth.tar]}
+#   入力: raw/<hash>/{rgb.mp4, frames.jsonl, imu.jsonl, metadata.json[, depth.tar]}
+#         (frames.jsonl は旧収録では realtime_handpose.jsonl。 どちらか必須)
 #   出力: <hash>/session.mcap  (= 決定論的キー。 再実行は同キーへの上書き = 冪等)
 #
 # トピック構成は stera-sdk の TopicConfig (data/mcap/_reader.py) に一致させる:
@@ -492,8 +493,12 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
     cam = meta["camera"]
 
     # per-frame 行 (= pose / tracking / intrinsics / timestamp)。 1 行 ~1KB なので全読みで問題ない。
+    # 新収録は frames.jsonl、 旧収録は realtime_handpose.jsonl (= 同一スキーマの旧名)。
+    frames_path = os.path.join(session_dir, "frames.jsonl")
+    if not os.path.exists(frames_path):
+        frames_path = os.path.join(session_dir, "realtime_handpose.jsonl")
     frames_meta: list[dict] = []
-    with open(os.path.join(session_dir, "realtime_handpose.jsonl")) as f:
+    with open(frames_path) as f:
         for line in f:
             line = line.strip()
             if not line:
@@ -501,7 +506,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
             row = json.loads(line)
             frames_meta.append(row)
     if not frames_meta:
-        raise RuntimeError("realtime_handpose.jsonl is empty")
+        raise RuntimeError(f"{os.path.basename(frames_path)} is empty")
 
     # 顔ぼかし (= blur=True のときだけ初期化)。 既定は EgoBlur (GPU、 Stera-10M と同じ)。
     face_backend = _make_face_backend(face_detector) if blur else None
@@ -635,7 +640,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         def _timestamp_for(idx: int) -> int:
             if idx >= len(frames_meta):
                 raise RuntimeError(
-                    f"rgb.mp4 has more frames than realtime_handpose.jsonl rows "
+                    f"rgb.mp4 has more frames than pose rows in frames.jsonl "
                     f"(frame index {idx} >= {len(frames_meta)} rows); refusing to fabricate timestamps"
                 )
             return int(frames_meta[idx]["timestamp_ns"])
@@ -685,7 +690,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         if i != len(frames_meta):
             raise RuntimeError(
                 f"frame/pose count mismatch: rgb.mp4 decoded {i} frames but "
-                f"realtime_handpose.jsonl has {len(frames_meta)} rows; "
+                f"frames.jsonl has {len(frames_meta)} rows; "
                 f"RGB timestamps would be misaligned, aborting"
             )
 
@@ -813,7 +818,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
 
 # ─── R2 入出力 (= 決定論的キーへの上書きで冪等) ────────────────────────
 
-SESSION_FILES = ["rgb.mp4", "realtime_handpose.jsonl", "imu.jsonl", "metadata.json", "depth.tar", "pointcloud.jsonl", "mesh.jsonl"]
+SESSION_FILES = ["rgb.mp4", "frames.jsonl", "realtime_handpose.jsonl", "imu.jsonl", "metadata.json", "depth.tar", "pointcloud.jsonl", "mesh.jsonl"]
 
 
 def _r2_client():
@@ -850,9 +855,13 @@ def process_session(content_hash: str, blur: bool = True,
             try:
                 s3.download_file(bucket_raw, key, dest)
             except Exception:
-                if name in ("rgb.mp4", "realtime_handpose.jsonl", "metadata.json"):
+                if name in ("rgb.mp4", "metadata.json"):
                     raise RuntimeError(f"required input missing: {key}")
-                # depth.tar / imu.jsonl はオプショナル
+                # frames.jsonl / realtime_handpose.jsonl は下でどちらか必須をチェック。
+                # depth.tar / imu.jsonl 等はオプショナル。
+        if not os.path.exists(os.path.join(session_dir, "frames.jsonl")) and \
+           not os.path.exists(os.path.join(session_dir, "realtime_handpose.jsonl")):
+            raise RuntimeError(f"required input missing: raw/{content_hash}/frames.jsonl (or legacy realtime_handpose.jsonl)")
 
         out_path = os.path.join(tmp, "session.mcap")
         result = build_mcap(session_dir, out_path, blur=blur,

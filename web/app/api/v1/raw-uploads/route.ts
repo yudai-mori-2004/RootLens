@@ -5,7 +5,7 @@
 // 流れ:
 //   1. device が生 mp4 の SHA-256 を計算して content_hash を確定
 //   2. このエンドポイントに contentHash を投げ、 撮影構成ファイル分の presigned PUT を得る
-//   3. R2 (raw/<content_hash>/{rgb.mp4 + realtime_handpose.jsonl + metadata.json + 等}) に並列 PUT
+//   3. R2 (raw/<content_hash>/{rgb.mp4 + frames.jsonl + metadata.json + 等}) に並列 PUT
 //
 // /api/clips とは別エンドポイントにする理由:
 //   端末は「アップロード可能か」 だけ先に確認したい (= 容量制限・帯域制限・空きスロット等の事前 reject)。

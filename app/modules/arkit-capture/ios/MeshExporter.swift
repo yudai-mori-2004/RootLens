@@ -8,7 +8,7 @@ enum MeshExporter {
   /// Export ARMeshAnchors as JSONL, one anchor per row: vertices as float32 LE
   /// xyz × n and faces as uint32 LE vertex indices × 3 × m, base64-encoded.
   /// transform is a row-major 4×4 into world space, the same convention as
-  /// camera_transform in realtime_handpose.jsonl. Values are copied verbatim
+  /// camera_transform in frames.jsonl. Values are copied verbatim
   /// from ARKit's buffers; no processing is applied.
   static func writeMeshJsonl(anchors: [ARMeshAnchor], into dir: URL) {
     guard !anchors.isEmpty else {

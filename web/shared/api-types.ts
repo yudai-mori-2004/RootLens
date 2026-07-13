@@ -50,6 +50,7 @@ export interface CreateClipRequest {
 ///   arkit      → rootlens-raw-arkit  (+ imu.jsonl / depth.tar)
 export type RawSessionFilename =
   | "rgb.mp4"
+  | "frames.jsonl"
   | "realtime_handpose.jsonl"
   | "metadata.json"
   | "imu.jsonl"
