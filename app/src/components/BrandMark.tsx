@@ -1,5 +1,5 @@
-// RootLens ブランドマーク (= アプリ実ロゴの二重 R + Fraunces の太いワードマーク)。
-// ログイン画面とマイビデオの扉カラムで共用する。
+// RootLens ブランドマーク (= LP のナビと同じ: -6° に傾いたアイコン + 太いワードマーク、
+// Lens だけ黄色)。 ログイン画面とマイビデオの扉カラムで共用する。
 
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';

@@ -8,17 +8,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import {
   useFonts,
-  MPLUS1_300Light,
-  MPLUS1_400Regular,
-  MPLUS1_500Medium,
-  MPLUS1_700Bold,
-  MPLUS1_800ExtraBold,
-} from '@expo-google-fonts/m-plus-1';
+  NotoSansJP_300Light,
+  NotoSansJP_400Regular,
+  NotoSansJP_500Medium,
+  NotoSansJP_700Bold,
+  NotoSansJP_900Black,
+} from '@expo-google-fonts/noto-sans-jp';
 import {
   JetBrainsMono_400Regular,
   JetBrainsMono_500Medium,
 } from '@expo-google-fonts/jetbrains-mono';
-import { Fraunces_700Bold } from '@expo-google-fonts/fraunces';
 import { Anton_400Regular } from '@expo-google-fonts/anton';
 import { DotGothic16_400Regular } from '@expo-google-fonts/dotgothic16';
 
@@ -70,14 +69,13 @@ export default function App() {
   }, []);
 
   const [fontsLoaded] = useFonts({
-    MPLUS1_300Light,
-    MPLUS1_400Regular,
-    MPLUS1_500Medium,
-    MPLUS1_700Bold,
-    MPLUS1_800ExtraBold,
+    NotoSansJP_300Light,
+    NotoSansJP_400Regular,
+    NotoSansJP_500Medium,
+    NotoSansJP_700Bold,
+    NotoSansJP_900Black,
     JetBrainsMono_400Regular,
     JetBrainsMono_500Medium,
-    Fraunces_700Bold,
     DotGothic16_400Regular,
     Anton_400Regular,
   });

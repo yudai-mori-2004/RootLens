@@ -59,36 +59,33 @@ export const colors = {
 } as const;
 
 // ── Typography ─────────────────────────────────────────────────────────
-// Two display families (Fraunces serif + Inter sans), one mono.
+// LP と同じ 3 面: Noto Sans JP (本文) + DotGothic16 (読み出し/ラベル) + Anton (英語見出し)。
 export const fonts = {
-  // 表示 (= 見出し / ヒーロー数値)。 M PLUS 1 は日本語を含む。
-  serifLight: 'MPLUS1_300Light',
-  serifRegular: 'MPLUS1_400Regular',
-  serifMedium: 'MPLUS1_500Medium',
-  serifSemibold: 'MPLUS1_700Bold',
-  serifBold: 'MPLUS1_800ExtraBold',
+  // 表示 (= 見出し / ヒーロー数値)
+  serifLight: 'NotoSansJP_300Light',
+  serifRegular: 'NotoSansJP_400Regular',
+  serifMedium: 'NotoSansJP_500Medium',
+  serifSemibold: 'NotoSansJP_700Bold',
+  serifBold: 'NotoSansJP_900Black',
 
   // 本文 / UI
-  sansRegular: 'MPLUS1_400Regular',
-  sansMedium: 'MPLUS1_500Medium',
-  sansSemibold: 'MPLUS1_700Bold',
-  sansBold: 'MPLUS1_800ExtraBold',
+  sansRegular: 'NotoSansJP_400Regular',
+  sansMedium: 'NotoSansJP_500Medium',
+  sansSemibold: 'NotoSansJP_700Bold',
+  sansBold: 'NotoSansJP_900Black',
 
-  // 読み出し (= 時刻 / 尺 / hash)
+  // 読み出し (= hash 類だけ。 人向けの数値は dot を使う)
   mono: 'JetBrainsMono_500Medium',
 
-  // 録画 HUD の数字 / インジケータ (= LP のドット文字 DotGothic16。 日本語グリフも持つ)
+  // LP のドット文字 (= 数値の読み出し / セクションラベル。 日本語グリフも持つ)
   dot: 'DotGothic16_400Regular',
 
   // LP の見出し (= Anton。 Latin のみ。 英語ヒーローと見出しの圧に使う)
   display: 'Anton_400Regular',
-
-  // ブランドワードマーク専用 (= RootLens の文字だけ Fraunces)
-  brand: 'Fraunces_700Bold',
 } as const;
 
 export const typography = {
-  // Display (Fraunces)
+  // Display
   display1: { fontFamily: fonts.serifLight, fontSize: 44, lineHeight: 50, letterSpacing: -0.6 },
   display2: { fontFamily: fonts.serifRegular, fontSize: 32, lineHeight: 38, letterSpacing: -0.4 },
   display3: { fontFamily: fonts.serifMedium, fontSize: 24, lineHeight: 30, letterSpacing: -0.2 },
@@ -101,13 +98,13 @@ export const typography = {
   // Caption
   caption: { fontFamily: fonts.sansRegular, fontSize: 13, lineHeight: 18 },
   captionMedium: { fontFamily: fonts.sansMedium, fontSize: 13, lineHeight: 18 },
-  // Labels (caps-track for section headers and chips)
+  // Labels (= セクション見出し / チップ。 LP のドット文字ラベルの文法)
   label: {
-    fontFamily: fonts.sansSemibold, fontSize: 11, lineHeight: 14,
+    fontFamily: fonts.dot, fontSize: 12, lineHeight: 15,
     letterSpacing: 1.0, textTransform: 'uppercase' as const,
   },
   labelSmall: {
-    fontFamily: fonts.sansSemibold, fontSize: 10, lineHeight: 14,
+    fontFamily: fonts.dot, fontSize: 11, lineHeight: 15,
     letterSpacing: 1.1, textTransform: 'uppercase' as const,
   },
   // Mono — readouts, hashes, prices

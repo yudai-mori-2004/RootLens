@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Polygon } from 'react-native-svg';
 
 import { BrandMark } from '../components/BrandMark';
+import { MarqueeBand } from '../components/MarqueeBand';
 import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import { HistoryDetailModal } from '../components/HistoryDetailModal';
@@ -235,9 +236,7 @@ export const CollectionScreen: React.FC = () => {
     return d;
   }, [serverClips]);
 
-  const [previewTarget, setPreviewTarget] = useState<Clip | null>(
-    DESIGN_PREVIEW ? (MOCKS[0].clip as Clip) : null,
-  );
+  const [previewTarget, setPreviewTarget] = useState<Clip | null>(null);
   const [historyTarget, setHistoryTarget] = useState<{ clip: ServerClipStatus; source?: ImageSourcePropType } | null>(null);
   // グラフで選択中の日 (= バーtap)。 履歴の該当日タイルもハイライトされる。
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -263,7 +262,8 @@ export const CollectionScreen: React.FC = () => {
   }, []);
 
   return (
-    <View style={[styles.root, { paddingLeft: insets.left }]}>
+    <View style={styles.root}>
+    <View style={[styles.rootRow, { paddingLeft: insets.left }]}>
       {/* ── 左: 扉カラム ── */}
       <View style={styles.aside}>
         <View style={styles.asideHead}>
@@ -271,10 +271,13 @@ export const CollectionScreen: React.FC = () => {
           <Text style={styles.date}>{todayLabel(nowMs)}</Text>
         </View>
 
-        {/* 中央: 合計撮影時間 (= 常時表示) */}
+        {/* 中央: 合計撮影時間 (= 常時表示。 ラベルの下に LP のテープ) */}
         <View style={styles.counter}>
           <Text style={styles.counterNumber}>{formatTotal(totalMs)}</Text>
-          <Text style={styles.counterLabel}>{t('portfolio.totalTime')}</Text>
+          <View style={styles.counterLabelWrap}>
+            <View style={styles.counterTape} />
+            <Text style={styles.counterLabel}>{t('portfolio.totalTime')}</Text>
+          </View>
         </View>
 
         <Text style={styles.mission}>{t('portfolio.mission')}</Text>
@@ -313,14 +316,16 @@ export const CollectionScreen: React.FC = () => {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.rowList}
               >
-                {rows.map((item) => (
-                  <ClipCard
-                    key={item.clip.id}
-                    clip={item.clip}
-                    width={CARD_WIDTH}
-                    previewSource={item.thumb}
-                    onOpen={onOpen}
-                  />
+                {rows.map((item, i) => (
+                  // ステッカーの傾き (= LP の文法。 交互にわずかに振る)
+                  <View key={item.clip.id} style={{ transform: [{ rotate: i % 2 === 0 ? '-0.8deg' : '0.7deg' }] }}>
+                    <ClipCard
+                      clip={item.clip}
+                      width={CARD_WIDTH}
+                      previewSource={item.thumb}
+                      onOpen={onOpen}
+                    />
+                  </View>
                 ))}
               </ScrollView>
             </View>
@@ -329,6 +334,11 @@ export const CollectionScreen: React.FC = () => {
           )}
         </View>
       </View>
+
+    </View>
+
+      {/* 下端: LP のマーキー帯 */}
+      <MarqueeBand />
 
       <ClipPreviewModal
         visible={previewTarget !== null}
@@ -471,10 +481,11 @@ const GraphPanel: React.FC<{
 
 const ASIDE_WIDTH = 236;
 const HISTORY_TILE_PITCH = 124 + 12; // tile width + historyRow gap
-const CARD_WIDTH = 260;
+const CARD_WIDTH = 228;
 
 const styles = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: colors.paper },
+  root: { flex: 1, backgroundColor: colors.paper },
+  rootRow: { flex: 1, flexDirection: 'row' },
 
   aside: {
     width: ASIDE_WIDTH,
@@ -497,9 +508,16 @@ const styles = StyleSheet.create({
     lineHeight: 40,
     color: colors.ink,
   },
+  counterLabelWrap: { alignSelf: 'flex-start', paddingHorizontal: 5, paddingVertical: 2 },
+  // ラベルの下に敷く LP のテープ (= 半透明の黄、 わずかに傾く)
+  counterTape: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 230, 0, 0.16)',
+    transform: [{ rotate: '-1.6deg' }],
+  },
   counterLabel: {
     ...typography.labelSmall,
-    color: colors.textMute,
+    color: colors.ink,
   },
   mission: {
     ...typography.caption,
@@ -511,7 +529,7 @@ const styles = StyleSheet.create({
   // ── 右面 ──
   main: {
     flex: 1,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
     gap: spacing.lg,
   },

@@ -290,12 +290,19 @@ const styles = StyleSheet.create({
   errorLabel: { ...typography.labelSmall, color: colors.danger },
   errorBody: { ...typography.caption, color: colors.danger, marginTop: 4 },
 
+  // LP のステッカーボタン (= ピンク地 + 黒枠 + ずらした硬い影)
   cta: {
     backgroundColor: colors.lpPink,
     paddingVertical: 16,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#0E0718',
+    shadowColor: '#000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.85,
+    shadowRadius: 0,
   },
   ctaPressed: { opacity: 0.85 },
   ctaDisabled: { opacity: 0.6 },

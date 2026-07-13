@@ -407,11 +407,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
+  // LP のステッカーボタン (= ピンク地 + 黒枠 + ずらした硬い影)
   primaryBtn: {
     borderRadius: radii.full,
     backgroundColor: colors.lpPink,
     paddingVertical: 12,
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#0E0718',
+    shadowColor: '#000',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.85,
+    shadowRadius: 0,
   },
   primaryBtnDisabled: { opacity: 0.35 },
   primaryBtnPressed: { opacity: 0.85 },
