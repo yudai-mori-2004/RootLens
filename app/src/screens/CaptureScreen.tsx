@@ -1,4 +1,4 @@
-// 撮影画面 (= v0.1.4)。 ジェスチャーキャリブレーション → 撮影 → ローカル保存、 の 3 手。
+// 撮影画面。 ジェスチャーキャリブレーション → 撮影 → ローカル保存、 の 3 手。
 //
 // 「キャリブレーション」 の意図 (= カメラの画角調整):
 //   ユーザは両腕をまっすぐ前に伸ばし、 顔を指先に向ける。 その自然な視線状態でカメラ映像内に
@@ -18,9 +18,9 @@
 //        - 1 本 ~100 分の長時間録画を想定した守り: 録画が乗ったら画面消灯 (タップで復帰)、
 //          熱 critical / 空き容量低下 / 120 分で理由を読み上げて自動終了
 //
-// ⚠ v0.1.4: 録画停止後の自動アップロードは行わない。 クリップは state 'recorded' でローカル一覧
+// ⚠ 録画停止後の自動アップロードは行わない。 クリップは state 'recorded' でローカル一覧
 //    (マイビデオ) に積まれ、 ユーザーがプレビュー確認 → 「アップロード」 した時に advanceClip が
-//    署名 → R2 → 登録 を進める (= DATA_SPECS §2)。
+//    hash → R2 → 登録 を進める。
 //
 // 効果音は assets/sounds/*.mp3 から expo-av で再生 (= captureSounds service)。
 
@@ -155,7 +155,7 @@ const LOW_BATTERY_WARN_LEVEL = 0.35;         // 録画開始時にこれ未満 (
 const LOW_BATTERY_STOP_LEVEL = 0.10;         // 録画中にこれを切ったら自動終了 (= 電池切れ死の前に)
 const RESOURCE_POLL_MS = 30_000;             // 録画中の空き容量 / 電池のポーリング間隔
 
-// 中央許容範囲 (= 縦方向のみ ±10%)。 左右は姿勢でほぼ決まるので見ない (2026-07-06 判断)。
+// 中央許容範囲 (= 縦方向のみ ±10%)。 左右は姿勢でほぼ決まるので見ない。
 const CALIBRATION_CENTER_MARGIN = 0.10;
 const LANDMARK_CONF = 0.3;
 
@@ -497,7 +497,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     return () => { cancelled = true; clearInterval(id); };
   }, [state.kind]);
 
-  // バックグラウンド移行 = その場で通常どおり撮影終了 (2026-07-06 ユーザー判断: 復帰継続はしない。
+  // バックグラウンド移行 = その場で通常どおり撮影終了 (= 復帰継続はしない。
   // 中断を挟んだ時系列は学習データに使えないので、 撮れていた分を 1 本として救って畳む)。
   // 終了処理は native の background 実行猶予 (= stopRecording の beginBackgroundTask) 内で走り、
   // 間に合わず kill された場合も fragmented mp4 + 起動時の孤児回収で拾える。
@@ -649,7 +649,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           const session = await config.stopRecording(sink);
           sessionDirRef.current = session.sessionDir;
 
-          // v0.1.4: ここでは自動アップロードしない。 state 'recorded' でローカル一覧 (マイビデオ) に
+          // ここでは自動アップロードしない。 state 'recorded' でローカル一覧 (マイビデオ) に
           // 積むだけ。 ユーザーがプレビュー確認 → 「アップロード」 した時に advanceClip が進める。
           // 録画尺 = native stop の wall-clock − 録画開始の wall-clock (= 端末申告)。
           const startedAt = recordingStartedAtRef.current;

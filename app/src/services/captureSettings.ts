@@ -40,8 +40,8 @@ export interface CaptureSettings {
 export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   resolution: '1440p',
   autoFocus: true,
-  // RGB-D の既定は 30 Hz (= 2026-07-12 に収録仕様を 1920×1440・30fps 固定と決定。 LP の
-  // スペック表と対)。 sync 時は depth / point cloud も追従する。
+  // RGB-D の既定は 30 Hz (= 収録仕様は 1920×1440・30fps。 LP のスペック表と対)。
+  // sync 時は depth / point cloud も追従する。
   // ⚠ これは初期値の宣言のみ。 fps は撮影設定として native へ渡るだけで、 実行時に別経路で
   //    fps を書き換えるコードは持たせない (= ユーザーが設定画面で選んだ値がそのまま効く)。
   recordingRate: 30,

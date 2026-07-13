@@ -38,7 +38,7 @@ interface Props {
   visible: boolean;
   clip: Clip | null;
   onClose: () => void;
-  /** 同意記録の成功後に呼ぶ。 署名 → R2 → 登録 を開始する (再試行も同じ)。 */
+  /** 同意記録の成功後に呼ぶ。 hash → R2 → 登録 を開始する (再試行も同じ)。 */
   onUpload: (clip: Clip) => void;
   onRemove: (clip: Clip) => void;
 }

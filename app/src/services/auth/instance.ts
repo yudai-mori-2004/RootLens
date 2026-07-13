@@ -15,7 +15,7 @@ let instance: AuthProvider | null = null;
 
 export function getAuthProvider(): AuthProvider {
   if (!instance) {
-    // 既定は Supabase (task 13)。 debug への fallback は dev ビルド限定。
+    // 既定は Supabase。 debug への fallback は dev ビルド限定。
     // release で env が欠けたまま debug に落ちると、 ed25519 の野良アカウントで
     // 撮影できてしまう (= build 25 で実際に起きた)。 release では起動時に即死させて
     // ビルド設定の欠落を露見させる。
@@ -53,7 +53,7 @@ export function requireCurrentSession(): AuthSession {
 
 /**
  * API 呼び出し用の Authorization ヘッダ。 トークンが取れない (= 未ログイン / debug provider)
- * 場合は throw する。 サーバはこのトークンの sub をアカウント id として使う (task 13)。
+ * 場合は throw する。 サーバはこのトークンの sub をアカウント id として使う。
  */
 export async function getAuthHeader(): Promise<{ Authorization: string }> {
   const provider = getAuthProvider();

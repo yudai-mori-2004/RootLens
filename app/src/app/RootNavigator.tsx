@@ -9,22 +9,22 @@ import { CaptureScreen } from '../screens/CaptureScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-// 起動は常に MainTabs (= ゲートを置かない。 2026-07-13 に onboarding を撤去)。
+// 起動は常に MainTabs (= 起動時のゲートは置かない)。
 //
-// ログインは起動のゲートにしない (2026-07-12 判断): 撮影は完全ローカルで、 アカウントが
+// ログインは起動のゲートにしない: 撮影は完全ローカルで、 アカウントが
 // 必要なのはアップロード + 同意記録の瞬間だけ。 オフラインの現場でトークン復元に失敗しても
 // 撮影は止めない。 Login はアップロード時 / 設定 / 発行 QR のディープリンクから開く。
 // 利用規約への同意はアップロード同意ポップ (ClipPreviewModal) がクリップごとに取る。
 //
-// CaptureMode は MainTabs の上に push する fullscreen modal (UI_SPECS §4 + §5)。
+// CaptureMode は MainTabs の上に push する fullscreen modal。
 
 export const RootNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       initialRouteName="Main"
-      // v0.1.4: アプリ全体を横持ちベースにする (= 常に landscape 動画を撮る前提の UI)。
+      // アプリ全体を横持ちベースにする (= 常に landscape 動画を撮る前提の UI)。
       // 撮影画面が landscape_right 固定なので、 他画面も同じ向きに固定する (= タブで逆さに持って
-      // いた人が撮影に入ると UI が 180° 回る、 を無くす。 2026-07-06 判断)。
+      // いた人が撮影に入ると UI が 180° 回る、 を無くす)。
       screenOptions={{ ...navigationHeaderOptions, orientation: 'landscape_right' }}
     >
       <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

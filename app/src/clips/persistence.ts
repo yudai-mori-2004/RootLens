@@ -1,13 +1,13 @@
-// クリップ永続化アダプタ (= Layer 2)。
+// クリップ永続化アダプタ。
 //
-// dataflowStore (Layer 1 純粋 store) を subscribe して、 進行中 / 準備完了のクリップを
+// dataflowStore (= 純粋 store) を subscribe して、 進行中 / 準備完了のクリップを
 // AsyncStorage に保存し、 起動時に hydrate する。 AsyncStorage は react-native 依存なので
-// Layer 1 (dataflow) には入れず、 この Layer 2 アダプタに分離する (= dataflow の純粋性維持)。
+// dataflow 層には入れず、 このアダプタに分離する (= dataflow の純粋性維持)。
 //
 // 仕様:
 //   - uploading の永続化は、 アプリ kill でタイマーが切れるため、
 //     起動時に error 扱い (= 「アプリ再起動中に中断されました」) にする。
-//   - 保存キーは旧 clipPipeline と同じ (= 既存ユーザのローカルクリップをそのまま引き継ぐ)。
+//   - 保存キーは変えない (= 既存端末のローカルクリップをそのまま引き継ぐ)。
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';

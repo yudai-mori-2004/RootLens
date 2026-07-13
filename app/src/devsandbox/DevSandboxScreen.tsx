@@ -1,11 +1,11 @@
-// 開発者用データフロー確認サンドボックス (Layer 3 = UI)。
+// 開発者用データフロー確認サンドボックス。
 //
 // 目的: UI フローから完全に独立した状態で、 単体クリップのデータフロー
-// (録画 → Pipeline 1 → Pipeline 2 → Pipeline 3) を 1 ボタンずつ叩いて検証する。
-// 本番 UI (RootNavigator 配下の screens) とは別系統。 __DEV__ 時に App.tsx がこれをルートにする。
+// (録画 → hash → アップロード → 登録) を 1 ボタンずつ叩いて検証する。
+// 本番 UI (RootNavigator 配下の screens) とは別系統。 EXPO_PUBLIC_USE_SANDBOX=1 のビルドで App.tsx がこれをルートにする。
 //
 // このファイルは UI 層なので react / react-native / zustand binding を自由に使う。
-// データフローのロジックは一切持たず、 dataflow 層 (Layer 1) の step / orchestrator を呼ぶだけ。
+// データフローのロジックは一切持たず、 dataflow 層の step / orchestrator を呼ぶだけ。
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -199,13 +199,13 @@ export const DevSandboxScreen: React.FC = () => {
       const session = await config.startRecording(sink);
       const store = dataflowStore.getState();
       store.setSession(session);
-      store.resetCurrent(); // 新しい録画 = 前の署名 + 進行中クリップ追跡を破棄
+      store.resetCurrent(); // 新しい録画 = 進行中クリップの追跡を破棄
       store.setRecording('recording');
     });
   }, [config, runAction]);
 
   // 録画停止 → クリップを起こす (= stage 'pending'、 local id で進行表示対象に)。
-  // 署名は「Pipeline 実行」 (= advanceClip) の段で行われる (= 失敗段から再開できる)。
+  // hash 以降は「送信」 (= advanceClip) の段で行われる (= 失敗段から再開できる)。
   const onStopRecording = useCallback(() => {
     runAction('録画停止', async () => {
       const session = await config.stopRecording(sink);
@@ -216,11 +216,11 @@ export const DevSandboxScreen: React.FC = () => {
     });
   }, [config, runAction]);
 
-  // Pipeline 実行 = 段レジュームランナー (advanceClip)。 pending → hash (content_hash 誕生)
+  // 送信 = 段レジュームランナー (advanceClip)。 pending → hash (content_hash 誕生)
   // → R2 upload → POST /api/clips まで一気に駆動する。
   // 失敗した段は clip.state='error' に反映され、 もう一度押すとその段から再開する。
   const onRunPipeline1 = useCallback(() => {
-    runAction('Pipeline 実行 (段レジューム)', async () => {
+    runAction('送信 (段レジューム)', async () => {
       const clipId = dataflowStore.getState().currentClipId;
       if (!clipId) {
         sink({ step: 'sandbox', level: 'error', message: 'クリップがありません。 先に録画 → 停止してください' });
@@ -329,9 +329,9 @@ export const DevSandboxScreen: React.FC = () => {
           <SandboxButton label="録画開始" onPress={onStartRecording} disabled={!canRecord || !!busy} />
           <SandboxButton label="録画停止" onPress={onStopRecording} disabled={!canStop || !!busy} />
         </View>
-        {/* 送信 (= 署名 → R2 アップ → /api/clips 登録)。 v0.1.4 は後段ワーカー無し。 */}
+        {/* 送信 (= hash → R2 アップ → /api/clips 登録) */}
         <View style={styles.row}>
-          <SandboxButton label="送信 (署名 → アップロード → 登録)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
+          <SandboxButton label="送信 (hash → アップロード → 登録)" onPress={onRunPipeline1} disabled={!canRunP1 || !!busy} primary />
         </View>
         <View style={styles.row}>
           <SandboxButton label="ログクリア" onPress={() => dataflowStore.getState().clearEvents()} disabled={!!busy} subtle />

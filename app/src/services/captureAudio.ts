@@ -13,7 +13,7 @@
 //    - 「自然に最後まで言い終わった」 時だけ seq を確定する (= clearAudioQueue / stop で中断された発話は
 //      完了扱いにしない。 よって途中キャンセルされた発話で遷移が起きない)。
 //
-// ⚠ presentation 層のサービス (= UI 用)。 dataflow (Layer 1) とは無関係。
+// ⚠ presentation 層のサービス (= UI 用)。 dataflow 層とは無関係。
 
 import * as Speech from 'expo-speech';
 

@@ -38,7 +38,7 @@ export const USE_DEV_SANDBOX = readOptional('EXPO_PUBLIC_USE_SANDBOX') === '1';
 export const SERVER_URL =
   readOptional('EXPO_PUBLIC_SERVER_URL') ?? 'https://www.rootlens.io';
 
-// ─── Supabase Auth (task 13) ────────────────────────────────────────────
+// ─── Supabase Auth ──────────────────────────────────────────────────────
 // 運営発行アカウント (uuid + パスワード) のログイン先。 anon key は公開前提の値。
 // 未設定のビルドは DebugAuthProvider に落ちる (= ローカル検証用)。
 

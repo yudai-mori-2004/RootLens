@@ -15,7 +15,7 @@ import { useLocalClipFrame } from '../services/clipFrames';
 import { useT, getLocale } from '../i18n';
 import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 
-// v0.1.4 クリップカード (= マイビデオの横一列スクロール用)。
+// クリップカード (= マイビデオの横一列スクロール用)。
 //
 // ボタンは持たない: 16:9 サムネ + 左上に状態チップ + 右下に尺タグ、 その下に日付と撮影時刻。
 // タップでプレビューポップが開き、 動画を確認 → 同意チェック → アップロード / 削除は全部そちらで行う。

@@ -6,9 +6,7 @@
 //   - 同じ音を連続再生する時は replayAsync で先頭から再生し直す
 //   - file は app/assets/sounds/*.mp3、 後から差替えやすいよう外部 file 参照
 //   - file が無い場合は silently skip (= 動作を阻害しない)、 console.warn のみ
-//
-// 2026-05-27 大方針転換で BGM 連動 hand framing は撤去、 こちらの SFX は新仕様 (= UI_SPECS §5.2)
-// の効果音一覧に対応。
+
 
 import { Audio } from 'expo-av';
 import type { AVPlaybackSource } from 'expo-av/build/AV.types';

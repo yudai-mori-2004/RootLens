@@ -1,6 +1,6 @@
-// クリップストアの React 購読 hooks (= Layer 3 = UI binding)。
+// クリップストアの React 購読 hooks (= UI binding)。
 //
-// dataflowStore は Layer 1 の純粋 vanilla store (= react 非依存)。 React からの購読は
+// dataflowStore は純粋 vanilla store (= react 非依存)。 React からの購読は
 // この UI 層 hooks に閉じ込める (= dataflow の純粋性を保ち、 画面は dataflow の詳細を知らない)。
 //
 // 一覧 (useClips) は s.clips (= Record の安定参照) を購読し、 useMemo で並べ替えるだけ。
@@ -31,7 +31,7 @@ export function useClip(id: string | null | undefined): Clip | null {
   return useMemo(() => (id ? clips[id] ?? null : null), [clips, id]);
 }
 
-/** 録画 → P1 → P2 で進行中のクリップ。 */
+/** 録画 → アップロードで進行中のクリップ。 */
 export function useCurrentClip(): Clip | null {
   return useStore(dataflowStore, selectCurrentClip);
 }

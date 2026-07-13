@@ -101,7 +101,7 @@ export function useLocalClipFrame(key: string, videoUri: string | null): string 
 }
 
 /** アップロード済みクリップの代表フレーム (= /media の presigned URL から range 読み)。
- *  識別子は content_hash (task 13)。 */
+ *  識別子は content_hash。 */
 export function useUploadedClipFrame(key: string | null, contentHash: string | null): string | null {
   const [uri, setUri] = useState<string | null>(key ? frames.get(key) ?? null : null);
   useEffect(() => {

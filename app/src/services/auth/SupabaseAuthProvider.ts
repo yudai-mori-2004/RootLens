@@ -1,11 +1,11 @@
-// Supabase Auth 実装 (task 13)。
+// Supabase Auth 実装。
 //
 // 運営が発行した合成メール (<handle>@rl.local) + パスワードでログインする。
 // アカウント id は auth.users.id (uuid)。 セッション (JWT + refresh token) は
 // expo-secure-store (= iOS Keychain) に永続化し、 アクセストークンは getSession() が
 // 必要に応じてリフレッシュする。
 //
-// セッションの寿命 (2026-07-13 判断): 標準の「短命 JWT (1h) + 長命 refresh token」 方式。
+// セッションの寿命: 標準の「短命 JWT (1h) + 長命 refresh token」 方式。
 // identity (= アカウント id) は保存済みセッションから常に復元するので、 オフラインで JWT が
 // 期限切れでも「誰か」 は分かったまま (= unauthenticated に落とさない)。 落とすのは明示的な
 // サインアウトとサーバ側の失効 (SIGNED_OUT イベント) だけ。 トークンの鮮度が要るのは

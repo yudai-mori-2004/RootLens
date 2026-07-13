@@ -1,4 +1,4 @@
-// Login screen (task 13)。
+// ログイン画面。
 //
 // 起動のゲートではない: アップロード時の誘導 / 設定 / 発行 QR のディープリンクから開く。
 // SupabaseAuthProvider: 運営発行の ID (= handle) + パスワードでログインする。

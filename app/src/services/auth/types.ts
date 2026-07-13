@@ -3,7 +3,7 @@
 // 目的: アプリ本体は具体的な認証実装 (supabase / debug など) を知らずに、
 // 「アカウント id」 と 「API 用アクセストークン」 だけ要求できるようにする。
 // アカウント id はクリップ所有者の識別子だが、 サーバは Bearer token の sub しか信用しない
-// (= id をクライアントから申告する経路は無い。 task 13)。
+// (= id をクライアントから申告する経路は無い)。
 //
 // 既定は SupabaseAuthProvider (= 運営発行の uuid + パスワード)。 DebugAuthProvider は
 // DevSandbox 用に温存 (= トークンを発行できないので本番 API には通らない)。
