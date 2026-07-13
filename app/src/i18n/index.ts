@@ -83,7 +83,7 @@ const ja = {
 
 
   'settings.capture.resolution': '解像度',
-  'settings.capture.res1440': '1440p(最大画角)',
+  'settings.capture.res1440': '1440p',
   'settings.capture.autoFocus': 'オートフォーカス',
   'settings.capture.recordingRate': '書き出しレート',
   'settings.capture.syncRate': 'レートを同期(映像・深度・点群)',
@@ -250,7 +250,7 @@ const en: Record<TranslationKey, string> = {
 
 
   'settings.capture.resolution': 'Resolution',
-  'settings.capture.res1440': '1440p (max FOV)',
+  'settings.capture.res1440': '1440p',
   'settings.capture.autoFocus': 'Auto focus',
   'settings.capture.recordingRate': 'Recording rate',
   'settings.capture.syncRate': 'Sync rate (RGB, depth, point cloud)',
