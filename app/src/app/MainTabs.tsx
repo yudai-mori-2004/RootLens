@@ -62,7 +62,8 @@ export const MainTabs: React.FC = () => {
         >
           <Svg width={30} height={30} viewBox="0 0 30 30" fill="none">
             <Circle cx={15} cy={15} r={12.5} stroke={colors.paper} strokeWidth={1.8} />
-            <Circle cx={15} cy={15} r={5.5} fill={colors.emerald} />
+            {/* 中心は LP のピンク (= primary CTA の差し色はアプリ内で 1 系統) */}
+            <Circle cx={15} cy={15} r={5.5} fill={colors.lpPink} />
           </Svg>
         </Pressable>
 

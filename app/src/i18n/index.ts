@@ -222,7 +222,7 @@ const ja = {
   'portfolio.uploadedLabel': '履歴',
   'portfolio.dailyLabel': '毎日の記録',
   'portfolio.pendingNotice': 'データの確認と同意が必要です。',
-  'portfolio.recordInvite': '右の丸いボタンから、きょうの家事を撮ってみましょう。',
+  'portfolio.recordInvite': '右の丸いボタンから、きょうの作業を撮ってみましょう。',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
@@ -385,7 +385,7 @@ const en: Record<TranslationKey, string> = {
   'portfolio.uploadedLabel': 'History',
   'portfolio.dailyLabel': 'Daily record',
   'portfolio.pendingNotice': 'These videos need your review and consent.',
-  'portfolio.recordInvite': 'Tap the round button on the right and capture today’s chores.',
+  'portfolio.recordInvite': 'Tap the round button on the right and capture today’s work.',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { ja, en };

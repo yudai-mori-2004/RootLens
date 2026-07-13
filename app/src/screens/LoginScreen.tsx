@@ -221,14 +221,14 @@ const styles = StyleSheet.create({
   },
   heroBlock: { gap: 2 },
   heroLine: {
-    fontFamily: fonts.serifLight,
-    fontSize: 32,
-    lineHeight: 38,
-    letterSpacing: -0.5,
+    fontFamily: fonts.display,
+    fontSize: 34,
+    lineHeight: 40,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
     color: colors.ink,
   },
   heroAccent: {
-    fontFamily: fonts.serifMedium,
     color: colors.lpPink,
   },
   lede: {

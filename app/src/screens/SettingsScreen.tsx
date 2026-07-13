@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   footnote: {
     ...typography.caption,
     color: colors.textFaint,
-    fontFamily: fonts.mono,
-    fontSize: 11,
+    fontFamily: fonts.dot,
+    fontSize: 12,
   },
 });

@@ -11,9 +11,10 @@ export const BrandMark: React.FC<{ size?: number; withWordmark?: boolean }> = ({
   withWordmark = true,
 }) => (
   <View style={styles.row}>
+    {/* LP のナビと同じ: アイコンは -6° 傾ける */}
     <Image
       source={require('../../assets/icon.png')}
-      style={{ width: size, height: size, borderRadius: size * 0.24 }}
+      style={{ width: size, height: size, borderRadius: size * 0.24, transform: [{ rotate: '-6deg' }] }}
       resizeMode="cover"
     />
     {withWordmark ? (
@@ -27,8 +28,8 @@ export const BrandMark: React.FC<{ size?: number; withWordmark?: boolean }> = ({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   wordmark: {
-    fontFamily: fonts.brand,
-    letterSpacing: -0.3,
+    fontFamily: fonts.sansBold,
+    letterSpacing: 0.2,
     color: colors.ink,
     flexShrink: 0,
   },

@@ -84,6 +84,9 @@ export const fonts = {
   // 録画 HUD の数字 / インジケータ (= LP のドット文字 DotGothic16。 日本語グリフも持つ)
   dot: 'DotGothic16_400Regular',
 
+  // LP の見出し (= Anton。 Latin のみ。 英語ヒーローと見出しの圧に使う)
+  display: 'Anton_400Regular',
+
   // ブランドワードマーク専用 (= RootLens の文字だけ Fraunces)
   brand: 'Fraunces_700Bold',
 } as const;
