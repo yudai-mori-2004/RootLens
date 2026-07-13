@@ -177,6 +177,18 @@ function effectiveStage(stage: UploadStage, contentHash: string | undefined): Up
   return 'pending';
 }
 
+let advanceQueue = Promise.resolve();
+
+/**
+ * Enqueue an advance so concurrent taps are serialized. The second clip waits
+ * for the first to finish (hash → upload → register) before starting its own.
+ */
+export function enqueueAdvance(clipId: string, sink: EventSink): void {
+  advanceQueue = advanceQueue
+    .then(() => advanceClip(clipId, sink))
+    .catch(() => {});
+}
+
 /**
  * Advance a clip from its current stage (shared by submit and retry).
  *

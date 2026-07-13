@@ -31,7 +31,7 @@ import { ClipCard, type DesignMock } from '../components/ClipCard';
 import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import { HistoryDetailModal } from '../components/HistoryDetailModal';
 import {
-  storeEventSink, advanceClip, discardClip, fetchMyClips, ClipApiError,
+  storeEventSink, enqueueAdvance, discardClip, fetchMyClips, ClipApiError,
   type Clip, type ServerClipStatus,
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
@@ -309,7 +309,7 @@ export const CollectionScreen: React.FC = () => {
   const onClose = useCallback(() => setPreviewTarget(null), []);
   const onUpload = useCallback((clip: Clip) => {
     setPreviewTarget(null);
-    void advanceClip(clip.id, storeEventSink);
+    enqueueAdvance(clip.id, storeEventSink);
   }, []);
   const onRemove = useCallback((clip: Clip) => {
     setPreviewTarget(null);

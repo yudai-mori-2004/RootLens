@@ -53,7 +53,7 @@ export {
 } from './steps';
 
 // Stage-resumable upload runner (shared by "upload" and "try again": record → hash → upload + register)
-export { enqueueRecording, advanceClip, discardClip, recoverOrphanRecordings } from './pipeline';
+export { enqueueRecording, enqueueAdvance, advanceClip, discardClip, recoverOrphanRecordings } from './pipeline';
 
 // Store
 export {
