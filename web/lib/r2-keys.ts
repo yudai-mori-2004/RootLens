@@ -16,7 +16,7 @@ export function rawSessionPrefix(contentHash: string): string {
 /// 撮影構成 ID (= app/src/dataflow/recording-configs/ と 1:1)。
 export type RecordingConfigId = "ultra_wide" | "arkit";
 
-/// 撮影構成が出力するファイル名 (DATA_SPECS §2.2)。 構成が増えたら固有ファイルを足す。
+/// 撮影構成が出力するファイル名。 構成が増えたら固有ファイルを足す。
 export type RawSessionFilename =
   | "rgb.mp4"
   | "frames.jsonl"            // per-frame の pose / intrinsics / tracking / hands (旧名 realtime_handpose.jsonl)

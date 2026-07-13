@@ -46,7 +46,7 @@ export { rawMp4Key };
 
 // ─── presigned URLs ────────────────────────────────────────────────────
 
-/// クリップ 1 件の撮影構成ファイル分の PUT presigned URL を一括発行 (DATA_SPECS §2.4)。
+/// クリップ 1 件の撮影構成ファイル分の PUT presigned URL を一括発行。
 /// 構成マニフェスト (RAW_SESSION_MANIFEST) のファイルだけを、 構成対応バケットに presign する。
 /// optional なファイル (= depth.tar 等) も presign には含め、 端末は実際に生成したものだけ PUT する。
 export async function presignRawSessionUploads(opts: {

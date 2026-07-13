@@ -13,7 +13,7 @@ export const clips = pgTable(
   "clips",
   {
     // ── 識別・所有 ───────────────────────────────────────────────────
-    /// raw mp4 バイト列の SHA-256 hex (= DATA_SPECS §2)。 端末で計算し、 R2 raw キーと
+    /// raw mp4 バイト列の SHA-256 hex。 端末で計算し、 R2 raw キーと
     /// 完全に 1:1 (= raw/<content_hash>/*)。 ストレージが内容アドレスで世界一意なので DB も同じ。
     contentHash: text("content_hash").primaryKey(),
 
@@ -27,7 +27,7 @@ export const clips = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 
     // ── 撮影ファクト (端末申告) ───────────────────────────────────────
-    /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit'、 DATA_SPECS §3)。
+    /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit')。
     recordingConfig: text("recording_config").notNull(),
 
     /// 録画尺 (ms)。 端末申告。 現場 × 月の録画時間集計 (= 撮影協力費の明細) の元。

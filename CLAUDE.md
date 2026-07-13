@@ -7,7 +7,7 @@ Embodied AI / VLA モデル向けの学習データとして FPV Labs (Stera) �
 
 - 現行フェーズ: **v0.1.4** (= C2PA / Title Protocol / Solana を撤去し、 データ収集 + 手渡し
   だけに絞った実装。 task 12 で残骸掃除まで実行済み)。
-- 仕様: `document/v0.1.4/DATA_SPECS_JA.md` + `document/v0.1.3/UI_SPECS_JA.md` (= UI は v0.1.3 のまま)
+- データ仕様の正: 実装 + `app/README.md` (= 契約は型 + fail-loud チェックで強制)。 UI 参考: `document/v0.1.3/UI_SPECS_JA.md`
 - タスク進捗: `document/v0.1.4/tasks/README.md`
 - 過去仕様: `document/v0.1.0..v0.1.3/` (= 参照用に保持、 触らない)
 
@@ -27,7 +27,8 @@ root-lens/
 │   └── lp-sample/       LP のサンプル動画パイプライン
 │
 └── document/
-    └── v0.1.4/         current spec + tasks/
+    ├── legal/          法務正本 (ja 正 + en ミラー。 gen-legal.mjs のビルド入力)
+    └── v0.1.4/         tasks/ (タスクログ)
         └── fpvlabs-handoff/ 運用手順 (RUNBOOK) + 未処理クリップ一覧 + FPV 向け README
 ```
 
@@ -39,7 +40,7 @@ root-lens/
 ```
 [撮影端末: app/]
   録画完了                → sha256(raw mp4) 計算 → content_hash 誕生
-  → R2 rootlens-raw-arkit へ並列 PUT (rgb.mp4 + realtime_handpose.jsonl +
+  → R2 rootlens-raw-arkit へ並列 PUT (rgb.mp4 + frames.jsonl +
      imu.jsonl + metadata.json + depth.tar)
   → POST /api/clips で登録 (= state='uploaded')
 
@@ -48,7 +49,7 @@ root-lens/
   /api/v1/consents で同意証跡。
 
 [運用: tools/modal/fpvlabs/]
-  手動で `modal run tools/modal/fpvlabs/fpvlabs.py --signature-hash <hash>` 実行。
+  手動で `modal run tools/modal/fpvlabs/fpvlabs.py --content-hash <hash>` 実行。
   raw を落として EgoBlur (GPU L4) で顔ぼかし → Stera 互換 MCAP を組み立て → rootlens-fpvlabs に put。
 
 [FPV Labs]
@@ -70,9 +71,10 @@ root-lens/
 
 ## Development methodology
 
-### 原則: 仕様駆動 + タスク駆動
+### 原則: 実装が正 + タスク駆動
 
-`document/v0.1.4/DATA_SPECS_JA.md` (= データパイプライン) が Source of Truth。
+データ仕様の正は実装と `app/README.md`。 コンポーネント間の契約 (ファイルマニフェスト /
+API 型 / スキーマ) は型と fail-loud チェックで強制し、 別文書に二重管理しない。
 タスクは `document/v0.1.4/tasks/NN-name/` に分割、 各 README に「目的 / 読むべきファイル / スコープ
 (= やること / やらないこと) / 成功基準 / 進捗」 を持つ。
 
@@ -88,7 +90,7 @@ root-lens/
 
 ## Coding conventions
 
-- TypeScript / Python は仕様書セクション参照を doc comment に書く
+- コメントは今のコードの説明だけを書く (= バージョン・task 番号・日付・変更履歴を書かない)
 - 公開向け文章 (= LP / dataset card) には内部設計プロセスを混ぜない
 - 完了バージョンの仕様書 (= `document/v0.1.0..v0.1.3/`) は誤り修正以外で変更しない
 

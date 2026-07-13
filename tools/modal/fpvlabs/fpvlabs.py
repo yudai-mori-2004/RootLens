@@ -1,4 +1,4 @@
-# pipeline-fpvlabs: raw セッション → (任意) 顔ぼかし → Stera 互換 raw MCAP (DATA_SPECS 外の受け渡し工程)。
+# pipeline-fpvlabs: raw セッション → (任意) 顔ぼかし → Stera 互換 raw MCAP。
 #
 # FPV Labs (https://fpvlabs.ai/stera) へのデータ受け渡し用。 rootlens-raw-arkit の
 # raw/<content_hash>/ を読み、 任意で顔ぼかしを適用した上で (= --blur/--no-blur、 既定オン)

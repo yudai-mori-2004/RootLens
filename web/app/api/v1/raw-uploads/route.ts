@@ -22,7 +22,7 @@ const CONTENT_ID_RE = /^[0-9a-f]{64}$/;
 
 const RequestSchema = z.object({
   contentHash: z.string().regex(CONTENT_ID_RE, "contentHash must be 64-char lowercase hex (SHA-256)"),
-  // 撮影構成 → アップロード先バケット + ファイルマニフェストが決まる (DATA_SPECS §3)。
+  // 撮影構成 → アップロード先バケット + ファイルマニフェストが決まる。
   // 旧クライアント互換のため省略時は ultra_wide。
   recordingConfig: z.enum(["ultra_wide", "arkit"]).default("ultra_wide"),
 });
