@@ -4,8 +4,7 @@
 // append-only: この route は INSERT のみ。 UPDATE / DELETE は提供しない
 // (= 同意の有効性を後から立証する証跡。 撤回も event_type='withdrawal' の追記)。
 //
-// subject は body ではなく Bearer token の sub から取る (= 検証済み JWT。 task 13 で
-// X-Account-Pubkey の MVP 認証を置換)。
+// subject は body ではなく Bearer token の sub から取る (= 検証済み JWT のみを信用する)。
 
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
