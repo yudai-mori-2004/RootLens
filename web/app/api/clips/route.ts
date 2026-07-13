@@ -40,7 +40,7 @@ export async function GET(req: Request) {
 }
 
 // POST /api/clips
-// v0.1.4: 端末で content_hash 計算 + R2 raw アップロードを終えてから呼ぶ「ただの登録」 endpoint。
+// 端末で content_hash 計算 + R2 raw アップロードを終えてから呼ぶ「ただの登録」 endpoint。
 // content_hash が PK (= ストレージの raw/<content_hash>/ と 1:1)。 同一 hash の再登録は
 // 同一アカウントなら idempotent に既存行を返し、 別アカウントなら 409。
 const createSchema = z.object({

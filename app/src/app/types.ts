@@ -7,7 +7,7 @@
 //
 // Camera タブを押すと RootStack の `CaptureMode` を push する。 CaptureMode は
 // 「対話サブモード」 と 「カメラサブモード」 を 1 画面内で切り替える。
-// 視覚的断絶を作らないため、 旧 TaskBriefing / Capture の 2 画面遷移はやめて単一画面に。
+// 対話と撮影を 1 画面に統合し、 途中で画面遷移の視覚的断絶を作らない。
 // 撮影完了で対話サブモードに戻り、 ループ可能。 「終わり」 または戻るボタンで Home に戻る。
 
 export type RootStackParamList = {

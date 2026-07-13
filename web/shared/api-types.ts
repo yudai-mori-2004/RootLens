@@ -1,13 +1,12 @@
 // クライアント (= iOS アプリ) と サーバ で共有する API 型定義。
-// v0.1.4 (task 13 適用後): 認証は Authorization: Bearer <supabase JWT>。
-// 詳細は document/v0.1.4/DATA_SPECS_JA.md。
+// 認証は Authorization: Bearer <supabase JWT>。
 
-// ─── 撮影構成 (= DATA_SPECS §3) ────────────────────────────────
+// ─── 撮影構成 ───────────────────────────────────────────────────
 export type RecordingConfig = "ultra_wide" | "arkit";
 
 // ─── ClipDto ─────────────────────────────────────────────────────
 // サーバの clip 行はアップロード完了後にしか作られないので、 状態機械は持たない
-// (state / errorMessage は task 13 で撤去。 端末側のローカル state とは別物)。
+// (サーバ行はアップロード完了後にしか無いので state を持たない。 端末側のローカル state とは別物)。
 
 export interface ClipDto {
   /// 識別子 (= raw mp4 の SHA-256 hex。 DB PK / R2 raw キーと同値)

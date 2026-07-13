@@ -10,10 +10,9 @@ import {
 
 // Cloudflare R2 (= S3 互換) アクセス。
 //
-// v0.1.4: バケットは撮影構成ごとに分離 (DATA_SPECS §3):
+// バケットは撮影構成ごとに分離する:
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= 既定 rootlens-raw-arkit、 env で上書き)
-// processed バケットは v0.1.4 では使わない (= 後段ワーカー未配線、 v0.1.5 で復活)。
 
 if (!process.env.R2_ACCOUNT_ID) {
   throw new Error("R2_ACCOUNT_ID is not set.");

@@ -52,7 +52,7 @@ import tarfile
 import tempfile
 import time
 
-PIPELINE_VERSION = "fpvlabs-4"  # v4: フレーム数と pose 行数の不一致で fail-loud (タイムスタンプ補外の捏造フォールバック撤去)。 v3: EgoBlur (GPU) 切替。
+PIPELINE_VERSION = "fpvlabs-4"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
 
 # ─── EgoBlur (既定) ──────────────────────────────────────────────
 # Stera-10M と同じ検出器 (Meta gen2 EgoBlur、 arXiv:2308.13093)。
@@ -915,7 +915,7 @@ try:
     @app.function(
         image=image,
         gpu="L4",                                # egoblur 推論用。 L4 は A10G より 25% 安く、
-                                                 # FasterRCNN gen2 の処理には十分 (2026-07-09 選定)。
+                                                 # FasterRCNN gen2 の処理には十分。
         timeout=7200,                            # 60 分クリップまで余裕を持たせる
         memory=16384,
         cpu=4.0,

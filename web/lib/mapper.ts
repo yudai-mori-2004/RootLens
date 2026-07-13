@@ -2,7 +2,7 @@ import type { Clip } from "@/db/schema";
 import type { ClipDto, RecordingConfig } from "@/shared/api-types";
 
 // DB row → API DTO 変換。 client が見るのはこれだけ。
-// task 13: 識別子は content_hash そのもの (合成 id 撤去)。 account_id は DTO に出さない
+// 識別子は content_hash そのもの。 account_id は DTO に出さない
 // (= 呼び出し元は自分のトークンで取った自分の行しか見えないので不要)。
 
 export function clipToDto(row: Clip): ClipDto {

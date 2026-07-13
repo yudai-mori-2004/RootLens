@@ -1,7 +1,7 @@
 // R2 オブジェクトキー / プレフィックス / 撮影構成マニフェストの命名関数。
 // AWS SDK 依存ゼロ (= 純粋な文字列関数)。
 //
-// v0.1.4: バケットは撮影構成ごとに分離する (DATA_SPECS §3):
+// バケットは撮影構成ごとに分離する:
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw、 超広角 RGB の raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= depth / IMU / 6DoF ポーズ等 ARKit 由来 raw)
 // key prefix はどちらのバケットでも raw/<content_hash>/ で対称。

@@ -4,7 +4,7 @@
 //   1. API ルートでの Bearer JWT 検証 (auth.getUser(token))
 //   2. 運用スクリプトでのアカウント発行 / 停止 (auth.admin.*)
 //
-// アカウントの意味論 (現場名・契約・振込先) は DB に置かない方針 (task 13)。
+// アカウントの意味論 (現場名・契約・振込先) は DB に置かない方針。
 // auth.users が持つのは合成メール (<handle>@rl.local) と uuid だけで、 PII は存在しない。
 
 import { createClient } from "@supabase/supabase-js";

@@ -1,4 +1,4 @@
-// 死骸テーブルの退避ダンプ (task 13)。 0005_drop_legacy_tables.sql の前に実行する。
+// 死骸テーブルの退避ダンプ。 0005_drop_legacy_tables.sql の前に実行する。
 //
 // 各テーブルの全行を JSON で <repo>/backups/<UTC日時>_<table>.json に書き出す (読み取りのみ)。
 // backups/ は gitignore 済み (= データはリポジトリに入れない)。

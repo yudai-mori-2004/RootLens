@@ -6,7 +6,7 @@ import { requireAccountId } from "@/lib/auth";
 import { clipToDto } from "@/lib/mapper";
 import type { DeleteClipResponse } from "@/shared/api-types";
 
-// path param `id` = content_hash (task 13 で合成 id を撤去し、 識別子は content_hash のみ)。
+// path param `id` = content_hash。
 interface Ctx {
   params: Promise<{ id: string }>;
 }

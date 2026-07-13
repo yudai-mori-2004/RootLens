@@ -1,6 +1,6 @@
 // POST /api/v1/raw-uploads
 //
-// v0.1.4: 端末側 Pipeline 1 用 presigned PUT URL endpoint。
+// 端末のアップロード用 presigned PUT URL endpoint。
 //
 // 流れ:
 //   1. device が生 mp4 の SHA-256 を計算して content_hash を確定
@@ -11,7 +11,7 @@
 //   端末は「アップロード可能か」 だけ先に確認したい (= 容量制限・帯域制限・空きスロット等の事前 reject)。
 //   /api/clips で行を作る前に presign を出せると、 失敗を早く検出できる。
 //
-// auth: Bearer token 必須 (task 13)。 presign の発行自体をログイン済みアカウントに限定する。
+// auth: Bearer token 必須。 presign の発行自体をログイン済みアカウントに限定する。
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";

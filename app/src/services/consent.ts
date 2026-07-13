@@ -1,12 +1,13 @@
-// 同意イベントの記録 (= document/v0.1.3/legal/consent-log-spec/ja.md の実装)。
+// 同意イベントの記録。
 //
-// アップロード同意フォームの「同意して進む」 押下時に、 層化同意の証跡を 1 イベントとして
+// アップロード同意ポップの「同意してアップロード」 押下時に、 同意の証跡を 1 イベントとして
 // サーバ (POST /api/v1/consents、 append-only) に記録する:
-//   - 同意対象の正本 (tester-consent) の版 + SHA-256 (= legalDocs.generated が保持)
-//   - 画面に表示した層1要約の版 + SHA-256 (= 表示した locale の文言そのものを hash)
+//   - 同意対象の正本 (terms-of-service) の版 + SHA-256 (= legalDocs.generated が保持)
+//   - 画面に表示した要約文言の版 + SHA-256 (= 表示した locale の文言そのものを hash)
 //   - スコープ / チェック結果 / locale / 取得方式 / アプリ・端末情報
 //
-// 記録が成功するまでアップロード画面に進めない (= 証跡なしの同意を作らない)。
+// 記録が成功するまでアップロードを開始しない (= 証跡なしの同意を作らない)。
+// 同意記録の要件は document/v0.1.3/legal/consent-log-spec/ja.md。
 
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
@@ -18,24 +19,14 @@ import { getCurrentSession, getAuthHeader } from './auth/instance';
 import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
-/// 層1要約 (= アップロード同意画面) の版。 文言を変えたら必ず上げる。
-/// .2: 第三者チェックを「本人のみ」 から「本人 + 撮影に同意した大人のみ (子ども不可)」 へ。
-/// .3: チェック 2 つを 1 行に短文化 + 正本を tester-consent から terms-of-service (本番規約) へ切替
-///     (2026-07-06)。
-/// .4: 店舗運用向けに整理 (2026-07-12): 年齢確認を撤去 (= 年齢条項は正本側に委ねる)、 場所の撮影許可を
-///     独立チェック化、 第三者文言を「同意していない人物は映り込んでいない」 に形式化、 規約リンクを
-///     チェック文言内のインラインリンクへ。
-/// .5: 第三者文言を「意図して撮影していない + 偶発映り込みは提供前にぼかし」 へ
-///     (= privacy-policy §8 の偶発映り込み条項の追加と対、 2026-07-12)。 絶対断定をやめ、
-///     スタッフが正直にチェックできる形にする。
+/// 同意画面に表示する文言の版。 サーバの同意イベントに記録され、 「どの文言に同意したか」 を
+/// 後から特定する鍵になる。 表示文言 (SUMMARY_KEYS の i18n 文言) を変えたら必ず上げる。
 export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-12.5';
 
-/// アップロード同意のスコープ (= terms-of-service §6: 収集 / AI学習利用 / 社外ライセンス・販売 / 越境提供)。
+/// 同意が及ぶ範囲 (= 収集 / AI 学習利用 / 社外ライセンス・販売 / 越境提供)。 利用規約の利用目的条項と対。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;
 
-/// 画面に表示する層1文言を構成する i18n キー (= summaryHash の算出対象。 表示順に固定)。
-/// 2026-07-06: サマリー段を廃止し、 動画プレビューを見ながら 3 つの個別チェック + 全文リンクで
-/// 同意する単一画面に変更 (= 表示文言はチェック 3 つとボタンラベル)。
+/// 画面に表示する文言を構成する i18n キー (= summaryHash の算出対象。 表示順に固定)。
 const SUMMARY_KEYS = [
   'upload.consentTitle',
   'upload.consentCheckLocation',
