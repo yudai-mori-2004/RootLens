@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size:A4; margin:0; }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  :root{
+    --ink:#111111;
+    --ink2:#333333;
+    --gray:#555555;
+    --soft:#777777;
+    --line:#BFBFBF;
+    --line2:#DDDDDD;
+    --tint:#EEEEEE;
+    --tint2:#F5F5F5;
+    --paper:#FFFFFF;
+  }
+  html,body{ width:210mm; height:297mm; overflow:hidden; background:var(--paper); color:var(--ink);
+    font-family:"Noto Sans CJK JP","Hiragino Sans",sans-serif; font-weight:400;
+    -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision;
+    line-break:strict; word-break:normal; overflow-wrap:normal; }
+  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; background:var(--paper);
+    display:flex; flex-direction:column; }
+
+  /* ---------------- HERO ---------------- */
+  .hero{ position:relative; flex:none; height:78mm; overflow:visible; z-index:5;
+    background:var(--ink); color:#fff; }
+  .heroPad{ position:relative; z-index:6; padding:7mm 14mm 0 14mm; height:100%; }
+  .brand{ display:flex; align-items:center; gap:5px; margin-bottom:3mm; }
+  .brand img{ width:10mm; height:10mm; filter:grayscale(1) brightness(2); }
+  .brand .wm{ font-size:12.5pt; font-weight:900; color:#fff; letter-spacing:.01em; }
+  .pill{ display:inline-block; background:#fff; color:var(--ink); font-size:9pt; font-weight:900;
+    letter-spacing:.14em; padding:1.6mm 5mm; border-radius:99px; }
+  .hero h1{ margin-top:4mm; font-weight:900; font-size:26pt; line-height:1.32; color:#fff; max-width:120mm;
+    letter-spacing:.01em; }
+  .hero h1 .hl{ position:relative; display:inline-block; z-index:0; color:var(--ink); background:#fff;
+    padding:0 2mm; }
+  .hero .sub{ margin-top:3.5mm; font-size:11pt; font-weight:700; color:#fff; letter-spacing:.03em; opacity:.85; max-width:118mm; line-height:1.5; }
+
+  /* 日本初スタンプ */
+  .burst{ position:absolute; z-index:8; top:6mm; left:118mm; width:26mm; height:26mm; display:flex;
+    align-items:center; justify-content:center; text-align:center; transform:rotate(-11deg);
+    border:2.5px solid #fff; border-radius:50%; color:#fff; font-weight:900; font-size:11pt; line-height:1.15;
+    letter-spacing:.02em; }
+
+  /* ポラロイド */
+  .pola{ position:absolute; z-index:7; top:12mm; right:13mm; width:52mm; background:#fff; border-radius:2px;
+    padding:2.5mm 2.5mm 2mm; transform:rotate(3deg); box-shadow:0 8px 22px rgba(0,0,0,.35); }
+  .pola img{ width:100%; display:block; filter:grayscale(1) contrast(1.05); }
+  .pola .cap{ padding:1.6mm 0 .6mm; text-align:center; font-size:8.5pt; font-weight:700; color:var(--ink); }
+  .pola::before{ content:""; position:absolute; top:-3mm; left:50%; width:20mm; height:5mm; margin-left:-10mm;
+    background:var(--tint); transform:rotate(-3deg); border-radius:1px; }
+
+  /* ---------------- BODY ---------------- */
+  .bodyPad{ position:relative; z-index:5; padding:5mm 14mm 0 14mm; flex:1; display:flex; flex-direction:column; }
+  .lead{ font-size:9.5pt; line-height:1.75; color:var(--ink2); }
+  .lead b{ font-weight:800; color:var(--ink); border-bottom:1.5px solid var(--ink); }
+
+  /* 3 STEPS */
+  .steps{ margin-top:4mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
+  .step{ position:relative; background:var(--paper); border:1.5px solid var(--ink);
+    border-radius:3px; padding:3.8mm 5mm 3.8mm; }
+  .step .num{ display:inline-block; font-size:15pt; font-weight:900; letter-spacing:.02em; color:var(--ink);
+    padding-bottom:.5mm; border-bottom:2.5px solid var(--ink); }
+  .step h3{ margin-top:2mm; font-size:11.5pt; font-weight:900; color:var(--ink); line-height:1.32; }
+  .step p{ margin-top:1.8mm; font-size:8.7pt; line-height:1.72; color:var(--ink2); }
+
+  /* MATH */
+  .math{ position:relative; margin-top:5mm; background:var(--paper); border:1.5px solid var(--ink);
+    border-radius:3px; padding:4.5mm 6mm 4.2mm 9mm;
+    display:flex; align-items:center; justify-content:space-between; }
+  .math .tag{ position:absolute; top:-3.2mm; left:8mm; background:var(--ink); color:#fff; font-size:8.5pt;
+    font-weight:900; letter-spacing:.12em; padding:1mm 4mm; }
+  .math .cell{ text-align:center; }
+  .math .cell .lb{ font-size:8.8pt; font-weight:800; color:var(--ink); margin-bottom:1mm; letter-spacing:.02em; }
+  .math .cell .v{ font-size:22pt; font-weight:900; color:var(--ink); letter-spacing:-.01em; }
+  .math .cell .v .u{ font-size:10.5pt; margin-left:.5mm; }
+  .math .cell.give .v{ position:relative; z-index:0; }
+  .math .cell.give .v::before{ content:""; position:absolute; left:-1.5mm; right:-1.5mm; bottom:1mm; height:3.4mm; z-index:-1;
+    background:var(--tint); }
+  .math .op{ font-size:16pt; font-weight:900; color:var(--ink); }
+  .math .cell.source{ background:var(--ink); color:#fff; border-radius:2px;
+    padding:3mm 6mm 3.4mm; }
+  .math .cell.source .lb{ color:#fff; }
+  .math .cell.source .v{ font-size:24pt; color:#fff; }
+  .math-note1{ margin-top:2mm; font-size:8.2pt; color:var(--gray); }
+  .math-note2{ margin-top:.4mm; font-size:8.2pt; color:var(--gray); }
+
+  /* FAQ */
+  .faqTitle{ margin-top:5mm; font-size:13pt; font-weight:900; color:var(--ink); }
+  .faqTitle .mk{ position:relative; z-index:0; display:inline-block; padding:0 1mm; }
+  .faqTitle .mk::before{ content:""; position:absolute; left:0; right:0; bottom:0; height:3mm; z-index:-1;
+    background:var(--tint); }
+  .faq{ margin-top:2.8mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
+  .qa{ background:var(--paper); border:1px solid var(--line); border-radius:3px; padding:3.2mm 4.5mm 3.2mm; color:var(--ink); }
+  .qa .q{ display:block; font-size:9.3pt; font-weight:900; color:var(--ink);
+    padding-bottom:1.4mm; margin-bottom:1.6mm; border-bottom:1.5px solid var(--ink); }
+  .qa .q::before{ content:"Q. "; }
+  .qa p{ font-size:8.6pt; line-height:1.7; color:var(--ink2); }
+
+  /* CTA */
+  .cta{ margin:auto -14mm 0; background:var(--ink); color:#fff;
+    padding:5mm 14mm 5mm; display:flex; align-items:center; gap:7mm; }
+  .cta .big{ flex:1.1; font-size:12.5pt; font-weight:900; line-height:1.4; color:#fff; }
+  .cta .ct{ flex:1; }
+  .cta .tel{ font-size:16pt; font-weight:900; letter-spacing:.02em; color:#fff; }
+  .cta .tel .lb, .cta .ml .lb{ font-size:8pt; font-weight:900; opacity:.7; margin-right:2mm; letter-spacing:.14em; color:#fff; }
+  .cta .ml{ margin-top:1.2mm; font-size:10pt; font-weight:700; color:#fff; }
+  .cta .nm{ margin-top:1.2mm; font-size:8.4pt; font-weight:600; opacity:.75; color:#fff; }
+  .cta .qr{ flex:none; text-align:center; }
+  .cta .qr img{ display:block; width:22mm; height:22mm; background:#fff; padding:1.2mm; border-radius:2px; }
+  .cta .qr .lb{ margin-top:1.5mm; font-size:7.5pt; font-weight:700; color:#fff; opacity:.85; letter-spacing:.06em; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- ===== HERO ===== -->
+  <div class="hero">
+    <div class="heroPad">
+      <div class="brand"><img src="../assets/rootlens_R.png" alt="RootLens"><span class="wm">RootLens</span></div>
+      <span class="pill">大阪大学発スタートアップ RootLens より</span>
+      <h1>ヘッドギアで、人件費<br><span class="hl">大幅に削減</span>できます。</h1>
+      <div class="sub">店舗の作業映像を、ロボット・AI 学習用データとして活用させていただきます。</div>
+    </div>
+    <div class="pola"><img src="../assets/headset.png" alt="ヘッドギア"><div class="cap">使用するヘッドギア</div></div>
+  </div>
+
+  <!-- ===== BODY ===== -->
+  <div class="bodyPad">
+    <div class="lead">RootLens は、店舗で働く方の作業映像を、<b>ロボット・AI の研究開発を行う企業</b>へ販売する事業を運営しております。撮影にご協力いただいた店舗様には、録画できた時間に応じて撮影協力費をお支払いいたします。</div>
+
+    <!-- STEPS -->
+    <div class="steps">
+      <div class="step">
+        <div class="num">01</div>
+        <h3>撮影方法</h3>
+        <p>スタッフの方にヘッドギア型カメラを装着していただき、勤務中の手元の作業を撮影します。撮影は店舗内のバックヤードに限り、映像内の顔にはモザイク処理を施します。音声は録音しません。</p>
+      </div>
+      <div class="step">
+        <div class="num">02</div>
+        <h3>データの用途</h3>
+        <p>撮影した映像は、ロボットやAI が人の作業を学習するための素材として、開発企業へ販売します。用途は AI・ロボット分野の研究開発に限り、店名や個人名は公表いたしません。</p>
+      </div>
+      <div class="step">
+        <div class="num">03</div>
+        <h3>撮影協力費</h3>
+        <p>録画できた時間 1時間につき 1,000円 を、撮影協力費として月次で銀行振込にてお支払いします。試算例は下記の通りです。</p>
+      </div>
+    </div>
+
+    <!-- MATH -->
+    <div class="math">
+      <div class="tag">試算例 (時給 1,200円 のスタッフ)</div>
+      <div class="cell"><div class="lb">お店が払う時給</div><div class="v">1,200<span class="u">円</span></div></div>
+      <div class="op">−</div>
+      <div class="cell give"><div class="lb">撮影協力費の還元</div><div class="v">1,000<span class="u">円</span></div></div>
+      <div class="op">=</div>
+      <div class="cell result"><div class="lb">お店の実質負担</div><div class="v">約200<span class="u">円/時</span></div></div>
+    </div>
+    <div class="math-note1">※1 還元額は録画できた時間分をお支払いいたします（勤務時間の目安 7〜8割）。</div>
+    <div class="math-note2">※2 撮影後に映像の品質を確認し、基準を満たしたもののみ撮影協力費の対象になります。</div>
+    <div class="math-note2">※3 データ販売の拡大にあわせ、還元額を引き上げてまいります。</div>
+
+
+    <!-- FAQ -->
+    <div class="faqTitle">よくある<span class="mk">お問い合わせ</span></div>
+    <div class="faq">
+      <div class="qa">
+        <span class="q">スタッフの負担について</span>
+        <p>スマートフォンをヘッドマウントで頭部に固定する構成です。装着中は両手が空き、通常の作業をしていただけます。中止は、スタッフ本人のご判断でいつでも可能です。</p>
+      </div>
+      <div class="qa">
+        <span class="q">お客様の映り込みについて</span>
+        <p>撮影は店舗内のバックヤードに限ります。ホールや店頭は撮影対象外です。映像内の顔にはモザイクを施し、音声は録音しません。</p>
+      </div>
+      <div class="qa">
+        <span class="q">撮影範囲の指定について</span>
+        <p>撮影を避けたい場所は、事前にお申し付けください。外部への提供前に映像内容をご確認いただけ、削除にも応じます。</p>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="cta">
+      <div class="big">まずは 3週間の試験導入から<br>ご検討いただけます。</div>
+      <div class="ct">
+        <div class="tel"><span class="lb">TEL</span>090-6751-4015</div>
+        <div class="ml"><span class="lb">MAIL</span>yudai@rootlens.io</div>
+        <div class="nm">担当: 森 雄大</div>
+      </div>
+      <div class="qr">
+        <img src="../assets/qr_rootlens.png" alt="rootlens.io">
+        <div class="lb">rootlens.io</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

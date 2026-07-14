@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page { size:A4; margin:0; }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  html,body{ width:210mm; background:#fff; color:#111;
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+    line-break:strict; word-break:normal; overflow-wrap:normal; }
+  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:22mm 24mm 18mm; }
+  h1{ text-align:center; font-size:17pt; letter-spacing:.3em; text-indent:.3em; font-weight:600; }
+  .lead{ margin-top:9mm; font-size:11pt; line-height:1.9; }
+  .lead .em{ font-weight:600; }
+
+  .checks{ margin-top:8mm; padding:5mm 8mm; border:.3mm solid #111; }
+  .checks .cn{ font-size:9.5pt; font-weight:600; letter-spacing:.16em; color:#555; margin-bottom:4mm; }
+  .ck{ display:flex; align-items:flex-start; gap:5mm; margin-top:4mm; font-size:11pt; line-height:1.7; }
+  .ck:first-of-type{ margin-top:0; }
+  .ck .box{ display:inline-block; flex:none; width:5mm; height:5mm; border:.3mm solid #111; margin-top:2mm; }
+  .ck .txt{ flex:1; }
+
+  .note{ margin-top:7mm; font-size:9.5pt; line-height:1.8; color:#333; }
+
+  .sign{ margin-top:11mm; display:flex; gap:10mm; font-size:11pt; }
+  .sg{ flex:1; }
+  .sg .row{ display:flex; align-items:flex-end; margin-top:7mm; }
+  .sg .row:first-child{ margin-top:0; }
+  .sg .row .lb{ width:22mm; }
+  .sg .row .ln{ flex:1; border-bottom:.3mm solid #111; height:8mm; position:relative; }
+  .sg .row .ln .in{ position:absolute; left:1mm; bottom:1mm; font-size:10pt; color:#666; }
+  .date{ margin-top:8mm; font-size:11pt; }
+  .date .bl{ display:inline-block; min-width:14mm; border-bottom:.3mm solid #111; text-align:center; }
+
+  .foot{ margin-top:9mm; font-size:8.5pt; color:#666; line-height:1.6; border-top:.3mm solid #ccc; padding-top:3mm; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>撮影同意書</h1>
+
+  <div class="lead">
+    RootLens (森 雄大) が行う、勤務中の作業映像の撮影について、下の内容をご確認のうえ、同意いただける場合はチェックと署名をお願いします。<br>
+    <span class="em">撮影した映像は、AI・ロボットの研究開発用の学習データとしてのみ使います。</span>
+  </div>
+
+  <div class="checks">
+    <div class="cn">下の内容を確認しました。</div>
+    <div class="ck"><span class="box"></span><span class="txt">作業中、頭部にカメラつきヘッドギアを装着し、手元の映像を撮影します。これに同意します。</span></div>
+    <div class="ck"><span class="box"></span><span class="txt">映像に映る顔（自分の顔を含む）は、外部に渡す前にぼかしをかけます。</span></div>
+    <div class="ck"><span class="box"></span><span class="txt">音声は録音しません。</span></div>
+    <div class="ck"><span class="box"></span><span class="txt">映像はAI・ロボットの研究開発にのみ使い、店名や個人名は公表しません。</span></div>
+    <div class="ck"><span class="box"></span><span class="txt">撮影の中止は、いつでも申し出できます。申し出があれば、すぐに対応します。</span></div>
+    <div class="ck"><span class="box"></span><span class="txt">撮影協力費の一部が、お店を通じてボーナスとして自分に支払われる場合があります（金額と方法はお店との取り決めによります）。</span></div>
+  </div>
+
+  <div class="note">
+    ご不明な点は、下記までお気軽にお問い合わせください。<br>
+    RootLens 担当 森 雄大 / TEL 090-6751-4015 / MAIL yudai@rootlens.io
+  </div>
+
+  <div class="date">同意日: 2026年<span class="bl">&nbsp;</span>月<span class="bl">&nbsp;</span>日</div>
+
+  <div class="sign">
+    <div class="sg">
+      <div class="row"><span class="lb">お店名</span><span class="ln"></span></div>
+      <div class="row"><span class="lb">氏名 (署名)</span><span class="ln"></span></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    この同意書は、お店とRootLensが交わす「撮影協力に関する合意書」の別紙として、お店で保管します。ヘッドギアを装着するスタッフ1名につき、1枚を作成してください。
+  </div>
+</div>
+</body>
+</html>
