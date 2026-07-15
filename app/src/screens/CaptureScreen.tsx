@@ -68,7 +68,7 @@ import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from
 import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isSpeechSettled } from '../services/captureAudio';
 import { applyCaptureSettingsToNative, loadCaptureSettings } from '../services/captureSettings';
 import { useCameraPitch } from '../services/devicePitch';
-import { GestureStabilizer } from '../domain/gestureDetect';
+import { GestureStabilizer, frameGesture } from '../domain/gestureDetect';
 import { t, useT } from '../i18n';
 import { colors, fonts, typography } from '../theme';
 
@@ -1359,22 +1359,6 @@ function formatElapsed(sec: number): string {
   const m = Math.floor(sec / 60);
   const s2 = sec % 60;
   return `${m}:${s2.toString().padStart(2, '0')}`;
-}
-
-// per-hand gesture を 1 フレームのジェスチャーに集約する (= 判定ポリシー = TS 側が持つ本丸)。
-// 非 null の手が全て同じサインなら採用、 null の手は無視 (= 片手の単フレーム検出落ちを吸収して
-// チカチカを抑える)、 異なるサインが混在したら不成立 (null)。 両手前提は呼び出し側の
-// wearerHandCount>=2 + ARM/HOLD の継続要求で担保する (= ここでは手の枚数は見ない)。
-function frameGesture(
-  hands: { gesture: 'open_palm' | 'thumbs_up' | null }[],
-): 'open_palm' | 'thumbs_up' | null {
-  let g: 'open_palm' | 'thumbs_up' | null = null;
-  for (const h of hands) {
-    if (h.gesture == null) continue;
-    if (g === null) g = h.gesture;
-    else if (g !== h.gesture) return null;
-  }
-  return g;
 }
 
 // 現フェーズで「意味のある」 ジェスチャーだけを通す (= 確定ビープのゲート)。

@@ -176,15 +176,15 @@ enum WearerHandClassifier {
 
   // MARK: - Gesture detection
   //
-  // Shape-based rules built to kill the two failure modes of a downward-looking
-  // head-mounted view:
-  //   - Typing misread as thumbs_up: never use image-space y; decide from the
-  //     compactness of the fist plus the thumb sticking out of it.
-  //   - A full open palm going undetected: no 5-finger AND; require a majority
-  //     of the fingers whose joints are confidently visible, treating
-  //     low-confidence fingers as "unknown" rather than "folded".
-  //   - Extension / curl come from joint angles; distances are normalized by
-  //     palm width, so the rules are scale-free.
+  // Per-hand shape classification for a downward-looking head-mounted view:
+  //   - thumbs_up / open_palm are decided from fist compactness, thumb extension,
+  //     and fingertip spread; angles and distances are normalized by palm width
+  //     so the rules are scale-free.
+  //   - open_palm requires a majority of the confidently-visible fingers to be
+  //     extended (not a 5-finger AND), treating low-confidence fingers as
+  //     "unknown" rather than "folded", so a partly-occluded palm still counts.
+  // Thumb-direction filtering (both thumbs roughly parallel, neither pointing
+  // down) is applied on the TS side in frameGesture, where both hands are visible.
   static func detectGesture(hand: RawHand) -> HandGesture? {
     let lm = hand.landmarks
     guard lm.count >= 21 else { return nil }
