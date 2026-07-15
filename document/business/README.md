@@ -2,6 +2,8 @@
 
 撮影協力店を獲得・運用するためのテンプレート (HTML) とビルドスクリプト。実データ (契約済みの店舗情報、押印スキャン、月次入金) は本 repo には置かず、Obsidian vault (`rootlens-vault/RESOURCE_MANAGEMENT/`) 側で管理する。
 
+契約・同意・プライバシーポリシーを主体非依存な形へ育てるための検討ログは [legal-design-notes.md](legal-design-notes.md) にある (保留中)。
+
 ## ディレクトリ
 
 ```
