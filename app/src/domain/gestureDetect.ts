@@ -16,22 +16,17 @@ interface Vec2 {
 type Landmark = { x: number; y: number; confidence: number };
 
 // ── 向き判定の調整ノブ ──
-// landmark は 2D 画面座標のみ (= 奥行き z は無い)。 top-left 原点で y は下ほど大きい
-// (= キャリブの computeAdjustDirection と同じ規約)。 向き判定はすべて「画面に投影した 2D
-// ベクトル」で行い、 正規化して長さを捨てる。 頭部装着の下向きカメラで親指がカメラ側 (手前/奥)
-// へ倒れる回転 (= 画面水平軸まわりの回転) は、 画面内では主に「短くなる (foreshorten)」として
-// 出るだけなので正規化でほぼ吸収される。 完全にカメラを向いて投影が潰れた手だけは向きが不定に
-// なるので、 判定材料から外す (= その軸の回転を仕様として許容する)。
+// landmark は 2D 画面座標のみ (top-left 原点、 y は下ほど大きい)。 停止判定は「両手 thumbs_up
+// かつ両親指が画面で明確に上を向いている」だけで済ませる。 native は握りの形しか見ないので 👎 も
+// thumbs_up ラベルになる。 誤停止 (録画を事故で終わらせる不可逆操作) を防ぐ側に倒す。
 
-// 画面内の親指ベクトルが (この倍率 × 手のひら幅) より短ければ、 親指がカメラ方向を向いて潰れて
-// いるとみなし向きを判定しない。 手前/奥への倒れを許容するための投影ガード。
+// 親指ベクトルが (この倍率 × 手のひら幅) より短ければ画面向きが読めない (= カメラ手前/奥に
+// 倒れて投影が潰れた) とみなす。 その手は「向き不定」= 停止不成立。
 const THUMB_PROJ_MIN_RATIO = 0.3;
-// 明確に「画面内で下を向いた」親指だけを弾くゆるい保険 (= 純粋な 👎 落とし)。 手前/奥の倒れは
-// 上の投影ガードで吸収済みなので強くしない。 実機で本物のグッドが弾かれるなら上げる。
-const THUMB_DOWN_REJECT_Y = 0.6;
-// 左右の親指がほぼ同じ方向を向いているか (= cos 類似度) の下限。 作業中の独立した 2 つの握りは
-// 向きが無相関でここを下回り、 意図的な両手グッドは親指がほぼ平行で上回る。 誤停止が残るなら上げる。
-const THUMBS_PARALLEL_MIN_COS = 0.5;
+// 画面 y。 明確に上を向いた親指は d.y が十分負。 -0.5 は仰角約 30° 以上の上向きに相当。
+// これより上向きでない親指は 1 本でもあれば停止不成立。 実機で本物のグッドが弾かれるなら
+// 緩める (= 値を大きく = 0 に近く)、 誤停止が残るなら締める (= 値を小さく = -1 に近く)。
+const THUMB_UP_REQUIRE_Y = -0.5;
 
 /** 手のひら幅 (= indexMCP(5) ↔ pinkyMCP(17))。 スケール基準。 取れなければ 0。 */
 function palmWidth(lm: Landmark[]): number {
@@ -63,38 +58,33 @@ export interface FrameGestureHand {
 }
 
 /**
- * per-hand のサインを 1 フレームのジェスチャーに集約する (= 判定ポリシーの本丸)。
- * 非 null の手が全て同じサインなら採用し、 null の手は無視する (= 片手の単フレーム落ちを
- * 吸収してチカチカを防ぐ)。 異なるサインが混在したら不成立。
+ * per-hand のサインを 1 フレームのジェスチャーに集約する。
  *
- * thumbs_up だけは誤停止が痛いので向きゲートを重ねる (= すべて画面内 2D、 手前/奥の倒れは無視):
- *   - 各親指が明確に画面下を向いていない
- *   - 両手が揃ったフレームでは左右の親指がほぼ平行 (= バラバラな握りの偶発一致を弾く)
- * 向きが取れない手 (= 低信頼度 or カメラ方向で投影が潰れた手) は判定材料にせず、 従来の
- * ラベル一致へフォールバックする。
+ * 開始 (open_palm) は寛容: 非 null の手が全て open_palm なら成立、 null の手は無視 (= 片手の
+ * 単フレーム落ちを吸収してチカチカを防ぐ)。 誤って開始してもすぐ止められるので厳しくしない。
+ *
+ * 停止 (thumbs_up) は厳格: 「両手 thumbs_up ラベル、 かつ両親指が画面で明確に上を向いている」
+ * のみ成立。 native は握りの形しか見ないので 👎 も thumbs_up ラベルになる。 向きの検査は TS
+ * 側で必ずやる。 曖昧なフレーム (片手のみ / 向きが読めない / 上向きが弱い) は全部弾く。 誤停止
+ * (録画を事故で終わらせる不可逆操作) は開始の誤爆より実害が大きいのでそちらに倒す。
  */
 export function frameGesture(hands: FrameGestureHand[]): GestureLabel | null {
-  let g: GestureLabel | null = null;
-  for (const h of hands) {
-    if (h.gesture == null) continue;
-    if (g === null) g = h.gesture;
-    else if (g !== h.gesture) return null;
-  }
-  if (g !== 'thumbs_up') return g;
+  const nonNull = hands.filter((h) => h.gesture != null);
+  if (nonNull.length === 0) return null;
 
-  const dirs: Vec2[] = [];
-  for (const h of hands) {
-    if (h.gesture !== 'thumbs_up') continue;
+  const allThumbs = nonNull.every((h) => h.gesture === 'thumbs_up');
+  const allPalm = nonNull.every((h) => h.gesture === 'open_palm');
+  if (!allThumbs && !allPalm) return null;
+
+  if (allPalm) return 'open_palm';
+
+  if (nonNull.length < 2) return null;
+  for (const h of nonNull) {
     const d = thumbDirection(h.landmarks);
-    if (d === null) continue;
-    if (d.y > THUMB_DOWN_REJECT_Y) return null;
-    dirs.push(d);
+    if (d === null) return null;
+    if (d.y > THUMB_UP_REQUIRE_Y) return null;
   }
-  if (dirs.length >= 2) {
-    const cos = dirs[0].x * dirs[1].x + dirs[0].y * dirs[1].y;
-    if (cos < THUMBS_PARALLEL_MIN_COS) return null;
-  }
-  return g;
+  return 'thumbs_up';
 }
 
 // ─── 時間方向の安定化 ──────────────────────────────────────────────
