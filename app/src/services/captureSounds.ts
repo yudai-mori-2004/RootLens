@@ -15,6 +15,7 @@ export type SfxName =
   | 'enter_capture'
   | 'detect_palm'
   | 'detect_thumbs_up'
+  | 'detect_cancel'
   | 'countdown_tick'
   | 'countdown_end'
   | 'rec_stop'
@@ -28,6 +29,7 @@ export type SfxName =
 //   enter_capture    入場時の柔らかいチャイム         ~0.4s   (session 開始時に 1 回)
 //   detect_palm      キャリブ確定の肯定的な確定音      ~0.4s   (手のひら中央 OK)
 //   detect_thumbs_up サムズアップ → 停止の確定音        ~0.4s
+//   detect_cancel    停止シーケンス中のキャンセル音    ~0.2s   (下降ベンド、 目立たせない)
 //   countdown_tick   3/2/1 の極短ブリップ               ~0.15s  (各カウントで 1 回)
 //   countdown_end    カウント終了 = 録画開始の合図音    ~0.5s   (上昇音など「ゴー」)
 //   rec_stop         録画停止音                          ~0.4s
@@ -38,6 +40,7 @@ const SOURCES: Record<SfxName, AVPlaybackSource> = {
   enter_capture:    require('../../assets/sounds/enter_capture_chime_0.4s.mp3'),
   detect_palm:      require('../../assets/sounds/detect_palm_confirm_0.4s.mp3'),
   detect_thumbs_up: require('../../assets/sounds/detect_thumbs_up_confirm_0.4s.mp3'),
+  detect_cancel:    require('../../assets/sounds/detect_cancel_blip_0.2s.mp3'),
   countdown_tick:   require('../../assets/sounds/countdown_tick_blip_0.15s.mp3'),
   countdown_end:    require('../../assets/sounds/countdown_end_go_0.5s.mp3'),
   rec_stop:         require('../../assets/sounds/rec_stop_soft_0.4s.mp3'),

@@ -136,12 +136,17 @@ const THUMBS_UP_ARM_MS = 300;
 const THUMBS_UP_HOLD_MS = 700;   // ARM と合わせて計 1.0 秒キープでチャイム + 確認 TTS
 // 離脱猶予を長めに (= 立て続けている最中の検出フリッカーを吸収。 意図的な離脱はこれより長く手を動かす)。
 const RELEASE_GRACE_MS = 800;
+// 停止シーケンスの間 (= ピロン → TTS 「撮影を終了します」 → ぴっぴっぴ → ピロロン)。
+// TTS の後にひと呼吸置いてから 3 発の tick を等間隔で入れる。 tick 自体は ~0.15s なので、
+// 「tick 開始 → 次の tick 開始」 が STOP_TICK_INTERVAL_MS。
+const STOP_TICK_POST_TTS_PAUSE_MS = 200;
+const STOP_TICK_INTERVAL_MS = 500;
 // 開始カウント: 3,2,1 を COUNTDOWN_TICK_MS 間隔で刻む (= 120bpm)。 合計 = 3 * tick。
 const COUNTDOWN_TICKS = 3;
 const COUNTDOWN_TICK_MS = 500;
 const HAND_LOST_WARN_MS = 5000;
 const STOP_HINT_DELAY_MS = 3000;        // 録画開始から終了方法の案内までの間
-const WARN_REPEAT_MS = 7000;            // 手が映ってない警告の繰り返し間隔 (= 間延びさせない)
+const WARN_REPEAT_MS = 30000;           // 手が映ってない警告の繰り返し間隔 (= 頻発するとイライラするので長めに)
 
 // ── 長時間録画 (= 1 本 ~100 分想定) の守り ──
 // 熱源はカメラ ISP + ARKit + 手ポーズ推論で録画中は止められない。 削れる最大の発熱源が画面なので、
@@ -237,8 +242,9 @@ function entryCue(s: CaptureState): { sfx?: SfxName; tts?: string; keep?: boolea
       // 保持の前半 (= ARM 後) は無音。 作業中の偶然の検出で音を出さない。
       return null;
     case 'stopping_confirm':
-      // 1.3 秒保持しきって初めて合図 (= ピロ) + 「撮影を終了します。」。 読み終わりまで保持で確定。
-      return { sfx: 'detect_thumbs_up', tts: t('capture.tts.stoppingConfirm') };
+      // ピロン → 「撮影を終了します」 → ぴっぴっぴ の全シーケンスは stopping_confirm 専用 effect が積む。
+      // 単発の cue で表現できないのでここでは null を返す (次のセクション参照)。
+      return null;
     case 'cycle_resuming':
       return { tts: t('capture.tts.cycleResume') };
     default:
@@ -347,6 +353,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const recordingStartedRef = useRef(false);
   // 終了方法の案内 (= 録画開始から数秒後に 1 回だけ)
   const stopHintSpokenRef = useRef(false);
+  // stopping_confirm 中のシーケンス (ピロン → TTS → ぴっぴっぴ) が最後まで鳴り終わったか。
+  // 途中でジェスチャが崩れたら false のまま cancel 分岐へ入る (= 中断発話は完了扱いしない captureAudio の
+  // 仕様と揃う)。 世代カウンタで古い試行の resolve が新しい試行を誤成立させないようにする。
+  const stopSeqRef = useRef<{ generation: number; done: boolean }>({ generation: 0, done: false });
   // 録画尺 (= POST /api/clips の durationMs) 算出用に、 native 録画開始の wall-clock を控える。
   const recordingStartedAtRef = useRef(0);
   const sessionDirRef = useRef<string | null>(null);
@@ -615,6 +625,31 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       awaitedSpeechSeqRef.current = enqueueSpeak(cue.tts);
     }
   }, [state.kind, permission, activeConfigId, config.id]);
+
+  // stopping_confirm の音声シーケンス: ピロン → 「撮影を終了します」 → ぴっ・ぴっ・ぴっ (等間隔)。
+  // 最後の tick が鳴り終わったら stopSeqRef.done を立てて ticker に伝える (= ticker が finalize へ)。
+  // 途中で離脱したら ticker 側で clearAudioQueue + cancel 音 + stopHint 再案内 → recording に戻す。
+  // 世代番号で「前試行の Promise 解決が新試行を誤成立させる」 のを防ぐ。
+  useEffect(() => {
+    if (state.kind !== 'stopping_confirm') return;
+    const gen = stopSeqRef.current.generation + 1;
+    stopSeqRef.current = { generation: gen, done: false };
+    clearAudioQueue();
+    void enqueueSfx('detect_thumbs_up');
+    enqueueSpeak(t('capture.tts.stoppingConfirm'));
+    enqueuePause(STOP_TICK_POST_TTS_PAUSE_MS);
+    // tick 自体 ~0.15s なので、 tick 開始から次の tick 開始までの空き = interval - 0.15s。
+    const gap = Math.max(0, STOP_TICK_INTERVAL_MS - 150);
+    void enqueueSfx('countdown_tick');
+    enqueuePause(gap);
+    void enqueueSfx('countdown_tick');
+    enqueuePause(gap);
+    void enqueueSfx('countdown_tick').then(() => {
+      if (stopSeqRef.current.generation === gen) {
+        stopSeqRef.current = { generation: gen, done: true };
+      }
+    });
+  }, [state.kind, t]);
 
   // 録画状態に入ったら native の startRecording を呼ぶ + recording 終了で finalize。
   // 二重発火 guard: recordingStartedRef + 「同 cycle で 1 度しか呼ばない」 を厳格化。
@@ -915,10 +950,12 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         if (!thumbsUp) {
           const lostSince = cur.lostSince === 0 ? now : cur.lostSince;
           if (now - lostSince >= RELEASE_GRACE_MS) {
-            // 本当に離した → キャンセルして録画継続 (= 確認 TTS も止める)。
-            // 止め方が分からなくて離した可能性が高いので、 1 秒おいて終了方法をもう一度案内する
-            // (= 直列キューなので、 すぐ再挑戦して stopping_confirm に入れば cue が上書きする)。
+            // 本当に離した → キャンセルして録画継続。 世代を進めて、 まだ鳴り終わっていない tick の
+            // Promise 解決で done=true が立つのを無効化する。 clearAudioQueue が in-flight の tick を
+            // 止めた直後に cancel 音を積む。 stopHint はもう一度読んで、 止め方を再提示する。
+            stopSeqRef.current = { generation: stopSeqRef.current.generation + 1, done: false };
             clearAudioQueue();
+            void enqueueSfx('detect_cancel');
             enqueuePause(1000);
             enqueueSpeak(t('capture.tts.stopHint'));
             setState({ kind: 'recording', startTs: now, lastHandSeenTs: now, lastWarnTs: 0, armedSince: 0 });
@@ -927,9 +964,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           }
           return;
         }
-        // 案内を最後まで言い終わり、 かつ今も立て続けている → 停止確定。 キャンセルされた前試行の発話は
-        // 自然完了扱いにならない (captureAudio) + awaitedSpeechSeqRef は現試行の seq なので、 誤 finalize しない。
-        if (speechDone()) {
+        // シーケンス (ピロン → TTS → ぴっぴっぴ) が最後まで鳴り切り、 今も立て続けている → 停止確定。
+        if (stopSeqRef.current.done) {
           setState({ kind: 'finalizing' });
           return;
         }

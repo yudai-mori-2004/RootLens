@@ -153,7 +153,7 @@ const ja = {
   'capture.tts.adjustUp': 'カメラを少し上へ向けてください。手と手元の作業を写すための調整です。',
   'capture.tts.adjustDown': 'カメラを少し下へ向けてください。手と手元の作業を写すための調整です。',
   'capture.tts.stoppingConfirm': '撮影を終了します。',
-  'capture.tts.stopHint': '終了するときは、両手で親指を立てて、そのままキープしてください。',
+  'capture.tts.stopHint': '終了するときは、両手でグッドサインを作って、キープしてください。',
   'capture.tts.handLost': '両手をカメラに映してください。',
   // 自動終了の理由 (= 熱 / 空き容量 / 長時間の安全弁)。 終了フロー冒頭で 1 回だけ読む。
   'capture.tts.autoStopHot': '本体が熱くなったため、撮影を終了します。',
