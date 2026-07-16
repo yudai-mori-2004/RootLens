@@ -1344,7 +1344,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       ) : null}
 
       {/* 自動サイクルの休止中: ARKit 停止 + 輝度 0 で「本当に暗く」 する。 タップで数秒だけ点灯して
-          「休憩中 あとN:MM」を確認できる (= dimmed のときは黒、 タップで復帰した数秒だけ文字が見える)。 */}
+          「休憩中 あとN:MM」を確認できる (= dimmed のときは黒、 タップで復帰した数秒だけ文字が見える)。
+          左上の戻るボタンだけは常にタップ可能 (= 休憩中でもホームへ戻れる。 内側 Pressable を上に重ね
+          onPress で親への伝搬を止める)。 */}
       {state.kind === 'cycle_pausing' ? (
         <Pressable
           style={styles.pauseOverlay}
@@ -1355,6 +1357,19 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         >
           <Text style={styles.pauseTitle}>{t('capture.hud.cyclePausing')}</Text>
           <Text style={styles.pauseRemain}>{formatElapsed(pauseRemainingSec)}</Text>
+          <View style={[styles.chromeTopLeft, { top: safeTop + 12, left: safeLeft + 12 }]}>
+            <Pressable
+              accessibilityLabel={t('common.back')}
+              onPress={onBack}
+              style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
+              hitSlop={8}
+            >
+              <Svg width={18} height={18} viewBox="0 0 18 18">
+                <Line x1={4} y1={4} x2={14} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
+                <Line x1={14} y1={4} x2={4} y2={14} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" />
+              </Svg>
+            </Pressable>
+          </View>
         </Pressable>
       ) : null}
     </View>
@@ -1565,7 +1580,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansSemibold,
     fontSize: 20,
     letterSpacing: 2,
-    color: colors.paper,
+    color: colors.emerald,
   },
   pauseRemain: {
     fontFamily: fonts.dot,

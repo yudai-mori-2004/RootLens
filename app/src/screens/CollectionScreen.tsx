@@ -717,6 +717,9 @@ const styles = StyleSheet.create({
   pendingBlock: { flex: 1, justifyContent: 'center' },
   rowList: {
     paddingHorizontal: spacing.xl,
+    // 各カードを ±0.8° 傾けているため、 CARD_WIDTH の隅が縦に ~4px 飛び出す。
+    // ScrollView は overflow: hidden なので、 上下に余白を持たせて下端のキャプションが見切れないようにする。
+    paddingVertical: 6,
     gap: spacing.lg,
     alignItems: 'center',
   },
