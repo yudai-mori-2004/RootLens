@@ -21,7 +21,7 @@
     border-left:2.5mm solid #111; padding-left:5mm; }
 
   /* ── step card ─────────────────────────────────── */
-  .step{ margin-top:2mm; background:#f6f4f0; border-radius:2.5mm; padding:2.5mm 5mm 3mm; }
+  .step{ margin-top:2.5mm; border:.4mm solid #111; padding:2.5mm 5mm 3mm; }
   .step .h{ display:flex; align-items:center; gap:3mm; font-size:14pt; font-weight:700; line-height:1.3; }
   .step .h .no{ flex:none; width:9mm; height:9mm; border-radius:50%; background:#111; color:#fff;
     font-size:13pt; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
@@ -31,28 +31,32 @@
   .step .pts{ margin-top:2mm; margin-left:12mm; }
 
   /* ── 準備: steps 1 & 2 side by side ─────────────── */
-  .prep-row{ display:flex; gap:6mm; margin-top:2mm; }
+  .prep-row{ display:flex; gap:8mm; margin-top:2.5mm; }
   .prep-row .col{ flex:1; display:flex; }
   .prep-row .step{ margin-top:0; width:100%; }
-  .imgs-2{ display:flex; align-items:center; gap:3mm; margin-top:2.5mm; margin-left:12mm; }
+  .imgs-2{ display:flex; align-items:center; gap:4mm; margin-top:2.5mm; margin-left:12mm; }
   .imgs-2 .cell{ flex:1; text-align:center; }
   .imgs-2 .arr{ flex:none; font-size:18pt; color:#888; line-height:1; padding:0 1mm; }
-  .imgs-2 img{ display:inline-block; width:auto; height:26mm; border-radius:1mm; background:#fff; }
+  .imgs-2 img{ display:inline-block; width:auto; height:24mm; border-radius:1mm; background:#fff; }
   .imgs-2 .cap{ margin-top:1.2mm; font-size:10pt; color:#333; font-weight:500; }
 
   /* ── step 3 ─────────────────────────────────────── */
   .step3{ display:flex; gap:6mm; align-items:flex-start; }
   .step3 .l{ flex:1; }
-  .step3 img{ flex:none; height:32mm; width:auto; align-self:center; }
+  .step3 img{ flex:none; height:28mm; width:auto; align-self:center; }
 
   /* ── step 4: loop-boxed 3-image flow ────────────── */
-  .loop-box{ position:relative; margin-top:2.5mm; margin-left:12mm; margin-right:2mm;
-    border:.6mm solid #666; border-radius:3mm; padding:3.5mm 4mm 2.5mm; }
-  .loop-label{ position:absolute; top:-2.7mm; left:5mm; background:#f6f4f0;
-    padding:0 3mm; font-size:10.5pt; font-weight:700; color:#333; letter-spacing:.04em; }
+  .loop-box{ position:relative; margin-top:3.5mm; margin-left:12mm; margin-right:2mm;
+    border:.5mm solid #111; padding:3.5mm 4mm 2.5mm; }
+  .loop-label{ position:absolute; top:-2.9mm; left:5mm; background:#fff;
+    padding:0 3mm; font-size:11pt; font-weight:700; color:#111; letter-spacing:.04em; }
+  .loop-icon{ position:absolute; top:-4.5mm; right:5mm; width:9mm; height:9mm;
+    border-radius:50%; background:#fff; border:.5mm solid #111;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13pt; font-weight:700; color:#111; line-height:1; }
   .step4-flow{ display:flex; align-items:center; gap:3mm; }
   .step4-flow .cell{ flex:1; text-align:center; }
-  .step4-flow img{ display:inline-block; width:auto; height:34mm; border-radius:1mm; background:#fff; }
+  .step4-flow img{ display:inline-block; width:auto; height:30mm; border-radius:1mm; background:#fff; }
   .step4-flow .cap{ margin-top:1.2mm; font-size:10pt; color:#333; font-weight:500; }
   .step4-flow .arr{ flex:none; font-size:22pt; color:#666; line-height:1; padding:0 1mm; }
 
@@ -61,18 +65,18 @@
     background:#fff; padding:2.5mm 6mm; font-size:14.5pt; font-weight:700; letter-spacing:.03em; }
 
   /* ── step 6 ─────────────────────────────────────── */
-  .step6-imgs{ display:flex; gap:6mm; margin-top:2.5mm; margin-left:12mm; }
+  .step6-imgs{ display:flex; gap:7mm; margin-top:2.5mm; margin-left:12mm; }
   .step6-imgs .cell{ flex:1; position:relative; text-align:center; }
-  .step6-imgs img{ display:inline-block; width:auto; height:38mm; border-radius:1mm; background:#fff; }
+  .step6-imgs img{ display:inline-block; width:auto; height:34mm; border-radius:1mm; background:#fff; }
   .step6-imgs .mk{ position:absolute; top:2mm; right:2mm; width:13mm; height:13mm;
     border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center;
     font-size:22pt; font-weight:700; line-height:1; }
-  .step6-imgs .mk-ng{ border:.7mm solid #c22; color:#c22; }
-  .step6-imgs .mk-ok{ border:.7mm solid #2a2; color:#2a2; }
+  .step6-imgs .mk-ng{ border:.7mm solid #111; color:#111; }
+  .step6-imgs .mk-ok{ border:.7mm solid #111; color:#111; }
   .step6-imgs .cap{ margin-top:1.2mm; font-size:11pt; color:#222; font-weight:600; }
 
   /* ── shoot-row (5 + 6 side by side) ──────────────── */
-  .shoot-row{ display:flex; gap:6mm; margin-top:2mm; align-items:stretch; }
+  .shoot-row{ display:flex; gap:8mm; margin-top:2.5mm; align-items:stretch; }
   .shoot-row .col-l{ flex:1.05; display:flex; }
   .shoot-row .col-r{ flex:1; display:flex; }
   .shoot-row .step{ margin-top:0; width:100%; }
@@ -156,7 +160,8 @@
     <div class="d">普段作業をするときの自然な位置に手を伸ばし、自然な視線で手元を見てください。<br>
       音声で「少し上へ」「少し下へ」と指示されたら、ヘッドギアのネジで角度を調整して、もう一度同じ姿勢をとります。</div>
     <div class="loop-box">
-      <div class="loop-label">↻ 指示が止まるまで繰り返す</div>
+      <div class="loop-label">音声が止まるまで繰り返す</div>
+      <div class="loop-icon">↻</div>
       <div class="step4-flow">
         <div class="cell">
           <img src="../assets/manual/manual-04a.jpg" alt="作業姿勢で構える">
