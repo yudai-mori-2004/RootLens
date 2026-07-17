@@ -164,9 +164,9 @@ const ja = {
   'capture.tts.lowDisk': '本体の空き容量が少なめです。長い撮影は途中で終わることがあります。',
   'capture.tts.lowBattery': '電池が少なめです。長い撮影は途中で終わることがあります。',
   // 自動サイクル: 区切りの停止と再開の案内。
-  'capture.tts.cyclePause': '撮影をひと区切りします。少し休憩します。',
+  'capture.tts.cyclePause': '撮影をひと区切りします。{minutes}分ほどで自動で再開します。',
   'capture.tts.cycleResume': '撮影を再開します。',
-  'capture.hud.cyclePausing': '休憩中',
+  'capture.hud.cyclePausing': '一時停止中',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
   'upload.consentTitle': 'アップロード前の確認',
@@ -338,9 +338,9 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.autoStopBackground': 'The app was interrupted, so recording has stopped.',
   'capture.tts.lowDisk': 'Free storage is limited. A long recording may stop early.',
   'capture.tts.lowBattery': 'The battery is low. A long recording may stop early.',
-  'capture.tts.cyclePause': 'Pausing recording for a short break.',
+  'capture.tts.cyclePause': 'Pausing recording. It will resume automatically in about {minutes} minutes.',
   'capture.tts.cycleResume': 'Resuming recording.',
-  'capture.hud.cyclePausing': 'On break',
+  'capture.hud.cyclePausing': 'Paused',
 
   // ── Upload consent pop (= tap a card in My Videos) ──
   'upload.consentTitle': 'Before you upload',

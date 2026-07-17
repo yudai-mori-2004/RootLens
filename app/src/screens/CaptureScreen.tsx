@@ -861,7 +861,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // finalize 後に休止 → 再開へ進む (cycleStopRef で finalizing に伝える)。
         const cyc = cycleRef.current;
         if (cyc.enabled && startedAt > 0 && now - startedAt >= cyc.recordMs) {
-          autoStopReasonRef.current = t('capture.tts.cyclePause');
+          autoStopReasonRef.current = t('capture.tts.cyclePause', { minutes: Math.max(1, Math.round(cyc.pauseMs / 60_000)) });
           cycleStopRef.current = true;
           setState({ kind: 'finalizing' });
           return;
@@ -1346,8 +1346,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       ) : null}
 
       {/* 自動サイクルの休止中: ARKit 停止 + 輝度 0 で「本当に暗く」 する。 タップで数秒だけ点灯して
-          「休憩中 あとN:MM」を確認できる (= dimmed のときは黒、 タップで復帰した数秒だけ文字が見える)。
-          左上の戻るボタンだけは常にタップ可能 (= 休憩中でもホームへ戻れる。 内側 Pressable を上に重ね
+          「一時停止中 あとN:MM」を確認できる (= dimmed のときは黒、 タップで復帰した数秒だけ文字が見える)。
+          左上の戻るボタンだけは常にタップ可能 (= 一時停止中でもホームへ戻れる。 内側 Pressable を上に重ね
           onPress で親への伝搬を止める)。 */}
       {state.kind === 'cycle_pausing' ? (
         <Pressable
