@@ -17,11 +17,11 @@
   .gear{ flex:none; text-align:right; font-size:10pt; color:#444; border:.4mm solid #999; padding:2mm 4mm; line-height:1.5; }
   .gear b{ display:block; font-size:11pt; color:#111; }
 
-  .sec{ margin-top:3mm; font-size:14pt; font-weight:700; letter-spacing:.14em;
+  .sec{ margin-top:2mm; font-size:14pt; font-weight:700; letter-spacing:.14em;
     border-left:2.5mm solid #111; padding-left:5mm; }
 
   /* ── step card ─────────────────────────────────── */
-  .step{ margin-top:2.5mm; border:.4mm solid #111; padding:2.5mm 5mm 3mm; }
+  .step{ margin-top:2mm; border:.4mm solid #111; padding:2.5mm 5mm 3mm; }
   .step .h{ display:flex; align-items:center; gap:3mm; font-size:14pt; font-weight:700; line-height:1.3; }
   .step .h .no{ flex:none; width:9mm; height:9mm; border-radius:50%; background:#111; color:#fff;
     font-size:13pt; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
@@ -31,7 +31,7 @@
   .step .pts{ margin-top:2mm; margin-left:12mm; }
 
   /* ── 準備: steps 1 & 2 side by side ─────────────── */
-  .prep-row{ display:flex; gap:8mm; margin-top:2.5mm; }
+  .prep-row{ display:flex; gap:8mm; margin-top:2mm; }
   .prep-row .col{ flex:1; display:flex; }
   .prep-row .step{ margin-top:0; width:100%; }
   .imgs-2{ display:flex; align-items:center; gap:4mm; margin-top:2.5mm; margin-left:12mm; }
@@ -55,7 +55,7 @@
     display:flex; align-items:center; justify-content:center; }
   .step4-flow{ display:flex; align-items:center; gap:3mm; margin-top:1mm; }
   .step4-flow .cell{ flex:1; text-align:center; position:relative; }
-  .step4-flow img{ display:block; width:100%; height:auto; border-radius:1mm; background:#fff; }
+  .step4-flow img{ display:inline-block; width:auto; height:40mm; max-width:100%; border-radius:1mm; background:#fff; }
   .step4-flow .cap{ margin-top:1.5mm; font-size:10.5pt; color:#333; font-weight:500; }
   .step4-flow .arr{ flex:none; font-size:22pt; color:#666; line-height:1; padding:0 1mm; }
   .step4-flow .bubble{ position:absolute; top:4%; left:3%;
@@ -87,18 +87,19 @@
   .step6-imgs .cap{ margin-top:1.2mm; font-size:11pt; color:#222; font-weight:600; }
 
   /* ── shoot-row (5 + 6 side by side) ──────────────── */
-  .shoot-row{ display:flex; gap:8mm; margin-top:2.5mm; align-items:stretch; }
+  .shoot-row{ display:flex; gap:8mm; margin-top:2mm; align-items:stretch; }
   .shoot-row .col-l{ flex:1.05; display:flex; }
   .shoot-row .col-r{ flex:1; display:flex; }
   .shoot-row .step{ margin-top:0; width:100%; }
 
   /* ── QA ─────────────────────────────────────────── */
-  .qa{ margin-top:2mm; border:.5mm solid #111; padding:3.5mm 7mm; }
-  .qa .r{ margin-top:1.3mm; font-size:12pt; line-height:1.45; color:#222; }
-  .qa .r:first-child{ margin-top:0; }
-  .qa .r b{ font-weight:700; }
+  .qa{ margin-top:1mm; display:flex; gap:3mm; align-items:stretch; }
+  .qa .r{ flex:1; border:.4mm solid #111; padding:2mm 3mm 2.5mm;
+    font-size:9pt; line-height:1.45; color:#222; }
+  .qa .r b{ display:block; font-weight:700; font-size:9.5pt; line-height:1.4;
+    margin-bottom:1.2mm; padding-bottom:1.2mm; border-bottom:.3mm solid #ccc; }
 
-  .foot{ position:absolute; bottom:3mm; left:20mm; right:20mm; font-size:10pt; color:#666;
+  .foot{ position:absolute; bottom:2mm; left:20mm; right:20mm; font-size:10pt; color:#666;
     border-top:.4mm solid #ccc; padding-top:3.5mm; line-height:1.6; }
 </style>
 </head>
@@ -224,10 +225,10 @@
   <div class="sec">困ったときは</div>
 
   <div class="qa">
-    <div class="r"><b>撮影をやめたいとき・勝手に始まってしまったとき</b> → 6の手順で撮影を終了してください。</div>
-    <div class="r"><b>アプリの応答がない・クラッシュしたとき</b> → 一度アプリのタスクごと削除してから、アプリを再起動して3以降の手順で撮影を開始してください。</div>
-    <div class="r"><b>映してはいけないものが入ってしまったとき（機密書類・お客様の顔等）</b> → 後から削除できるのでご安心ください。すぐに6の手順で撮影を終了し、現在時刻をメモして管理者に報告してください。</div>
-    <div class="r"><b>バッテリーを交換するとき</b> → バッテリーの交換は3時間ごとが目安です。一時停止中の交換がおすすめです。</div>
+    <div class="r"><b>撮影をやめたいとき・勝手に始まってしまったとき</b>6の手順で撮影を終了してください。</div>
+    <div class="r"><b>アプリの応答がない・クラッシュしたとき</b>一度アプリのタスクごと削除してから、アプリを再起動して3以降の手順で撮影を開始してください。</div>
+    <div class="r"><b>映してはいけないものが入ってしまったとき（機密書類・お客様の顔等）</b>後から削除できるのでご安心ください。すぐに6の手順で撮影を終了し、現在時刻をメモして管理者に報告してください。</div>
+    <div class="r"><b>バッテリーを交換するとき</b>バッテリーの交換は3時間ごとが目安です。一時停止中の交換がおすすめです。</div>
   </div>
 
   <div class="foot">
