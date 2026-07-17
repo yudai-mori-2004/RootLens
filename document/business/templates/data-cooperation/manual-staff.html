@@ -8,46 +8,72 @@
   html,body{ width:297mm; background:#fff; color:#111;
     font-family:"Hiragino Sans","Yu Gothic",sans-serif;
     line-break:strict; word-break:normal; overflow-wrap:normal; }
-  .sheet{ position:relative; width:297mm; height:420mm; overflow:hidden; padding:10mm 20mm 14mm; }
+  .sheet{ position:relative; width:297mm; height:420mm; overflow:hidden; padding:9mm 20mm 12mm; }
 
   .head{ display:flex; align-items:flex-start; }
   .head .l{ flex:1; }
   .tag{ display:inline-block; font-size:11pt; font-weight:600; letter-spacing:.22em; border:.5mm solid #111; padding:1.5mm 5mm; }
-  h1{ margin-top:3mm; font-size:26pt; font-weight:700; letter-spacing:.04em; line-height:1.25; }
+  h1{ margin-top:3mm; font-size:26pt; font-weight:700; letter-spacing:.04em; line-height:1.2; }
   .gear{ flex:none; text-align:right; font-size:10pt; color:#444; border:.4mm solid #999; padding:2mm 4mm; line-height:1.5; }
   .gear b{ display:block; font-size:11pt; color:#111; }
 
-  .sec{ margin-top:5mm; font-size:15pt; font-weight:700; letter-spacing:.14em;
+  .sec{ margin-top:3.5mm; font-size:14pt; font-weight:700; letter-spacing:.14em;
     border-left:2.5mm solid #111; padding-left:5mm; }
 
-  .step{ display:flex; gap:9mm; margin-top:3.5mm; align-items:flex-start; }
-  .prep-row{ display:flex; gap:9mm; margin-top:3.5mm; }
-  .pcard{ flex:1; }
-  .pcard .ph{ width:100%; height:42mm; margin-top:2.5mm; }
-  .step .bd{ flex:1; }
-  .step .bd .h, .pcard .h{ font-size:15pt; font-weight:700; line-height:1.4; }
-  .step .bd .h .no, .pcard .h .no{ display:inline-flex; width:9mm; height:9mm; border-radius:50%; background:#111; color:#fff;
+  .step{ margin-top:2.5mm; }
+  .step .h{ font-size:14pt; font-weight:700; line-height:1.4; }
+  .step .h .no{ display:inline-flex; width:9mm; height:9mm; border-radius:50%; background:#111; color:#fff;
     font-size:13pt; font-weight:700; align-items:center; justify-content:center; margin-right:3mm; vertical-align:-1.5mm; }
-  .step .bd .d{ margin-top:1.8mm; margin-left:12mm; font-size:12pt; line-height:1.55; color:#222; }
-  .pcard .d{ margin-top:1.8mm; font-size:12pt; line-height:1.55; color:#222; }
-  .step .bd li{ list-style:none; margin-top:1.6mm; font-size:12pt; line-height:1.55; padding-left:6mm; position:relative; color:#222; }
-  .step .bd li::before{ content:"■"; position:absolute; left:0; font-size:9pt; top:1.5mm; }
-  .step .bd .pts{ margin-top:2mm; margin-left:12mm; }
+  .step .d{ margin-top:1.5mm; margin-left:12mm; font-size:12pt; line-height:1.5; color:#222; }
+  .step li{ list-style:none; margin-top:1.2mm; font-size:12pt; line-height:1.5; padding-left:6mm; position:relative; color:#222; }
+  .step li::before{ content:"■"; position:absolute; left:0; font-size:9pt; top:1.5mm; }
+  .step .pts{ margin-top:2mm; margin-left:12mm; }
 
-  .ph{ flex:none; width:100mm; height:48mm; border:.5mm dashed #999; background:#fafafa;
-    display:flex; align-items:center; justify-content:center; text-align:center;
-    font-size:10pt; color:#888; line-height:1.6; padding:4mm; }
-  .gearimg{ flex:none; height:50mm; width:auto; align-self:center; }
+  .prep-row{ display:flex; gap:9mm; margin-top:2.5mm; }
+  .prep-row .col{ flex:1; }
+  .imgs-2{ display:flex; gap:3mm; margin-top:2mm; margin-left:12mm; }
+  .imgs-2 .cell{ flex:1; }
+  .imgs-2 .cell{ text-align:center; }
+  .imgs-2 img{ display:inline-block; width:auto; height:26mm; border-radius:1mm; }
+  .imgs-2 .cap{ margin-top:1mm; font-size:9.5pt; color:#555; text-align:center; }
 
-  .strip{ display:inline-block; margin-top:3mm; margin-left:12mm; border:.5mm solid #111;
+  .step3{ display:flex; gap:9mm; margin-top:2.5mm; align-items:flex-start; }
+  .step3 .l{ flex:1; }
+  .step3 img{ flex:none; height:36mm; width:auto; align-self:center; }
+
+  .step4-flow{ display:flex; gap:3mm; margin-top:2mm; margin-left:12mm; align-items:center; }
+  .step4-flow .cell{ flex:1; text-align:center; }
+  .step4-flow img{ display:inline-block; width:auto; height:40mm; border-radius:1mm; }
+  .step4-flow .cap{ margin-top:1mm; font-size:9.5pt; color:#555; }
+  .step4-flow .arr{ flex:none; font-size:22pt; color:#666; padding:0 1mm; }
+  .step4-note{ margin-top:1.5mm; margin-left:12mm; font-size:11pt; color:#222; }
+
+  .strip{ display:inline-block; margin-top:2mm; margin-left:12mm; border:.5mm solid #111;
     padding:2.5mm 6mm; font-size:15pt; font-weight:700; letter-spacing:.03em; }
 
-  .qa{ margin-top:3mm; border:.5mm solid #111; padding:4mm 7mm; }
-  .qa .r{ margin-top:1.8mm; font-size:12pt; line-height:1.5; color:#222; }
+  .step6-imgs{ display:flex; gap:6mm; margin-top:2mm; margin-left:12mm; }
+  .step6-imgs .cell{ flex:1; position:relative; }
+  .step6-imgs .cell{ text-align:center; }
+  .step6-imgs img{ display:inline-block; width:auto; height:44mm; border-radius:1mm; }
+  .step6-imgs .mk{ position:absolute; top:2mm; right:2mm; width:14mm; height:14mm;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:24pt; font-weight:700; line-height:1; }
+  .step6-imgs .mk-ng{ background:#fff; border:.7mm solid #c22; color:#c22; }
+  .step6-imgs .mk-ok{ background:#fff; border:.7mm solid #2a2; color:#2a2; }
+  .step6-imgs .cap{ margin-top:1mm; font-size:11pt; color:#222; text-align:center; font-weight:600; }
+
+
+  .shoot-row{ display:flex; gap:9mm; margin-top:2.5mm; align-items:flex-start; }
+  .shoot-row .col-l{ flex:1.05; }
+  .shoot-row .col-r{ flex:1; }
+  .shoot-row .step{ margin-top:0; }
+  .shoot-row .step6-imgs{ margin-top:2mm; }
+  .qa{ margin-top:2mm; border:.5mm solid #111; padding:3mm 7mm; }
+  .qa .r{ margin-top:1.3mm; font-size:12pt; line-height:1.4; color:#222; }
   .qa .r:first-child{ margin-top:0; }
   .qa .r b{ font-weight:700; }
 
-  .foot{ position:absolute; bottom:6mm; left:20mm; right:20mm; font-size:10pt; color:#666;
+  .foot{ position:absolute; bottom:4mm; left:20mm; right:20mm; font-size:10pt; color:#666;
     border-top:.4mm solid #ccc; padding-top:3.5mm; line-height:1.6; }
 </style>
 </head>
@@ -64,20 +90,42 @@
   <div class="sec">準備</div>
 
   <div class="prep-row">
-    <div class="pcard">
-      <div class="h"><span class="no">1</span>バッテリーを装着</div>
-      <div class="d">マグネット式バッテリーをスマホの背面に貼り付けます。<br>必ず有線ケーブルで直接つないでください。</div>
-      <div class="ph">写真を入れる：<br>スマホ背面にマグネットバッテリーを付ける手元</div>
+    <div class="col">
+      <div class="step">
+        <div class="h"><span class="no">1</span>バッテリーを取り付ける</div>
+        <div class="d">マグネット式バッテリーをスマホ背面に貼り付け、有線ケーブルでスマホと直接つなぎます。</div>
+        <div class="imgs-2">
+          <div class="cell">
+            <img src="../assets/manual/manual-01a.jpg" alt="バッテリーを背面に貼る">
+            <div class="cap">① 背面に貼る</div>
+          </div>
+          <div class="cell">
+            <img src="../assets/manual/manual-01b.jpg" alt="ケーブルでつなぐ">
+            <div class="cap">② ケーブルでつなぐ</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="pcard">
-      <div class="h"><span class="no">2</span>スマホをヘッドギアに取り付ける</div>
-      <div class="d">下の写真のようにスマホをヘッドギアに取り付けます。<br>その後、RootLensアプリを開き、カメラを起動します。</div>
-      <div class="ph">写真を入れる：<br>スマホをヘッドギアに取り付け、撮影画面を開いたところ</div>
+    <div class="col">
+      <div class="step">
+        <div class="h"><span class="no">2</span>スマホをヘッドギアに取り付ける</div>
+        <div class="d">スマホをヘッドギアにはめ込み、RootLensアプリのカメラを起動します。</div>
+        <div class="imgs-2">
+          <div class="cell">
+            <img src="../assets/manual/manual-02a.jpg" alt="スマホをはめ込む">
+            <div class="cap">① スマホをはめ込む</div>
+          </div>
+          <div class="cell">
+            <img src="../assets/manual/manual-02b.jpg" alt="撮影ボタンを押す">
+            <div class="cap">② 撮影ボタンを押す</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="step">
-    <div class="bd">
+  <div class="step step3">
+    <div class="l">
       <div class="h"><span class="no">3</span>ヘッドギアをかぶる</div>
       <div class="pts">
         <li>ヘッドギアをかぶり、あごストラップを留めます。</li>
@@ -86,33 +134,62 @@
         <li>締める途中で本体が前後に滑っていく場合は、位置が合っていません。ヘッドバンドを少しずらして締め直し、最適な位置を探してください。</li>
       </div>
     </div>
-    <img class="gearimg" src="../assets/headset.png" alt="Ulanzi CM029">
+    <img src="../assets/headset.png" alt="Ulanzi CM029">
   </div>
 
   <div class="sec">撮影</div>
 
   <div class="step">
-    <div class="bd">
-      <div class="h"><span class="no">4</span>両手がカメラに映るように画角調整</div>
-      <div class="d">普段作業をするときの自然な位置に手を伸ばし、自然な視線で手元を見てください。<br>画角が合わない場合は音声指示にしたがって画角を調整してください。<br>調整したら再度同じ手の位置、視線で手元を映してください。<br>この流れを画角が合うまで繰り返します。</div>
+    <div class="h"><span class="no">4</span>両手がカメラに映るように画角調整</div>
+    <div class="d">普段作業をするときの自然な位置に手を伸ばし、自然な視線で手元を見てください。<br>
+      音声で「少し上へ」「少し下へ」と指示されたら、ヘッドギアのネジで角度を調整して、もう一度同じ姿勢をとります。<br>
+      指示が止まるまで繰り返してください。</div>
+    <div class="step4-flow">
+      <div class="cell">
+        <img src="../assets/manual/manual-04a.jpg" alt="作業姿勢で手を出す">
+        <div class="cap">① 作業姿勢で構える</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="cell">
+        <img src="../assets/manual/manual-04b.jpg" alt="音声指示が流れる">
+        <div class="cap">② 音声指示が流れたら</div>
+      </div>
+      <div class="arr">→</div>
+      <div class="cell">
+        <img src="../assets/manual/manual-04c.jpg" alt="ネジで角度調整">
+        <div class="cap">③ ネジで角度調整</div>
+      </div>
+      <div class="arr">↻</div>
     </div>
-    <div class="ph">写真を入れる：<br>作業台の上で両手を開いて、手元を見ているところ</div>
+    <div class="step4-note">→ 指示が止まるまで①〜③を繰り返します。</div>
   </div>
 
-  <div class="step">
-    <div class="bd">
-      <div class="h"><span class="no">5</span>30分に1回、自動で一時停止</div>
-      <div class="strip">撮影30分 → 一時停止5分 → 手順4を再度</div>
-      <div class="d">スマホの発熱管理のため30分に一度撮影を5分間停止します。<br>「撮影を再開します」と聞こえたら、再度4の手順を行ってください。</div>
+  <div class="shoot-row">
+    <div class="col-l">
+      <div class="step">
+        <div class="h"><span class="no">5</span>30分に1回、自動で一時停止</div>
+        <div class="strip">撮影30分 → 一時停止5分 → 手順4を再度</div>
+        <div class="d">スマホの発熱管理のため30分に一度、撮影を5分間停止します。<br>「撮影を再開します」と聞こえたら、再度4の手順を行ってください。</div>
+      </div>
     </div>
-  </div>
-
-  <div class="step">
-    <div class="bd">
-      <div class="h"><span class="no">6</span>両手グッドサインで撮影終了</div>
-      <div class="d">両手でグッドサインを作ります。<br>「ピッピッピ」という音が鳴り終わるまでキープすると撮影終了となります。<br>どうしても検知されない場合は、ヘッドギアを外して画面のバツボタンから終了することも可能です。</div>
+    <div class="col-r">
+      <div class="step">
+        <div class="h"><span class="no">6</span>両手グッドサインで撮影終了</div>
+        <div class="d">両手で親指を立てて、「ピッピッピ」という音が鳴り終わるまでキープします。<b>親指と、他の4本の指先が両方見える</b>形が確実です。</div>
+        <div class="step6-imgs">
+          <div class="cell">
+            <img src="../assets/manual/manual-06a.jpg" alt="指が見えない">
+            <div class="mk mk-ng">△</div>
+            <div class="cap">指が隠れている</div>
+          </div>
+          <div class="cell">
+            <img src="../assets/manual/manual-06b.jpg" alt="指が見える">
+            <div class="mk mk-ok">○</div>
+            <div class="cap">指先が見えている</div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="ph">写真を入れる：<br>両手でグッドサインを作っているところ+写真に小さく文字で補足で、写真のように全ての指が見えるようにグッドサインを作ってください</div>
   </div>
 
   <div class="sec">困ったときは</div>
