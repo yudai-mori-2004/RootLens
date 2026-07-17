@@ -337,7 +337,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
 
   // 自動サイクル撮影の設定 (= 設定画面の値を撮影中に読む)。 cycleStopRef は「今の停止が
   // 計画的なサイクル区切りか」 のフラグ (= finalizing が休止へ分岐するかの判定に使う)。
-  const cycleRef = useRef({ enabled: false, recordMs: 30 * 60_000, pauseMs: 10 * 60_000 });
+  const cycleRef = useRef({ enabled: false, recordMs: 30 * 60_000, pauseMs: 5 * 60_000 });
   const cycleStopRef = useRef(false);
   const [pauseRemainingSec, setPauseRemainingSec] = useState(0);
   useEffect(() => {

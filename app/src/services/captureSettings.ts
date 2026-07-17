@@ -55,7 +55,7 @@ export const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   streamMesh: true,
   cycleEnabled: false,
   cycleRecordMinutes: 30,
-  cyclePauseMinutes: 10,
+  cyclePauseMinutes: 5,
 };
 
 const STORAGE_KEY = '@rootlens/capture-settings/v1';
