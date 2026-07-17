@@ -8,45 +8,46 @@
   html,body{ width:210mm; background:#fff; color:#111;
     font-family:"Hiragino Sans","Yu Gothic",sans-serif;
     line-break:strict; word-break:normal; overflow-wrap:normal; }
-  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:6mm 16mm 12mm; }
+  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:7mm 16mm 11mm; }
 
   .head{ display:flex; align-items:flex-start; }
   .head .l{ flex:1; }
   .tag{ display:inline-block; font-size:9pt; font-weight:600; letter-spacing:.2em; border:.4mm solid #111; padding:1.2mm 4mm; }
-  h1{ margin-top:1.5mm; font-size:19pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
+  h1{ margin-top:1mm; font-size:17.5pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
   .gear{ flex:none; text-align:right; font-size:8.5pt; color:#444; border:.3mm solid #999; padding:1.5mm 3mm; line-height:1.5; }
   .gear b{ display:block; font-size:9.5pt; color:#111; }
 
-  .grid{ margin-top:2mm; }
-  .row{ display:flex; gap:4mm; margin-top:2.5mm; }
-  .row:first-child{ margin-top:0; }
-  .card{ flex:1; }
-  .card .h{ font-size:11.5pt; font-weight:700; line-height:1.4; }
-  .card .h .no{ display:inline-flex; width:7.5mm; height:7.5mm; border-radius:50%; background:#111; color:#fff;
-    font-size:10.5pt; font-weight:700; align-items:center; justify-content:center; margin-right:2.5mm; vertical-align:-1.2mm; }
-  .ph{ margin-top:1.5mm; height:32mm; border:.4mm dashed #999; background:#fafafa;
+  .sec{ margin-top:3mm; font-size:11pt; font-weight:700; letter-spacing:.14em;
+    border-left:1.8mm solid #111; padding-left:3.5mm; }
+
+  .step{ display:flex; gap:6mm; margin-top:2mm; align-items:flex-start; }
+  .prep-row{ display:flex; gap:5mm; margin-top:2.5mm; }
+  .pcard{ flex:1; }
+  .pcard .ph{ width:100%; height:18mm; margin-top:1.5mm; }
+  .step .bd{ flex:1; }
+  .step .bd .h, .pcard .h{ font-size:11pt; font-weight:700; line-height:1.4; }
+  .step .bd .h .no, .pcard .h .no{ display:inline-flex; width:7mm; height:7mm; border-radius:50%; background:#111; color:#fff;
+    font-size:10pt; font-weight:700; align-items:center; justify-content:center; margin-right:2.5mm; vertical-align:-1mm; }
+  .step .bd .d{ margin-top:1.2mm; margin-left:9.5mm; font-size:9.5pt; line-height:1.5; color:#222; }
+  .pcard .d{ margin-top:1.2mm; font-size:9.5pt; line-height:1.5; color:#222; }
+  .step .bd li{ list-style:none; margin-top:.8mm; font-size:9.5pt; line-height:1.5; padding-left:4.5mm; position:relative; color:#222; }
+  .step .bd li::before{ content:"■"; position:absolute; left:0; font-size:7.5pt; top:1mm; }
+  .step .bd .pts{ margin-top:1.2mm; margin-left:9.5mm; }
+
+  .ph{ flex:none; width:54mm; height:27mm; border:.4mm dashed #999; background:#fafafa;
     display:flex; align-items:center; justify-content:center; text-align:center;
-    font-size:8.5pt; color:#888; line-height:1.6; padding:2mm; }
-  .card .cap{ margin-top:1.2mm; font-size:9.5pt; line-height:1.45; color:#222; }
+    font-size:7.5pt; color:#888; line-height:1.5; padding:2mm; }
+  .gearimg{ flex:none; height:31mm; width:auto; align-self:center; }
 
-  .wear{ border:.5mm solid #111; padding:2.5mm 4mm; display:flex; gap:5mm; align-items:center; }
-  .wear img{ height:40mm; width:auto; }
-  .wear .pts{ flex:1; }
-  .wear .pts .h{ font-size:11.5pt; font-weight:700; }
-  .wear li{ list-style:none; margin-top:1.3mm; font-size:10pt; line-height:1.5; padding-left:5mm; position:relative; }
-  .wear li::before{ content:"■"; position:absolute; left:0; font-size:8pt; top:1.2mm; }
+  .strip{ display:inline-block; margin-top:1.5mm; margin-left:9.5mm; border:.4mm solid #111;
+    padding:1.5mm 4mm; font-size:11pt; font-weight:700; letter-spacing:.02em; }
 
-  .cycle{ margin-top:1.5mm; height:32mm; border:.4mm solid #111; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:2mm; }
-  .cycle .big{ font-size:12.5pt; font-weight:700; white-space:nowrap; }
-  .cycle .sub{ font-size:9pt; color:#444; }
-
-  .qa{ margin-top:1.5mm; border:.4mm solid #111; padding:2mm 4mm; }
-  .qa .h2{ font-size:10.5pt; font-weight:700; letter-spacing:.08em; }
-  .qa .r{ margin-top:1.2mm; font-size:9pt; line-height:1.45; color:#222; }
+  .qa{ margin-top:2mm; border:.4mm solid #111; padding:2mm 4mm; }
+  .qa .r{ margin-top:1.1mm; font-size:9pt; line-height:1.45; color:#222; }
+  .qa .r:first-child{ margin-top:0; }
   .qa .r b{ font-weight:700; }
 
-  .foot{ position:absolute; bottom:7mm; left:16mm; right:16mm; font-size:8.5pt; color:#666;
+  .foot{ position:absolute; bottom:6mm; left:16mm; right:16mm; font-size:8.5pt; color:#666;
     border-top:.3mm solid #ccc; padding-top:2.5mm; line-height:1.6; }
 </style>
 </head>
@@ -60,69 +61,71 @@
     <div class="gear">対象機材<b>Ulanzi CM029 ヘッドマウント</b></div>
   </div>
 
-  <div class="grid">
-    <div class="row">
-      <div class="card">
-        <div class="h"><span class="no">1</span>バッテリーを装着</div>
-        <div class="ph">写真を入れる：<br>スマホ背面にマグネットバッテリーを付ける手元</div>
-        <div class="cap">マグネット式バッテリーをスマホの背面に貼り付けます。<br/>必ず有線ケーブルで直接つないでください。</div>
-      </div>
-      <div class="card">
-        <div class="h"><span class="no">2</span>スマホをヘッドギアに取り付ける</div>
-        <div class="ph">写真を入れる：<br>スマホをヘッドギアに取り付け、撮影画面を開いたところ</div>
-        <div class="cap">スマホを上図のようにヘッドギアに取り付けます。<br/>その後、RootLensアプリを開き、カメラを起動します。</div>
-      </div>
-    </div>
+  <div class="sec">準備</div>
 
-    <div class="row">
-      <div class="card wear">
-        <img src="../assets/headset.png" alt="Ulanzi CM029">
-        <div class="pts">
-          <div class="h"><span class="no">3</span>ヘッドギアをかぶる</div>
-          <li>ヘッドギアをかぶり、あごストラップを留めます。</li>
-          <li>後ろのダイヤルをゆっくり締めていきます。</li>
-          <li>締めるほどしっかりフィットしていく感じなら、その位置で正解です。</li>
-          <li>締める途中で本体が前後に滑っていく場合は、位置が合っていません。ヘッドバンドを少しずらして締め直し、最適な位置を探してください。</li>
-        </div>
-      </div>
+  <div class="prep-row">
+    <div class="pcard">
+      <div class="h"><span class="no">1</span>バッテリーを装着</div>
+      <div class="d">マグネット式バッテリーをスマホの背面に貼り付けます。<br>必ず有線ケーブルで直接つないでください。</div>
+      <div class="ph">写真を入れる：<br>スマホ背面にマグネットバッテリーを付ける手元</div>
     </div>
-
-    <div class="row">
-      <div class="card">
-        <div class="h"><span class="no">4</span>両手がカメラに映るように画角調整</div>
-        <div class="ph">写真を入れる：<br>作業台の上で両手を開いて、手元を見ているところ</div>
-        <div class="cap">普段作業をするときの自然な位置に手を伸ばし、自然な視線で手元を見てください。画角が合わない場合は音声指示にしたがって画角を調整してください。調整したら再度同じ手の位置、視線で手元を映してください。この流れを画角が合うまで繰り返します。</div>
-      </div>
-      <div class="card">
-        <div class="h"><span class="no">5</span>30分に1回、画角の確認</div>
-        <div class="cycle">
-          <div class="big">撮影30分 → 一時停止5分 → またパー</div>
-          <div class="sub">スマホの熱を逃がすため、自動で止まります</div>
-        </div>
-        <div class="cap">スマホの発熱管理のため30分に一度撮影を5分間停止します。「撮影を再開します」と聞こえたら、再度4の手順を行ってください。</div>
-      </div>
-    </div>
-
-    <div class="row">
-      <div class="card">
-        <div class="h"><span class="no">6</span>両手グッドサインで撮影終了</div>
-        <div class="ph">写真を入れる：<br>両手でグッドサインを作っているところ+写真に小さく文字で補足で、写真のように全ての指が見えるようにグッドサインを作ってください</div>
-        <div class="cap">両手でグッドサインを作ります。「ピッピッピ」という音が鳴り終わるまでキープすると撮影終了となります。どうしても検知されない場合は、ヘッドギアを外して画面のバツボタンから終了することも可能です。</div>
-      </div>
-      <div class="card">
-        <div class="h">困ったときは</div>
-        <div class="qa">
-          <div class="r"><b>撮影をやめたいとき・勝手に始まってしまったとき</b> → 6の手順で撮影を終了してください。</div>
-          <div class="r"><b>アプリの応答がない・クラッシュしたとき</b> → 一度アプリのタスクごと削除したのち、アプリを再起動して3以降の手順で撮影を開始してください。</div>
-          <div class="r"><b>映してはいけないものが入ってしまったとき（機密書類・お客様の顔等）</b> → 後から削除可能ですのでご安心ください。すぐに6の手順で撮影を終了し、現在時刻をメモして管理者に報告してください。</div>
-          <div class="r"><b>バッテリーを交換するとき</b> → バッテリーの交換は3時間ごとが目安です。撮影停止中の交換が好ましいです。</div>
-        </div>
-      </div>
+    <div class="pcard">
+      <div class="h"><span class="no">2</span>スマホをヘッドギアに取り付ける</div>
+      <div class="d">下の写真のようにスマホをヘッドギアに取り付けます。<br>その後、RootLensアプリを開き、カメラを起動します。</div>
+      <div class="ph">写真を入れる：<br>スマホをヘッドギアに取り付け、撮影画面を開いたところ</div>
     </div>
   </div>
 
+  <div class="step">
+    <div class="bd">
+      <div class="h"><span class="no">3</span>ヘッドギアをかぶる</div>
+      <div class="pts">
+        <li>ヘッドギアをかぶり、あごストラップを留めます。</li>
+        <li>後ろのダイヤルをゆっくり締めていきます。</li>
+        <li>締めるほどしっかりフィットしていく感じなら、その位置で正解です。</li>
+        <li>締める途中で本体が前後に滑っていく場合は、位置が合っていません。ヘッドバンドを少しずらして締め直し、最適な位置を探してください。</li>
+      </div>
+    </div>
+    <img class="gearimg" src="../assets/headset.png" alt="Ulanzi CM029">
+  </div>
+
+  <div class="sec">撮影</div>
+
+  <div class="step">
+    <div class="bd">
+      <div class="h"><span class="no">4</span>両手がカメラに映るように画角調整</div>
+      <div class="d">普段作業をするときの自然な位置に手を伸ばし、自然な視線で手元を見てください。<br>画角が合わない場合は音声指示にしたがって画角を調整してください。<br>調整したら再度同じ手の位置、視線で手元を映してください。<br>この流れを画角が合うまで繰り返します。</div>
+    </div>
+    <div class="ph">写真を入れる：<br>作業台の上で両手を開いて、手元を見ているところ</div>
+  </div>
+
+  <div class="step">
+    <div class="bd">
+      <div class="h"><span class="no">5</span>30分に1回、自動で一時停止</div>
+      <div class="strip">撮影30分 → 一時停止5分 → 手順4を再度</div>
+      <div class="d">スマホの発熱管理のため30分に一度撮影を5分間停止します。<br>「撮影を再開します」と聞こえたら、再度4の手順を行ってください。</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="bd">
+      <div class="h"><span class="no">6</span>両手グッドサインで撮影終了</div>
+      <div class="d">両手でグッドサインを作ります。<br>「ピッピッピ」という音が鳴り終わるまでキープすると撮影終了となります。<br>どうしても検知されない場合は、ヘッドギアを外して画面のバツボタンから終了することも可能です。</div>
+    </div>
+    <div class="ph">写真を入れる：<br>両手でグッドサインを作っているところ+写真に小さく文字で補足で、写真のように全ての指が見えるようにグッドサインを作ってください</div>
+  </div>
+
+  <div class="sec">困ったときは</div>
+
+  <div class="qa">
+    <div class="r"><b>撮影をやめたいとき・勝手に始まってしまったとき</b> → 6の手順で撮影を終了してください。</div>
+    <div class="r"><b>アプリの応答がない・クラッシュしたとき</b> → 一度アプリのタスクごと削除してから、アプリを再起動して3以降の手順で撮影を開始してください。</div>
+    <div class="r"><b>映してはいけないものが入ってしまったとき（機密書類・お客様の顔等）</b> → 後から削除できるのでご安心ください。すぐに6の手順で撮影を終了し、現在時刻をメモして管理者に報告してください。</div>
+    <div class="r"><b>バッテリーを交換するとき</b> → バッテリーの交換は3時間ごとが目安です。一時停止中の交換がおすすめです。</div>
+  </div>
+
   <div class="foot">
-    RootLens 撮影ヘッドセット スタッフ用マニュアル ／ お問い合わせ：森 雄大　TEL 090-6751-4015
+    RootLens 撮影ヘッドギア スタッフ用マニュアル ／ お問い合わせ：森 雄大　TEL 090-6751-4015
   </div>
 </div>
 </body>
