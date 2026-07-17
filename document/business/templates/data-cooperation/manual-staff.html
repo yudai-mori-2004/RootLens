@@ -53,11 +53,14 @@
   .loop-icon{ position:absolute; top:-4.5mm; right:5mm; width:9mm; height:9mm;
     border-radius:50%; background:#fff; border:.5mm solid #111;
     display:flex; align-items:center; justify-content:center; }
-  .step4-flow{ display:flex; align-items:center; gap:3mm; }
-  .step4-flow .cell{ flex:1; text-align:center; }
-  .step4-flow img{ display:inline-block; width:auto; height:30mm; border-radius:1mm; background:#fff; }
-  .step4-flow .cap{ margin-top:1.2mm; font-size:10pt; color:#333; font-weight:500; }
+  .step4-flow{ display:flex; align-items:center; gap:3mm; margin-top:1mm; }
+  .step4-flow .cell{ flex:1; text-align:center; position:relative; }
+  .step4-flow img{ display:block; width:100%; height:auto; border-radius:1mm; background:#fff; }
+  .step4-flow .cap{ margin-top:1.5mm; font-size:10.5pt; color:#333; font-weight:500; }
   .step4-flow .arr{ flex:none; font-size:22pt; color:#666; line-height:1; padding:0 1mm; }
+  .step4-flow .bubble{ position:absolute; top:8%; right:5%; background:#fff;
+    border:.4mm solid #111; border-radius:4mm; padding:1.3mm 3mm;
+    font-size:10.5pt; font-weight:700; color:#111; white-space:nowrap; line-height:1.2; }
 
   /* ── step 5 ─────────────────────────────────────── */
   .strip{ display:inline-block; margin-top:2.5mm; margin-left:12mm; border:.5mm solid #111;
@@ -161,7 +164,7 @@
     <div class="d">普段作業をするときの自然な位置に手を伸ばし、自然な視線で手元を見てください。<br>
       音声で「少し上へ」「少し下へ」と指示されたら、ヘッドギアのネジで角度を調整して、もう一度同じ姿勢をとります。</div>
     <div class="loop-box">
-      <div class="loop-label">音声が止まるまで繰り返す</div>
+      <div class="loop-label">撮影が開始されるまで繰り返す</div>
       <div class="loop-icon"><svg viewBox="0 0 24 24" width="5.5mm" height="5.5mm" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 4 21 10 15 10"/><path d="M 20.49 15 A 9 9 0 1 1 18.37 5.64 L 21 8"/></svg></div>
       <div class="step4-flow">
         <div class="cell">
@@ -171,6 +174,7 @@
         <div class="arr">→</div>
         <div class="cell">
           <img src="../assets/manual/manual-04b.jpg" alt="音声指示が流れる">
+          <div class="bubble">少し上へ</div>
           <div class="cap">音声指示が流れる</div>
         </div>
         <div class="arr">→</div>
