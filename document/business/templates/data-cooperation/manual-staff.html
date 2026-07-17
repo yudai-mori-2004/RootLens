@@ -3,52 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <style>
-  @page { size:A4; margin:0; }
+  @page { size:A3; margin:0; }
   *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  html,body{ width:210mm; background:#fff; color:#111;
+  html,body{ width:297mm; background:#fff; color:#111;
     font-family:"Hiragino Sans","Yu Gothic",sans-serif;
     line-break:strict; word-break:normal; overflow-wrap:normal; }
-  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:7mm 16mm 11mm; }
+  .sheet{ position:relative; width:297mm; height:420mm; overflow:hidden; padding:10mm 20mm 14mm; }
 
   .head{ display:flex; align-items:flex-start; }
   .head .l{ flex:1; }
-  .tag{ display:inline-block; font-size:9pt; font-weight:600; letter-spacing:.2em; border:.4mm solid #111; padding:1.2mm 4mm; }
-  h1{ margin-top:1mm; font-size:17.5pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
-  .gear{ flex:none; text-align:right; font-size:8.5pt; color:#444; border:.3mm solid #999; padding:1.5mm 3mm; line-height:1.5; }
-  .gear b{ display:block; font-size:9.5pt; color:#111; }
+  .tag{ display:inline-block; font-size:11pt; font-weight:600; letter-spacing:.22em; border:.5mm solid #111; padding:1.5mm 5mm; }
+  h1{ margin-top:3mm; font-size:26pt; font-weight:700; letter-spacing:.04em; line-height:1.25; }
+  .gear{ flex:none; text-align:right; font-size:10pt; color:#444; border:.4mm solid #999; padding:2mm 4mm; line-height:1.5; }
+  .gear b{ display:block; font-size:11pt; color:#111; }
 
-  .sec{ margin-top:3mm; font-size:11pt; font-weight:700; letter-spacing:.14em;
-    border-left:1.8mm solid #111; padding-left:3.5mm; }
+  .sec{ margin-top:5mm; font-size:15pt; font-weight:700; letter-spacing:.14em;
+    border-left:2.5mm solid #111; padding-left:5mm; }
 
-  .step{ display:flex; gap:6mm; margin-top:2mm; align-items:flex-start; }
-  .prep-row{ display:flex; gap:5mm; margin-top:2.5mm; }
+  .step{ display:flex; gap:9mm; margin-top:3.5mm; align-items:flex-start; }
+  .prep-row{ display:flex; gap:9mm; margin-top:3.5mm; }
   .pcard{ flex:1; }
-  .pcard .ph{ width:100%; height:18mm; margin-top:1.5mm; }
+  .pcard .ph{ width:100%; height:42mm; margin-top:2.5mm; }
   .step .bd{ flex:1; }
-  .step .bd .h, .pcard .h{ font-size:11pt; font-weight:700; line-height:1.4; }
-  .step .bd .h .no, .pcard .h .no{ display:inline-flex; width:7mm; height:7mm; border-radius:50%; background:#111; color:#fff;
-    font-size:10pt; font-weight:700; align-items:center; justify-content:center; margin-right:2.5mm; vertical-align:-1mm; }
-  .step .bd .d{ margin-top:1.2mm; margin-left:9.5mm; font-size:9.5pt; line-height:1.5; color:#222; }
-  .pcard .d{ margin-top:1.2mm; font-size:9.5pt; line-height:1.5; color:#222; }
-  .step .bd li{ list-style:none; margin-top:.8mm; font-size:9.5pt; line-height:1.5; padding-left:4.5mm; position:relative; color:#222; }
-  .step .bd li::before{ content:"■"; position:absolute; left:0; font-size:7.5pt; top:1mm; }
-  .step .bd .pts{ margin-top:1.2mm; margin-left:9.5mm; }
+  .step .bd .h, .pcard .h{ font-size:15pt; font-weight:700; line-height:1.4; }
+  .step .bd .h .no, .pcard .h .no{ display:inline-flex; width:9mm; height:9mm; border-radius:50%; background:#111; color:#fff;
+    font-size:13pt; font-weight:700; align-items:center; justify-content:center; margin-right:3mm; vertical-align:-1.5mm; }
+  .step .bd .d{ margin-top:1.8mm; margin-left:12mm; font-size:12pt; line-height:1.55; color:#222; }
+  .pcard .d{ margin-top:1.8mm; font-size:12pt; line-height:1.55; color:#222; }
+  .step .bd li{ list-style:none; margin-top:1.6mm; font-size:12pt; line-height:1.55; padding-left:6mm; position:relative; color:#222; }
+  .step .bd li::before{ content:"■"; position:absolute; left:0; font-size:9pt; top:1.5mm; }
+  .step .bd .pts{ margin-top:2mm; margin-left:12mm; }
 
-  .ph{ flex:none; width:54mm; height:27mm; border:.4mm dashed #999; background:#fafafa;
+  .ph{ flex:none; width:100mm; height:48mm; border:.5mm dashed #999; background:#fafafa;
     display:flex; align-items:center; justify-content:center; text-align:center;
-    font-size:7.5pt; color:#888; line-height:1.5; padding:2mm; }
-  .gearimg{ flex:none; height:31mm; width:auto; align-self:center; }
+    font-size:10pt; color:#888; line-height:1.6; padding:4mm; }
+  .gearimg{ flex:none; height:50mm; width:auto; align-self:center; }
 
-  .strip{ display:inline-block; margin-top:1.5mm; margin-left:9.5mm; border:.4mm solid #111;
-    padding:1.5mm 4mm; font-size:11pt; font-weight:700; letter-spacing:.02em; }
+  .strip{ display:inline-block; margin-top:3mm; margin-left:12mm; border:.5mm solid #111;
+    padding:2.5mm 6mm; font-size:15pt; font-weight:700; letter-spacing:.03em; }
 
-  .qa{ margin-top:2mm; border:.4mm solid #111; padding:2mm 4mm; }
-  .qa .r{ margin-top:1.1mm; font-size:9pt; line-height:1.45; color:#222; }
+  .qa{ margin-top:3mm; border:.5mm solid #111; padding:4mm 7mm; }
+  .qa .r{ margin-top:1.8mm; font-size:12pt; line-height:1.5; color:#222; }
   .qa .r:first-child{ margin-top:0; }
   .qa .r b{ font-weight:700; }
 
-  .foot{ position:absolute; bottom:6mm; left:16mm; right:16mm; font-size:8.5pt; color:#666;
-    border-top:.3mm solid #ccc; padding-top:2.5mm; line-height:1.6; }
+  .foot{ position:absolute; bottom:6mm; left:20mm; right:20mm; font-size:10pt; color:#666;
+    border-top:.4mm solid #ccc; padding-top:3.5mm; line-height:1.6; }
 </style>
 </head>
 <body>
