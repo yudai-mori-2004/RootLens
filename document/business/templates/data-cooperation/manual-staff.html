@@ -8,30 +8,30 @@
   html,body{ width:210mm; background:#fff; color:#111;
     font-family:"Hiragino Sans","Yu Gothic",sans-serif;
     line-break:strict; word-break:normal; overflow-wrap:normal; }
-  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:8mm 18mm 14mm; }
+  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:7mm 18mm 14mm; }
 
   .tag{ display:inline-block; font-size:9pt; font-weight:600; letter-spacing:.2em; border:.4mm solid #111; padding:1.2mm 4mm; }
-  h1{ margin-top:2mm; font-size:19pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
-  .lead{ margin-top:2mm; font-size:10.5pt; line-height:1.8; }
+  h1{ margin-top:2mm; font-size:18pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
+  .lead{ margin-top:1.5mm; font-size:10.5pt; line-height:1.7; }
 
-  .steps{ margin-top:3mm; }
-  .step{ display:flex; gap:5mm; margin-top:3mm; align-items:flex-start; }
-  .step .no{ flex:none; width:11mm; height:11mm; border-radius:50%; background:#111; color:#fff;
-    font-size:14pt; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .steps{ margin-top:2mm; }
+  .step{ display:flex; gap:5mm; margin-top:2.2mm; align-items:flex-start; }
+  .step .no{ flex:none; width:10mm; height:10mm; border-radius:50%; background:#111; color:#fff;
+    font-size:13pt; font-weight:700; display:flex; align-items:center; justify-content:center; }
   .step .bd{ flex:1; padding-top:.5mm; }
-  .step .bd .h{ font-size:12.5pt; font-weight:700; }
-  .step .bd .d{ margin-top:1.2mm; font-size:10.5pt; line-height:1.6; color:#222; }
-  .step .bd .voice{ display:inline-block; margin-top:1.2mm; font-size:9.5pt; line-height:1.5;
+  .step .bd .h{ font-size:12pt; font-weight:700; }
+  .step .bd .d{ margin-top:1mm; font-size:10.5pt; line-height:1.55; color:#222; }
+  .step .bd .voice{ display:inline-block; margin-top:1mm; font-size:9.5pt; line-height:1.5;
     background:#f0f0f0; border-left:1mm solid #999; padding:1mm 3mm; }
 
-  .rules{ margin-top:4mm; border:.5mm solid #111; padding:3mm 6mm; }
+  .rules{ margin-top:3mm; border:.5mm solid #111; padding:2.8mm 6mm; }
   .rules .h{ font-size:11.5pt; font-weight:700; letter-spacing:.08em; }
-  .rules li{ list-style:none; margin-top:2mm; font-size:10.5pt; line-height:1.6; padding-left:5mm; position:relative; }
+  .rules li{ list-style:none; margin-top:1.5mm; font-size:10.5pt; line-height:1.55; padding-left:5mm; position:relative; }
   .rules li::before{ content:"■"; position:absolute; left:0; font-size:8pt; top:1.2mm; }
 
-  .qa{ margin-top:3.5mm; }
+  .qa{ margin-top:2.5mm; }
   .qa .h{ font-size:10.5pt; font-weight:700; letter-spacing:.08em; }
-  .qa .row{ margin-top:1.5mm; font-size:9.5pt; line-height:1.6; color:#222; }
+  .qa .row{ margin-top:1mm; font-size:9.5pt; line-height:1.55; color:#222; }
   .qa .row b{ font-weight:700; }
 
   .foot{ position:absolute; bottom:10mm; left:18mm; right:18mm; font-size:8.5pt; color:#666;
@@ -42,14 +42,14 @@
 <div class="sheet">
   <span class="tag">スタッフ用</span>
   <h1>撮影ヘッドセットの使い方</h1>
-  <div class="lead">操作はアプリの音声がすべて案内します。この紙では、一日の流れと、覚えておいていただきたいことをまとめています。</div>
+  <div class="lead">操作はアプリの音声がすべて案内します。この紙は、一日の流れのまとめです。</div>
 
   <div class="steps">
     <div class="step">
       <div class="no">1</div>
       <div class="bd">
         <div class="h">ヘッドセットを装着する</div>
-        <div class="d">店長からヘッドセットを受け取り、頭に装着します。ベルトがゆるいと映像がぶれるため、しっかりと締めてください。</div>
+        <div class="d">管理者からヘッドセットを受け取り、頭に装着します。ベルトがゆるいと映像がぶれるため、しっかりと締めてください。</div>
       </div>
     </div>
     <div class="step">
@@ -64,12 +64,19 @@
       <div class="no">3</div>
       <div class="bd">
         <div class="h">通常どおり作業する</div>
-        <div class="d">録画が始まると、節電のため画面は自動的に暗くなります（故障ではありません）。撮影は30分ごとに自動で休憩に入ります。休憩中の操作は不要です。「撮影を再開します」と音声が流れたら、手が空いたときにもう一度両手をパーにしてください。急ぐ必要はありません。</div>
-        <span class="voice">音声「撮影をひと区切りします。少し休憩します。」→ 約10分後 →「撮影を再開します。」</span>
+        <div class="d">録画が始まると、節電のため画面は自動的に暗くなります（故障ではありません）。撮影が30分続くと、スマホにこもった熱を逃がすため、約5分の休憩に自動で入ります。休憩中の操作は不要です。「撮影を再開します」と音声が流れたら、手が空いたときにもう一度両手をパーにしてください。急ぐ必要はありません。</div>
+        <span class="voice">音声「撮影をひと区切りします。少し休憩します。」→ 約5分後 →「撮影を再開します。」</span>
       </div>
     </div>
     <div class="step">
       <div class="no">4</div>
+      <div class="bd">
+        <div class="h">休憩のあいだにバッテリーを交換する</div>
+        <div class="d">半日に1回を目安に、スマホ背面のバッテリーを磁石で付け替えます。交換中も撮影は止まりません。使い終わったバッテリーは充電スタンドに戻してください。</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="no">5</div>
       <div class="bd">
         <div class="h">両手のグッドサインで終了する</div>
         <div class="d">両手の親指を立てて、そのまま動かさずに待ちます。「撮影を終了します」と音声が流れたら、ヘッドセットを外してかまいません。</div>
@@ -81,15 +88,14 @@
     <div class="h">撮影中のお願い</div>
     <li>売り場など、撮影場所の外に出るときは、先に両手のグッドサインで撮影を終了してください。</li>
     <li>手元の作業が映っている映像が、いちばん役に立ちます。「両手をカメラに映してください」と音声が流れたら、手元に視線を戻してください。</li>
-    <li>バッテリーは磁石で付け替えるだけで交換できます。交換は休憩中がおすすめです。</li>
-    <li>長い休憩に入るときや帰るときは、ヘッドセットを外して店長に返してください。</li>
+    <li>長い休憩に入るときや帰るときは、ヘッドセットを外して管理者に返してください。</li>
   </div>
 
   <div class="qa">
     <div class="h">困ったときは</div>
-    <div class="row"><b>撮影するつもりがないのに始まってしまった：</b> 両手のグッドサインで終了してください。撮れてしまった動画は店長が確認したうえでアップロードするものを選ぶため、そのまま外部に出ることはありません。</div>
+    <div class="row"><b>撮影するつもりがないのに始まってしまった：</b> 両手のグッドサインで終了してください。撮れてしまった動画は管理者が確認したうえでアップロードするものを選ぶため、そのまま外部に出ることはありません。</div>
     <div class="row"><b>画面が真っ暗になっている：</b> 節電中です。軽くタップすると数秒間だけ表示されます。</div>
-    <div class="row"><b>「熱くなったため」「電池が少なくなったため」と音声が流れて止まった：</b> ヘッドセットを店長に渡してください。</div>
+    <div class="row"><b>「熱くなったため」「電池が少なくなったため」と音声が流れて止まった：</b> ヘッドセットを管理者に渡してください。</div>
     <div class="row"><b>撮影をやめたい：</b> いつでも両手のグッドサインで終了できます。無理に続ける必要はありません。</div>
   </div>
 
