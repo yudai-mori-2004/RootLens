@@ -8,14 +8,14 @@
   html,body{ width:210mm; background:#fff; color:#111;
     font-family:"Hiragino Sans","Yu Gothic",sans-serif;
     line-break:strict; word-break:normal; overflow-wrap:normal; }
-  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:10mm 18mm 14mm; }
+  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:8mm 18mm 14mm; }
 
   .tag{ display:inline-block; font-size:9pt; font-weight:600; letter-spacing:.2em; border:.4mm solid #111; padding:1.2mm 4mm; }
-  h1{ margin-top:3mm; font-size:19pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
-  .lead{ margin-top:3mm; font-size:11pt; line-height:1.8; font-weight:600; }
+  h1{ margin-top:2mm; font-size:19pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
+  .lead{ margin-top:2mm; font-size:10.5pt; line-height:1.8; }
 
-  .steps{ margin-top:4mm; }
-  .step{ display:flex; gap:5mm; margin-top:3.5mm; align-items:flex-start; }
+  .steps{ margin-top:3mm; }
+  .step{ display:flex; gap:5mm; margin-top:3mm; align-items:flex-start; }
   .step .no{ flex:none; width:11mm; height:11mm; border-radius:50%; background:#111; color:#fff;
     font-size:14pt; font-weight:700; display:flex; align-items:center; justify-content:center; }
   .step .bd{ flex:1; padding-top:.5mm; }
@@ -24,12 +24,12 @@
   .step .bd .voice{ display:inline-block; margin-top:1.2mm; font-size:9.5pt; line-height:1.5;
     background:#f0f0f0; border-left:1mm solid #999; padding:1mm 3mm; }
 
-  .rules{ margin-top:4.5mm; border:.5mm solid #111; padding:3.5mm 6mm; }
+  .rules{ margin-top:4mm; border:.5mm solid #111; padding:3mm 6mm; }
   .rules .h{ font-size:11.5pt; font-weight:700; letter-spacing:.08em; }
   .rules li{ list-style:none; margin-top:2mm; font-size:10.5pt; line-height:1.6; padding-left:5mm; position:relative; }
   .rules li::before{ content:"■"; position:absolute; left:0; font-size:8pt; top:1.2mm; }
 
-  .qa{ margin-top:4mm; }
+  .qa{ margin-top:3.5mm; }
   .qa .h{ font-size:10.5pt; font-weight:700; letter-spacing:.08em; }
   .qa .row{ margin-top:1.5mm; font-size:9.5pt; line-height:1.6; color:#222; }
   .qa .row b{ font-weight:700; }
@@ -40,61 +40,61 @@
 </head>
 <body>
 <div class="sheet">
-  <span class="tag">スタッフのみなさまへ</span>
-  <h1>撮影ヘッドセットの使いかた</h1>
-  <div class="lead">むずかしい操作はありません。スマホの音声がぜんぶ案内してくれるので、声にしたがってください。</div>
+  <span class="tag">スタッフ用</span>
+  <h1>撮影ヘッドセットの使い方</h1>
+  <div class="lead">操作はアプリの音声がすべて案内します。この紙では、一日の流れと、覚えておいていただきたいことをまとめています。</div>
 
   <div class="steps">
     <div class="step">
       <div class="no">1</div>
       <div class="bd">
-        <div class="h">かぶる</div>
-        <div class="d">店長からヘッドセットを受け取って、頭にかぶります。ゆるいと映像がぶれるので、ベルトはしっかりめに。</div>
+        <div class="h">ヘッドセットを装着する</div>
+        <div class="d">店長からヘッドセットを受け取り、頭に装着します。ベルトがゆるいと映像がぶれるため、しっかりと締めてください。</div>
       </div>
     </div>
     <div class="step">
       <div class="no">2</div>
       <div class="bd">
-        <div class="h">いつもの作業の位置で、両手をパー</div>
-        <div class="d">いつも作業するときの手の位置に両手をパーで構えて、作業のときと同じ目線で手元を見ます。この姿勢で合わせると、ふだんの作業がいちばんきれいに映ります。ずれていると「少し上へ」「少し下へ」と教えてくれるので、カメラの角度を直してもう一度。</div>
-        <span class="voice">声:「準備ができたら、手をパーにして目線を指先に向けてください。」→「位置が合いました。これより撮影を開始します。」</span>
+        <div class="h">いつもの作業位置で、両手をパーにする</div>
+        <div class="d">音声の案内が流れたら、いつも作業をするときの手の位置で両手を開き、ふだんの作業と同じ目線で手元を見ます。カメラの向きがずれている場合は「少し上へ」「少し下へ」と案内が流れるので、カメラの角度を調整して、もう一度同じ姿勢をとってください。いつもの作業の姿勢で合わせるほど、作業の様子がきれいに記録されます。</div>
+        <span class="voice">音声「準備ができたら、手をパーにして目線を指先に向けてください。」→「位置が合いました。これより撮影を開始します。」</span>
       </div>
     </div>
     <div class="step">
       <div class="no">3</div>
       <div class="bd">
-        <div class="h">あとは、ふだんどおりに働くだけ</div>
-        <div class="d">画面はすぐ真っ暗になりますが、故障ではなく節電です。30分にいちど、自動で休憩に入ります。休憩中は何もしなくて大丈夫。「再開します」の声がしたら、手が空いたタイミングでまた両手パー(急がなくてOKです)。</div>
-        <span class="voice">声:「撮影をひと区切りします。少し休憩します。」→ 約10分後 →「撮影を再開します。」</span>
+        <div class="h">通常どおり作業する</div>
+        <div class="d">録画が始まると、節電のため画面は自動的に暗くなります（故障ではありません）。撮影は30分ごとに自動で休憩に入ります。休憩中の操作は不要です。「撮影を再開します」と音声が流れたら、手が空いたときにもう一度両手をパーにしてください。急ぐ必要はありません。</div>
+        <span class="voice">音声「撮影をひと区切りします。少し休憩します。」→ 約10分後 →「撮影を再開します。」</span>
       </div>
     </div>
     <div class="step">
       <div class="no">4</div>
       <div class="bd">
-        <div class="h">終わるときは、両手でグッド</div>
-        <div class="d">両手で親指を立てて(グッドサイン)、そのままキープ。「撮影を終了します」と聞こえたら、外して大丈夫です。</div>
+        <div class="h">両手のグッドサインで終了する</div>
+        <div class="d">両手の親指を立てて、そのまま動かさずに待ちます。「撮影を終了します」と音声が流れたら、ヘッドセットを外してかまいません。</div>
       </div>
     </div>
   </div>
 
   <div class="rules">
-    <div class="h">おぼえておいてほしいこと</div>
-    <li>売り場など、撮影場所の外へ出るときは、先に両手グッドで終了してから。</li>
-    <li>手元の作業がカメラに映っているのが、いちばん良い映像です。「両手をカメラに映してください」と声がしたら、手元を見てあげてください。</li>
-    <li>バッテリーの交換は、背面のマグネットをパチッと付け替えるだけ。休憩中がおすすめです。</li>
-    <li>長い休憩や帰るときは、ヘッドセットを外して店長に返してください。</li>
+    <div class="h">撮影中のお願い</div>
+    <li>売り場など、撮影場所の外に出るときは、先に両手のグッドサインで撮影を終了してください。</li>
+    <li>手元の作業が映っている映像が、いちばん役に立ちます。「両手をカメラに映してください」と音声が流れたら、手元に視線を戻してください。</li>
+    <li>バッテリーは磁石で付け替えるだけで交換できます。交換は休憩中がおすすめです。</li>
+    <li>長い休憩に入るときや帰るときは、ヘッドセットを外して店長に返してください。</li>
   </div>
 
   <div class="qa">
-    <div class="h">こんなときは</div>
-    <div class="row"><b>始めるつもりがないのに、撮影が始まってしまった:</b> 両手グッドで止めてください。撮れてしまった動画がそのまま外に出ることはありません(店長が確認して、アップロードするものを選びます)。</div>
-    <div class="row"><b>画面が真っ暗:</b> 節電中です。軽くタップすると数秒だけ表示されます。</div>
-    <div class="row"><b>「熱くなったため」「電池が少なくなったため」と声がして止まった:</b> そのまま店長に渡してください。</div>
-    <div class="row"><b>撮影をやめたくなった:</b> いつでも両手グッドで終了できます。無理に続ける必要はありません。</div>
+    <div class="h">困ったときは</div>
+    <div class="row"><b>撮影するつもりがないのに始まってしまった：</b> 両手のグッドサインで終了してください。撮れてしまった動画は店長が確認したうえでアップロードするものを選ぶため、そのまま外部に出ることはありません。</div>
+    <div class="row"><b>画面が真っ暗になっている：</b> 節電中です。軽くタップすると数秒間だけ表示されます。</div>
+    <div class="row"><b>「熱くなったため」「電池が少なくなったため」と音声が流れて止まった：</b> ヘッドセットを店長に渡してください。</div>
+    <div class="row"><b>撮影をやめたい：</b> いつでも両手のグッドサインで終了できます。無理に続ける必要はありません。</div>
   </div>
 
   <div class="foot">
-    RootLens 撮影ヘッドセット スタッフ用マニュアル / お問い合わせ: 森 雄大 TEL 090-6751-4015
+    RootLens 撮影ヘッドセット スタッフ用マニュアル ／ お問い合わせ：森 雄大　TEL 090-6751-4015
   </div>
 </div>
 </body>
