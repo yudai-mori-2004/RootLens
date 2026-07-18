@@ -20,6 +20,10 @@ import Speech
 //     keeps playing through the speaker while the mic listens.
 //   - Apple ends a recognition task after roughly one minute, so the task is
 //     restarted in a loop for shift-long listening.
+//   - expo-av rebuilds the audio session for every sound it plays, and its
+//     .playAndRecord configuration lacks .defaultToSpeaker, which lands
+//     playback on the quiet earpiece receiver. A route-change observer pushes
+//     output back to the speaker whenever that happens.
 //   - Keyword matching happens here, on the transcript suffix, so JS only
 //     receives discrete 'start' / 'stop' events instead of a partial-result
 //     firehose. The suffix window keeps a long rambling transcript from
@@ -37,6 +41,7 @@ final class SpeechCommandController: NSObject {
   private var request: SFSpeechAudioBufferRecognitionRequest?
   private var task: SFSpeechRecognitionTask?
   private var running = false
+  private var routeChangeObserver: NSObjectProtocol?
   // Cooldown so one utterance does not fire twice (partial results repeat the
   // matched suffix while the recognizer refines the sentence).
   private var lastMatchAt: Date = .distantPast
@@ -78,6 +83,11 @@ final class SpeechCommandController: NSObject {
                                       options: [.defaultToSpeaker, .allowBluetooth])
               try session.setActive(true, options: .notifyOthersOnDeactivation)
               self.running = true
+              self.routeChangeObserver = NotificationCenter.default.addObserver(
+                forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main
+              ) { [weak self] _ in
+                self?.reassertSpeakerRoute()
+              }
               self.startRecognitionTask()
               completion(nil)
             } catch {
@@ -91,6 +101,10 @@ final class SpeechCommandController: NSObject {
 
   func stop() {
     running = false
+    if let routeChangeObserver {
+      NotificationCenter.default.removeObserver(routeChangeObserver)
+      self.routeChangeObserver = nil
+    }
     task?.cancel()
     task = nil
     request?.endAudio()
@@ -101,6 +115,18 @@ final class SpeechCommandController: NSObject {
     }
     // Hand the audio session back so plain playback routes normally again.
     try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+  }
+
+  /// .playAndRecord without .defaultToSpeaker routes playback to the earpiece
+  /// receiver (capped around -9 dB), and expo-av reconfigures the session that
+  /// way on its first sound after the listener starts. Route changes are the
+  /// only hook for noticing, so push output back to the speaker there.
+  private func reassertSpeakerRoute() {
+    guard running else { return }
+    let session = AVAudioSession.sharedInstance()
+    if session.currentRoute.outputs.contains(where: { $0.portType == .builtInReceiver }) {
+      try? session.overrideOutputAudioPort(.speaker)
+    }
   }
 
   private func startRecognitionTask() {

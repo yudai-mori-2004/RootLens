@@ -58,3 +58,9 @@
   状態が起こりうる。管理者マニュアルの端末セットアップに「音声入力トグルを一度オフ → オン」
   を載せる。実機フィードバック: 録画開始後の終了案内が gesture 文言 (グッドサイン) のまま
   だったのを stopHintTts としてフロー接合点に移設 (voice は「撮影ストップ」案内)。
+- 2026-07-19 (音量低下の根因と修正): voice フロー中に案内音声が小さく聞こえる件を syslog の
+  ルーティングログで確定。expo-av は効果音を鳴らすたびにセッションを再構成するが、その
+  playAndRecord 構成に .defaultToSpeaker が無く (EXAV.m 確認)、リスナー起動 1.5 秒後の初回
+  効果音で出力が受話口 (Built-In Receiver、最大 -9dB) に落ちてそのまま戻らない実測。対処:
+  SpeechCommandController が routeChangeNotification を監視し、受話口に落ちたら
+  overrideOutputAudioPort(.speaker) でスピーカーへ戻す。リビルド後に実機で音量差の解消を確認する。
