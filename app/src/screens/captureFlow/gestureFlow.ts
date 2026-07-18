@@ -19,6 +19,36 @@ export const gestureFlow: CaptureFlow = {
   id: 'gesture',
   usesVoiceCommands: false,
 
+  initialPrompt(ctx) {
+    ctx.clearAwaitedSpeech();
+    ctx.setState({ kind: 'palm_prompt' });
+  },
+
+  calibrationIdleState() {
+    return { kind: 'awaiting_palm' };
+  },
+
+  calibrationConfirmedTts() {
+    return t('capture.tts.confirmed');
+  },
+
+  donePromptTts() {
+    return t('capture.tts.done');
+  },
+
+  afterDonePrompt(ctx) {
+    ctx.setState({ kind: 'awaiting_palm' });
+  },
+
+  afterCycleResume(ctx) {
+    ctx.clearAwaitedSpeech();
+    ctx.setState({ kind: 'palm_prompt' });
+  },
+
+  tickCalibrationIdle() {
+    return false;
+  },
+
   afterCalibration(ctx) {
     ctx.setState({ kind: 'precapture_countdown', startTs: ctx.now });
   },

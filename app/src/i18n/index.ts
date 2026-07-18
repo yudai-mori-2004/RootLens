@@ -170,7 +170,9 @@ const ja = {
   'capture.tts.cyclePause': '撮影をひと区切りします。{minutes}分ほどで自動で再開します。',
   'capture.tts.cycleResume': '撮影を再開します。',
   // 音声コマンドフロー: キャリブレーション確定後の開始待ち案内。
-  'capture.tts.voiceArmed': '準備ができました。「さつえいスタート」と言うと撮影を始めます。',
+  'capture.tts.voiceArmed': '「さつえいスタート」と言うと、撮影を始めます。手をパーにすると、カメラの位置合わせができます。',
+  'capture.tts.confirmedAim': '位置が合いました。',
+  'capture.tts.doneVoice': '撮影終了です。「さつえいスタート」と言うと、次の撮影を始めます。',
   'capture.hud.cyclePausing': '一時停止中',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
@@ -348,7 +350,9 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.lowBattery': 'The battery is low. A long recording may stop early.',
   'capture.tts.cyclePause': 'Pausing recording. It will resume automatically in about {minutes} minutes.',
   'capture.tts.cycleResume': 'Resuming recording.',
-  'capture.tts.voiceArmed': 'Ready. Say the start command to begin recording.',
+  'capture.tts.voiceArmed': 'Say the start command to begin recording. Hold both palms up to align the camera.',
+  'capture.tts.confirmedAim': 'Position confirmed.',
+  'capture.tts.doneVoice': 'Recording finished. Say the start command to begin the next one.',
   'capture.hud.cyclePausing': 'Paused',
 
   // ── Upload consent pop (= tap a card in My Videos) ──

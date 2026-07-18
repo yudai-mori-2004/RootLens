@@ -72,7 +72,6 @@ import {
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
 import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isAudioBusy, isSpeechSettled } from '../services/captureAudio';
 import { applyCaptureSettingsToNative, loadCaptureSettings } from '../services/captureSettings';
-import { useCameraPitch } from '../services/devicePitch';
 import { GestureStabilizer, frameGesture } from '../domain/gestureDetect';
 import {
   getCaptureFlow,
@@ -109,14 +108,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CaptureMode'>;
 
 // パーのキープ (= 検出ビープからこの時間キープで中央判定)
 const PALM_HOLD_MS = 1000;
-// 装着待ちの判定は「早く次へ進むための補助」 であって、 進行のゲートにしない。
-// きれいな経路 (= 取り付けの動き → 静止 + 装着らしい角度) を検知したら早めに進み、
-// 検知できなくても MOUNT_HARD_TIMEOUT_MS で必ず進む (= 判定失敗で詰む経路を作らない)。
-const MOUNT_STILL_DELTA_DEG = 2;      // 1 tick (100ms) あたりの角度変化がこれ超 = 扱い中
-const MOUNT_STILL_MS = 2000;
-const MOUNT_MOTION_MIN_MS = 1000;     // 取り付けの動きと見なす累計時間
-const MOUNT_HARD_TIMEOUT_MS = 8000;   // これを超えたら判定に関係なく次の案内へ
-const MOUNT_WORN_PITCH_RANGE = { min: -40, max: 85 } as const; // 机に平置き (≈90°) だけ除外
+// 装着案内のあと、 フローの最初の案内へ進むまでの間 (= 取り付けの一呼吸)。
+const MOUNT_PAUSE_MS = 2500;
 // 停止トリガー (サムズアップ保持 / 音声コマンド) はフロー実装が持つ (= captureFlow/)。
 // 停止シーケンスの間 (= ピロン → TTS 「撮影を終了します」 → ぴっぴっぴ → ピロロン)。
 // TTS の後にひと呼吸置いてから 3 発の tick を等間隔で入れる。 tick 自体は ~0.15s なので、
@@ -218,8 +211,9 @@ function entryCue(s: CaptureState, flow: CaptureFlow): { sfx?: SfxName; tts?: st
       return { tts: calibAdjustText(s.direction) };
     case 'calibration_confirmed':
       // 検出ビープ (detect_palm) はジェスチャー確定時に即時再生する専用 effect が鳴らす
-      // (= キュー非経由で不発しない + アイコン表示と同期)。 ここは確定 TTS のみ。
-      return { tts: t('capture.tts.confirmed') };
+      // (= キュー非経由で不発しない + アイコン表示と同期)。 確定 TTS はフローが決める
+      // (= gesture は「開始します」、 voice は位置確認のみ)。
+      return { tts: flow.calibrationConfirmedTts() };
     case 'cycle_resuming':
       return { tts: t('capture.tts.cycleResume') };
     default:
@@ -361,12 +355,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const recordingStartedAtRef = useRef(0);
   const sessionDirRef = useRef<string | null>(null);
 
-  // 装着判定 (= 取り付けの動き → 静止 + 装着らしい俯角)。 加速度計は装着待ちの間だけ回す。
-  const pitchRef = useCameraPitch(state.kind === 'announcing' || state.kind === 'mounting');
-  const mountTrackRef = useRef({ enteredTs: 0, lastPitch: null as number | null, motionMs: 0, stillSince: 0 });
+  // mounting 入場時刻 (= 固定の間を測るだけ)。
+  const mountTrackRef = useRef({ enteredTs: 0 });
   useEffect(() => {
     if (state.kind === 'mounting') {
-      mountTrackRef.current = { enteredTs: Date.now(), lastPitch: null, motionMs: 0, stillSince: 0 };
+      mountTrackRef.current = { enteredTs: Date.now() };
     }
   }, [state.kind]);
   // 「今の voiced state が待っている発話の seq」 (0 = まだ発行前 / 音声ゲート無し)。
@@ -525,9 +518,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         autoStopReasonRef.current = t('capture.tts.autoStopBackground');
         setState({ kind: 'finalizing' });
       } else if (k === 'precapture_countdown') {
-        // まだ録画が始まっていない → 開始せずパー待ちに戻す (= 復帰したらやり直し)。
+        // まだ録画が始まっていない → 開始せずフローの待機に戻す (= 復帰したらやり直し)。
         clearAudioQueue();
-        setState({ kind: 'awaiting_palm' });
+        setState(flowRef.current.calibrationIdleState());
       }
     });
     return () => sub.remove();
@@ -607,7 +600,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     // 撮影完了後の案内: 「お疲れさま → 少し間 → 続けるなら手のひらを」 の二部構成。 待つのは最後の発話の seq。
     if (state.kind === 'next_task_announcing') {
       clearAudioQueue();
-      awaitedSpeechSeqRef.current = enqueueSpeak(t('capture.tts.done'));
+      awaitedSpeechSeqRef.current = enqueueSpeak(flowRef.current.donePromptTts());
       return;
     }
     const cue = entryCue(state, flowRef.current);
@@ -674,7 +667,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         } catch (e: any) {
           recordingStartedRef.current = false;
           setError(`${t('capture.recStartFailed')}: ${e?.message ?? e}`);
-          setState({ kind: 'awaiting_palm' });
+          setState(flowRef.current.calibrationIdleState());
         }
       })();
     }
@@ -727,7 +720,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         } catch (e: any) {
           recordingStartedRef.current = false;
           setError(`${t('capture.recStopFailed')}: ${e?.message ?? e}`);
-          setState({ kind: 'awaiting_palm' });
+          setState(flowRef.current.calibrationIdleState());
         }
       })();
     }
@@ -782,43 +775,16 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return;
       }
       case 'next_task_announcing': {
-        // クリップ間は装着済みなので、 装着待ちを飛ばしてパー待ちへ (= 案内は done TTS に含む)。
-        if (speechDone()) setState({ kind: 'awaiting_palm' });
+        // クリップ間は装着済みなので、 装着待ちを飛ばしてフローの待機へ (= 案内は done TTS に含む)。
+        if (speechDone()) flowRef.current.afterDonePrompt(ctx);
         return;
       }
       case 'mounting': {
-        const track = mountTrackRef.current;
-        // ⚠ ゲートにしない: 判定がどう転んでも HARD_TIMEOUT で必ず次へ進む。
-        //    (以前は装着角度の範囲に入らない限り進めず、 装着したまま手元を見下ろす普通の姿勢
-        //     (= 俯角 70° 超) で詰んでいた。)
-        const timedOut = now - track.enteredTs >= MOUNT_HARD_TIMEOUT_MS;
-        const reading = pitchRef.current;
-        if (!reading.available || timedOut) {
-          awaitedSpeechSeqRef.current = 0;
-          setState({ kind: 'palm_prompt' });
-          return;
-        }
-        const pitch = reading.pitchDownDeg;
-        // 動いているか = 読めない加速度 (激しい動き) or tick 間の角度変化が大きい。
-        const inMotion =
-          pitch == null || track.lastPitch == null ||
-          Math.abs(pitch - track.lastPitch) > MOUNT_STILL_DELTA_DEG;
-        track.lastPitch = pitch;
-        if (inMotion) {
-          track.motionMs += 100; // ≒ ticker 周期
-          track.stillSince = 0;
-          return;
-        }
-        const wornRange = pitch >= MOUNT_WORN_PITCH_RANGE.min && pitch <= MOUNT_WORN_PITCH_RANGE.max;
-        if (!wornRange) {
-          track.stillSince = 0; // 静止しているが装着角度ではなさそう → 早期通過はしない (timeout 待ち)
-          return;
-        }
-        if (track.stillSince === 0) track.stillSince = now;
-        // きれいな経路: 取り付けの動きを見たあと、 装着らしい角度で静止 → 早めに次へ。
-        if (track.motionMs >= MOUNT_MOTION_MIN_MS && now - track.stillSince >= MOUNT_STILL_MS) {
-          awaitedSpeechSeqRef.current = 0;
-          setState({ kind: 'palm_prompt' });
+        // 装着チェックはしない: 案内を言い終えたあと、 ちょうどいい間 (= 取り付けの一呼吸) を
+        // 置いてフローの最初の案内へ進むだけ。 (以前は IMU で装着角度を判定していたが、 8 秒の
+        // ハードタイムアウト待ちが現場で長すぎた。)
+        if (now - mountTrackRef.current.enteredTs >= MOUNT_PAUSE_MS) {
+          flowRef.current.initialPrompt(ctx);
         }
         return;
       }
@@ -828,6 +794,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return;
       }
       case 'awaiting_palm': {
+        if (flowRef.current.tickCalibrationIdle(ctx, cur)) return;
         if (gesture === 'open_palm') {
           setState({ kind: 'palm_holding', startTs: now });
         }
@@ -835,14 +802,14 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       }
       case 'palm_holding': {
         if (gesture !== 'open_palm') {
-          setState({ kind: 'awaiting_palm' });
+          setState(flowRef.current.calibrationIdleState());
           return;
         }
         if (now - cur.startTs >= PALM_HOLD_MS) {
           if (!e) return; // 手イベント未着 (= 稀)。 次 tick で再判定
           const bbox = computeHandBoundingBox(e.wearerHands);
           if (!bbox) {
-            setState({ kind: 'awaiting_palm' });
+            setState(flowRef.current.calibrationIdleState());
             return;
           }
           const dir = computeAdjustDirection(bbox);
@@ -867,6 +834,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return;
       }
       case 'adjust_needed': {
+        if (flowRef.current.tickCalibrationIdle(ctx, cur)) return;
         // 案内 TTS を言い終わるまで palm 受付しない (= 案内の中断防止)。
         if (speechDone() && gesture === 'open_palm') {
           setState({ kind: 'palm_holding', startTs: now });
@@ -946,6 +914,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       }
       case 'stopping':
       case 'stopping_confirm':
+      case 'voice_prompt':
       case 'awaiting_start_command': {
         // フロー固有 state (= 停止保持 / 開始コマンド待ち) はフローが tick する。
         flowRef.current.tickFlowState(ctx, cur);
@@ -957,8 +926,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // 休止は専用 effect (session 停止 + タイマー) が駆動。 ticker はここでは何もしない。
         return;
       case 'cycle_resuming':
-        // 再開案内を言い終わったらパー案内へ (= 既存のキャリブレーションに合流)。
-        if (speechDone()) setState({ kind: 'palm_prompt' });
+        // 再開案内を言い終わったらフローの最初の案内へ。
+        if (speechDone()) flowRef.current.afterCycleResume(ctx);
         return;
     }
   }, []);
@@ -1110,7 +1079,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     const calibratePhase =
       k === 'announcing' || k === 'next_task_announcing' || k === 'mounting' ||
       k === 'palm_prompt' || k === 'awaiting_palm' || k === 'palm_holding' ||
-      k === 'adjust_needed' || k === 'calibration_confirmed';
+      k === 'adjust_needed' || k === 'calibration_confirmed' ||
+      k === 'voice_prompt' || k === 'awaiting_start_command';
     if (!calibratePhase) return;
     clearAudioQueue(); // 切替で旧構成の案内音声を止める
     setSelectedConfigId(id);

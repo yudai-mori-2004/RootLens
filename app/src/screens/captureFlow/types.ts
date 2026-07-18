@@ -31,6 +31,7 @@ export type CaptureState =
   | { kind: 'recording'; startTs: number; lastHandSeenTs: number; lastWarnTs: number; armedSince: number }
   | { kind: 'stopping'; startTs: number; lostSince: number }                 // gesture フロー所有
   | { kind: 'stopping_confirm'; startTs: number; lostSince: number }        // gesture フロー所有
+  | { kind: 'voice_prompt' }                                                 // voice フロー所有 (開始コマンド案内 TTS 中)
   | { kind: 'awaiting_start_command' }                                       // voice フロー所有
   | { kind: 'finalizing' }
   | { kind: 'cycle_pausing'; startTs: number }
@@ -78,6 +79,20 @@ export interface FlowHud {
 
 export interface CaptureFlow {
   id: CaptureFlowId;
+  /** 装着案内のあとの最初の案内へ (= フローの分岐点はここから始まる)。 */
+  initialPrompt(ctx: FlowTickCtx): void;
+  /** キャリブレーション途中離脱・エラー時に戻る待機 state。 */
+  calibrationIdleState(): CaptureState;
+  /** キャリブレーション確定時の TTS (= gesture は「開始します」、 voice は位置確認のみ)。 */
+  calibrationConfirmedTts(): string;
+  /** クリップ完了時の案内 TTS。 */
+  donePromptTts(): string;
+  /** クリップ完了案内のあとの待機へ。 */
+  afterDonePrompt(ctx: FlowTickCtx): void;
+  /** サイクル休止明けの再開案内のあとへ。 */
+  afterCycleResume(ctx: FlowTickCtx): void;
+  /** 待機系 state (awaiting_palm / adjust_needed) での追加トリガー (= voice の開始コマンド)。 遷移したら true。 */
+  tickCalibrationIdle(ctx: FlowTickCtx, cur: CaptureState): boolean;
   /** キャリブレーション確定 TTS 完了後に呼ばれる。 次の state へ遷移させる。 */
   afterCalibration(ctx: FlowTickCtx): void;
   /**
