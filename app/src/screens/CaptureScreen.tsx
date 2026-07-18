@@ -891,23 +891,26 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         }
         const handVisible = e.wearerHandCount >= 1;
         let lastHandSeen = cur.lastHandSeenTs;
-        let lastWarn = cur.lastWarnTs;
+        const lastWarn = cur.lastWarnTs;
         if (handVisible) {
           lastHandSeen = now;
-        } else if (
-          now - cur.lastHandSeenTs >= HAND_LOST_WARN_MS &&
-          now - cur.lastWarnTs >= WARN_REPEAT_MS &&
-          // 検出ストリームが生きている時だけ警告する (= イベントが止まっている時の「手が無い」 は
-          // 検出側の問題であって装着者の問題ではない)。
-          now - lastHandEventAtRef.current < 2000 &&
-          // 前の警告がまだキュー内 / 再生中なら積まない (= 溜まった警告の連続再生を構造的に防ぐ)。
-          isSpeechSettled(lastWarnSeqRef.current)
-        ) {
-          // 警告は遷移を駆動しない副作用 (= fire-and-forget で enqueue)。
-          void enqueueSfx('warn_hand_lost');
-          lastWarnSeqRef.current = enqueueSpeak(t('capture.tts.handLost'));
-          lastWarn = now;
         }
+        // 手が映っていない警告は鳴らさない。 支払いが「手が映っている有効録画時間」 ベースなので、
+        // 手を映すインセンティブは金銭側で立っており、 作業中の警告音は現場では驚かせるだけだった。
+        // else if (
+        //   now - cur.lastHandSeenTs >= HAND_LOST_WARN_MS &&
+        //   now - cur.lastWarnTs >= WARN_REPEAT_MS &&
+        //   // 検出ストリームが生きている時だけ警告する (= イベントが止まっている時の「手が無い」 は
+        //   // 検出側の問題であって装着者の問題ではない)。
+        //   now - lastHandEventAtRef.current < 2000 &&
+        //   // 前の警告がまだキュー内 / 再生中なら積まない (= 溜まった警告の連続再生を構造的に防ぐ)。
+        //   isSpeechSettled(lastWarnSeqRef.current)
+        // ) {
+        //   // 警告は遷移を駆動しない副作用 (= fire-and-forget で enqueue)。
+        //   void enqueueSfx('warn_hand_lost');
+        //   lastWarnSeqRef.current = enqueueSpeak(t('capture.tts.handLost'));
+        //   lastWarn = now;
+        // }
         // thumbs-up を ARM_MS 連続検出で stopping へ (= armedSince を state に内包)。
         const isThumbsUp = gesture === 'thumbs_up';
         let armedSince = cur.armedSince;
