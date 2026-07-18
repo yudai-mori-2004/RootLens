@@ -51,39 +51,36 @@ final class SpeechCommandController: NSObject {
     }
   }
 
-  func start() throws {
-    if running { return }
-    guard let recognizer, recognizer.isAvailable else { throw SpeechCommandError.unavailable }
-
-    var authStatus = SFSpeechRecognizer.authorizationStatus()
-    if authStatus == .notDetermined {
-      let sem = DispatchSemaphore(value: 0)
-      SFSpeechRecognizer.requestAuthorization { status in
-        authStatus = status
-        sem.signal()
-      }
-      sem.wait()
+  /// Permission prompts need a free main thread to present their dialogs, so the
+  /// whole start path is callback-chained instead of blocking (a semaphore here
+  /// deadlocked: the dialog waited for main while main waited for the dialog).
+  func start(completion: @escaping (Error?) -> Void) {
+    if running { completion(nil); return }
+    guard let recognizer, recognizer.isAvailable else {
+      completion(SpeechCommandError.unavailable); return
     }
-    guard authStatus == .authorized else { throw SpeechCommandError.unauthorized }
-
-    var micGranted = AVAudioSession.sharedInstance().recordPermission == .granted
-    if AVAudioSession.sharedInstance().recordPermission == .undetermined {
-      let sem = DispatchSemaphore(value: 0)
-      AVAudioSession.sharedInstance().requestRecordPermission { granted in
-        micGranted = granted
-        sem.signal()
+    SFSpeechRecognizer.requestAuthorization { status in
+      DispatchQueue.main.async {
+        guard status == .authorized else { completion(SpeechCommandError.unauthorized); return }
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
+          DispatchQueue.main.async {
+            guard granted else { completion(SpeechCommandError.unauthorized); return }
+            do {
+              let session = AVAudioSession.sharedInstance()
+              try session.setCategory(.playAndRecord, mode: .default,
+                                      options: [.defaultToSpeaker, .allowBluetooth])
+              try session.setActive(true, options: .notifyOthersOnDeactivation)
+              self.running = true
+              self.startRecognitionTask()
+              NSLog("[SpeechCommand] listening started")
+              completion(nil)
+            } catch {
+              completion(error)
+            }
+          }
+        }
       }
-      sem.wait()
     }
-    guard micGranted else { throw SpeechCommandError.unauthorized }
-
-    let session = AVAudioSession.sharedInstance()
-    try session.setCategory(.playAndRecord, mode: .measurement,
-                            options: [.defaultToSpeaker, .allowBluetooth, .duckOthers])
-    try session.setActive(true, options: .notifyOthersOnDeactivation)
-
-    running = true
-    startRecognitionTask()
   }
 
   func stop() {
@@ -121,9 +118,12 @@ final class SpeechCommandController: NSObject {
       try? audioEngine.start()
     }
 
+    NSLog("[SpeechCommand] task start (onDevice=%d, rate=%.0f)",
+          req.requiresOnDeviceRecognition ? 1 : 0, format.sampleRate)
     task = recognizer.recognitionTask(with: req) { [weak self] result, error in
       guard let self else { return }
       if let result {
+        NSLog("[SpeechCommand] heard: %@", result.bestTranscription.formattedString)
         self.match(transcript: result.bestTranscription.formattedString)
         if result.isFinal {
           self.restartSoon()

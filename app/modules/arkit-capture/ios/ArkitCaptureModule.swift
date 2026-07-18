@@ -118,11 +118,12 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
     // ja-JP recognition; transcripts are transient and never stored.
     AsyncFunction("startVoiceCommands") { (promise: Promise) in
       DispatchQueue.main.async {
-        do {
-          try SpeechCommandController.shared.start()
-          promise.resolve(nil)
-        } catch {
-          promise.reject("VOICE_COMMANDS_START_ERROR", error.localizedDescription)
+        SpeechCommandController.shared.start { error in
+          if let error {
+            promise.reject("VOICE_COMMANDS_START_ERROR", error.localizedDescription)
+          } else {
+            promise.resolve(nil)
+          }
         }
       }
     }

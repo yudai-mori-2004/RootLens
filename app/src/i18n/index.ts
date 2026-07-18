@@ -170,9 +170,9 @@ const ja = {
   'capture.tts.cyclePause': '撮影をひと区切りします。{minutes}分ほどで自動で再開します。',
   'capture.tts.cycleResume': '撮影を再開します。',
   // 音声コマンドフロー: キャリブレーション確定後の開始待ち案内。
-  'capture.tts.voiceArmed': '「さつえいスタート」と言うと、撮影を始めます。手をパーにすると、カメラの位置合わせができます。',
+  'capture.tts.voiceArmed': '「撮影スタート」と言うと、撮影を始めます。',
   'capture.tts.confirmedAim': '位置が合いました。',
-  'capture.tts.doneVoice': '撮影終了です。「さつえいスタート」と言うと、次の撮影を始めます。',
+  'capture.tts.doneVoice': '撮影終了です。「撮影スタート」と言うと、次の撮影を始めます。',
   'capture.hud.cyclePausing': '一時停止中',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
