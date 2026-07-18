@@ -893,7 +893,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // 録画が乗ってきた頃に、 終了方法を 1 回だけ案内する (= 遷移を駆動しない副作用)。
         if (!stopHintSpokenRef.current && now - cur.startTs >= STOP_HINT_DELAY_MS) {
           stopHintSpokenRef.current = true;
-          enqueueSpeak(t('capture.tts.stopHint'));
+          enqueueSpeak(flowRef.current.stopHintTts());
         }
         const handVisible = e.wearerHandCount >= 1;
         let lastHandSeen = cur.lastHandSeenTs;

@@ -34,6 +34,10 @@ export const voiceFlow: CaptureFlow = {
     return t('capture.tts.doneVoice');
   },
 
+  stopHintTts() {
+    return t('capture.tts.stopHintVoice');
+  },
+
   afterDonePrompt(ctx) {
     // 完了案内に次の始めようが含まれるので、 再プロンプトせず黙って待機へ。
     ctx.setState({ kind: 'awaiting_start_command' });

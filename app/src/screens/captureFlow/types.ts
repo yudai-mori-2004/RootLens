@@ -87,6 +87,8 @@ export interface CaptureFlow {
   calibrationConfirmedTts(): string;
   /** クリップ完了時の案内 TTS。 */
   donePromptTts(): string;
+  /** 録画が乗ってきた頃に 1 回だけ読む、 終了方法の案内 TTS。 */
+  stopHintTts(): string;
   /** クリップ完了案内のあとの待機へ。 */
   afterDonePrompt(ctx: FlowTickCtx): void;
   /** サイクル休止明けの再開案内のあとへ。 */

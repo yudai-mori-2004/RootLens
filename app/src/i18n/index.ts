@@ -157,6 +157,7 @@ const ja = {
   'capture.tts.adjustDown': 'カメラを少し下へ向けてください。手と手元の作業を写すための調整です。',
   'capture.tts.stoppingConfirm': '撮影を終了します。',
   'capture.tts.stopHint': '終了するときは、両手でグッドサインを作って、キープしてください。',
+  'capture.tts.stopHintVoice': '「撮影ストップ」と言うと、撮影を終了します。',
   'capture.tts.handLost': '両手をカメラに映してください。',
   // 自動終了の理由 (= 熱 / 空き容量 / 長時間の安全弁)。 終了フロー冒頭で 1 回だけ読む。
   'capture.tts.autoStopHot': '本体が熱くなったため、撮影を終了します。',
@@ -341,6 +342,7 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.adjustDown': 'Tilt the camera down a little. This keeps your hands and your work in view.',
   'capture.tts.stoppingConfirm': 'Ending the recording.',
   'capture.tts.stopHint': 'To finish, hold a thumbs-up with both hands and keep it steady.',
+  'capture.tts.stopHintVoice': 'Say the stop command to finish recording.',
   'capture.tts.handLost': 'Show both hands to the camera.',
   'capture.tts.autoStopHot': 'The phone is getting hot, so recording will stop now.',
   'capture.tts.autoStopDisk': 'Storage is running low, so recording will stop now.',

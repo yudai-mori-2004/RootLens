@@ -36,6 +36,10 @@ export const gestureFlow: CaptureFlow = {
     return t('capture.tts.done');
   },
 
+  stopHintTts() {
+    return t('capture.tts.stopHint');
+  },
+
   afterDonePrompt(ctx) {
     ctx.setState({ kind: 'awaiting_palm' });
   },
