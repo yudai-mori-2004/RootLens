@@ -110,6 +110,14 @@ final class SpeechCommandController: NSObject {
     let input = audioEngine.inputNode
     input.removeTap(onBus: 0)
     let format = input.outputFormat(forBus: 0)
+    // installTap throws an NSException (= crash) on a 0 Hz / 0 ch format, which is
+    // what the input node reports when the audio session is not actually recording.
+    guard format.sampleRate > 0, format.channelCount > 0 else {
+      NSLog("[SpeechCommand] input format not ready (rate=%.0f ch=%d), retrying",
+            format.sampleRate, format.channelCount)
+      restartSoon()
+      return
+    }
     input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
       self?.request?.append(buffer)
     }

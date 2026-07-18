@@ -57,7 +57,9 @@
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>動画撮影で音声を録音するために使用します</string>
+    <string>撮影の開始・終了の音声コマンドを聞き取るために使用します。音声が保存されることはありません</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>「撮影スタート」「撮影ストップ」の音声コマンドを端末内で認識するために使用します。音声が端末の外に送られることはありません</string>
     <key>NSMotionUsageDescription</key>
     <string>撮影中の端末の動き (加速度・ジャイロ) を記録し、映像との整合性検証に使用します</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
