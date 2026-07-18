@@ -143,8 +143,8 @@ const RESOURCE_POLL_MS = 30_000;             // 録画中の空き容量 / 電�
 // カメラが下向きになりすぎ、 作業中に手が上へはみ出す。 手を下 1/3 に合わせて
 // 手より上の作業対象・作業面が写る余白を確保する。
 const CALIBRATION_TARGET_CY = 2 / 3;
-// 目標高さの許容範囲 (= 縦方向のみ ±7%)。 左右は姿勢でほぼ決まるので見ない。
-const CALIBRATION_CENTER_MARGIN = 0.07;
+// 目標高さの許容範囲 (= 縦方向のみ ±10%)。 左右は姿勢でほぼ決まるので見ない。
+const CALIBRATION_CENTER_MARGIN = 0.1;
 const LANDMARK_CONF = 0.3;
 
 const STORAGE_BASELINE_KEY = '@rootlens/calibration/baseline/v1';
