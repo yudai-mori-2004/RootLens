@@ -94,6 +94,9 @@ const ja = {
   'settings.capture.streamDepth': '深度(LiDAR)',
   'settings.capture.streamPointCloud': '特徴点群',
   'settings.capture.streamMesh': '3Dメッシュ',
+  'settings.capture.flow': '開始・終了の操作',
+  'settings.capture.flowGesture': 'ジェスチャー',
+  'settings.capture.flowVoice': '音声コマンド',
   'settings.capture.cycleEnabled': '自動サイクル撮影',
   'settings.capture.cycleRecord': '連続撮影時間',
   'settings.capture.cyclePause': '休止時間',
@@ -166,6 +169,8 @@ const ja = {
   // 自動サイクル: 区切りの停止と再開の案内。
   'capture.tts.cyclePause': '撮影をひと区切りします。{minutes}分ほどで自動で再開します。',
   'capture.tts.cycleResume': '撮影を再開します。',
+  // 音声コマンドフロー: キャリブレーション確定後の開始待ち案内。
+  'capture.tts.voiceArmed': '準備ができました。「さつえいスタート」と言うと撮影を始めます。',
   'capture.hud.cyclePausing': '一時停止中',
 
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
@@ -271,6 +276,9 @@ const en: Record<TranslationKey, string> = {
   'settings.capture.streamDepth': 'Depth (LiDAR)',
   'settings.capture.streamPointCloud': 'Feature point cloud',
   'settings.capture.streamMesh': '3D mesh',
+  'settings.capture.flow': 'Start / stop control',
+  'settings.capture.flowGesture': 'Gestures',
+  'settings.capture.flowVoice': 'Voice commands',
   'settings.capture.cycleEnabled': 'Auto cycle recording',
   'settings.capture.cycleRecord': 'Recording length',
   'settings.capture.cyclePause': 'Pause length',
@@ -340,6 +348,7 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.lowBattery': 'The battery is low. A long recording may stop early.',
   'capture.tts.cyclePause': 'Pausing recording. It will resume automatically in about {minutes} minutes.',
   'capture.tts.cycleResume': 'Resuming recording.',
+  'capture.tts.voiceArmed': 'Ready. Say the start command to begin recording.',
   'capture.hud.cyclePausing': 'Paused',
 
   // ── Upload consent pop (= tap a card in My Videos) ──

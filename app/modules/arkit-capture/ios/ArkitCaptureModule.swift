@@ -21,10 +21,13 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
   public func definition() -> ModuleDefinition {
     Name("ArkitCapture")
 
-    Events("onHandTrack", "onThermalState")
+    Events("onHandTrack", "onThermalState", "onVoiceCommand")
 
     OnCreate {
       ArkitCaptureController.shared.delegate = self
+      SpeechCommandController.shared.onCommand = { [weak self] command, transcript in
+        self?.sendEvent("onVoiceCommand", ["command": command, "transcript": transcript])
+      }
     }
 
     View(ArkitCapturePreviewView.self) {}
@@ -109,6 +112,26 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
 
     AsyncFunction("isAvailable") { () -> Bool in
       return ARWorldTrackingConfiguration.isSupported
+    }
+
+    // Voice capture flow: listen for spoken start/stop commands. On-device
+    // ja-JP recognition; transcripts are transient and never stored.
+    AsyncFunction("startVoiceCommands") { (promise: Promise) in
+      DispatchQueue.main.async {
+        do {
+          try SpeechCommandController.shared.start()
+          promise.resolve(nil)
+        } catch {
+          promise.reject("VOICE_COMMANDS_START_ERROR", error.localizedDescription)
+        }
+      }
+    }
+
+    AsyncFunction("stopVoiceCommands") { (promise: Promise) in
+      DispatchQueue.main.async {
+        SpeechCommandController.shared.stop()
+        promise.resolve(nil)
+      }
     }
 
     // Rewrite an MP4 with faststart (moov atom to the front), no re-encode

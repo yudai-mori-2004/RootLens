@@ -142,6 +142,12 @@ export function isSpeechSettled(seq: number): boolean {
   return seq <= lastSettledSpeechSeq;
 }
 
+/** 音声キューが再生中 / 未消化か (= スピーカーが鳴っている可能性)。 音声コマンドのリスナーが
+ *  「アプリ自身の TTS を聞き取って誤発火する」 のを防ぐゲートに使う。 */
+export function isAudioBusy(): boolean {
+  return draining || queue.length > 0;
+}
+
 /** 保留中の cue を全破棄 + 現在の TTS / SFX を停止する (= 状態が切り替わった時・退場時)。
  *  中断された発話は完了扱いにしない (= lastDoneSpeechSeq は進めない)。 */
 export function clearAudioQueue(): void {

@@ -86,6 +86,8 @@ interface ArkitCaptureNativeModule {
   getThermalState(): Promise<ThermalState>;
   getPowerState(): Promise<PowerState>;
   getMemoryFootprintMB(): Promise<number>;
+  startVoiceCommands(): Promise<void>;
+  stopVoiceCommands(): Promise<void>;
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 }
@@ -186,6 +188,29 @@ export async function getArkitPowerState(): Promise<PowerState> {
 export function subscribeThermalState(listener: (e: { state: ThermalState }) => void): { remove: () => void } {
   if (!nativeModule) return { remove: () => {} };
   const sub = (nativeModule as any).addListener?.('onThermalState', listener);
+  if (sub && typeof sub.remove === 'function') return sub;
+  return { remove: () => (nativeModule as any).removeListeners?.(1) };
+}
+
+/** Start listening for spoken start/stop commands (on-device speech recognition,
+ *  ja-JP). Keywords are matched inside the recognizer; only matches surface as
+ *  onVoiceCommand events. Audio is transcribed transiently and never stored. */
+export async function startArkitVoiceCommands(): Promise<void> {
+  if (!nativeModule) return;
+  return nativeModule.startVoiceCommands();
+}
+
+export async function stopArkitVoiceCommands(): Promise<void> {
+  if (!nativeModule) return;
+  return nativeModule.stopVoiceCommands();
+}
+
+/** Spoken command matches ('start' | 'stop') with the raw transcript for debugging. */
+export function subscribeVoiceCommand(
+  listener: (e: { command: 'start' | 'stop'; transcript: string }) => void,
+): { remove: () => void } {
+  if (!nativeModule) return { remove: () => {} };
+  const sub = (nativeModule as any).addListener?.('onVoiceCommand', listener);
   if (sub && typeof sub.remove === 'function') return sub;
   return { remove: () => (nativeModule as any).removeListeners?.(1) };
 }

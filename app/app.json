@@ -19,12 +19,13 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "カメラで写真や動画を撮影するために使用します",
-        "NSMicrophoneUsageDescription": "動画撮影で音声を録音するために使用します",
+        "NSMicrophoneUsageDescription": "撮影の開始・終了の音声コマンドを聞き取るために使用します。音声が保存されることはありません",
         "NSPhotoLibraryUsageDescription": "端末の写真にアクセスするために使用します",
         "NSPhotoLibraryAddUsageDescription": "撮影した写真を保存するために使用します",
         "NSFaceIDUsageDescription": "セキュアな認証のために使用します",
         "NSMotionUsageDescription": "撮影中の端末の動き (加速度・ジャイロ) を記録し、映像との整合性検証に使用します",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSpeechRecognitionUsageDescription": "「さつえいスタート」「さつえいストップ」の音声コマンドを端末内で認識するために使用します。音声が端末の外に送られることはありません"
       }
     },
     "android": {

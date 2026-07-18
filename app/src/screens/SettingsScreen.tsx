@@ -287,6 +287,16 @@ export const SettingsScreen: React.FC = () => {
             value={cs.streamMesh}
             onChange={(v) => updateCs({ streamMesh: v })}
           />
+          {/* 撮影フロー (= 開始・終了の指示方法)。 gesture = サムズアップ / voice = 音声コマンド。 */}
+          <SegmentRow
+            label={t('settings.capture.flow')}
+            value={cs.captureFlow}
+            options={[
+              { value: 'gesture', label: t('settings.capture.flowGesture') },
+              { value: 'voice', label: t('settings.capture.flowVoice') },
+            ]}
+            onChange={(v) => updateCs({ captureFlow: v as CaptureSettings['captureFlow'] })}
+          />
           {/* 自動サイクル撮影 (= N 分録画 → 休止 → 再開のループ)。 有効時のみ分数を出す。 */}
           <SwitchRow
             label={t('settings.capture.cycleEnabled')}
