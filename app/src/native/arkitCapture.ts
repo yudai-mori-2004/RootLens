@@ -215,6 +215,18 @@ export function subscribeVoiceCommand(
   return { remove: () => (nativeModule as any).removeListeners?.(1) };
 }
 
+/** Voice listening stopped for good. On-device recognition rides on the OS
+ *  dictation engine, so this fires when Siri and keyboard dictation are both
+ *  disabled on the device (the only unrecoverable case seen in practice). */
+export function subscribeVoiceUnavailable(
+  listener: (e: { message: string }) => void,
+): { remove: () => void } {
+  if (!nativeModule) return { remove: () => {} };
+  const sub = (nativeModule as any).addListener?.('onVoiceUnavailable', listener);
+  if (sub && typeof sub.remove === 'function') return sub;
+  return { remove: () => (nativeModule as any).removeListeners?.(1) };
+}
+
 /** Subscribe to hand tracking (fires at ~15 Hz). */
 export function subscribeHandTrack(listener: (e: HandTrackEvent) => void): { remove: () => void } {
   if (!nativeModule) return { remove: () => {} };

@@ -57,6 +57,7 @@ import {
   stopArkitVoiceCommands,
   subscribeThermalState,
   subscribeVoiceCommand,
+  subscribeVoiceUnavailable,
   type PowerState,
   type ThermalState,
 } from '../native/arkitCapture';
@@ -342,8 +343,15 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       if (isAudioBusy()) return;
       voiceCmdRef.current = { cmd: e.command, at: Date.now() };
     });
+    // Siri と音声入力が両方オフの端末ではオンデバイス認識自体が動かない (= native 側が
+    // リッスンを停止してこのイベントを投げる)。 現場ではログが見えないので TTS で告知する。
+    const unavailableSub = subscribeVoiceUnavailable((e) => {
+      sink({ step: 'capture', level: 'error', message: `音声コマンド利用不可: ${e.message}` });
+      enqueueSpeak(t('capture.tts.voiceUnavailable'));
+    });
     return () => {
       sub.remove();
+      unavailableSub.remove();
       voiceCmdRef.current = null;
       stopArkitVoiceCommands().catch(() => {});
       Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});

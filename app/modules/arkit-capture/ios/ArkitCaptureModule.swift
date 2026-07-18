@@ -21,12 +21,15 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
   public func definition() -> ModuleDefinition {
     Name("ArkitCapture")
 
-    Events("onHandTrack", "onThermalState", "onVoiceCommand")
+    Events("onHandTrack", "onThermalState", "onVoiceCommand", "onVoiceUnavailable")
 
     OnCreate {
       ArkitCaptureController.shared.delegate = self
       SpeechCommandController.shared.onCommand = { [weak self] command, transcript in
         self?.sendEvent("onVoiceCommand", ["command": command, "transcript": transcript])
+      }
+      SpeechCommandController.shared.onUnavailable = { [weak self] message in
+        self?.sendEvent("onVoiceUnavailable", ["message": message])
       }
     }
 

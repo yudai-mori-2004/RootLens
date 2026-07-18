@@ -9,6 +9,11 @@ import Speech
 //     leaves the device, which is what the shop-facing documents promise.
 //     Audio is transcribed transiently and discarded; nothing is stored and
 //     the recording clips carry no audio track.
+//   - On-device recognition runs on the OS dictation engine, so the device
+//     must have Siri or keyboard dictation enabled. When both are off, every
+//     recognition task dies instantly with kLSRErrorDomain ("Siri and
+//     Dictation are disabled") — retrying can never succeed, so that case
+//     stops the listener and surfaces onUnavailable instead.
 //   - Runs alongside the ARKit camera session: the camera and the microphone
 //     are separate resources, so both can capture concurrently. The audio
 //     session uses .playAndRecord with .defaultToSpeaker so the TTS guidance
@@ -24,6 +29,8 @@ final class SpeechCommandController: NSObject {
 
   /// (command, transcript) on a keyword match. command is "start" or "stop".
   var onCommand: ((String, String) -> Void)?
+  /// Listening stopped for good (e.g. Siri / dictation disabled on the device).
+  var onUnavailable: ((String) -> Void)?
 
   private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "ja-JP"))
   private let audioEngine = AVAudioEngine()
@@ -72,7 +79,6 @@ final class SpeechCommandController: NSObject {
               try session.setActive(true, options: .notifyOthersOnDeactivation)
               self.running = true
               self.startRecognitionTask()
-              NSLog("[SpeechCommand] listening started")
               completion(nil)
             } catch {
               completion(error)
@@ -113,8 +119,6 @@ final class SpeechCommandController: NSObject {
     // installTap throws an NSException (= crash) on a 0 Hz / 0 ch format, which is
     // what the input node reports when the audio session is not actually recording.
     guard format.sampleRate > 0, format.channelCount > 0 else {
-      NSLog("[SpeechCommand] input format not ready (rate=%.0f ch=%d), retrying",
-            format.sampleRate, format.channelCount)
       restartSoon()
       return
     }
@@ -126,20 +130,30 @@ final class SpeechCommandController: NSObject {
       try? audioEngine.start()
     }
 
-    NSLog("[SpeechCommand] task start (onDevice=%d, rate=%.0f)",
-          req.requiresOnDeviceRecognition ? 1 : 0, format.sampleRate)
     task = recognizer.recognitionTask(with: req) { [weak self] result, error in
-      guard let self else { return }
+      // Restarting cancels the old task, which still fires its callback once
+      // with a cancellation error; the identity check drops those stale calls
+      // so they cannot schedule a second, competing restart.
+      guard let self, self.request === req else { return }
       if let result {
-        NSLog("[SpeechCommand] heard: %@", result.bestTranscription.formattedString)
         self.match(transcript: result.bestTranscription.formattedString)
         if result.isFinal {
           self.restartSoon()
           return
         }
       }
-      if error != nil {
-        self.restartSoon()
+      if let error {
+        let ns = error as NSError
+        if ns.domain == "kLSRErrorDomain" {
+          // The on-device recognizer itself cannot run (Siri and dictation are
+          // both disabled in Settings). No amount of retrying fixes that.
+          DispatchQueue.main.async {
+            self.stop()
+            self.onUnavailable?(ns.localizedDescription)
+          }
+        } else {
+          self.restartSoon()
+        }
       }
     }
   }
