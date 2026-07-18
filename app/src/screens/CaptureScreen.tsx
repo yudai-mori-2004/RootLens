@@ -39,6 +39,7 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Line, LinearGradient as SvgLinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { Audio } from 'expo-av';
 import { Camera } from 'expo-camera';
 import * as Device from 'expo-device';
 import * as FileSystem from 'expo-file-system';
@@ -330,6 +331,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const voiceCmdRef = useRef<{ cmd: 'start' | 'stop'; at: number } | null>(null);
   useEffect(() => {
     if (!getCaptureFlow(flowId).usesVoiceCommands) return;
+    // expo-av は効果音を鳴らすたびに自分の audio mode でセッションを再構成する。
+    // allowsRecordingIOS を立てないと category が playback に戻り、 マイク入力が無音化する
+    // (= 認識器はエラーも出さず沈黙する)。 再生と録音の共存はこのフラグが正規の調整点。
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: true }).catch(() => {});
     startArkitVoiceCommands().catch((e) =>
       sink({ step: 'capture', level: 'warn', message: `音声コマンド開始失敗: ${errMsg(e)}` }),
     );
@@ -341,6 +346,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       sub.remove();
       voiceCmdRef.current = null;
       stopArkitVoiceCommands().catch(() => {});
+      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});
     };
   }, [flowId]);
 
