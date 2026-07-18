@@ -173,7 +173,7 @@ const ja = {
   // 音声コマンドフロー: キャリブレーション確定後の開始待ち案内。
   'capture.tts.voiceArmed': '「撮影スタート」と言うと、撮影を始めます。',
   'capture.tts.confirmedAim': '位置が合いました。',
-  'capture.tts.doneVoice': '撮影終了です。「撮影スタート」と言うと、次の撮影を始めます。',
+  'capture.tts.doneVoice': '撮影終了です。次の撮影をする際は、「撮影スタート」と言ってください。',
   'capture.tts.voiceUnavailable': '音声コマンドが使えません。iPhoneの設定で、音声入力をオンにしてください。',
   'capture.hud.cyclePausing': '一時停止中',
 
@@ -355,7 +355,7 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.cycleResume': 'Resuming recording.',
   'capture.tts.voiceArmed': 'Say the start command to begin recording. Hold both palms up to align the camera.',
   'capture.tts.confirmedAim': 'Position confirmed.',
-  'capture.tts.doneVoice': 'Recording finished. Say the start command to begin the next one.',
+  'capture.tts.doneVoice': 'Recording finished. To start the next recording, say the start command.',
   'capture.tts.voiceUnavailable': 'Voice commands are unavailable. Please turn on dictation in the iPhone settings.',
   'capture.hud.cyclePausing': 'Paused',
 
