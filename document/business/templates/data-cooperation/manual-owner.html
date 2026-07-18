@@ -8,22 +8,30 @@
   html,body{ width:210mm; background:#fff; color:#111;
     font-family:"Hiragino Sans","Yu Gothic",sans-serif;
     line-break:strict; word-break:normal; overflow-wrap:normal; }
-  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:13mm 18mm 14mm; }
+  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; padding:10mm 18mm 14mm; }
 
   .tag{ display:inline-block; font-size:9pt; font-weight:600; letter-spacing:.2em; border:.4mm solid #111; padding:1.2mm 4mm; }
-  h1{ margin-top:3mm; font-size:21pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
-  .lead{ margin-top:3mm; font-size:11pt; line-height:1.8; }
+  h1{ margin-top:2mm; font-size:19pt; font-weight:700; letter-spacing:.04em; line-height:1.3; }
+  .lead{ margin-top:2.5mm; font-size:10.5pt; line-height:1.7; }
 
-  .sec{ margin-top:4mm; }
+  .sec{ margin-top:3.5mm; }
   .sec .h{ font-size:13pt; font-weight:700; border-left:1.6mm solid #111; padding-left:3.5mm; letter-spacing:.04em; }
-  .sec .bd{ margin-top:2.5mm; }
-  .sec li{ list-style:none; margin-top:1.8mm; font-size:10.5pt; line-height:1.58; padding-left:5mm; position:relative; color:#222; }
+  .sec .bd{ margin-top:2mm; }
+  .sec li{ list-style:none; margin-top:1.5mm; font-size:10.5pt; line-height:1.5; padding-left:5mm; position:relative; color:#222; }
   .sec li::before{ content:"■"; position:absolute; left:0; font-size:8pt; top:1.4mm; }
-  .sec .note{ margin-top:2.5mm; margin-left:5mm; font-size:9.5pt; line-height:1.6; background:#f0f0f0; border-left:1mm solid #999; padding:1.5mm 3mm; }
 
-  .money{ margin-top:4mm; border:.5mm solid #111; padding:3.5mm 6mm; }
+  .chk{ margin-top:2.5mm; margin-left:5mm; border:.4mm solid #111; padding:2.5mm 5mm 3mm; }
+  .chk .intro{ font-size:10pt; line-height:1.6; color:#222; }
+  .chk .ci{ display:flex; gap:3mm; margin-top:2mm; align-items:flex-start; }
+  .chk .ci .bx{ flex:none; width:4.5mm; height:4.5mm; border:.35mm solid #111; margin-top:.8mm; }
+  .chk .ci .tx{ flex:1; font-size:10.5pt; line-height:1.45; color:#111; }
+  .chk .sub{ margin-left:7.5mm; margin-top:.6mm; font-size:9pt; line-height:1.45; color:#555; }
+  .chk .outro{ margin-top:2.5mm; font-size:9.5pt; line-height:1.6; color:#222;
+    background:#f0f0f0; border-left:1mm solid #999; padding:1.5mm 3mm; }
+
+  .money{ margin-top:3.5mm; border:.5mm solid #111; padding:3mm 6mm; }
   .money .h{ font-size:11.5pt; font-weight:700; letter-spacing:.06em; }
-  .money .d{ margin-top:2mm; font-size:10pt; line-height:1.65; color:#222; }
+  .money .d{ margin-top:1.5mm; font-size:10pt; line-height:1.55; color:#222; }
 
   .foot{ position:absolute; bottom:10mm; left:18mm; right:18mm; font-size:8.5pt; color:#666;
     border-top:.3mm solid #ccc; padding-top:2.5mm; line-height:1.6; }
@@ -33,32 +41,41 @@
 <div class="sheet">
   <span class="tag">管理者用</span>
   <h1>撮影の運用メモ</h1>
-  <div class="lead">機材とアップロードを担当する方向けの資料です。毎日の作業は、朝・日中・夜の3つだけです。スタッフの操作は別紙「撮影ヘッドギアの使い方」をご覧ください。</div>
+  <div class="lead">機材とアップロードを担当する方向けの資料です。作業は、撮影前と撮影後の2つだけです。スタッフの操作は別紙「撮影ヘッドギアの使い方」をご覧ください。</div>
 
   <div class="sec">
-    <div class="h">朝の準備</div>
+    <div class="h">撮影前</div>
     <div class="bd">
-      <li>スマホとバッテリーが満充電になっていることを確認し、ヘッドギアと一緒にスタッフへ渡してください。</li>
-      <li>バッテリーの取り付けから装着までの手順は、別紙スタッフ用マニュアルのとおりです。装着してからの操作は、アプリの音声がスタッフを案内します。</li>
+      <li>撮影前までに、端末とモバイル充電器の充電を済ませてください。</li>
     </div>
   </div>
 
   <div class="sec">
-    <div class="h">日中の作業（充電スタンドの管理）</div>
-    <div class="bd">
-      <li>バッテリーの付け替えは、撮影が一時停止している間にスタッフが行います。管理者にお願いしたいのは、充電スタンドに満充電のバッテリーがそろった状態を保つことです。</li>
-      <li>バッテリーは1台につき2個のローテーションで、交換は3時間ごとが目安です。スタンドに戻されたバッテリーが充電されているか、ときどき確認してください。</li>
-    </div>
-  </div>
-
-  <div class="sec">
-    <div class="h">夜の作業（動画の確認とアップロード）</div>
+    <div class="h">撮影後（動画の確認とアップロード）</div>
     <div class="bd">
       <li>アプリの動画一覧で、その日に撮れた動画を確認してください。</li>
-      <li>問題がなければ、Wi-Fiのある場所でアップロードしてください。</li>
       <li>見られたくない場面が映っている動画や、誤って撮れてしまった動画は、アップロードせずに削除できます。アップロードしない限り、動画が店の外に出ることはありません。</li>
       <li>スタッフから「撮影できないものが映った」と報告があったときは、報告された時刻の動画を確認し、アップロードせずに削除してください。</li>
-      <div class="note">アップロードの際は、確認事項が3つ表示されます（撮影場所の許可を得ていること・同意していない人を撮影していないこと・利用規約）。この確認のうえでアップロードされた動画が、合意書にもとづく提供の対象となります。</div>
+      <li>問題のない動画は、Wi-Fiのある場所でアップロードしてください。</li>
+      <div class="chk">
+        <div class="intro">アップロードの際は、次の3つの確認が表示されます。内容を確かめてチェックを入れ、「同意してアップロード」を押してください。</div>
+        <div class="ci">
+          <span class="bx"></span>
+          <span class="tx">この場所での撮影の許可を得ています。</span>
+        </div>
+        <div class="sub">撮影協力に関する合意書を交わした店舗での撮影である、という確認です。</div>
+        <div class="ci">
+          <span class="bx"></span>
+          <span class="tx">撮影に同意していない人を意図して撮影していません（偶発的な映り込みは提供前にぼかされます）。</span>
+        </div>
+        <div class="sub">撮影同意書を提出したスタッフ以外の人を、狙って撮影していないことの確認です。うっかり映り込んだ顔は、外部に提供される前にぼかし処理されます。</div>
+        <div class="ci">
+          <span class="bx"></span>
+          <span class="tx">利用規約に同意します。</span>
+        </div>
+        <div class="sub">画面のリンクから全文を確認できます。</div>
+        <div class="outro">この確認のうえでアップロードされた動画が、合意書にもとづく提供の対象となります。</div>
+      </div>
     </div>
   </div>
 
@@ -72,7 +89,8 @@
     <div class="bd">
       <li>ヘッドギアとスマホは、湿気や粉の少ない場所で保管してください。</li>
       <li>汚れた場合は、かたく絞った布で拭いてください。</li>
-      <li>故障や破損の際は、そのままの状態でご連絡ください。修理費のご負担はありません。</li>
+      <li>通常の使用のなかでの故障・破損は、修理費のご負担はありません。そのままの状態でご連絡ください。</li>
+      <li>故意の破損や、通常の使用の範囲を超えた乱暴な扱いによる破損は、修理費をご負担いただく場合があります。</li>
     </div>
   </div>
 
