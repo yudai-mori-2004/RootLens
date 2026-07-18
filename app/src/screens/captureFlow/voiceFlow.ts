@@ -44,8 +44,10 @@ export const voiceFlow: CaptureFlow = {
   },
 
   afterCycleResume(ctx) {
+    // 自動サイクルの区切りからの復帰は「撮影を再開します」と告げた直後なので、
+    // 開始コマンドを待たずそのままカウントダウンへ (= 案内どおり実際に再開する)。
     ctx.clearAwaitedSpeech();
-    ctx.setState({ kind: 'voice_prompt' });
+    ctx.setState({ kind: 'precapture_countdown', startTs: ctx.now });
   },
 
   tickCalibrationIdle(ctx, cur) {

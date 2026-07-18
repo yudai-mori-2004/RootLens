@@ -64,3 +64,7 @@
   効果音で出力が受話口 (Built-In Receiver、最大 -9dB) に落ちてそのまま戻らない実測。対処:
   SpeechCommandController が routeChangeNotification を監視し、受話口に落ちたら
   overrideOutputAudioPort(.speaker) でスピーカーへ戻す。リビルド後に実機で音量差の解消を確認する。
+- 2026-07-19 (voice フローのループ整合): 自動サイクル復帰時、「撮影を再開します」と告げた直後に
+  開始コマンド待機へ戻していたのを、案内どおりそのままカウントダウンへ直行するよう修正。
+  gesture フローは positioning が変わっている想定でパー再キャリブへ戻すが、voice フローは
+  キャリブレーション任意なので開始待ちに戻す意味が無かった。
