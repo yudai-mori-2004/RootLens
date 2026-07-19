@@ -17,11 +17,11 @@
   .gear{ flex:none; text-align:right; font-size:10pt; color:#444; border:.4mm solid #999; padding:2mm 4mm; line-height:1.5; }
   .gear b{ display:block; font-size:11pt; color:#111; }
 
-  .sec{ margin-top:3mm; font-size:14pt; font-weight:700; letter-spacing:.14em;
+  .sec{ margin-top:2.5mm; font-size:14pt; font-weight:700; letter-spacing:.14em;
     border-left:2.5mm solid #111; padding-left:5mm; }
 
   /* ── step card ─────────────────────────────────── */
-  .step{ margin-top:2.5mm; border:.4mm solid #111; padding:2.5mm 5mm 3mm; }
+  .step{ margin-top:2mm; border:.4mm solid #111; padding:2.2mm 5mm 2.5mm; }
   .step .h{ display:flex; align-items:center; gap:3mm; font-size:14pt; font-weight:700; line-height:1.3; }
   .step .h .no{ flex:none; width:9mm; height:9mm; border-radius:50%; background:#111; color:#fff;
     font-size:13pt; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
@@ -55,23 +55,28 @@
     width:0; height:0; border-left:2mm solid transparent; border-right:2mm solid transparent; }
   .cmd .bub::after{ border-top:3.2mm solid #111; }
   .cmd .bub::before{ border-top:3.2mm solid #fff; margin-top:-.85mm; z-index:1; }
-  .cmd .note{ margin-top:3.5mm; font-size:10.5pt; color:#333; font-weight:500; }
+  .cmd .note{ margin-top:3.5mm; font-size:10.5pt; color:#333; font-weight:500; line-height:1.6; }
 
-  /* 任意の画角合わせ */
-  .opt{ margin-top:3mm; margin-left:12mm; border:.4mm solid #999; padding:2.5mm 4mm; }
-  .opt b{ display:block; font-size:11pt; font-weight:700; color:#111; margin-bottom:1mm; }
-  .opt .t{ font-size:10.5pt; line-height:1.55; color:#222; }
+  /* 任意の画角合わせ (= 撮影スタートの下、 大きめの淡色ボックス) */
+  .opt{ margin-top:3mm; margin-left:12mm; margin-right:2mm;
+    border:.4mm dashed #666; padding:2.5mm 5mm 2.5mm; background:#fafafa; }
+  .opt b{ display:block; font-size:12pt; font-weight:700; color:#111; margin-bottom:1mm;
+    letter-spacing:.02em; }
+  .opt .why{ font-size:10.5pt; line-height:1.55; color:#111; font-weight:600; margin-bottom:1mm; }
+  .opt .t{ font-size:10.5pt; line-height:1.6; color:#222; }
 
   /* ── 一時停止サイクルの縦帯 ───────────────────────── */
-  .strip{ display:inline-block; margin-top:2.5mm; margin-left:12mm; border:.5mm solid #111;
+  .strip{ display:inline-block; border:.5mm solid #111;
     background:#fff; padding:3mm 8mm; text-align:center; }
   .strip .row{ font-size:13pt; font-weight:700; letter-spacing:.03em; line-height:1.45; }
   .strip .down{ font-size:11pt; color:#666; line-height:1; padding:.5mm 0; }
 
-  /* ── 撮影: 開始と終了を左右に ─────────────────────── */
-  .shoot-row{ display:flex; gap:8mm; margin-top:2.5mm; align-items:stretch; }
-  .shoot-row .col{ flex:1; display:flex; }
-  .shoot-row .step{ margin-top:0; width:100%; }
+  /* ── 撮影終了 (5) と 自動一時停止 (6) を左右に ────── */
+  .end-row{ display:flex; gap:8mm; margin-top:2mm; align-items:stretch; }
+  .end-row .col{ flex:1; display:flex; }
+  .end-row .step{ margin-top:0; width:100%; }
+  .end-row .step6-body{ display:flex; gap:6mm; align-items:center; margin-top:2.5mm; margin-left:12mm; }
+  .end-row .step6-body .txt{ flex:1; font-size:10.5pt; line-height:1.65; color:#222; }
 
   /* ── QA ─────────────────────────────────────────── */
   .qa{ margin-top:2mm; display:flex; gap:3mm; align-items:stretch; }
@@ -129,8 +134,8 @@
     <div class="h"><span class="no">3</span>ヘルメットをかぶる</div>
     <div class="pts" style="display:flex; gap:8mm; align-items:center;">
       <div style="flex:1;">
-        <li>ヘルメットをかぶり、あごひもを留めます。</li>
-        <li>前後にぐらつかず、頭にしっかり乗っていれば正解です。</li>
+        <li>ヘルメットをかぶり、あごひもをしっかり留めます。</li>
+        <li>前後にぐらつかず、頭に安定して乗っていれば装着完了です。</li>
       </div>
       <span class="ph tall" style="flex:none;">写真準備中</span>
     </div>
@@ -138,48 +143,50 @@
 
   <div class="sec">撮影</div>
 
-  <div class="shoot-row">
-    <div class="col">
-      <div class="step">
-        <div class="h"><span class="no">4</span>声で撮影を始める</div>
-        <div class="d">ヘルメットをかぶったら、ふだんの声の大きさで言ってください。</div>
-        <div class="cmd">
-          <div class="bub">さつえいスタート</div>
-          <div class="note">3・2・1 のカウントのあと、撮影が始まります。</div>
-        </div>
-        <div class="opt">
-          <b>カメラの向きを合わせたいとき（やらなくてもOK）</b>
-          <div class="t">撮影を始める前に、手をパーにして目線を指先に向けてください。「位置が合いました」と聞こえたらOKです。「少し上へ」「少し下へ」と指示されたら、マウントの角度を直してもう一度同じ姿勢をとります。</div>
-        </div>
-      </div>
+  <div class="step">
+    <div class="h"><span class="no">4</span>声で撮影を始める</div>
+    <div class="d">ヘルメットをかぶり、「撮影スタート」と声に出して言ってください。</div>
+    <div class="cmd">
+      <div class="bub">撮影スタート</div>
+      <div class="note">3・2・1 のカウントのあと、撮影が始まります。</div>
     </div>
-    <div class="col">
-      <div class="step">
-        <div class="h"><span class="no">5</span>声で撮影を終える</div>
-        <div class="d">仕事の区切りがついたら、こう言ってください。</div>
-        <div class="cmd">
-          <div class="bub">さつえいストップ</div>
-          <div class="note">「撮影を終了します」と聞こえたら終了です。<br>次の撮影も「さつえいスタート」で始められます。</div>
-        </div>
-      </div>
+    <div class="opt">
+      <b>カメラの画角調整（任意）</b>
+      <div class="why">両手がカメラに映るように、あらかじめマウントの角度を合わせておく作業です。</div>
+      <div class="t">「撮影スタート」の前に、普段作業をするときの自然な位置に手を伸ばし、自然な視線で手元を見てください。音声で「少し上へ」「少し下へ」と指示されたら、マウントの角度を調整して、もう一度同じ姿勢をとります。「位置が合いました」と聞こえたらOKです。</div>
     </div>
   </div>
 
-  <div class="step">
-    <div class="h"><span class="no">6</span>30分に1回、自動で一時停止</div>
-    <div class="pts" style="display:flex; gap:10mm; align-items:center;">
-      <div class="strip" style="margin:0;"><div class="row">撮影 30分</div><div class="down">↓</div><div class="row">一時停止 5分</div><div class="down">↓</div><div class="row">自動で再開</div></div>
-      <div style="flex:1; font-size:12pt; line-height:1.6; color:#222;">スマホの発熱管理のため、30分に一度、撮影が5分間止まります。<br>5分たつと「撮影を再開します」と流れて、そのまま自動で撮影が続きます。<b>何もしなくて大丈夫です。</b></div>
+  <div class="end-row">
+    <div class="col">
+      <div class="step">
+        <div class="h"><span class="no">5</span>声で撮影を終える</div>
+        <div class="d">仕事の区切りがついたら、「撮影ストップ」と声に出して言ってください。</div>
+        <div class="cmd">
+          <div class="bub">撮影ストップ</div>
+          <div class="note">「撮影を終了します」と聞こえたら終了です。<br>次の撮影も「撮影スタート」で始められます。</div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="step">
+        <div class="h"><span class="no">6</span>30分に1回、自動で一時停止</div>
+        <div class="d">スマホの発熱を抑えるため、撮影は30分ごとに一度、自動で止まります。</div>
+        <div class="step6-body">
+          <div class="strip"><div class="row">撮影 30分</div><div class="down">↓</div><div class="row">一時停止 5分</div><div class="down">↓</div><div class="row">自動で再開</div></div>
+          <div class="txt">5分たつと「撮影を再開します」の音声とともに、そのまま撮影が続きます。<b>操作は必要ありません。</b></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="sec">困ったときは</div>
 
   <div class="qa">
-    <div class="r"><b>撮影をやめたいとき・勝手に始まってしまったとき</b>「さつえいストップ」と言って撮影を終了してください。</div>
+    <div class="r"><b>撮影をやめたいとき・勝手に始まってしまったとき</b>「撮影ストップ」と言って撮影を終了してください。</div>
     <div class="r"><b>声に反応しないとき</b>少し大きな声で、はっきり言い直してください。「音声コマンドが使えません」と流れたときは、管理者に伝えてください。</div>
-    <div class="r"><b>アプリの応答がない・クラッシュしたとき</b>一度アプリのタスクごと削除してから、アプリを再起動して2以降の手順で撮影を開始してください。</div>
-    <div class="r"><b>撮影できないものが映ってしまったとき（機密書類・お客様の顔等）</b>後から削除できるのでご安心ください。すぐに「さつえいストップ」で終了し、現在時刻をメモして管理者に報告してください。</div>
+    <div class="r"><b>アプリの応答がない・クラッシュしたとき</b>アプリを一度終了し（画面下からスワイプして消す）、もう一度アプリを開いて手順2からやり直してください。</div>
+    <div class="r"><b>撮影できないものが映ってしまったとき（機密書類・お客様の顔等）</b>後から削除できるのでご安心ください。すぐに「撮影ストップ」で終了し、現在時刻をメモして管理者に報告してください。</div>
     <div class="r"><b>バッテリーを交換するとき</b>バッテリーの交換は3時間ごとが目安です。一時停止中の交換がおすすめです。</div>
   </div>
 
