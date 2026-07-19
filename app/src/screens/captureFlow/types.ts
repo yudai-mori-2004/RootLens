@@ -11,6 +11,7 @@
 //    1 つ足し、 CaptureState に固有 kind を足し、 registry (index.ts) に登録するだけ。
 
 import type { SfxName } from '../../services/captureSounds';
+import type { TranslationKey } from '../../i18n';
 
 export type CaptureFlowId = 'gesture' | 'voice';
 
@@ -39,6 +40,26 @@ export type CaptureState =
 
 export type StableGesture = 'open_palm' | 'thumbs_up' | null;
 
+/** 音声キューを操作する束。 tick と入場効果の両方で使う。 */
+export interface FlowAudio {
+  speak(text: string): number;
+  sfx(name: SfxName): Promise<void>;
+  pause(ms: number): void;
+  clear(): void;
+}
+
+/** フロー固有の停止シーケンス (gesture の ピロン → TTS → ぴっぴっぴ) の世代管理。
+ *  同 state に再突入 (キャンセル→復帰→再度発火) した時に、 古い試行の Promise 解決で
+ *  誤って完了フラグが立たないように、 発火時に世代を進めてトラッキングする。 */
+export interface StopSeqController {
+  isDone(): boolean;
+  /** 新しい世代を開始する (= 古い試行を無効化)。 返り値をトラッキング id に使う。
+   *  ticker から呼ぶ場合は返り値を捨てれば実質「今の試行を中止」 として使える。 */
+  newGeneration(): number;
+  /** 世代が一致していれば完了フラグを立てる (= 遅延解決の stale 破棄)。 */
+  markDone(gen: number): void;
+}
+
 /** フローが tick 中に使える操作の束。 CaptureScreen が ref 経由で組み立てる。 */
 export interface FlowTickCtx {
   now: number;
@@ -53,17 +74,14 @@ export interface FlowTickCtx {
   clearAwaitedSpeech(): void;
   /** 理由 TTS 付きで finalizing へ (= 理由は finalizing 冒頭で 1 回読まれる)。 */
   finalizeWithReason(reasonTts: string | null): void;
-  audio: {
-    speak(text: string): number;
-    sfx(name: SfxName): Promise<void>;
-    pause(ms: number): void;
-    clear(): void;
-  };
-  /** gesture フローの停止シーケンス (ピロン → TTS → ぴっぴっぴ) の完了フラグと世代破棄。 */
-  stopSeq: {
-    isDone(): boolean;
-    cancel(): void;
-  };
+  audio: FlowAudio;
+  stopSeq: StopSeqController;
+}
+
+/** state 入場時のフロー固有副作用に渡す ctx (= 音声シーケンス組み立て用の最小セット)。 */
+export interface FlowEnterCtx {
+  audio: FlowAudio;
+  stopSeq: StopSeqController;
 }
 
 export interface FlowCue {
@@ -102,12 +120,28 @@ export interface CaptureFlow {
    * 遷移した場合は { transitioned: true }。 継続なら armedSince (= デバウンス継続値) を返す。
    */
   tickRecordingStop(ctx: FlowTickCtx, armedSince: number): { transitioned: boolean; armedSince: number };
-  /** フロー固有 state (stopping / stopping_confirm / awaiting_start_command) の tick。 */
+  /** フロー固有 state の tick (= gesture の palm_prompt / awaiting_palm / stopping* 、 voice の
+   *  voice_prompt / awaiting_start_command)。 CaptureScreen の dispatcher が該当 state kind を
+   *  この関数へ流す。 */
   tickFlowState(ctx: FlowTickCtx, cur: CaptureState): void;
+  /** state 入場時のフロー固有副作用 (= gesture の停止確認シーケンス「ピロン→TTS→ぴっぴっぴ」)。
+   *  単発 cue (音+TTS 1 回) は entryCue で足りるが、 多段音声シーケンスや完了トラッキングが要る
+   *  ケースをここに置く。 未定義なら何もしない。 */
+  onEnterState?(state: CaptureState, ctx: FlowEnterCtx): void;
   /** フロー固有 state の入場 cue (共通 state は CaptureScreen 側)。 */
   entryCue(state: CaptureState): FlowCue | null;
-  /** フロー固有 state の HUD (共通 state は CaptureScreen 側)。 */
+  /** state 表示用 HUD。 フロー固有 state に加え、 共通 state のうちフローごとに文言が異なるもの
+   *  (recording / calibration_confirmed / next_task_announcing) もここで返す。 null なら
+   *  CaptureScreen 側のフロー中立フォールバックを使う。 */
   hud(state: CaptureState): FlowHud | null;
   /** このフローが音声コマンドのリスナーを必要とするか (= マイク・音声認識の起動)。 */
   usesVoiceCommands: boolean;
+  /** 設定画面のセグメントに出す表示名の i18n キー。 新フロー追加時に SettingsScreen を編集せず
+   *  registry のみで反映されるように、 各フローが自分のラベルを供給する。 */
+  displayLabelKey: TranslationKey;
+  /** 共通の 'recording' 以外にも「録画進行中」 として扱う state kind か
+   *  (= gesture の停止確認シーケンス中 = stopping / stopping_confirm)。
+   *  録画中の副作用 (画面消灯・空き容量ポーリング・経過タイマー・バックグラウンド停止判定) が
+   *  これを参照する (= フロー固有 state 名を CaptureScreen に直書きしない)。 */
+  isStillRecording(state: CaptureState): boolean;
 }

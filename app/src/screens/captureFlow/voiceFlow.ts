@@ -15,6 +15,12 @@ import type { CaptureFlow, CaptureState } from './types';
 export const voiceFlow: CaptureFlow = {
   id: 'voice',
   usesVoiceCommands: true,
+  displayLabelKey: 'settings.capture.flowVoice',
+
+  isStillRecording() {
+    // 声の停止は state 'recording' → 'finalizing' に直行 (gesture の stopping* を経由しない)。
+    return false;
+  },
 
   initialPrompt(ctx) {
     ctx.clearAwaitedSpeech();
@@ -102,9 +108,18 @@ export const voiceFlow: CaptureFlow = {
   },
 
   hud(state: CaptureState) {
-    if (state.kind === 'voice_prompt' || state.kind === 'awaiting_start_command') {
-      return { text: t('capture.tts.voiceArmed'), tone: 'normal' as const };
+    switch (state.kind) {
+      case 'voice_prompt':
+      case 'awaiting_start_command':
+        return { text: t('capture.tts.voiceArmed'), tone: 'normal' as const };
+      case 'calibration_confirmed':
+        return { text: t('capture.tts.confirmedAim'), tone: 'accent' as const };
+      case 'recording':
+        return { text: t('capture.hud.recordingHintVoice'), tone: 'dim' as const };
+      case 'next_task_announcing':
+        return { text: t('capture.tts.doneVoice'), tone: 'normal' as const };
+      default:
+        return null;
     }
-    return null;
   },
 };

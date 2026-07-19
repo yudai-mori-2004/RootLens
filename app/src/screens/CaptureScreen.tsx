@@ -112,12 +112,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CaptureMode'>;
 const PALM_HOLD_MS = 1000;
 // 装着案内のあと、 フローの最初の案内へ進むまでの間 (= 取り付けの一呼吸)。
 const MOUNT_PAUSE_MS = 2500;
-// 停止トリガー (サムズアップ保持 / 音声コマンド) はフロー実装が持つ (= captureFlow/)。
-// 停止シーケンスの間 (= ピロン → TTS 「撮影を終了します」 → ぴっぴっぴ → ピロロン)。
-// TTS の後にひと呼吸置いてから 3 発の tick を等間隔で入れる。 tick 自体は ~0.15s なので、
-// 「tick 開始 → 次の tick 開始」 が STOP_TICK_INTERVAL_MS。
-const STOP_TICK_POST_TTS_PAUSE_MS = 200;
-const STOP_TICK_INTERVAL_MS = 500;
+// 停止トリガー (サムズアップ保持 / 音声コマンド) と、 その入場シーケンスはフローが持つ
+// (= gesture のピロン→TTS→ぴっぴっぴ シーケンスは gestureFlow.onEnterState)。
 // 開始カウント: 3,2,1 を COUNTDOWN_TICK_MS 間隔で刻む (= 120bpm)。 合計 = 3 * tick。
 const COUNTDOWN_TICKS = 3;
 const COUNTDOWN_TICK_MS = 500;
@@ -206,8 +202,6 @@ function entryCue(s: CaptureState, flow: CaptureFlow): { sfx?: SfxName; tts?: st
   switch (s.kind) {
     case 'announcing':
       return { tts: t('capture.tts.intro'), keep: true };
-    case 'palm_prompt':
-      return { tts: t('capture.tts.palmPrompt') };
     // next_task_announcing は二部構成 (お疲れさま → 間 → 続けるなら) なので state→audio effect で個別に積む。
     case 'adjust_needed':
       return { tts: calibAdjustText(s.direction) };
@@ -219,7 +213,8 @@ function entryCue(s: CaptureState, flow: CaptureFlow): { sfx?: SfxName; tts?: st
     case 'cycle_resuming':
       return { tts: t('capture.tts.cycleResume') };
     default:
-      // フロー固有 state (stopping / stopping_confirm / awaiting_start_command) はフローに聞く。
+      // 上に無い state はすべてフローが決める (= フロー固有 state と、 gesture の palm 案内 / voice の
+      // 開始コマンド案内など、 フローごとに文言・cue が違うもの)。
       return flow.entryCue(s);
   }
 }
@@ -503,8 +498,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
 
   // 録画中の空き容量 / 電池ポーリング (= 30 秒ごと。 判定は ticker が ref を見る)。
   useEffect(() => {
-    const k = state.kind;
-    const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
+    const active = state.kind === 'recording' || flowRef.current.isStillRecording(state);
     if (!active) return;
     let cancelled = false;
     const poll = () => {
@@ -527,11 +521,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'background') return;
-      const k = stateRef.current.kind;
-      if (k === 'recording' || k === 'stopping' || k === 'stopping_confirm') {
+      const cur = stateRef.current;
+      if (cur.kind === 'recording' || flowRef.current.isStillRecording(cur)) {
         autoStopReasonRef.current = t('capture.tts.autoStopBackground');
         setState({ kind: 'finalizing' });
-      } else if (k === 'precapture_countdown') {
+      } else if (cur.kind === 'precapture_countdown') {
         // まだ録画が始まっていない → 開始せずフローの待機に戻す (= 復帰したらやり直し)。
         clearAudioQueue();
         setState(flowRef.current.calibrationIdleState());
@@ -544,9 +538,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // プレビューも無いので暗くて良い)。 どちらもタップ (wakeUntilRef) で一時的に点灯。 録画/休止を
   // 抜けたら必ず復帰。
   useEffect(() => {
-    const k = state.kind;
-    const recActive = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
-    const pauseActive = k === 'cycle_pausing';
+    const recActive = state.kind === 'recording' || flowRef.current.isStillRecording(state);
+    const pauseActive = state.kind === 'cycle_pausing';
     if (!recActive && !pauseActive) {
       setDimmed(false);
       wakeUntilRef.current = 0;
@@ -633,30 +626,27 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     }
   }, [state.kind, permission, activeConfigId, config.id]);
 
-  // stopping_confirm の音声シーケンス: ピロン → 「撮影を終了します」 → ぴっ・ぴっ・ぴっ (等間隔)。
-  // 最後の tick が鳴り終わったら stopSeqRef.done を立てて ticker に伝える (= ticker が finalize へ)。
-  // 途中で離脱したら ticker 側で clearAudioQueue + cancel 音 + stopHint 再案内 → recording に戻す。
-  // 世代番号で「前試行の Promise 解決が新試行を誤成立させる」 のを防ぐ。
+  // state 入場時のフロー固有副作用 (= gesture のみが持つ停止確認シーケンス「ピロン→TTS→ぴっぴっぴ」)。
+  // 単発 cue は entryCue で足りるので、 これは多段音声+完了トラッキング用の枠。 voice フローは未実装 = no-op。
   useEffect(() => {
-    if (state.kind !== 'stopping_confirm') return;
-    const gen = stopSeqRef.current.generation + 1;
-    stopSeqRef.current = { generation: gen, done: false };
-    clearAudioQueue();
-    void enqueueSfx('detect_thumbs_up');
-    enqueueSpeak(t('capture.tts.stoppingConfirm'));
-    enqueuePause(STOP_TICK_POST_TTS_PAUSE_MS);
-    // tick 自体 ~0.15s なので、 tick 開始から次の tick 開始までの空き = interval - 0.15s。
-    const gap = Math.max(0, STOP_TICK_INTERVAL_MS - 150);
-    void enqueueSfx('countdown_tick');
-    enqueuePause(gap);
-    void enqueueSfx('countdown_tick');
-    enqueuePause(gap);
-    void enqueueSfx('countdown_tick').then(() => {
-      if (stopSeqRef.current.generation === gen) {
-        stopSeqRef.current = { generation: gen, done: true };
-      }
+    const stopSeqCtl = {
+      isDone: () => stopSeqRef.current.done,
+      newGeneration: () => {
+        const gen = stopSeqRef.current.generation + 1;
+        stopSeqRef.current = { generation: gen, done: false };
+        return gen;
+      },
+      markDone: (gen: number) => {
+        if (stopSeqRef.current.generation === gen) {
+          stopSeqRef.current = { generation: gen, done: true };
+        }
+      },
+    };
+    flowRef.current.onEnterState?.(state, {
+      audio: { speak: enqueueSpeak, sfx: enqueueSfx, pause: enqueuePause, clear: clearAudioQueue },
+      stopSeq: stopSeqCtl,
     });
-  }, [state.kind, t]);
+  }, [state.kind]);
 
   // 録画状態に入ったら native の startRecording を呼ぶ + recording 終了で finalize。
   // 二重発火 guard: recordingStartedRef + 「同 cycle で 1 度しか呼ばない」 を厳格化。
@@ -776,8 +766,15 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       audio: { speak: enqueueSpeak, sfx: enqueueSfx, pause: enqueuePause, clear: clearAudioQueue },
       stopSeq: {
         isDone: () => stopSeqRef.current.done,
-        cancel: () => {
-          stopSeqRef.current = { generation: stopSeqRef.current.generation + 1, done: false };
+        newGeneration: () => {
+          const gen = stopSeqRef.current.generation + 1;
+          stopSeqRef.current = { generation: gen, done: false };
+          return gen;
+        },
+        markDone: (gen: number) => {
+          if (stopSeqRef.current.generation === gen) {
+            stopSeqRef.current = { generation: gen, done: true };
+          }
         },
       },
     };
@@ -799,18 +796,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // ハードタイムアウト待ちが現場で長すぎた。)
         if (now - mountTrackRef.current.enteredTs >= MOUNT_PAUSE_MS) {
           flowRef.current.initialPrompt(ctx);
-        }
-        return;
-      }
-      case 'palm_prompt': {
-        // パー案内を言い終わったら検出開始へ。
-        if (speechDone()) setState({ kind: 'awaiting_palm' });
-        return;
-      }
-      case 'awaiting_palm': {
-        if (flowRef.current.tickCalibrationIdle(ctx, cur)) return;
-        if (gesture === 'open_palm') {
-          setState({ kind: 'palm_holding', startTs: now });
         }
         return;
       }
@@ -926,11 +911,14 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         }
         return;
       }
+      case 'palm_prompt':
+      case 'awaiting_palm':
       case 'stopping':
       case 'stopping_confirm':
       case 'voice_prompt':
       case 'awaiting_start_command': {
-        // フロー固有 state (= 停止保持 / 開始コマンド待ち) はフローが tick する。
+        // フロー固有 state (= gesture のパー案内 / 停止保持、 voice の開始コマンド案内・待機)
+        // はフローが tick する。
         flowRef.current.tickFlowState(ctx, cur);
         return;
       }
@@ -1037,8 +1025,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
 
   // 録画経過タイマー (= 0.5s 刻み。 native 録画開始時刻を基準にするので state 遷移で揺れない)
   useEffect(() => {
-    const k = state.kind;
-    const active = k === 'recording' || k === 'stopping' || k === 'stopping_confirm';
+    const active = state.kind === 'recording' || flowRef.current.isStillRecording(state);
     if (!active) { setElapsedSec(0); return; }
     const id = setInterval(() => {
       const base = recordingStartedAtRef.current;
@@ -1086,16 +1073,17 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     requestAnimationFrame(() => navigation.goBack());
   }, [navigation, stopAndRegisterImmediately]);
 
-  // 撮影構成の切替 (= キャリブレーション待機中のみ)。 切替後はキャリブレーションを最初からやり直す。
+  // 撮影構成の切替 (= 録画・停止処理・サイクル中は不可、 それ以外の待機系 state ならいつでも切れる)。
+  // 切替後はキャリブレーションを最初からやり直す。
   const onSelectConfig = useCallback((id: string) => {
     if (id === selectedConfigId) return;
-    const k = stateRef.current.kind;
-    const calibratePhase =
-      k === 'announcing' || k === 'next_task_announcing' || k === 'mounting' ||
-      k === 'palm_prompt' || k === 'awaiting_palm' || k === 'palm_holding' ||
-      k === 'adjust_needed' || k === 'calibration_confirmed' ||
-      k === 'voice_prompt' || k === 'awaiting_start_command';
-    if (!calibratePhase) return;
+    const cur = stateRef.current;
+    const k = cur.kind;
+    const activePhase =
+      k === 'precapture_countdown' || k === 'recording' ||
+      flowRef.current.isStillRecording(cur) ||
+      k === 'finalizing' || k === 'cycle_pausing' || k === 'cycle_resuming';
+    if (activePhase) return;
     clearAudioQueue(); // 切替で旧構成の案内音声を止める
     setSelectedConfigId(id);
     setState({ kind: 'announcing' });
@@ -1138,10 +1126,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const isRecording =
-    state.kind === 'recording' ||
-    state.kind === 'stopping' ||
-    state.kind === 'stopping_confirm';
+  const isRecording = state.kind === 'recording' || flowRef.current.isStillRecording(state);
 
 
   // プレビューは「実際に稼働中の構成」 の native view を出す (= 切替完了後に swap)。
@@ -1159,23 +1144,14 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       case 'announcing':
       case 'mounting':
         return { text: t('capture.tts.intro'), tone: 'normal' };
-      case 'palm_prompt':
-      case 'awaiting_palm':
-        return { text: t('capture.tts.palmPrompt'), tone: 'normal' };
       case 'palm_holding':
         return { text: t('capture.hud.detecting'), tone: 'accent' };
       case 'adjust_needed':
         return { text: calibAdjustText(state.direction), tone: 'normal', arrow: state.direction };
-      case 'calibration_confirmed':
-        return { text: t('capture.tts.confirmed'), tone: 'accent' };
       case 'precapture_countdown':
         return { text: t('capture.hud.countdown'), tone: 'normal' };
-      case 'recording':
-        return { text: t('capture.hud.recordingHint'), tone: 'dim' };
       case 'finalizing':
         return { text: t('capture.hud.saving'), tone: 'normal' };
-      case 'next_task_announcing':
-        return { text: t('capture.tts.done'), tone: 'normal' };
       case 'cycle_pausing':
         return { text: t('capture.hud.cyclePausing'), tone: 'dim' };
       case 'cycle_resuming':
@@ -1377,11 +1353,14 @@ function formatElapsed(sec: number): string {
 }
 
 // 現フェーズで「意味のある」 ジェスチャーだけを通す (= 確定ビープのゲート)。
-//   キャリブ中 → open_palm のみ。 撮影中の thumbs_up は即時ビープしない
-//   (= 作業中の偶然の検出で鳴るのが不快。 合図は保持しきった後の stopping_confirm 入場音で出す)。
+//   キャリブに絡む待機 state で open_palm を検出したら即時ビープ。 撮影中の thumbs_up は即時
+//   ビープしない (= 作業中の偶然の検出で鳴るのが不快。 合図は保持しきった後の stopping_confirm 入場音で出す)。
+//   ⚠ 両フローの待機 state を全部載せる (= voice フローは voice_prompt / awaiting_start_command
+//      でもパーを出せばキャリブに合流するので、 そこでもビープを鳴らす)。
 const CALIB_KINDS: CaptureState['kind'][] = [
   'announcing', 'next_task_announcing', 'mounting', 'palm_prompt',
   'awaiting_palm', 'palm_holding', 'adjust_needed', 'calibration_confirmed',
+  'voice_prompt', 'awaiting_start_command',
 ];
 function relevantGesture(
   g: 'open_palm' | 'thumbs_up' | null,

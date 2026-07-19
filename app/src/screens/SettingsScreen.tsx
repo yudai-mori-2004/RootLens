@@ -45,6 +45,7 @@ import {
   type RecordingRate,
 } from '../services/captureSettings';
 import type { LegalDocKey } from '../content/legalDocs.generated';
+import { CAPTURE_FLOWS } from './captureFlow';
 
 export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
@@ -287,14 +288,12 @@ export const SettingsScreen: React.FC = () => {
             value={cs.streamMesh}
             onChange={(v) => updateCs({ streamMesh: v })}
           />
-          {/* 撮影フロー (= 開始・終了の指示方法)。 gesture = サムズアップ / voice = 音声コマンド。 */}
+          {/* 撮影フロー (= 開始・終了の指示方法)。 選択肢は registry から自動生成 (= 新フロー追加時に
+              ここを触らない)。 gesture = サムズアップ / voice = 音声コマンド。 */}
           <SegmentRow
             label={t('settings.capture.flow')}
             value={cs.captureFlow}
-            options={[
-              { value: 'gesture', label: t('settings.capture.flowGesture') },
-              { value: 'voice', label: t('settings.capture.flowVoice') },
-            ]}
+            options={CAPTURE_FLOWS.map((f) => ({ value: f.id, label: t(f.displayLabelKey) }))}
             onChange={(v) => updateCs({ captureFlow: v as CaptureSettings['captureFlow'] })}
           />
           {/* 自動サイクル撮影 (= N 分録画 → 休止 → 再開のループ)。 有効時のみ分数を出す。 */}

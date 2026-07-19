@@ -145,6 +145,7 @@ const ja = {
   'capture.hud.detecting': 'そのまま、動かないでください。',
   'capture.hud.countdown': 'まもなく撮影がはじまります。',
   'capture.hud.recordingHint': '終わるときは、両手で親指を立ててキープしてください。',
+  'capture.hud.recordingHintVoice': '終わるときは、「撮影ストップ」と言ってください。',
   'capture.hud.saving': '保存しています…',
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
@@ -173,7 +174,7 @@ const ja = {
   // 音声コマンドフロー: キャリブレーション確定後の開始待ち案内。
   'capture.tts.voiceArmed': '「撮影スタート」と言うと、撮影を始めます。',
   'capture.tts.confirmedAim': '位置が合いました。',
-  'capture.tts.doneVoice': '撮影終了です。次の撮影をする際は、「撮影スタート」と言ってください。',
+  'capture.tts.doneVoice': '撮影を終了しました。次の準備ができたら、再度「撮影スタート」と言ってください。',
   'capture.tts.voiceUnavailable': '音声コマンドが使えません。iPhoneの設定で、音声入力をオンにしてください。',
   'capture.hud.cyclePausing': '一時停止中',
 
@@ -331,6 +332,7 @@ const en: Record<TranslationKey, string> = {
   'capture.hud.detecting': 'Hold still.',
   'capture.hud.countdown': 'Recording starts in a moment.',
   'capture.hud.recordingHint': 'To finish, hold a thumbs-up with both hands.',
+  'capture.hud.recordingHintVoice': 'To finish, say the stop command.',
   'capture.hud.saving': 'Saving…',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
@@ -355,7 +357,7 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.cycleResume': 'Resuming recording.',
   'capture.tts.voiceArmed': 'Say the start command to begin recording. Hold both palms up to align the camera.',
   'capture.tts.confirmedAim': 'Position confirmed.',
-  'capture.tts.doneVoice': 'Recording finished. To start the next recording, say the start command.',
+  'capture.tts.doneVoice': 'Recording ended. When you are ready for the next one, say the start command again.',
   'capture.tts.voiceUnavailable': 'Voice commands are unavailable. Please turn on dictation in the iPhone settings.',
   'capture.hud.cyclePausing': 'Paused',
 

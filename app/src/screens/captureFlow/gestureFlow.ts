@@ -15,9 +15,20 @@ const THUMBS_UP_HOLD_MS = 700;   // ARM と合わせて計 1.0 秒キープで�
 // 離脱猶予 (= 立て続け中の検出フリッカーを吸収。 意図的な離脱はこれより長く手を動かす)。
 const RELEASE_GRACE_MS = 800;
 
+// 停止確認シーケンス (= ピロン → TTS「撮影を終了します」 → ぴっぴっぴ) のタイミング。
+// TTS の後にひと呼吸置いてから 3 発の tick を等間隔で入れる。 tick 自体は ~0.15s なので、
+// 「tick 開始 → 次の tick 開始」 が STOP_TICK_INTERVAL_MS。
+const STOP_TICK_POST_TTS_PAUSE_MS = 200;
+const STOP_TICK_INTERVAL_MS = 500;
+
 export const gestureFlow: CaptureFlow = {
   id: 'gesture',
   usesVoiceCommands: false,
+  displayLabelKey: 'settings.capture.flowGesture',
+
+  isStillRecording(state) {
+    return state.kind === 'stopping' || state.kind === 'stopping_confirm';
+  },
 
   initialPrompt(ctx) {
     ctx.clearAwaitedSpeech();
@@ -57,6 +68,25 @@ export const gestureFlow: CaptureFlow = {
     ctx.setState({ kind: 'precapture_countdown', startTs: ctx.now });
   },
 
+  onEnterState(state, ctx) {
+    if (state.kind !== 'stopping_confirm') return;
+    // 停止確認シーケンス: ピロン → TTS「撮影を終了します」 → ぴっぴっぴ 3 発。
+    // 最後の tick が鳴り終わった時点で世代一致なら done=true、 tickFlowState がそれを見て finalize へ。
+    // 途中で離脱すると tickFlowState が newGeneration() で世代を進めるので、 このシーケンスの
+    // Promise が後から解決しても markDone は空振り (= 誤って停止確定しない)。
+    const gen = ctx.stopSeq.newGeneration();
+    ctx.audio.clear();
+    void ctx.audio.sfx('detect_thumbs_up');
+    ctx.audio.speak(t('capture.tts.stoppingConfirm'));
+    ctx.audio.pause(STOP_TICK_POST_TTS_PAUSE_MS);
+    const gap = Math.max(0, STOP_TICK_INTERVAL_MS - 150);
+    void ctx.audio.sfx('countdown_tick');
+    ctx.audio.pause(gap);
+    void ctx.audio.sfx('countdown_tick');
+    ctx.audio.pause(gap);
+    void ctx.audio.sfx('countdown_tick').then(() => ctx.stopSeq.markDone(gen));
+  },
+
   tickRecordingStop(ctx, armedSince) {
     if (ctx.gesture !== 'thumbs_up') return { transitioned: false, armedSince: 0 };
     const since = armedSince === 0 ? ctx.now : armedSince;
@@ -69,6 +99,17 @@ export const gestureFlow: CaptureFlow = {
   },
 
   tickFlowState(ctx, cur) {
+    if (cur.kind === 'palm_prompt') {
+      // パー案内を言い終わったら検出開始へ (= awaiting_palm)。
+      if (ctx.speechDone()) ctx.setState({ kind: 'awaiting_palm' });
+      return;
+    }
+    if (cur.kind === 'awaiting_palm') {
+      if (ctx.gesture === 'open_palm') {
+        ctx.setState({ kind: 'palm_holding', startTs: ctx.now });
+      }
+      return;
+    }
     if (cur.kind === 'stopping') {
       const thumbsUp = ctx.gesture === 'thumbs_up';
       if (!thumbsUp) {
@@ -98,7 +139,7 @@ export const gestureFlow: CaptureFlow = {
         if (ctx.now - lostSince >= RELEASE_GRACE_MS) {
           // 本当に離した → キャンセルして録画継続。 世代を進めて、 まだ鳴り終わっていない tick の
           // Promise 解決で done=true が立つのを無効化する。
-          ctx.stopSeq.cancel();
+          ctx.stopSeq.newGeneration();
           ctx.audio.clear();
           void ctx.audio.sfx('detect_cancel');
           ctx.audio.pause(1000);
@@ -120,11 +161,14 @@ export const gestureFlow: CaptureFlow = {
 
   entryCue(state) {
     switch (state.kind) {
+      case 'palm_prompt':
+        // 装着案内の直後、 手をパーにして目線を指先へ向けさせる案内。
+        return { tts: t('capture.tts.palmPrompt') };
       case 'stopping':
         // 保持の前半 (= ARM 後) は無音。 作業中の偶然の検出で音を出さない。
         return null;
       case 'stopping_confirm':
-        // ピロン → 「撮影を終了します」 → ぴっぴっぴ は CaptureScreen の専用 effect が積む。
+        // ピロン → 「撮影を終了します」 → ぴっぴっぴ は onEnterState が積む。
         return null;
       default:
         return null;
@@ -132,9 +176,21 @@ export const gestureFlow: CaptureFlow = {
   },
 
   hud(state: CaptureState) {
-    if (state.kind === 'stopping' || state.kind === 'stopping_confirm') {
-      return { text: t('capture.tts.stoppingConfirm'), tone: 'accent' as const };
+    switch (state.kind) {
+      case 'palm_prompt':
+      case 'awaiting_palm':
+        return { text: t('capture.tts.palmPrompt'), tone: 'normal' as const };
+      case 'stopping':
+      case 'stopping_confirm':
+        return { text: t('capture.tts.stoppingConfirm'), tone: 'accent' as const };
+      case 'calibration_confirmed':
+        return { text: t('capture.tts.confirmed'), tone: 'accent' as const };
+      case 'recording':
+        return { text: t('capture.hud.recordingHint'), tone: 'dim' as const };
+      case 'next_task_announcing':
+        return { text: t('capture.tts.done'), tone: 'normal' as const };
+      default:
+        return null;
     }
-    return null;
   },
 };
