@@ -21,7 +21,7 @@ import { getLocale, t } from '../i18n';
 
 /// 同意画面に表示する文言の版。 サーバの同意イベントに記録され、 「どの文言に同意したか」 を
 /// 後から特定する鍵になる。 表示文言 (SUMMARY_KEYS の i18n 文言) を変えたら必ず上げる。
-export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-12.5';
+export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-21.1';
 
 /// 同意が及ぶ範囲 (= 収集 / AI 学習利用 / 社外ライセンス・販売 / 越境提供)。 利用規約の利用目的条項と対。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;

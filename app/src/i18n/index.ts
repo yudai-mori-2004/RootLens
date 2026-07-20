@@ -182,7 +182,7 @@ const ja = {
   // ── アップロード同意ポップ (= マイビデオのカードタップ) ──
   'upload.consentTitle': 'アップロード前の確認',
   'upload.consentCheckLocation': 'この場所での撮影の許可を得ています。',
-  'upload.consentCheckNoThirdParty': '撮影に同意していない人を意図して撮影していません(偶発的な映り込みは提供前にぼかされます)。',
+  'upload.consentCheckNoThirdParty': '撮影に同意していない人を意図して撮影していません。',
   'upload.consentCheckTermsPrefix': '',
   'upload.consentCheckTermsLink': '利用規約',
   'upload.consentCheckTermsSuffix': 'に同意します。',
@@ -366,7 +366,7 @@ const en: Record<TranslationKey, string> = {
   // ── Upload consent pop (= tap a card in My Videos) ──
   'upload.consentTitle': 'Before you upload',
   'upload.consentCheckLocation': 'I have permission to record at this location.',
-  'upload.consentCheckNoThirdParty': 'No one who has not consented is filmed intentionally (incidental captures are blurred before delivery).',
+  'upload.consentCheckNoThirdParty': 'No one who has not consented is filmed intentionally.',
   'upload.consentCheckTermsPrefix': 'I agree to the ',
   'upload.consentCheckTermsLink': 'Terms of Use',
   'upload.consentCheckTermsSuffix': '.',
