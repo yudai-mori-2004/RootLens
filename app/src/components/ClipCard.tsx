@@ -40,6 +40,9 @@ export const ClipCard: React.FC<Props> = ({ clip, width, previewSource, onOpen }
   const t = useT();
   const isError = clip.state === 'error';
   const isUploading = clip.state === 'uploading';
+  const isQueued = clip.state === 'queued';
+  // アップロード進行中 + 順番待ちはタップ不可 (= 同意ポップを開かせない。 二重エンキュー防止)。
+  const locked = isUploading || isQueued;
   if (clip.state === 'uploaded') return null;
 
   const dur = formatDuration(clip.durationMs);
@@ -47,13 +50,13 @@ export const ClipCard: React.FC<Props> = ({ clip, width, previewSource, onOpen }
 
   return (
     <Pressable
-      onPress={() => !isUploading && onOpen?.(clip)}
-      disabled={isUploading}
-      style={({ pressed }) => [{ width }, pressed && !isUploading && styles.pressed]}
+      onPress={() => !locked && onOpen?.(clip)}
+      disabled={locked}
+      style={({ pressed }) => [{ width }, pressed && !locked && styles.pressed]}
     >
       {/* ── サムネ (= カード本体) ── */}
       <View style={styles.thumbFrame}>
-        <ClipThumb clip={clip} previewSource={previewSource} dimmed={isUploading} />
+        <ClipThumb clip={clip} previewSource={previewSource} dimmed={locked} />
 
         {isError ? (
           <View style={[styles.chip, styles.chipDanger]}>
@@ -64,6 +67,10 @@ export const ClipCard: React.FC<Props> = ({ clip, width, previewSource, onOpen }
             <Text style={styles.chipTextDark}>
               {t('clip.uploading')}{progress > 0 ? ` ${Math.round(progress * 100)}%` : ''}
             </Text>
+          </View>
+        ) : isQueued ? (
+          <View style={[styles.chip, styles.chipAmber]}>
+            <Text style={styles.chipTextDark}>{t('clip.queued')}</Text>
           </View>
         ) : null}
 

@@ -58,6 +58,11 @@ async function hydrate(): Promise<void> {
       if (clip.state === 'uploading') {
         return { ...clip, state: 'error' as const, errorMessage: 'アプリ再起動中に中断されました' };
       }
+      // queued (= 順番待ちのまま kill) はまだ何も始まっていないので、 黙って録画済みに戻す
+      // (= キュー自体は再起動で消えるため、 もう一度アップロード操作してもらう)。
+      if (clip.state === 'queued') {
+        return { ...clip, state: 'recorded' as const };
+      }
       return clip;
     });
     dataflowStore.getState().replaceClips(sanitized);

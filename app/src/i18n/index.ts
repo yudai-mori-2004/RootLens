@@ -126,6 +126,7 @@ const ja = {
 
   // ── Clip card ──
   'clip.uploading': 'アップロード中',
+  'clip.queued': '順番待ち',
   'clip.errorEyebrow': 'アップロード失敗',
 
   // ── Capture flow: ガード / UI ──
@@ -313,6 +314,7 @@ const en: Record<TranslationKey, string> = {
 
   // ── Clip card ──
   'clip.uploading': 'Uploading',
+  'clip.queued': 'Waiting',
   'clip.errorEyebrow': 'Upload failed',
 
   // ── Capture flow: guards / UI ──

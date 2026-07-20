@@ -9,7 +9,8 @@
 
 export type ClipState =
   | 'recorded'    // saved on the device, not uploaded yet (visible in the clip list)
-  | 'uploading'   // the user tapped upload; hash → R2 PUT → server registration in progress
+  | 'queued'      // the user tapped upload; waiting for an earlier clip's upload to finish
+  | 'uploading'   // hash → R2 PUT → server registration in progress
   | 'uploaded'    // upload and registration complete (drops out of the list)
   | 'error';      // a step failed; the clip stays listed with a retry option
 

@@ -183,8 +183,14 @@ let advanceQueue = Promise.resolve();
 /**
  * Enqueue an advance so concurrent taps are serialized. The second clip waits
  * for the first to finish (hash → upload → register) before starting its own.
+ * The clip is marked 'queued' immediately so the wait is visible on its card
+ * (advanceClip flips it to 'uploading' when its turn starts); an already
+ * queued / uploading clip is not enqueued twice.
  */
 export function enqueueAdvance(clipId: string, sink: EventSink): void {
+  const clip = dataflowStore.getState().clips[clipId];
+  if (!clip || clip.state === 'queued' || clip.state === 'uploading') return;
+  dataflowStore.getState().patchClip(clipId, { state: 'queued', errorMessage: null });
   advanceQueue = advanceQueue
     .then(() => advanceClip(clipId, sink))
     .catch(() => {});
