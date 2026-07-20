@@ -102,12 +102,20 @@ export function localVideoUri(clip: Clip): string | null {
   }
 }
 
+/** サムネのキャッシュキー。 clip.id はハッシュ確定時に rename される (local id → content hash) ので、
+ *  id をキーにするとアップロード開始直後にキャッシュが全ミスし、 数 GB の mp4 デコードが
+ *  PUT と同時に走ってしまう。 rename をまたいで安定な録画ディレクトリ名 (rec-<ts>) を使う。 */
+function frameCacheKey(clip: Clip): string {
+  const dirName = clip.sessionDir?.split('/').filter(Boolean).pop();
+  return dirName && dirName.startsWith('rec-') ? dirName : clip.id;
+}
+
 const ClipThumb: React.FC<{
   clip: Clip;
   previewSource?: ImageSourcePropType;
   dimmed?: boolean;
 }> = ({ clip, previewSource, dimmed }) => {
-  const thumb = useLocalClipFrame(clip.id, localVideoUri(clip));
+  const thumb = useLocalClipFrame(frameCacheKey(clip), localVideoUri(clip));
   const source = previewSource ?? (thumb ? { uri: thumb } : null);
 
   return (
