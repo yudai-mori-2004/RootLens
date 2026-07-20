@@ -1,0 +1,48 @@
+diff --git a/node_modules/expo-file-system/ios/NetworkingHelpers.swift b/node_modules/expo-file-system/ios/NetworkingHelpers.swift
+index a2198c3..fb4405d 100644
+--- a/node_modules/expo-file-system/ios/NetworkingHelpers.swift
++++ b/node_modules/expo-file-system/ios/NetworkingHelpers.swift
+@@ -16,6 +16,10 @@ func createUrlSession(type: SessionType, delegate: URLSessionDelegate) -> URLSes
+   let configuration = type == .foreground ? URLSessionConfiguration.default : URLSessionConfiguration.background(withIdentifier: UUID().uuidString)
+   configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+   configuration.urlCache = nil
++  // RootLens patch: 大容量 (数 GB) raw アップロードが既定 60s のリクエストタイムアウトで
++  // 切れる (NSURLErrorTimedOut -1001) のを防ぐ。 進捗が 10 分止まらない限り継続、 総計 24h まで。
++  configuration.timeoutIntervalForRequest = 600
++  configuration.timeoutIntervalForResource = 86400
+   return URLSession(configuration: configuration, delegate: delegate, delegateQueue: .main)
+ }
+ 
+diff --git a/node_modules/expo-file-system/src/FileSystem.ts b/node_modules/expo-file-system/src/FileSystem.ts
+index 56b5013..e34e352 100644
+--- a/node_modules/expo-file-system/src/FileSystem.ts
++++ b/node_modules/expo-file-system/src/FileSystem.ts
+@@ -443,15 +443,19 @@ export class UploadTask extends FileSystemCancellableNetworkTask<UploadProgressD
+     }
+ 
+     this.addSubscription();
+-    const result = await ExponentFileSystem.uploadTaskStartAsync(
+-      this.url,
+-      this.fileUri,
+-      this.uuid,
+-      this.options
+-    );
+-    this.removeSubscription();
+-
+-    return result;
++    // RootLens patch: remove the progress subscription on rejection too. Without
++    // the finally, every failed/retried upload leaks its listener on the module
++    // event emitter for the rest of the app session.
++    try {
++      return await ExponentFileSystem.uploadTaskStartAsync(
++        this.url,
++        this.fileUri,
++        this.uuid,
++        this.options
++      );
++    } finally {
++      this.removeSubscription();
++    }
+   }
+ }
+ 
