@@ -29,7 +29,7 @@ export type CaptureState =
   | { kind: 'adjust_needed'; direction: AdjustDirection }
   | { kind: 'calibration_confirmed' }
   | { kind: 'precapture_countdown'; startTs: number }
-  | { kind: 'recording'; startTs: number; lastHandSeenTs: number; lastWarnTs: number; armedSince: number }
+  | { kind: 'recording'; startTs: number; armedSince: number }
   | { kind: 'stopping'; startTs: number; lostSince: number }                 // gesture フロー所有
   | { kind: 'stopping_confirm'; startTs: number; lostSince: number }        // gesture フロー所有
   | { kind: 'voice_prompt' }                                                 // voice フロー所有 (開始コマンド案内 TTS 中)

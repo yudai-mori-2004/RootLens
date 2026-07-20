@@ -116,7 +116,7 @@ export const gestureFlow: CaptureFlow = {
         // 離脱ヒステリシス (= 単フレームのフリッカーでは切らない)。 lostSince を state に内包。
         const lostSince = cur.lostSince === 0 ? ctx.now : cur.lostSince;
         if (ctx.now - lostSince >= RELEASE_GRACE_MS) {
-          ctx.setState({ kind: 'recording', startTs: cur.startTs, lastHandSeenTs: ctx.now, lastWarnTs: 0, armedSince: 0 });
+          ctx.setState({ kind: 'recording', startTs: cur.startTs, armedSince: 0 });
         } else if (lostSince !== cur.lostSince) {
           ctx.setState({ ...cur, lostSince });
         }
@@ -144,7 +144,7 @@ export const gestureFlow: CaptureFlow = {
           void ctx.audio.sfx('detect_cancel');
           ctx.audio.pause(1000);
           ctx.audio.speak(t('capture.tts.stopHint'));
-          ctx.setState({ kind: 'recording', startTs: ctx.now, lastHandSeenTs: ctx.now, lastWarnTs: 0, armedSince: 0 });
+          ctx.setState({ kind: 'recording', startTs: ctx.now, armedSince: 0 });
         } else if (lostSince !== cur.lostSince) {
           ctx.setState({ ...cur, lostSince });
         }

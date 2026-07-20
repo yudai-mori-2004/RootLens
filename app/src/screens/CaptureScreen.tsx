@@ -72,7 +72,7 @@ import {
   type HandTrackEvent,
 } from '../dataflow';
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
-import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isAudioBusy, isSpeechSettled } from '../services/captureAudio';
+import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isAudioBusy } from '../services/captureAudio';
 import { applyCaptureSettingsToNative, loadCaptureSettings } from '../services/captureSettings';
 import { GestureStabilizer, frameGesture } from '../domain/gestureDetect';
 import {
@@ -117,9 +117,7 @@ const MOUNT_PAUSE_MS = 2500;
 // 開始カウント: 3,2,1 を COUNTDOWN_TICK_MS 間隔で刻む (= 120bpm)。 合計 = 3 * tick。
 const COUNTDOWN_TICKS = 3;
 const COUNTDOWN_TICK_MS = 500;
-const HAND_LOST_WARN_MS = 5000;
 const STOP_HINT_DELAY_MS = 3000;        // 録画開始から終了方法の案内までの間
-const WARN_REPEAT_MS = 30000;           // 手が映ってない警告の繰り返し間隔 (= 頻発するとイライラするので長めに)
 
 // ── 長時間録画 (= 1 本 ~100 分想定) の守り ──
 // 熱源はカメラ ISP + ARKit + 手ポーズ推論で録画中は止められない。 削れる最大の発熱源が画面なので、
@@ -281,10 +279,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const [currentGesture, setCurrentGesture] = useState<'open_palm' | 'thumbs_up' | null>(null);
 
   const latestHandRef = useRef<HandTrackEvent | null>(null);
-  // 手検出イベントの最終到着時刻 (= 検出ストリーム自体が止まっている時に「映せ」 と言わないため)
-  const lastHandEventAtRef = useRef(0);
-  // 直近の手ロスト警告の発話 seq (= 前の警告が決着するまで次を積まない)
-  const lastWarnSeqRef = useRef(0);
   // 時間方向の平滑化 (= 5/5 実装の GestureStabilizer 相当、 ~167ms)。 単フレームのノイズで
   // hold が崩れる/ちらつくのを防ぐ。 両手要件は「2 手揃った frame gesture だけを投入」で担保する。
   const gestureStabilizerRef = useRef(new GestureStabilizer(5));
@@ -577,7 +571,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     gestureStabilizerRef.current.reset();
     const subc = config.subscribeHandTrack((e) => {
       latestHandRef.current = e;
-      lastHandEventAtRef.current = Date.now();
       // 両手揃った時だけ frame gesture を採用 (= 両手要件) し、 時間方向に平滑化する。
       // ノイズ 1 フレームでは確定が変わらない (= 5 連続同一で確定。 ~167ms @30Hz)。
       const frameG = e.wearerHandCount >= 2 ? frameGesture(e.wearerHands) : null;
@@ -874,40 +867,18 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           setState({ kind: 'finalizing' });
           return;
         }
-        if (!e) return;
         // 録画が乗ってきた頃に、 終了方法を 1 回だけ案内する (= 遷移を駆動しない副作用)。
         if (!stopHintSpokenRef.current && now - cur.startTs >= STOP_HINT_DELAY_MS) {
           stopHintSpokenRef.current = true;
           enqueueSpeak(flowRef.current.stopHintTts());
         }
-        const handVisible = e.wearerHandCount >= 1;
-        let lastHandSeen = cur.lastHandSeenTs;
-        const lastWarn = cur.lastWarnTs;
-        if (handVisible) {
-          lastHandSeen = now;
-        }
-        // 手が映っていない警告は鳴らさない。 支払いが「手が映っている有効録画時間」 ベースなので、
+        // 手が映っていない警告は出さない。 支払いが「手が映っている有効録画時間」 ベースなので、
         // 手を映すインセンティブは金銭側で立っており、 作業中の警告音は現場では驚かせるだけだった。
-        // else if (
-        //   now - cur.lastHandSeenTs >= HAND_LOST_WARN_MS &&
-        //   now - cur.lastWarnTs >= WARN_REPEAT_MS &&
-        //   // 検出ストリームが生きている時だけ警告する (= イベントが止まっている時の「手が無い」 は
-        //   // 検出側の問題であって装着者の問題ではない)。
-        //   now - lastHandEventAtRef.current < 2000 &&
-        //   // 前の警告がまだキュー内 / 再生中なら積まない (= 溜まった警告の連続再生を構造的に防ぐ)。
-        //   isSpeechSettled(lastWarnSeqRef.current)
-        // ) {
-        //   // 警告は遷移を駆動しない副作用 (= fire-and-forget で enqueue)。
-        //   void enqueueSfx('warn_hand_lost');
-        //   lastWarnSeqRef.current = enqueueSpeak(t('capture.tts.handLost'));
-        //   lastWarn = now;
-        // }
         // 停止トリガー (= サムズアップ保持 / 音声コマンド) はフローが判定する。
         const stopRes = flowRef.current.tickRecordingStop(ctx, cur.armedSince);
         if (stopRes.transitioned) return;
-        const armedSince = stopRes.armedSince;
-        if (lastHandSeen !== cur.lastHandSeenTs || lastWarn !== cur.lastWarnTs || armedSince !== cur.armedSince) {
-          setState({ ...cur, lastHandSeenTs: lastHandSeen, lastWarnTs: lastWarn, armedSince });
+        if (stopRes.armedSince !== cur.armedSince) {
+          setState({ ...cur, armedSince: stopRes.armedSince });
         }
         return;
       }
@@ -959,7 +930,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         ended = true;
         setCountdownRemaining(null);
         playSfx('countdown_end'); // 録画開始の合図 (= 即時再生)
-        setState({ kind: 'recording', startTs: Date.now(), lastHandSeenTs: Date.now(), lastWarnTs: 0, armedSince: 0 });
+        setState({ kind: 'recording', startTs: Date.now(), armedSince: 0 });
         return;
       }
       const step = COUNTDOWN_TICKS - Math.floor(elapsed / COUNTDOWN_TICK_MS); // 3 → 2 → 1

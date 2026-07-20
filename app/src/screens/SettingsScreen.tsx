@@ -354,7 +354,7 @@ export const SettingsScreen: React.FC = () => {
 
 const SFX_NAMES: SfxName[] = [
   'enter_capture', 'detect_palm', 'detect_thumbs_up', 'detect_cancel',
-  'countdown_tick', 'countdown_end', 'rec_stop', 'warn_hand_lost',
+  'countdown_tick', 'countdown_end', 'rec_stop',
 ];
 
 // ─── building blocks ────────────────────────────────────────────────────

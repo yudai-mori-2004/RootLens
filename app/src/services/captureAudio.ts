@@ -40,9 +40,6 @@ let generation = 0;
 let speechSeqCounter = 0;
 let lastDoneSpeechSeq = 0;
 let lastDoneSpeechAt = 0;
-// 「決着した (= 自然完了 or 中断・破棄)」 最新発話の seq。 完了判定 (lastDone) とは別物で、
-// 「同じ警告を二重に積まない」 类の dedup に使う。
-let lastSettledSpeechSeq = 0;
 
 // TTS の声は現在の locale に追従する (= ja は ja-JP、 en は en-US)。
 // rate/pitch は発話時に毎回現 locale で組む (= 言語切替後に開いた撮影で正しい声になる)。
@@ -96,7 +93,6 @@ async function drain(): Promise<void> {
           lastDoneSpeechSeq = item.cue.seq;
           lastDoneSpeechAt = Date.now();
         }
-        lastSettledSpeechSeq = Math.max(lastSettledSpeechSeq, item.cue.seq);
       }
     } catch {
       // 個別 cue の失敗は無視 (= 音声で UX を止めない)
@@ -136,12 +132,6 @@ export function getLastSpeechDone(): { seq: number; at: number } {
   return { seq: lastDoneSpeechSeq, at: lastDoneSpeechAt };
 }
 
-/** その発話が「決着した (= 再生し終えた・中断された・破棄された)」 か。 まだキュー内 / 再生中なら false。
- *  繰り返し系の発話 (= 手ロスト警告) を二重に積まないための dedup に使う。 */
-export function isSpeechSettled(seq: number): boolean {
-  return seq <= lastSettledSpeechSeq;
-}
-
 /** 音声キューが再生中 / 未消化か (= スピーカーが鳴っている可能性)。 音声コマンドのリスナーが
  *  「アプリ自身の TTS を聞き取って誤発火する」 のを防ぐゲートに使う。 */
 export function isAudioBusy(): boolean {
@@ -152,8 +142,6 @@ export function isAudioBusy(): boolean {
  *  中断された発話は完了扱いにしない (= lastDoneSpeechSeq は進めない)。 */
 export function clearAudioQueue(): void {
   generation += 1;
-  // 発行済みの発話はすべて「決着」 扱い (= 破棄された発話を待ち続ける dedup を作らない)。
-  lastSettledSpeechSeq = speechSeqCounter;
   const pending = queue;
   queue = [];
   Speech.stop();

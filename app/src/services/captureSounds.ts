@@ -18,8 +18,7 @@ export type SfxName =
   | 'detect_cancel'
   | 'countdown_tick'
   | 'countdown_end'
-  | 'rec_stop'
-  | 'warn_hand_lost';
+  | 'rec_stop';
 
 // 効果音の意図する仕様 (= 役割・音色・長さ)。 ファイル名にも長さと内容を埋め込んである。
 // 音源を差し替える時はこの仕様 (短く・テンポ良く) に沿った音を同じファイル名で置くこと。
@@ -33,7 +32,6 @@ export type SfxName =
 //   countdown_tick   3/2/1 の極短ブリップ               ~0.15s  (各カウントで 1 回)
 //   countdown_end    カウント終了 = 録画開始の合図音    ~0.5s   (上昇音など「ゴー」)
 //   rec_stop         録画停止音                          ~0.4s
-//   warn_hand_lost   手がフレーム外の警告 (繰り返し用)  ~0.6s   (短く、 耳障りでない程度)
 //
 // require() の path は static 文字列のみ解決可。 ファイル名に長さ・内容を含める。
 const SOURCES: Record<SfxName, AVPlaybackSource> = {
@@ -44,7 +42,6 @@ const SOURCES: Record<SfxName, AVPlaybackSource> = {
   countdown_tick:   require('../../assets/sounds/countdown_tick_blip_0.15s.mp3'),
   countdown_end:    require('../../assets/sounds/countdown_end_go_0.5s.mp3'),
   rec_stop:         require('../../assets/sounds/rec_stop_soft_0.4s.mp3'),
-  warn_hand_lost:   require('../../assets/sounds/warn_hand_lost_alert_0.6s.mp3'),
 };
 
 const sounds: Partial<Record<SfxName, Audio.Sound>> = {};
