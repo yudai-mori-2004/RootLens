@@ -36,7 +36,11 @@ public class ContentHashModule: Module {
         var buf = [UInt8](repeating: 0, count: bufSize)
         var total = 0
         while true {
-          let n = stream.read(&buf, maxLength: bufSize)
+          // autoreleasepool: NSInputStream.read can create bridged ObjC temporaries;
+          // draining per-chunk prevents accumulation over a multi-GB file.
+          let n: Int = autoreleasepool {
+            stream.read(&buf, maxLength: bufSize)
+          }
           if n < 0 {
             let msg = stream.streamError?.localizedDescription ?? "read failed"
             promise.reject("CONTENT_HASH_READ_ERROR", "\(msg) (at byte \(total))")
@@ -53,6 +57,17 @@ public class ContentHashModule: Module {
         let hex = hasher.finalize().map { String(format: "%02x", $0) }.joined()
         promise.resolve(hex)
       }
+    }
+
+    Function("getMemoryMB") { () -> Double in
+      var info = task_vm_info_data_t()
+      var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+      let kr = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+          task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+      }
+      return kr == KERN_SUCCESS ? Double(info.phys_footprint) / 1_000_000.0 : -1
     }
   }
 }

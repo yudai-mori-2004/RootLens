@@ -7,6 +7,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 
 interface ContentHashNativeModule {
   sha256File(path: string): Promise<string>;
+  getMemoryMB(): number;
 }
 
 const native = requireOptionalNativeModule<ContentHashNativeModule>('ContentHash');
@@ -19,4 +20,10 @@ const native = requireOptionalNativeModule<ContentHashNativeModule>('ContentHash
 export async function nativeSha256File(uri: string): Promise<string | null> {
   if (!native) return null;
   return native.sha256File(uri);
+}
+
+/** phys_footprint in MB (-1 when unavailable). Synchronous. */
+export function getMemoryMB(): number {
+  if (!native) return -1;
+  return native.getMemoryMB();
 }

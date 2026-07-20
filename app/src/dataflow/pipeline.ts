@@ -21,6 +21,7 @@ import { computeContentHash } from './steps/hash';
 import { uploadToR2 } from './steps/upload';
 import { registerClip } from './steps/register';
 import { dataflowStore, makeLocalClipId } from './store';
+import { getMemoryMB } from '../native/contentHash';
 
 function errMsg(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -221,15 +222,35 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
     }
   };
 
+  // Progress writes are throttled to ~0.4% steps. The native sent-bytes callback
+  // fires per socket write (hundreds of times per second on fast Wi-Fi), and an
+  // unthrottled patchClip clones the clip map, notifies every subscriber, and
+  // re-arms the persistence timer on each call, starving the JS thread during
+  // the most memory-sensitive stretch of the upload.
+  let lastPatchedProgress = -1;
+  const patchProgress = (progress: number) => {
+    if (progress < 1 && Math.abs(progress - lastPatchedProgress) < 0.004) return;
+    lastPatchedProgress = progress;
+    dataflowStore.getState().patchClip(targetIdRef.id, { uploadProgress: progress });
+  };
+
   try {
     let stage = effectiveStage(initial.stage ?? 'pending', initial.contentHash);
+
+    const memLog = (label: string) => {
+      const mb = getMemoryMB();
+      if (mb >= 0) sink({ step: 'memory', level: 'info', message: `[mem] ${label}: ${mb.toFixed(0)} MB` });
+    };
+    memLog('pipeline-start');
 
     // ─── pending → hashed (the content hash is born) ──────────────────
     if (stage === 'pending') {
       const rawMp4Uri = config.primaryVideoUri(session);
+      memLog('hash-begin');
       const hashed = await computeContentHash(rawMp4Uri, progressSink, (f) => {
-        dataflowStore.getState().patchClip(targetIdRef.id, { uploadProgress: hashFractionToProgress(f) });
+        patchProgress(hashFractionToProgress(f));
       });
+      memLog('hash-done');
       dataflowStore.getState().renameClipId(clipId, hashed.contentHash);
       clipId = hashed.contentHash;
       targetIdRef.id = clipId;
@@ -259,13 +280,13 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
           throw new Error(`required output file missing: ${spec.name}`);
         }
       }
+      memLog('upload-begin');
       await uploadToR2(
         { contentHash: cur.contentHash, recordingConfig: config.id, files },
         progressSink,
-        (f) => {
-          dataflowStore.getState().patchClip(targetIdRef.id, { uploadProgress: uploadFractionToProgress(f) });
-        },
+        (f) => patchProgress(uploadFractionToProgress(f)),
       );
+      memLog('upload-done');
 
       await registerClip(
         {
