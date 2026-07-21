@@ -58,6 +58,7 @@ import {
   subscribeThermalState,
   subscribeVoiceCommand,
   subscribeVoiceUnavailable,
+  subscribeMarkerCommand,
   type PowerState,
   type ThermalState,
 } from '../native/arkitCapture';
@@ -118,6 +119,19 @@ const MOUNT_PAUSE_MS = 2500;
 const COUNTDOWN_TICKS = 3;
 const COUNTDOWN_TICK_MS = 500;
 const STOP_HINT_DELAY_MS = 3000;        // 録画開始から終了方法の案内までの間
+
+// ── 印刷マーカー (ROOTLENS QR) = フロー非依存の決定的トグル ──
+// ジェスチャーが通らない・現場が騒がしくて声が通らない時のための第三の導線。 カード 1 枚で
+// 「待機中に見せる → 録画開始 / 録画中に見せる → 終了」 をトグルする。 判定はレベル駆動
+// (= 提示中 + 再武装済み + 対象 state) なので、 案内 TTS 中に見せ始めても待機に入った瞬間に効く。
+const MARKER_PAYLOAD = 'ROOTLENS:REC';
+const MARKER_ACTIVE_MS = 800;       // 直近この時間内に検出があれば「提示中」 (スキャンは ~4Hz)
+const MARKER_REARM_GAP_MS = 1500;   // 発火後、 この時間以上見えなくなるまで次のトグルを受け付けない
+// マーカーで録画開始してよい待機系 state (= カウントダウン・終了処理・サイクル休止中は無視)。
+const MARKER_START_KINDS: CaptureState['kind'][] = [
+  'palm_prompt', 'awaiting_palm', 'palm_holding', 'adjust_needed',
+  'voice_prompt', 'awaiting_start_command',
+];
 
 // ── 長時間録画 (= 1 本 ~100 分想定) の守り ──
 // 熱源はカメラ ISP + ARKit + 手ポーズ推論で録画中は止められない。 削れる最大の発熱源が画面なので、
@@ -279,6 +293,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const [currentGesture, setCurrentGesture] = useState<'open_palm' | 'thumbs_up' | null>(null);
 
   const latestHandRef = useRef<HandTrackEvent | null>(null);
+  // この画面で録画を 1 本以上開始したか (= voice フローのパー合流を初回前に限るための事実)。
+  const everRecordedRef = useRef(false);
+  // 印刷マーカー (ROOTLENS QR) の直近検出時刻と再武装状態。 提示 1 回 = 1 トグルにするため、
+  // 一度発火したらマーカーが MARKER_REARM_GAP_MS 以上見えなくなるまで次を受け付けない。
+  const markerRef = useRef({ lastSeenAt: 0, armed: true });
   // 時間方向の平滑化 (= 5/5 実装の GestureStabilizer 相当、 ~167ms)。 単フレームのノイズで
   // hold が崩れる/ちらつくのを防ぐ。 両手要件は「2 手揃った frame gesture だけを投入」で担保する。
   const gestureStabilizerRef = useRef(new GestureStabilizer(5));
@@ -346,6 +365,16 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});
     };
   }, [flowId]);
+
+  // 印刷マーカー (ROOTLENS QR)。 フローに関係なく常時購読し、 検出時刻だけ ref に積む
+  // (= 遷移判定は ticker が state を見て行う)。
+  useEffect(() => {
+    const sub = subscribeMarkerCommand(({ payload }) => {
+      if (payload !== MARKER_PAYLOAD) return;
+      markerRef.current.lastSeenAt = Date.now();
+    });
+    return () => sub.remove();
+  }, []);
 
   const recordingStartedRef = useRef(false);
   // 終了方法の案内 (= 録画開始から数秒後に 1 回だけ)
@@ -586,7 +615,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 撮影中の open_palm / キャリブ中の thumbs_up は無関係なので鳴らさない。 音はパー/サムズ共通 (= 好評の音)。
   const prevShownRef = useRef<'open_palm' | 'thumbs_up' | null>(null);
   useEffect(() => {
-    const shown = relevantGesture(currentGesture, state.kind);
+    const shown = relevantGesture(currentGesture, state.kind, !everRecordedRef.current);
     const prev = prevShownRef.current;
     prevShownRef.current = shown;
     if (shown && shown !== prev) playSfx('detect_palm');
@@ -646,6 +675,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     if (state.kind === 'recording' && !recordingStartedRef.current) {
       recordingStartedRef.current = true;  // 同期で即 true、 後続 fire 防止
+      everRecordedRef.current = true;      // 以後、 voice フローのパー合流 (任意キャリブ) を閉じる
       stopHintSpokenRef.current = false;
       (async () => {
         try {
@@ -746,6 +776,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     const ctx: FlowTickCtx = {
       now,
       gesture,
+      firstRecordingStarted: everRecordedRef.current,
       // 鮮度切れ (= 1.5 秒) の一致は捨てる。 TTS 中の一致はリスナー側で捨て済み。
       voiceCommand: voice && now - voice.at <= 1500 ? voice.cmd : null,
       consumeVoiceCommand: () => { voiceCmdRef.current = null; },
@@ -771,6 +802,28 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         },
       },
     };
+
+    // 印刷マーカーのトグル (= フロー非依存の決定的トリガー。 提示 1 回 = 1 トグル)。
+    // 発火後はマーカーが一度フレームから消える (= REARM_GAP 以上未検出) まで再武装しない:
+    // 開始トグル後にカードを出し続けても、 録画に入った瞬間の停止誤爆にならない。
+    const mk = markerRef.current;
+    if (now - mk.lastSeenAt > MARKER_REARM_GAP_MS) mk.armed = true;
+    if (mk.armed && now - mk.lastSeenAt <= MARKER_ACTIVE_MS) {
+      if (MARKER_START_KINDS.includes(cur.kind)) {
+        mk.armed = false;
+        playSfx('detect_palm'); // 認識の即時フィードバック (以降はカウントダウン音が引き継ぐ)
+        clearAudioQueue();
+        awaitedSpeechSeqRef.current = 0;
+        setState({ kind: 'precapture_countdown', startTs: now });
+        return;
+      }
+      if (cur.kind === 'recording' || flowRef.current.isStillRecording(cur)) {
+        mk.armed = false;
+        playSfx('detect_palm');
+        ctx.finalizeWithReason(t('capture.tts.stoppingConfirm'));
+        return;
+      }
+    }
 
     switch (cur.kind) {
       case 'announcing': {
@@ -1326,18 +1379,21 @@ function formatElapsed(sec: number): string {
 // 現フェーズで「意味のある」 ジェスチャーだけを通す (= 確定ビープのゲート)。
 //   キャリブに絡む待機 state で open_palm を検出したら即時ビープ。 撮影中の thumbs_up は即時
 //   ビープしない (= 作業中の偶然の検出で鳴るのが不快。 合図は保持しきった後の stopping_confirm 入場音で出す)。
-//   ⚠ 両フローの待機 state を全部載せる (= voice フローは voice_prompt / awaiting_start_command
-//      でもパーを出せばキャリブに合流するので、 そこでもビープを鳴らす)。
 const CALIB_KINDS: CaptureState['kind'][] = [
   'announcing', 'next_task_announcing', 'mounting', 'palm_prompt',
   'awaiting_palm', 'palm_holding', 'adjust_needed', 'calibration_confirmed',
-  'voice_prompt', 'awaiting_start_command',
 ];
+// voice フローの待機 state はパー合流が「初回録画前だけ」 開いている (voiceFlow 参照)。
+// 合流が閉じた後にビープだけ鳴ると「反応したのに何も起きない」 になるので、 音も同じ条件で消す。
+const VOICE_WAIT_KINDS: CaptureState['kind'][] = ['voice_prompt', 'awaiting_start_command'];
 function relevantGesture(
   g: 'open_palm' | 'thumbs_up' | null,
   kind: CaptureState['kind'],
+  voicePalmMergeOpen: boolean,
 ): 'open_palm' | 'thumbs_up' | null {
-  if (g === 'open_palm') return CALIB_KINDS.includes(kind) ? 'open_palm' : null;
+  if (g !== 'open_palm') return null;
+  if (CALIB_KINDS.includes(kind)) return 'open_palm';
+  if (VOICE_WAIT_KINDS.includes(kind) && voicePalmMergeOpen) return 'open_palm';
   return null;
 }
 

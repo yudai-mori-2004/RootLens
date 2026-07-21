@@ -21,7 +21,7 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
   public func definition() -> ModuleDefinition {
     Name("ArkitCapture")
 
-    Events("onHandTrack", "onThermalState", "onVoiceCommand", "onVoiceUnavailable")
+    Events("onHandTrack", "onThermalState", "onVoiceCommand", "onVoiceUnavailable", "onMarkerCommand")
 
     OnCreate {
       ArkitCaptureController.shared.delegate = self
@@ -234,6 +234,10 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
 
   func arkitCapture(didChangeThermalState state: String) {
     sendEvent("onThermalState", ["state": state])
+  }
+
+  func arkitCapture(didDetectMarker payload: String) {
+    sendEvent("onMarkerCommand", ["payload": payload])
   }
 
   private func buildHandTrackPayload(_ out: HandTracker.Output) -> [String: Any] {

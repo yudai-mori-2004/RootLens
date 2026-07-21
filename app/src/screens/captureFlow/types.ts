@@ -64,6 +64,10 @@ export interface StopSeqController {
 export interface FlowTickCtx {
   now: number;
   gesture: StableGesture;
+  /** この撮影画面で録画を 1 本以上開始したか。 voice フローが「パーによる任意キャリブの合流は
+   *  初回録画前だけ」 と判定するのに使う (= 2 本目以降の待機中に、 作業中の開いた両手をパーと
+   *  誤検出してキャリブへ飛ぶ事故の防止)。 */
+  firstRecordingStarted: boolean;
   /** 直近の音声コマンド (= 鮮度・TTS 再生中ゲート適用済み)。 読んだら consumeVoiceCommand で消費する。 */
   voiceCommand: 'start' | 'stop' | null;
   consumeVoiceCommand(): void;

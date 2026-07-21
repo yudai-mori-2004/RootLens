@@ -227,6 +227,17 @@ export function subscribeVoiceUnavailable(
   return { remove: () => (nativeModule as any).removeListeners?.(1) };
 }
 
+/** Printed ROOTLENS QR marker decoded in the camera frame (~4 Hz scan). Only
+ *  ROOTLENS-prefixed payloads surface; environment QR codes never cross the bridge. */
+export function subscribeMarkerCommand(
+  listener: (e: { payload: string }) => void,
+): { remove: () => void } {
+  if (!nativeModule) return { remove: () => {} };
+  const sub = (nativeModule as any).addListener?.('onMarkerCommand', listener);
+  if (sub && typeof sub.remove === 'function') return sub;
+  return { remove: () => (nativeModule as any).removeListeners?.(1) };
+}
+
 /** Subscribe to hand tracking (fires at ~15 Hz). */
 export function subscribeHandTrack(listener: (e: HandTrackEvent) => void): { remove: () => void } {
   if (!nativeModule) return { remove: () => {} };

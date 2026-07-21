@@ -6,6 +6,7 @@ import CoreVideo
 import Foundation
 import ImageIO
 import UIKit
+import Vision
 import simd
 
 // Owns the single ARSession and runs two jobs on it concurrently:
@@ -22,6 +23,8 @@ protocol ArkitCaptureControllerDelegate: AnyObject {
   func arkitCapture(didTrackHand output: HandTracker.Output)
   /// The device thermal state (ProcessInfo.thermalState) changed while recording. "nominal" | "fair" | "serious" | "critical".
   func arkitCapture(didChangeThermalState state: String)
+  /// A ROOTLENS-prefixed QR marker was decoded in the camera frame (~4 Hz scan).
+  func arkitCapture(didDetectMarker payload: String)
 }
 
 extension Notification.Name {
@@ -94,6 +97,16 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var handTrackerBusy = false
   private var handTrackerSkipCount: Int = 0
   private let handTrackerInterval: Int = 4  // ARKit 60 Hz / 4 ≈ 15 Hz
+
+  // Marker scan (printed ROOTLENS QR = deterministic start/stop trigger that works
+  // in every capture flow). Same drop-while-busy pattern as HandTracker; only
+  // ROOTLENS-prefixed payloads leave this class, so bystander QR codes in the
+  // environment are never surfaced.
+  private let markerQueue = DispatchQueue(label: "io.rootlens.arkit-capture.marker", qos: .userInitiated)
+  private let markerBusyLock = NSLock()
+  private var markerBusy = false
+  private var markerSkipCount: Int = 0
+  private let markerInterval: Int = 8  // ~4 Hz at 30 fps sensor rate
 
   // Latest HandTracker output, kept to fill the hands field of each
   // frames.jsonl row. HandTracker runs at ~15 Hz while rows are
@@ -1154,6 +1167,41 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
           self.latestHandOutput = out
           self.latestHandOutputLock.unlock()
           self.delegate?.arkitCapture(didTrackHand: out)
+        }
+      }
+    }
+
+    // Marker scan (drop-while-busy, single in-flight buffer, same rules as
+    // HandTracker: the pooled buffer is held only by this one pending block).
+    self.markerSkipCount += 1
+    if self.markerSkipCount >= self.markerInterval {
+      self.markerSkipCount = 0
+      self.markerBusyLock.lock()
+      let shouldScan = !self.markerBusy
+      if shouldScan { self.markerBusy = true }
+      self.markerBusyLock.unlock()
+
+      if shouldScan {
+        let orientation = self.currentDisplayOrientation().cgImageOrientation
+        self.markerQueue.async { [weak self] in
+          guard let self = self else { return }
+          defer {
+            self.markerBusyLock.lock()
+            self.markerBusy = false
+            self.markerBusyLock.unlock()
+          }
+          let request = VNDetectBarcodesRequest()
+          request.symbologies = [.qr]
+          let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer,
+                                              orientation: orientation,
+                                              options: [:])
+          guard (try? handler.perform([request])) != nil else { return }
+          for observation in request.results ?? [] {
+            guard let payload = observation.payloadStringValue,
+                  payload.hasPrefix("ROOTLENS") else { continue }
+            self.delegate?.arkitCapture(didDetectMarker: payload)
+            break
+          }
         }
       }
     }
