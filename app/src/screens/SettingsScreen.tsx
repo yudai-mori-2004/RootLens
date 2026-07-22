@@ -32,7 +32,7 @@ import type { RootStackParamList } from '../app/types';
 import { config } from '../config';
 import { useAuth } from '../services/auth';
 import { useT, useLocale, setLocale, type Locale } from '../i18n';
-import { colors, fonts, radii, spacing, typography } from '../theme';
+import { colors, fonts, radii, shadows, spacing, typography } from '../theme';
 import { LegalDocModal } from '../components/LegalDocModal';
 import { playSfxAwait, type SfxName } from '../services/captureSounds';
 import {
@@ -448,7 +448,7 @@ const SwitchRow: React.FC<{
     <Switch
       value={value}
       onValueChange={onChange}
-      trackColor={{ true: colors.emerald, false: colors.border }}
+      trackColor={{ true: colors.accent, false: colors.border }}
       thumbColor="#FFFFFF"
     />
   </View>
@@ -584,11 +584,12 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   sectionCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: colors.card,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
     overflow: 'hidden',
+    ...shadows.sm,
   },
   divider: { height: 1, backgroundColor: colors.border, marginLeft: spacing.lg },
 
@@ -632,11 +633,7 @@ const styles = StyleSheet.create({
   },
   segmentControl: {
     flexDirection: 'row',
-    backgroundColor: colors.paperDeep,
-    borderRadius: radii.md,
-    padding: 2.5,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: 6,
   },
   stepper: {
     flexDirection: 'row',
@@ -648,7 +645,7 @@ const styles = StyleSheet.create({
     height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     backgroundColor: colors.paperDeep,
     borderWidth: 1,
     borderColor: colors.border,
@@ -668,14 +665,18 @@ const styles = StyleSheet.create({
   },
   segmentBtn: {
     paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radii.sm,
-    // 影 / elevation を使わない (= 選択の切替でボタンが 1px 縦にズレる原因になる)
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: 'transparent',
   },
+  // 選択は LP の差し色でべた塗り (黄地 + 黒文字)
   segmentBtnActive: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   segmentBtnPressed: { opacity: 0.6 },
   // 選択のたびに font family が Medium → Semibold へ切り替わると Noto の縦メトリクスが
@@ -686,7 +687,7 @@ const styles = StyleSheet.create({
     color: colors.textMute,
   },
   segmentLabelActive: {
-    color: colors.ink,
+    color: colors.textOnInk,
   },
 
   footnote: {

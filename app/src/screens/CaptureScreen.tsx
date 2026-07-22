@@ -1122,7 +1122,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   if (permission === 'pending' || available === null) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.emerald} />
+        <ActivityIndicator color={colors.accent} />
         <Text style={styles.body}>{t('capture.preparing')}</Text>
       </View>
     );
@@ -1195,7 +1195,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           <PreviewView style={StyleSheet.absoluteFill} />
         ) : (
           <View style={[StyleSheet.absoluteFill, styles.previewPlaceholder]}>
-            <ActivityIndicator color={colors.emerald} />
+            <ActivityIndicator color={colors.accent} />
             <Text style={styles.body}>
               {switching ? t('capture.switchingConfig', { config: config.id }) : t('capture.previewStarting')}
             </Text>
@@ -1364,7 +1364,7 @@ const ArrowGlyph: React.FC<{ dir: AdjustDirection }> = ({ dir }) => {
   return (
     <View style={{ transform: [{ rotate }], marginBottom: 8 }}>
       <Svg width={30} height={30} viewBox="0 0 26 26" fill="none">
-        <Path d="M13 21 V6 M6.5 12.5 L13 6 L19.5 12.5" stroke={colors.emerald} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+        <Path d="M13 21 V6 M6.5 12.5 L13 6 L19.5 12.5" stroke={colors.accent} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
       </Svg>
     </View>
   );
@@ -1489,7 +1489,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 3,
     borderRadius: 2,
-    backgroundColor: colors.emerald,
+    backgroundColor: colors.accent,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOpacity: 0.4,
@@ -1513,7 +1513,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 5,
   },
-  hudTextAccent: { color: colors.emerald },
+  hudTextAccent: { color: colors.accent },
   hudTextDim: {
     color: 'rgba(255,255,255,0.66)',
     fontSize: 15.5,
@@ -1550,12 +1550,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansSemibold,
     fontSize: 20,
     letterSpacing: 2,
-    color: colors.emerald,
+    color: colors.accent,
   },
   pauseRemain: {
     fontFamily: fonts.dot,
     fontSize: 40,
-    color: colors.emerald,
+    color: colors.accent,
     letterSpacing: 1,
   },
 });

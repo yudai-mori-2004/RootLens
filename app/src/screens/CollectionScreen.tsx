@@ -708,9 +708,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 1,
   },
-  tileDateSelected: { color: colors.emeraldDeep },
+  tileDateSelected: { color: colors.accentDeep },
   tilePressed: { opacity: 0.7 },
-  tileThumbSelected: { borderColor: colors.emerald, borderWidth: 2 },
+  tileThumbSelected: { borderColor: colors.accent, borderWidth: 2 },
 
   // 下段 (= 待ちリスト or グラフ)
   bottomBlock: { flex: 1 },

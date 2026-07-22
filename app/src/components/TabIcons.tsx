@@ -18,7 +18,7 @@ const STROKE = 1.6;
 
 export const JobIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
   const stroke = active ? colors.ink : colors.textMute;
-  const fill = active ? colors.emeraldSoft : 'transparent';
+  const fill = active ? colors.accentSoft : 'transparent';
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       {/* Briefcase */}
@@ -31,14 +31,14 @@ export const JobIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
         stroke={stroke} strokeWidth={STROKE} strokeLinecap="round"
       />
       <Path d="M3 12h18" stroke={stroke} strokeWidth={STROKE} />
-      {active && <Circle cx={12} cy={13} r={1.4} fill={colors.emerald} />}
+      {active && <Circle cx={12} cy={13} r={1.4} fill={colors.accent} />}
     </Svg>
   );
 };
 
 export const CollectionIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
   const stroke = active ? colors.ink : colors.textMute;
-  const fill = active ? colors.emeraldSoft : 'transparent';
+  const fill = active ? colors.accentSoft : 'transparent';
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       {/* Stacked cards / film strip */}
@@ -48,7 +48,7 @@ export const CollectionIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
       />
       <Path d="M7 4h10" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
       <Path d="M5 20h14" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
-      {active && <Circle cx={12} cy={12} r={1.6} fill={colors.emerald} />}
+      {active && <Circle cx={12} cy={12} r={1.6} fill={colors.accent} />}
     </Svg>
   );
 };
@@ -57,7 +57,7 @@ export const CollectionIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
 // ニュアンスを足す。 ファインダー風のコーナーティック + アパチャ中央ドット。
 export const HomeIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
   const stroke = active ? colors.ink : colors.textMute;
-  const accent = active ? colors.emerald : colors.textMute;
+  const accent = active ? colors.accent : colors.textMute;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       {/* Viewfinder ticks (= 4 corners) */}
@@ -66,21 +66,21 @@ export const HomeIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
       <Path d="M20 15.5V19h-3.5" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
       <Path d="M7.5 19H4v-3.5" stroke={stroke} strokeWidth={STROKE} strokeLinecap="round" />
       {/* Aperture core */}
-      <Circle cx={12} cy={12} r={3.4} stroke={stroke} strokeWidth={STROKE} fill={active ? colors.emeraldSoft : 'transparent'} />
+      <Circle cx={12} cy={12} r={3.4} stroke={stroke} strokeWidth={STROKE} fill={active ? colors.accentSoft : 'transparent'} />
       {active && <Circle cx={12} cy={12} r={1.2} fill={accent} />}
     </Svg>
   );
 };
 
 // Center Camera tab (= 撮影モード入口)。 タブバー上の他アイコンと違い、 リング型で
-// 一段大きく扱う想定 (= MainTabs 側で size=32 + 余白)。 active 時は emerald で塗る。
+// 一段大きく扱う想定 (= MainTabs 側で size=32 + 余白)。 active 時は accent で塗る。
 export const CameraIcon: React.FC<IconProps> = ({ active, size = 28 }) => {
-  const ring = active ? colors.emerald : colors.ink;
-  const inner = active ? colors.paper : colors.emerald;
+  const ring = active ? colors.accent : colors.ink;
+  const inner = active ? colors.paper : colors.accent;
   return (
     <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
       {/* Outer ring */}
-      <Circle cx={14} cy={14} r={11.5} stroke={ring} strokeWidth={1.8} fill={active ? colors.emerald : 'transparent'} />
+      <Circle cx={14} cy={14} r={11.5} stroke={ring} strokeWidth={1.8} fill={active ? colors.accent : 'transparent'} />
       {/* Aperture petal hint */}
       <Circle cx={14} cy={14} r={6.5} stroke={inner} strokeWidth={1.6} fill="transparent" />
       {/* Shutter dot */}
@@ -91,7 +91,7 @@ export const CameraIcon: React.FC<IconProps> = ({ active, size = 28 }) => {
 
 export const SettingsIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
   const stroke = active ? colors.ink : colors.textMute;
-  const fill = active ? colors.emeraldSoft : 'transparent';
+  const fill = active ? colors.accentSoft : 'transparent';
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       {/* Gear */}
@@ -100,7 +100,7 @@ export const SettingsIcon: React.FC<IconProps> = ({ active, size = 24 }) => {
         stroke={stroke} strokeWidth={STROKE} strokeLinejoin="round" fill={fill}
       />
       <Circle cx={12} cy={12} r={2.6} stroke={stroke} strokeWidth={STROKE} />
-      {active && <Circle cx={12} cy={12} r={1.2} fill={colors.emerald} />}
+      {active && <Circle cx={12} cy={12} r={1.2} fill={colors.accent} />}
     </Svg>
   );
 };

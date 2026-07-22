@@ -36,7 +36,7 @@ const pageHtml = (bodyHtml: string): string => `<!DOCTYPE html><html lang="ja"><
   strong { color:${colors.ink}; font-weight:600; }
   code { background:${colors.paperDeep}; padding:1px 5px; border-radius:4px; font-size:13px; }
   blockquote { margin:0 0 16px; padding:12px 14px; background:${colors.card};
-    border:1px solid ${colors.border}; border-left:3px solid ${colors.emerald}; border-radius:10px; }
+    border:1px solid ${colors.border}; border-left:3px solid ${colors.accent}; border-radius:10px; }
   blockquote > :last-child { margin-bottom:0; }
   table { border-collapse:collapse; width:100%; margin:0 0 12px; font-size:13px; }
   th,td { border:1px solid ${colors.border}; padding:6px 8px; text-align:left; vertical-align:top; }

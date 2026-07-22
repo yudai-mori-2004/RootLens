@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   // サムネの上に載る文字は「琥珀地に黒」 か「濃い地に白」。 colors.paper (= ダークテーマでは
   // ほぼ黒) を文字色に使うと黒地に黒文字になるので使わない。
-  chipAmber: { backgroundColor: colors.emerald },
+  chipAmber: { backgroundColor: colors.accent },
   chipDanger: { backgroundColor: 'rgba(200,64,52,0.95)' },
   chipTextLight: {
     fontFamily: fonts.sansSemibold,

@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...typography.labelSmall,
-    color: colors.emeraldDeep,
+    color: colors.accentDeep,
     marginBottom: 6,
   },
   title: {
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 1,
   },
-  checkboxOn: { backgroundColor: colors.emerald, borderColor: colors.emerald },
+  checkboxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   checkLabel: {
     ...typography.caption,
     fontSize: 12.5,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
 
   termsLink: {
     fontFamily: fonts.sansSemibold,
-    color: colors.emerald,
+    color: colors.accent,
     textDecorationLine: 'underline',
   },
 

@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...typography.labelSmall,
-    color: colors.emeraldDeep,
+    color: colors.accentDeep,
     marginBottom: spacing.sm,
   },
   title: {

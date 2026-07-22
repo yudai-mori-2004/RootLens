@@ -28,10 +28,10 @@ export const colors = {
   textOnInk: '#150B24',
 
   // Accent — 黄 (= LP のマーク色。 確定・強調・選択)
-  emerald: '#FFE600',
-  emeraldDeep: '#E8D200',
-  emeraldSoft: '#332D10',
-  emeraldFaint: '#26210D',
+  accent: '#FFE600',
+  accentDeep: '#E8D200',
+  accentSoft: '#332D10',
+  accentFaint: '#26210D',
 
   // Highlight
   gold: '#FFE600',
@@ -45,7 +45,7 @@ export const colors = {
   // Borders / hairlines
   border: '#2E2249',
   borderInk: '#F4F1FA',
-  borderEmerald: '#8F7F1A',
+  borderAccent: '#8F7F1A',
 
   // Status
   success: '#A5E22B',
@@ -139,35 +139,37 @@ export const radii = {
   full: 9999,
 } as const;
 
+// Hard offset shadow — LP の box-shadow と同じ「ずらして硬く落とす」影。
+// ブラー無し + 斜めオフセットで、紙を貼ったステッカーの厚みを出す。
+// iPhone 前提なので iOS の shadow を主に見る。Android の elevation はソフトになる。
 export const shadows = {
-  // Warm, soft float — cards lifting off warm paper (warm-toned shadow, not cold navy).
   card: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 4,
+    shadowColor: '#080410',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.55,
+    shadowRadius: 0,
+    elevation: 6,
   },
-  // More pronounced — for modal / popover
+  // モーダル / ポップオーバー — 一段深くずらす
   pop: {
-    shadowColor: '#0E1F44',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowColor: '#080410',
+    shadowOffset: { width: 6, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 0,
+    elevation: 10,
   },
-  // legacy aliases
+  // legacy aliases — こちらも硬い影に統一
   sm: {
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08, shadowRadius: 2, elevation: 2,
+    shadowColor: '#080410', shadowOffset: { width: 2, height: 2 },
+    shadowOpacity: 0.5, shadowRadius: 0, elevation: 3,
   },
   md: {
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12, shadowRadius: 4, elevation: 4,
+    shadowColor: '#080410', shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.52, shadowRadius: 0, elevation: 4,
   },
   lg: {
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18, shadowRadius: 12, elevation: 8,
+    shadowColor: '#080410', shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.55, shadowRadius: 0, elevation: 6,
   },
 } as const;
 
