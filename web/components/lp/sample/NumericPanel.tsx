@@ -9,7 +9,7 @@
 //
 // タイムスタンプは Store 由来。 状態が動くたび再描画。
 
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { usePlayhead } from "./TimeContext";
 import type { TimeSeriesData } from "./types";
 
@@ -114,12 +114,13 @@ function Card({ label, values }: { label: string; values: [string, number][] }) 
       <div style={cardLabelStyle}>{label}</div>
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0 12px", fontSize: 12 }}>
         {values.map(([k, v]) => (
-          <>
-            <div key={k + "-l"} style={{ color: "#7a8090" }}>{k}</div>
-            <div key={k + "-v"} style={{ fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
+          // Fragment に key を付けるためこの形。 <>...</> だと key が乗せられない。
+          <React.Fragment key={k}>
+            <div style={{ color: "#7a8090" }}>{k}</div>
+            <div style={{ fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
               {v.toFixed(2)}
             </div>
-          </>
+          </React.Fragment>
         ))}
       </div>
     </div>
