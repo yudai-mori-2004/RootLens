@@ -66,7 +66,7 @@ export default async function HomePage() {
             <div style={{ height: 12 }} />
             {/* 実績カウンタ。 売れはじめたら手で更新する (= 盛らない。 0 は 0 と書く) */}
             <div className={s.heroMetaLabel}>{tHero("metaCountLabel")}</div>
-            <div className={s.heroMetaValue}>1 · 0</div>
+            <div className={s.heroMetaValue}>2 · 1</div>
           </aside>
         </div>
       </section>
