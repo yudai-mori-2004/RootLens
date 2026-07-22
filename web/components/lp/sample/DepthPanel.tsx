@@ -8,6 +8,7 @@
 //   src が null なら「収録なし」 表示を出す。
 
 import { useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { usePlayhead } from "./TimeContext";
 
 const SYNC_TOLERANCE_S = 0.1;
@@ -20,6 +21,7 @@ interface Props {
 export default function DepthPanel({ src, aspectRatio = 4 / 3 }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const state = usePlayhead();
+  const t = useTranslations("pages.sample.empty");
 
   useEffect(() => {
     const v = videoRef.current;
@@ -39,7 +41,7 @@ export default function DepthPanel({ src, aspectRatio = 4 / 3 }: Props) {
         width: "100%", aspectRatio, background: "#0b0d11",
         color: "#666", fontSize: 12,
       }}>
-        深度データはこのクリップには含まれていません
+        {t("depth")}
       </div>
     );
   }

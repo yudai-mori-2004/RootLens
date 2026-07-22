@@ -45,7 +45,12 @@ try:
         with tempfile.TemporaryDirectory() as tmp:
             fp = os.path.join(tmp, "frames.jsonl")
             mp = os.path.join(tmp, "metadata.json")
-            s3.download_file(bucket, f"raw/{content_hash}/frames.jsonl", fp)
+            # 旧録画は frames.jsonl の代わりに realtime_handpose.jsonl。 まず新名で試して、
+            # 404 なら旧名にフォールバック (fpvlabs.py と同じ扱い)。
+            try:
+                s3.download_file(bucket, f"raw/{content_hash}/frames.jsonl", fp)
+            except Exception:
+                s3.download_file(bucket, f"raw/{content_hash}/realtime_handpose.jsonl", fp)
             s3.download_file(bucket, f"raw/{content_hash}/metadata.json", mp)
 
             frames_ts, hands_present, tracking_normal, xyz = [], 0, 0, []

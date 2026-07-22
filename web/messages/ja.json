@@ -19,60 +19,68 @@
     },
     "sample": {
       "meta": {
-        "title": "RootLens サンプル (v0.1)",
-        "description": "一人称視点の家事動画48本。各フレームに3Dハンドポーズと自然言語の行動ラベルを格納。約1 GB。LeRobotDataset v3.0形式。"
+        "title": "RootLens サンプル",
+        "description": "映像・LiDAR 深度・3D 空間と歩いた道・センサー値を、同じ 1 本のクリップから同期表示します。"
       },
-      "pageTitle": "RootLens サンプルデータ",
-      "pageIntro": "RootLens iOS アプリで撮影できるデータの形式と品質を確認するためのサンプルセットです。撮影条件やコントリビューター規模を段階的に拡大しながら、新しいバージョンを追加していきます。",
-      "heroTitle": "RootLens sample (v0.1)",
-      "heroSubtitle": "一人称視点の家事動画48本。各フレームに3Dハンドポーズ、手首の6DoFアクションベクトル、自然言語の行動ラベルを収録。",
-      "ctaDownloadAll": "データセット一括ダウンロード (約1 GB)",
-      "statEpisodes": "エピソード数",
-      "statFrames": "合計フレーム数",
-      "statLabels": "行動ラベル数",
-      "statFps": "FPS",
-      "statResolution": "解像度",
-      "statCodec": "コーデック",
-      "statSize": "合計サイズ",
-      "statRegion": "撮影地域",
-      "statViewpoint": "視点",
-      "statFormat": "形式",
-      "statRegionValue": "日本",
-      "statViewpointValue": "頭部装着・一人称視点",
-      "s1Title": "各フレームの内容",
-      "s1p1Lead": "RootLens iOSアプリと頭部装着カメラで撮影した家事動画48本です。日本国内にて収録、顔はぼかし処理済み。各フレームには次の情報を収録しています。",
-      "s1p1Items": [
-        "ぼかし処理済みRGB映像 (H.264)",
-        "両手それぞれ21関節の3D座標、MANOの標準手ローカル座標系 (`observation.hand_keypoints_3d`)",
-        "各手の検出フラグ (`observation.hand_present`)",
-        "各手のMANO axis-angle姿勢 (`observation.hand_pose_mano`)",
-        "両手首の6DoFを連結した14次元のアクションベクトル (`action`)",
-        "`meta/tasks.jsonl`の行動ラベル文を指す`task_index`"
-      ],
-      "s2Title": "ディレクトリ構造",
-      "s2p1": "LeRobotDataset v3.0形式。標準ローダーからそのまま読み込めます。",
-      "s3Title": "行動ラベル",
-      "s3p1": "各フレームの`task_index`は`meta/tasks.jsonl`内の行動ラベルを参照します。ラベルは英語の現在形で、手の動きと操作対象を中心に記述しています (例: \"Right hand reaches for the kettle handle.\")。1本のクリップは動作の切り替わりに応じて複数のラベルに分割されています。",
-      "s3p2": "ラベルは動画フレームをもとに視覚言語モデルが生成しています。",
-      "loadingTitle": "読み込み",
-      "loadingNote": "LeRobotDataset v3.0形式。`lerobot` >= 0.5 が必要です。",
-      "episodesHeading": "エピソード一覧",
-      "episodesSubheading": "全48エピソード。クリックで再生、パネルを開くとタイムスタンプ付きの全ラベルを表示。",
-      "episodesPhasesLabel": "行動ラベル",
-      "episodesFrameLabel": "フレーム",
-      "episodeDownloadLabel": "MP4をダウンロード",
-      "showAll": "全48エピソードを表示",
-      "s4Title": "次回リリース予定",
-      "s4p1Lead": "次回のサンプルでは、実際に営業している現場で収集したデータの追加を予定しています。追加予定の内容:",
-      "s4p1Items": [
-        "`observation.state` : ARKitワールド座標系のカメラ6-DoF",
-        "`observation.imu_orientation`, `observation.imu_angular_velocity`, `observation.imu_linear_acceleration` : 100Hz IMU",
-        "`observation.tracking_state` : ARKitトラッキング品質",
-        "`depth/{frame_index:06d}.png` : LiDAR搭載端末の深度マップ",
-        "`sensors.jsonl` / `imu_high_rate.jsonl` / `camera_intrinsics.json` : サイドカーファイル"
-      ],
-      "licenseHeading": "ライセンス",
-      "licenseP1": "評価・確認目的で提供。再配布やモデル学習での利用についてはRootLensまでお問い合わせください。"
+      "pageTitle": "サンプル",
+      "pipelines": {
+        "arkit": {
+          "label": "iPhone (LiDAR あり)",
+          "description": "LiDAR 付きの iPhone(15 Pro 以降)で撮影しました。映像に加えて、部屋の奥行き・カメラの位置と向き・加速度・手の動き・空間の 3D メッシュを、すべて同じ時刻に揃えて記録しています。"
+        },
+        "mentra": {
+          "label": "スマートグラス (Mentra Live)",
+          "description": "スマートグラスの Mentra Live で撮影します。記録できるのは映像と加速度で、LiDAR の奥行き情報や 3D メッシュはありません。現場での本収録を準備中です。"
+        }
+      },
+      "preparingBadge": "準備中",
+      "placeholder": "のサンプルはまだありません。",
+      "loading": "読み込み中…",
+      "loadError": "データを読み込めませんでした。時間を置いて再読み込みしてみてください。",
+      "panels": {
+        "rgb": "カメラ映像",
+        "depth": "LiDAR 深度",
+        "scene": "部屋の 3D モデルと歩いた道",
+        "numeric": "センサーの値"
+      },
+      "numeric": {
+        "hands": "手の映り",
+        "leftHand": "左手",
+        "rightHand": "右手",
+        "accel": "動きの強さ (m/s²)",
+        "gyro": "回転の速さ (rad/s)"
+      },
+      "empty": {
+        "depth": "深度データはこのクリップには含まれていません",
+        "mesh": "LiDAR 非搭載のため 3D モデルはありません"
+      },
+      "summary": {
+        "clipSection": "この 1 本",
+        "durationLabel": "長さ",
+        "framesLabel": "フレーム数",
+        "fpsLabel": "1 秒あたりのコマ数",
+        "deviceLabel": "撮影に使った端末",
+        "osLabel": "OS",
+        "spaceSection": "歩いた場所",
+        "pathLengthLabel": "歩いた距離",
+        "areaLabel": "歩いた範囲",
+        "bboxLabel": "縦・横・高さ",
+        "qualitySection": "認識のよさ",
+        "handRateLabel": "手が映っていた割合",
+        "trackingRateLabel": "位置合わせが安定していた割合",
+        "cameraSection": "カメラ",
+        "resolutionLabel": "解像度",
+        "fovLabel": "視野角",
+        "lensLabel": "レンズ",
+        "depthResolutionLabel": "LiDAR の解像度",
+        "deliverySection": "納品するもの",
+        "deliveryFormatLabel": "ファイル",
+        "deliveryFormatValue": "session.mcap (顔ぼかし済み、Stera 互換 MCAP)",
+        "deliveryBytesLabel": "サイズ",
+        "deliveryContentsLabel": "含まれるデータ",
+        "deliveryContentsValue": "映像 (JPEG 系列) / LiDAR 深度と信頼度 / カメラの位置と向き (6DoF) / IMU / トラッキング状態 / 手のランドマーク / メッシュ",
+        "deliveryPending": "取引先向けのファイルはまだ生成されていません"
+      }
     }
   },
   "lp": {

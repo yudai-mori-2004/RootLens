@@ -14,6 +14,7 @@ import { Suspense, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import { useTranslations } from "next-intl";
 import { usePlayhead } from "./TimeContext";
 import type { TrajectoryData } from "./types";
 
@@ -23,13 +24,14 @@ interface Props {
 }
 
 export default function ScenePanel({ meshUrl, trajectory }: Props) {
+  const t = useTranslations("pages.sample.empty");
   if (!meshUrl || !trajectory) {
     return (
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center",
         width: "100%", height: "100%", background: "#0b0d11", color: "#666", fontSize: 12,
       }}>
-        LiDAR 非搭載のため 3D モデルはありません
+        {t("mesh")}
       </div>
     );
   }

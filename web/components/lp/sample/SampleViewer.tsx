@@ -7,6 +7,7 @@
 // - RGB が master、 他は slave (詳細は TimeContext / RgbPanel 参照)。
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { TimeProvider } from "./TimeContext";
 import RgbPanel from "./RgbPanel";
 import DepthPanel from "./DepthPanel";
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function SampleViewer({ pipelines, initialPipelineId }: Props) {
+  const t = useTranslations("pages.sample");
   const firstAvail = useMemo(() => pipelines.find((p) => p.available), [pipelines]);
   const [pipelineId, setPipelineId] = useState<string>(
     initialPipelineId ?? firstAvail?.id ?? pipelines[0].id,
@@ -39,28 +41,32 @@ export default function SampleViewer({ pipelines, initialPipelineId }: Props) {
         active={pipeline.id}
         onChange={setPipelineId}
         description={pipeline.description}
+        pageTitle={t("pageTitle")}
+        preparingBadge={t("preparingBadge")}
       />
       {pipeline.available && pipeline.assets ? (
         <LoadedViewer assets={pipeline.assets} label={pipeline.label} />
       ) : (
-        <Placeholder label={pipeline.label} description={pipeline.description} />
+        <Placeholder label={pipeline.label} description={pipeline.description} placeholderTail={t("placeholder")} />
       )}
     </div>
   );
 }
 
 function Header({
-  pipelines, active, onChange, description,
+  pipelines, active, onChange, description, pageTitle, preparingBadge,
 }: {
   pipelines: PipelineOption[];
   active: string;
   onChange: (id: string) => void;
   description: string;
+  pageTitle: string;
+  preparingBadge: string;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
       <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#f4f1fa" }}>
-        サンプル
+        {pageTitle}
       </h1>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {pipelines.map((p) => {
@@ -84,7 +90,7 @@ function Header({
               }}
             >
               {p.label}
-              {!p.available && <span style={{ fontSize: 10, fontWeight: 500 }}>(準備中)</span>}
+              {!p.available && <span style={{ fontSize: 10, fontWeight: 500 }}>({preparingBadge})</span>}
             </button>
           );
         })}
@@ -96,7 +102,11 @@ function Header({
   );
 }
 
-function Placeholder({ label, description }: { label: string; description: string }) {
+function Placeholder({ label, description, placeholderTail }: {
+  label: string;
+  description: string;
+  placeholderTail: string;
+}) {
   return (
     <div style={{
       minHeight: 400, background: "#0b0d11",
@@ -105,13 +115,14 @@ function Placeholder({ label, description }: { label: string; description: strin
       alignItems: "center", justifyContent: "center",
       color: "#7a8090", gap: 8, padding: 24, textAlign: "center",
     }}>
-      <div style={{ fontSize: 14, color: "#e8ebf2" }}>{label} のサンプルはまだありません。</div>
+      <div style={{ fontSize: 14, color: "#e8ebf2" }}>{label}{placeholderTail}</div>
       <div style={{ fontSize: 12, maxWidth: 480 }}>{description}</div>
     </div>
   );
 }
 
 function LoadedViewer({ assets, label }: { assets: NonNullable<PipelineOption["assets"]>; label: string }) {
+  const t = useTranslations("pages.sample");
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [trajectory, setTrajectory] = useState<TrajectoryData | null>(null);
   const [timeseries, setTimeseries] = useState<TimeSeriesData | null>(null);
@@ -136,7 +147,7 @@ function LoadedViewer({ assets, label }: { assets: NonNullable<PipelineOption["a
   if (error) {
     return (
       <div style={{ color: "#ff3d80", padding: 24 }}>
-        データを読み込めませんでした。時間を置いて再読み込みしてみてください。
+        {t("loadError")}
       </div>
     );
   }
@@ -144,7 +155,7 @@ function LoadedViewer({ assets, label }: { assets: NonNullable<PipelineOption["a
   if (!summary || !trajectory || !timeseries) {
     return (
       <div style={{ minHeight: 400, color: "#7a8090", padding: 24 }}>
-        読み込み中…
+        {t("loading")}
       </div>
     );
   }
@@ -173,44 +184,50 @@ function PanelGrid({
   trajectory: TrajectoryData;
   timeseries: TimeSeriesData;
 }) {
+  const t = useTranslations("pages.sample.panels");
   return (
+    // 3 段構成: 1) RGB / Depth の 2 カラム、 2) 3D シーンを幅いっぱい、
+    // 3) センサーの値を幅いっぱい (グラフが横に伸びるのでこの方が読みやすい)。
+    // かつては 2x2 でセンサーを右下に置いていたが、 隣の 3D シーンの高さに引きずられて
+    // 空間が余り、 逆に横方向は 1 カラム分に切られて詰まって見えた。
     <div style={{
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gridTemplateRows: "auto auto",
       gap: 8,
       background: "#151820",
       borderRadius: 8,
       border: "1px solid #1a1d24",
       overflow: "hidden",
     }}>
-      <PanelCell title="カメラ映像">
+      <PanelCell title={t("rgb")}>
         <RgbPanel src={rgbUrl} />
       </PanelCell>
-      <PanelCell title="LiDAR 深度">
+      <PanelCell title={t("depth")}>
         <DepthPanel src={depthUrl} />
       </PanelCell>
-      <PanelCell title="部屋の 3D モデルと歩いた道" minHeight={300}>
+      <PanelCell title={t("scene")} minHeight={320} span={2}>
         <ScenePanel meshUrl={meshUrl} trajectory={trajectory} />
       </PanelCell>
-      {/* センサーは中身の高さで決めさせる (min-height を敷かない = 上の 3D パネルの高さに引きずられない)。 */}
-      <PanelCell title="センサーの値">
+      <PanelCell title={t("numeric")} span={2}>
         <NumericPanel data={timeseries} />
       </PanelCell>
     </div>
   );
 }
 
-function PanelCell({ title, children, minHeight }: {
+function PanelCell({ title, children, minHeight, span }: {
   title: string;
   children: React.ReactNode;
   minHeight?: number;
+  /** グリッドカラムの跨ぎ数 (2 で全幅)。 3 行目の 3D シーン / センサーは 2 カラム跨ぎで幅いっぱいにする。 */
+  span?: number;
 }) {
   return (
     <div style={{
       background: "#0b0d11",
       display: "flex", flexDirection: "column",
       minHeight,
+      gridColumn: span ? `span ${span}` : undefined,
     }}>
       <div style={{
         fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a8090",

@@ -19,60 +19,68 @@
     },
     "sample": {
       "meta": {
-        "title": "RootLens sample (v0.1)",
-        "description": "48 first-person clips of household tasks with per-frame 3D hand pose and natural-language action labels. ~1 GB. LeRobotDataset v3.0."
+        "title": "RootLens Sample",
+        "description": "Video, LiDAR depth, 3D scene with trajectory, and sensor readouts — all synchronized from a single recording."
       },
-      "pageTitle": "RootLens Sample Data",
-      "pageIntro": "Sample sets to verify the format and quality of data captured with the RootLens iOS app. New versions will be added as recording conditions and contributor scale expand.",
-      "heroTitle": "RootLens sample (v0.1)",
-      "heroSubtitle": "48 first-person video clips of household tasks with per-frame 3D hand pose, wrist 6-DoF actions, and natural-language action labels.",
-      "ctaDownloadAll": "Download dataset (~1 GB)",
-      "statEpisodes": "Episodes",
-      "statFrames": "Total frames",
-      "statLabels": "Action labels",
-      "statFps": "FPS",
-      "statResolution": "Resolution",
-      "statCodec": "Codec",
-      "statSize": "Total size",
-      "statRegion": "Region",
-      "statViewpoint": "Viewpoint",
-      "statFormat": "Format",
-      "statRegionValue": "Japan",
-      "statViewpointValue": "Head-mounted, first-person",
-      "s1Title": "Per-frame contents",
-      "s1p1Lead": "48 clips of household tasks recorded with the RootLens iOS app from a head-mounted camera in Japan. All faces are blurred. Each frame contains:",
-      "s1p1Items": [
-        "Blurred RGB video (H.264)",
-        "21 hand joints in 3D per hand, in MANO canonical hand-local coordinates (`observation.hand_keypoints_3d`)",
-        "Per-hand detection flag (`observation.hand_present`)",
-        "MANO axis-angle pose per hand (`observation.hand_pose_mano`)",
-        "14-dimensional two-hand wrist 6-DoF action vector (`action`)",
-        "`task_index` into `meta/tasks.jsonl` pointing to a natural-language action label"
-      ],
-      "s2Title": "Directory layout",
-      "s2p1": "LeRobotDataset v3.0 format. Standard loaders read this layout without modification.",
-      "s3Title": "Action labels",
-      "s3p1": "Each frame's `task_index` maps to an action label in `meta/tasks.jsonl`. Labels are present-tense English sentences describing hand movements and objects (e.g. \"Right hand reaches for the kettle handle.\"). Each clip is segmented into multiple labels at action transitions.",
-      "s3p2": "Labels are generated from video frames by a vision-language model.",
-      "loadingTitle": "Loading",
-      "loadingNote": "LeRobotDataset v3.0 format. Requires `lerobot` >= 0.5.",
-      "episodesHeading": "Episodes",
-      "episodesSubheading": "All 48 episodes. Click to play; expand a panel to read every action label with its timestamp.",
-      "episodesPhasesLabel": "Action labels",
-      "episodesFrameLabel": "frames",
-      "episodeDownloadLabel": "Download MP4",
-      "showAll": "Show all 48 episodes",
-      "s4Title": "Planned next release",
-      "s4p1Lead": "The next sample will add data collected at real working sites:",
-      "s4p1Items": [
-        "`observation.state` : camera 6-DoF in the ARKit world frame",
-        "`observation.imu_orientation`, `observation.imu_angular_velocity`, `observation.imu_linear_acceleration` : 100 Hz IMU",
-        "`observation.tracking_state` : ARKit tracking quality",
-        "`depth/{frame_index:06d}.png` : LiDAR depth maps on supported devices",
-        "`sensors.jsonl`, `imu_high_rate.jsonl`, `camera_intrinsics.json` : companion sidecar files"
-      ],
-      "licenseHeading": "License",
-      "licenseP1": "Provided for evaluation and inspection. Contact RootLens for licensing terms covering redistribution or model training use."
+      "pageTitle": "Sample",
+      "pipelines": {
+        "arkit": {
+          "label": "iPhone (LiDAR)",
+          "description": "Recorded on iPhone 15 Pro or newer with LiDAR. Video, depth, camera pose, IMU, hand tracking, and a room mesh — all aligned on a single timeline."
+        },
+        "mentra": {
+          "label": "Smart glasses (Mentra Live)",
+          "description": "Captured with the Mentra Live smart glasses. Video and IMU only — no LiDAR depth or mesh. On-site recording is in preparation."
+        }
+      },
+      "preparingBadge": "In preparation",
+      "placeholder": " — sample not yet available.",
+      "loading": "Loading…",
+      "loadError": "Could not load the data. Please wait a moment and try again.",
+      "panels": {
+        "rgb": "Camera",
+        "depth": "LiDAR depth",
+        "scene": "Room mesh & path",
+        "numeric": "Sensor readouts"
+      },
+      "numeric": {
+        "hands": "Hands in frame",
+        "leftHand": "Left hand",
+        "rightHand": "Right hand",
+        "accel": "Acceleration (m/s²)",
+        "gyro": "Angular velocity (rad/s)"
+      },
+      "empty": {
+        "depth": "No depth data in this clip",
+        "mesh": "No LiDAR mesh available for this clip"
+      },
+      "summary": {
+        "clipSection": "This clip",
+        "durationLabel": "Length",
+        "framesLabel": "Frames",
+        "fpsLabel": "Frames per second",
+        "deviceLabel": "Device",
+        "osLabel": "OS",
+        "spaceSection": "Where the wearer walked",
+        "pathLengthLabel": "Distance walked",
+        "areaLabel": "Ground area covered",
+        "bboxLabel": "Extent (x · z · y)",
+        "qualitySection": "Detection quality",
+        "handRateLabel": "Hands in frame",
+        "trackingRateLabel": "Stable camera tracking",
+        "cameraSection": "Camera",
+        "resolutionLabel": "Resolution",
+        "fovLabel": "Field of view",
+        "lensLabel": "Lens",
+        "depthResolutionLabel": "LiDAR resolution",
+        "deliverySection": "What ships to buyers",
+        "deliveryFormatLabel": "File",
+        "deliveryFormatValue": "session.mcap (faces blurred, Stera-compatible MCAP)",
+        "deliveryBytesLabel": "Size",
+        "deliveryContentsLabel": "Included streams",
+        "deliveryContentsValue": "Video (JPEG series) · LiDAR depth + confidence · 6DoF camera pose · IMU · Tracking state · Hand landmarks · Mesh",
+        "deliveryPending": "The deliverable file has not been generated yet"
+      }
     }
   },
   "lp": {

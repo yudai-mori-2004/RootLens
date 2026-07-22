@@ -11,6 +11,7 @@
 // 数字だけが変わっていくカードは情報密度が低く、 グラフで十分。
 
 import { useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { usePlayhead } from "./TimeContext";
 import type { TimeSeriesData } from "./types";
 
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function NumericPanel({ data }: Props) {
+  const t = useTranslations("pages.sample.numeric");
   const state = usePlayhead();
   const idx = Math.min(data.hands.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
 
@@ -39,45 +41,66 @@ export default function NumericPanel({ data }: Props) {
       padding: 12, gap: 10,
       fontFamily: "'JetBrains Mono', 'SF Mono', ui-monospace, monospace", fontSize: 11,
     }}>
-      <HandRow leftOn={handOn} rightOn={handOn} />
-      <SeriesCanvas label="動きの強さ (m/s²)" data={data} idxNow={idx} field="accel" />
-      <SeriesCanvas label="回転の速さ (rad/s)" data={data} idxNow={idx} field="gyro" />
+      <HandRow
+        leftOn={handOn}
+        rightOn={handOn}
+        title={t("hands")}
+        leftLabel={t("leftHand")}
+        rightLabel={t("rightHand")}
+      />
+      <SeriesCanvas label={t("accel")} data={data} idxNow={idx} field="accel" />
+      <SeriesCanvas label={t("gyro")} data={data} idxNow={idx} field="gyro" />
     </div>
   );
 }
 
 // 手の映り 2 個。 白 = 映っている、 灰 = 映っていない。
-function HandRow({ leftOn, rightOn }: { leftOn: boolean; rightOn: boolean }) {
+function HandRow({ leftOn, rightOn, title, leftLabel, rightLabel }: {
+  leftOn: boolean;
+  rightOn: boolean;
+  title: string;
+  leftLabel: string;
+  rightLabel: string;
+}) {
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12,
       borderBottom: "1px solid rgba(255,255,255,0.06)",
       paddingBottom: 8,
     }}>
-      <div style={labelStyle}>手の映り</div>
+      <div style={labelStyle}>{title}</div>
       <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-        <HandIcon on={leftOn} side="left" />
-        <HandIcon on={rightOn} side="right" />
+        <HandIcon on={leftOn} side="left" label={leftLabel} />
+        <HandIcon on={rightOn} side="right" label={rightLabel} />
       </div>
     </div>
   );
 }
 
-function HandIcon({ on, side }: { on: boolean; side: "left" | "right" }) {
-  const fill = on ? "#ffffff" : "#3a3f4a";
-  // シンプルな手のシルエット。 5 本指と手のひらの丸みだけの記号。 右手は d を左右反転。
-  const path = "M20 34 V22 c0-2 -3-2 -3 0 V16 c0-2 -3-2 -3 0 V8 c0-2 3-2 3 0 V16 c0-2 3-2 3 0 V22 c0-2 3-2 3 0 V26 c0-2 3-2 3 0 V22 c0-2 3-2 3 0 V32 c0 5 -3 8 -6 8 h-3 c-3 0 -6-3 -6-8 Z";
+function HandIcon({ on, side, label }: { on: boolean; side: "left" | "right"; label: string }) {
+  // Lucide の "Hand" アイコン (ISC ライセンス)。 open palm のストロークデザインで、
+  // color prop で白 / 灰の切替が素直にできる。 右手用は左右反転。
+  const color = on ? "#ffffff" : "#3a3f4a";
   return (
     <svg
       width={22}
-      height={26}
-      viewBox="0 0 36 44"
+      height={22}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
       style={{
         transform: side === "right" ? "scaleX(-1)" : undefined,
         display: "block",
       }}
+      aria-label={label}
     >
-      <path d={path} fill={fill} />
+      <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+      <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
+      <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15V9a2 2 0 0 1 2-2h.5" />
     </svg>
   );
 }

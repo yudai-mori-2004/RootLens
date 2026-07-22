@@ -90,6 +90,7 @@ def _r2_client():
 SESSION_FILES = [
     "rgb.mp4",
     "frames.jsonl",
+    "realtime_handpose.jsonl",  # 旧録画は frames.jsonl の代わりにこの名前
     "imu.jsonl",
     "metadata.json",
     "depth.tar",       # LiDAR デバイスのみ
@@ -97,12 +98,13 @@ SESSION_FILES = [
     "pointcloud.jsonl",  # 参考。 現状の showcase では使わない (mesh を優先)
 ]
 
-REQUIRED_INPUTS = ["rgb.mp4", "frames.jsonl", "metadata.json"]
+REQUIRED_INPUTS = ["rgb.mp4", "metadata.json"]  # 手ポーズ系はどちらかがあれば OK (下でチェック)
 
 
 def download_raw(s3, bucket_raw: str, content_hash: str, dest_dir: str) -> dict[str, str]:
     """raw/<hash>/ の全ファイルを dest_dir に落とし、 存在するものだけの {name: path} を返す。
-    REQUIRED_INPUTS のどれかが欠けていたら RuntimeError で落とす。"""
+    REQUIRED_INPUTS のどれかが欠けていたら RuntimeError で落とす。
+    frames.jsonl / realtime_handpose.jsonl のどちらかが必須 (旧録画は後者)。"""
     got = {}
     for name in SESSION_FILES:
         key = f"raw/{content_hash}/{name}"
@@ -113,6 +115,11 @@ def download_raw(s3, bucket_raw: str, content_hash: str, dest_dir: str) -> dict[
         except Exception:
             if name in REQUIRED_INPUTS:
                 raise RuntimeError(f"required input missing: {key}")
+    if "frames.jsonl" not in got and "realtime_handpose.jsonl" not in got:
+        raise RuntimeError(f"required input missing: raw/{content_hash}/frames.jsonl (or legacy realtime_handpose.jsonl)")
+    # 呼び出し側は frames.jsonl を鍵として使うので、 レガシー版はエイリアスで見えるようにする。
+    if "frames.jsonl" not in got:
+        got["frames.jsonl"] = got["realtime_handpose.jsonl"]
     return got
 
 
@@ -507,9 +514,11 @@ def build_timeseries(src_frames: str, src_imu: str | None, out_json: str) -> dic
 # summary.json (静的な統計情報。 LP のフッタに載せる数値)
 # ══════════════════════════════════════════════════════════════════════
 
-def build_summary(session_files: dict[str, str], asset_stats: dict[str, dict], out_json: str) -> dict:
-    """尺・fps・軌跡距離・面積・検出率・デバイス・ストリーム別バイト数をまとめる。
-    asset_stats は他の build_* の返り値。 このステージでは frames.jsonl と metadata.json を追加で読む。"""
+def build_summary(session_files: dict[str, str], asset_stats: dict[str, dict], out_json: str,
+                  delivery: dict | None = None) -> dict:
+    """尺・fps・軌跡距離・面積・検出率・デバイス・ストリーム別バイト数と、
+    納品形式 (fpvlabs パイプラインが吐く session.mcap のサイズ) をまとめる。
+    asset_stats は他の build_* の返り値。 delivery は {"format": "session.mcap", "bytes": ...}。"""
     import numpy as np
 
     frames_ts = []
@@ -570,6 +579,10 @@ def build_summary(session_files: dict[str, str], asset_stats: dict[str, dict], o
         "handDetectionRate": hand_hits / n if n else 0.0,
         "trackingNormalRate": tracking_normal / n if n else 0.0,
         "assets": asset_stats,
+        # 実際に取引先に納品する形式 (fpvlabs パイプラインの session.mcap)。 LP 用の
+        # rgb.mp4 / depth.mp4 / mesh.glb 等はビジュアライザ配信のためのビュー用アセットで、
+        # 商品ではない。 summary はこの区別を明示する。
+        "delivery": delivery,
     }
     with open(out_json, "w") as fh:
         json.dump(payload, fh, indent=2)
@@ -629,8 +642,19 @@ def process_session(content_hash: str, slug: str,
             ts_out,
         )
 
+        # fpvlabs バケットに置かれている納品 MCAP のサイズを取得 (顔ぼかし + Stera 互換 MCAP)。
+        # 存在しなければ delivery=None (= fpvlabs パイプラインをまだ回していないクリップ)。
+        delivery = None
+        try:
+            fpv_bucket = os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
+            head = s3.head_object(Bucket=fpv_bucket, Key=f"{content_hash}/session.mcap")
+            delivery = {"format": "session.mcap", "bytes": int(head["ContentLength"]),
+                        "blurred": True, "spec": "stera-sdk MCAP (ROS2 messages)"}
+        except Exception:
+            pass
+
         sum_out = os.path.join(out_dir, "summary.json")
-        asset_stats["summary.json"] = build_summary(session_files, asset_stats, sum_out)
+        asset_stats["summary.json"] = build_summary(session_files, asset_stats, sum_out, delivery=delivery)
 
         # 出力を rootlens-public/lp-sample/<slug>/ へアップロード
         uploaded = []

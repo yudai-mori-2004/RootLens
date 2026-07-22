@@ -75,6 +75,15 @@ export interface SummaryData {
   handDetectionRate: number;
   trackingNormalRate: number;
   assets: Record<string, AssetStats>;
+  /** 取引先に納品する形式 (fpvlabs パイプラインの session.mcap = 顔ぼかし + Stera 互換 MCAP)。
+   *  showcase.py が fpvlabs バケットの ContentLength を head_object で取ってサマリに埋める。
+   *  fpvlabs をまだ回していないクリップでは null (LP 側で「準備中」 表示にする)。 */
+  delivery: {
+    format: string;
+    bytes: number;
+    blurred: boolean;
+    spec: string;
+  } | null;
 }
 
 /** /sample にぶら下がる 1 個のショーケース = 1 個の slug ぶんの URL 集合。
