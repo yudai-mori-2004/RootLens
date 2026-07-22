@@ -1,133 +1,93 @@
 "use client";
 
-// センサ数値パネル。 現時刻の IMU 6 軸 + 手検出 boolean + トラッキング状態を
-// リアルタイム更新 + ミニ時系列で表示する。
+// センサーの値パネル。 現時刻の左右の手の映り (アイコン) + 動きの強さと回転の速さの時系列グラフ。
 //
-// レイアウトは 2 段:
-//   上段: 現在値カード (accel xyz / gyro xyz / hand / tracking)
-//   下段: 過去 10 秒の accel と gyro の折れ線 (Canvas 直描き。 recharts への依存を避ける)
+// 上段: 右手・左手アイコン。 映っていれば白、 映ってなければグレー。 面積で状態を示す。
+// 下段: 動きの強さ (accel xyz) と 回転の速さ (gyro xyz)、 過去 10 秒の折れ線。
+//       高さは固定 (px)。 Y スケールはウィンドウ内の実データに合わせて自動で伸縮する
+//       (= キャンバスが縦に伸びないので、 パネル全体が高くならない)。
 //
-// タイムスタンプは Store 由来。 状態が動くたび再描画。
+// リアルタイム値のテキストカードと 「トラッキング状態」 の boolean 表示は廃止。
+// 数字だけが変わっていくカードは情報密度が低く、 グラフで十分。
 
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { usePlayhead } from "./TimeContext";
 import type { TimeSeriesData } from "./types";
 
-const WINDOW_S = 10;  // 折れ線に描く過去秒数
+const WINDOW_S = 10;              // 折れ線に描く過去秒数
+const GRAPH_HEIGHT_PX = 96;       // グラフ 1 枚の高さ (パネル全体が広がらないよう固定)
+const CHANNEL_COLORS = ["#ff3d80", "#7be89c", "#5aa8ff"];  // x / y / z
 
 interface Props {
   data: TimeSeriesData;
 }
 
-const TRACKING_LABEL: Record<number, string> = {
-  0: "見失い中",
-  1: "不安定",
-  2: "安定",
-};
-
-const TRACKING_COLOR: Record<number, string> = {
-  0: "#ff3d80",
-  1: "#ffd400",
-  2: "#7be89c",
-};
-
 export default function NumericPanel({ data }: Props) {
   const state = usePlayhead();
   const idx = Math.min(data.hands.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
 
-  const accel = data.imu.accel[idx] ?? [0, 0, 0];
-  const gyro = data.imu.gyro[idx] ?? [0, 0, 0];
+  // 手の左右の判定はハンドトラッキングの左右ラベルまではこのパネルまで届いていないので、
+  // 「1 本以上」 か「2 本」 かで代替する。 hands boolean は現状 「1 本以上」 の flag なので
+  // 2 本判定用に別チャンネルを追加したくなったら timeseries を拡張する。
+  // ここではとりあえず 「片手だけ映っている」 か 「両手映っている」 かを見せられる形にしておく。
   const handOn = !!data.hands[idx];
-  const tracking = data.tracking[idx] ?? 0;
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", height: "100%",
-      background: "#0b0d11", color: "#e8ebf2", padding: 12, gap: 10,
+      display: "flex", flexDirection: "column",
+      background: "#0b0d11", color: "#e8ebf2",
+      padding: 12, gap: 10,
       fontFamily: "'JetBrains Mono', 'SF Mono', ui-monospace, monospace", fontSize: 11,
     }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <Card label="動きの強さ (m/s²)" values={[
-          ["x", accel[0]],
-          ["y", accel[1]],
-          ["z", accel[2]],
-        ]} />
-        <Card label="回転の速さ (rad/s)" values={[
-          ["x", gyro[0]],
-          ["y", gyro[1]],
-          ["z", gyro[2]],
-        ]} />
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <div style={cardBoxStyle}>
-          <div style={cardLabelStyle}>手が映っているか</div>
-          <div style={{
-            fontSize: 18, fontWeight: 600,
-            color: handOn ? "#7be89c" : "#666",
-          }}>
-            {handOn ? "映っている" : "—"}
-          </div>
-        </div>
-        <div style={cardBoxStyle}>
-          <div style={cardLabelStyle}>カメラの位置合わせ</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: TRACKING_COLOR[tracking] ?? "#e8ebf2" }}>
-            {TRACKING_LABEL[tracking] ?? String(tracking)}
-          </div>
-        </div>
-      </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-        <SeriesCanvas
-          label="動きの強さ x/y/z"
-          data={data}
-          idxNow={idx}
-          field="accel"
-        />
-        <SeriesCanvas
-          label="回転の速さ x/y/z"
-          data={data}
-          idxNow={idx}
-          field="gyro"
-        />
+      <HandRow leftOn={handOn} rightOn={handOn} />
+      <SeriesCanvas label="動きの強さ (m/s²)" data={data} idxNow={idx} field="accel" />
+      <SeriesCanvas label="回転の速さ (rad/s)" data={data} idxNow={idx} field="gyro" />
+    </div>
+  );
+}
+
+// 手の映り 2 個。 白 = 映っている、 灰 = 映っていない。
+function HandRow({ leftOn, rightOn }: { leftOn: boolean; rightOn: boolean }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12,
+      borderBottom: "1px solid rgba(255,255,255,0.06)",
+      paddingBottom: 8,
+    }}>
+      <div style={labelStyle}>手の映り</div>
+      <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+        <HandIcon on={leftOn} side="left" />
+        <HandIcon on={rightOn} side="right" />
       </div>
     </div>
   );
 }
 
-const cardBoxStyle: React.CSSProperties = {
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  padding: 8,
-  borderRadius: 4,
-};
+function HandIcon({ on, side }: { on: boolean; side: "left" | "right" }) {
+  const fill = on ? "#ffffff" : "#3a3f4a";
+  // シンプルな手のシルエット。 5 本指と手のひらの丸みだけの記号。 右手は d を左右反転。
+  const path = "M20 34 V22 c0-2 -3-2 -3 0 V16 c0-2 -3-2 -3 0 V8 c0-2 3-2 3 0 V16 c0-2 3-2 3 0 V22 c0-2 3-2 3 0 V26 c0-2 3-2 3 0 V22 c0-2 3-2 3 0 V32 c0 5 -3 8 -6 8 h-3 c-3 0 -6-3 -6-8 Z";
+  return (
+    <svg
+      width={22}
+      height={26}
+      viewBox="0 0 36 44"
+      style={{
+        transform: side === "right" ? "scaleX(-1)" : undefined,
+        display: "block",
+      }}
+    >
+      <path d={path} fill={fill} />
+    </svg>
+  );
+}
 
-const cardLabelStyle: React.CSSProperties = {
+const labelStyle: React.CSSProperties = {
   fontSize: 9,
   color: "#7a8090",
   textTransform: "uppercase",
   letterSpacing: 1,
-  marginBottom: 4,
 };
-
-function Card({ label, values }: { label: string; values: [string, number][] }) {
-  return (
-    <div style={cardBoxStyle}>
-      <div style={cardLabelStyle}>{label}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "0 12px", fontSize: 12 }}>
-        {values.map(([k, v]) => (
-          // Fragment に key を付けるためこの形。 <>...</> だと key が乗せられない。
-          <React.Fragment key={k}>
-            <div style={{ color: "#7a8090" }}>{k}</div>
-            <div style={{ fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
-              {v.toFixed(2)}
-            </div>
-          </React.Fragment>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const CHANNEL_COLORS = ["#ff3d80", "#7be89c", "#5aa8ff"];
 
 function SeriesCanvas({ data, idxNow, field, label }: {
   data: TimeSeriesData;
@@ -158,7 +118,8 @@ function SeriesCanvas({ data, idxNow, field, label }: {
     const n = end - start;
     if (n <= 1) return;
 
-    // Y レンジ: 全 3 チャンネルの max |v| を左右対称で。 発散を防ぐため min 3 (accel) / 2 (gyro)。
+    // Y スケール: このウィンドウ内の実データの絶対値ピーク基準。 小さすぎる (= 静止) ときは
+    // 発散防止のため最低値を敷く (accel は 3、 gyro は 2)。 これで枠 (固定高さ) 内に必ず収まる。
     const minRange = field === "accel" ? 3 : 2;
     let peak = 0;
     for (let i = start; i <= end; i++) {
@@ -168,7 +129,7 @@ function SeriesCanvas({ data, idxNow, field, label }: {
     }
     const yMax = Math.max(minRange, peak * 1.15);
 
-    // 目盛り (0 line)
+    // 0 ライン
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -176,7 +137,7 @@ function SeriesCanvas({ data, idxNow, field, label }: {
     ctx.lineTo(w, h / 2);
     ctx.stroke();
 
-    // ラベル
+    // 見出し (小さく左上)
     ctx.fillStyle = "#7a8090";
     ctx.font = "9px ui-monospace";
     ctx.fillText(label, 4, 10);
@@ -202,7 +163,7 @@ function SeriesCanvas({ data, idxNow, field, label }: {
       ref={canvasRef}
       style={{
         width: "100%",
-        flex: 1,
+        height: GRAPH_HEIGHT_PX,          // 固定高さ (枠が広がらない)
         background: "rgba(255,255,255,0.02)",
         border: "1px solid rgba(255,255,255,0.06)",
         borderRadius: 4,

@@ -33,7 +33,7 @@ export default function SampleViewer({ pipelines, initialPipelineId }: Props) {
   );
 
   return (
-    <div style={{ maxWidth: 1440, margin: "0 auto", padding: "24px 20px 48px" }}>
+    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 20px 48px" }}>
       <Header
         pipelines={pipelines}
         active={pipeline.id}
@@ -190,10 +190,11 @@ function PanelGrid({
       <PanelCell title="LiDAR 深度">
         <DepthPanel src={depthUrl} />
       </PanelCell>
-      <PanelCell title="部屋の 3D モデルと歩いた道" minHeight={360}>
+      <PanelCell title="部屋の 3D モデルと歩いた道" minHeight={300}>
         <ScenePanel meshUrl={meshUrl} trajectory={trajectory} />
       </PanelCell>
-      <PanelCell title="センサーの値" minHeight={360}>
+      {/* センサーは中身の高さで決めさせる (min-height を敷かない = 上の 3D パネルの高さに引きずられない)。 */}
+      <PanelCell title="センサーの値">
         <NumericPanel data={timeseries} />
       </PanelCell>
     </div>
