@@ -29,7 +29,7 @@ export default function ScenePanel({ meshUrl, trajectory }: Props) {
         display: "flex", alignItems: "center", justifyContent: "center",
         width: "100%", height: "100%", background: "#0b0d11", color: "#666", fontSize: 12,
       }}>
-        3D シーン (LiDAR 収録なし)
+        LiDAR 非搭載のため 3D モデルはありません
       </div>
     );
   }

@@ -27,19 +27,19 @@ function assetsFor(slug: string, opts: { hasLidar: boolean }) {
 function buildPipelines(locale: "ja" | "en"): PipelineOption[] {
   const arkit: PipelineOption = {
     id: "arkit",
-    label: locale === "ja" ? "arkit パイプライン" : "arkit pipeline",
+    label: locale === "ja" ? "iPhone (LiDAR あり)" : "iPhone (LiDAR)",
     description: locale === "ja"
-      ? "iPhone 15 Pro 以降の LiDAR 搭載機に、 Apple の ARKit を土台にした収録スタック。 RGB / LiDAR 深度 / 6DoF 姿勢 / IMU / ハンドトラック / メッシュを同じ時計で吐き出す。"
-      : "Apple's ARKit-based capture stack running on iPhone 15 Pro or newer (with LiDAR). Delivers RGB, LiDAR depth, 6DoF pose, IMU, hand tracking, and reconstructed mesh on a single shared clock.",
+      ? "LiDAR 付きの iPhone(15 Pro 以降)で撮影しました。映像に加えて、部屋の奥行き・カメラの位置と向き・加速度・手の動き・空間の 3D メッシュを、すべて同じ時刻に揃えて記録しています。"
+      : "Recorded on iPhone 15 Pro or newer with LiDAR. Video, depth, camera pose, IMU, hand tracking, and a room mesh — all aligned on a single timeline.",
     available: true,
     assets: assetsFor("arkit-home-01", { hasLidar: true }),
   };
   const mentra: PipelineOption = {
     id: "mentra",
-    label: locale === "ja" ? "mentra パイプライン" : "mentra pipeline",
+    label: locale === "ja" ? "スマートグラス (Mentra Live)" : "Smart glasses (Mentra Live)",
     description: locale === "ja"
-      ? "Mentra Live を代表とする MentraOS 系スマートグラスの収録スタック。 RGB + IMU が主。 家事とパン工房での本収録を準備中。"
-      : "MentraOS-based smart-glasses capture stack (Mentra Live). Delivers RGB and IMU. In-shop capture is in preparation.",
+      ? "スマートグラスの Mentra Live で撮影します。記録できるのは映像と加速度で、LiDAR の奥行き情報や 3D メッシュはありません。現場での本収録を準備中です。"
+      : "Captured with the Mentra Live smart glasses. Video and IMU only — no LiDAR depth or mesh. On-site recording is in preparation.",
     available: false,
   };
   return [arkit, mentra];

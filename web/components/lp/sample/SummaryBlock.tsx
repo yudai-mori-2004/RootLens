@@ -12,6 +12,7 @@ interface Props {
 function fmtDuration(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
+  if (m === 0) return `${s}秒`;
   return `${m}分${s.toString().padStart(2, "0")}秒`;
 }
 
@@ -30,26 +31,30 @@ export default function SummaryBlock({ summary }: Props) {
       gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
       color: "#e8ebf2", fontSize: 13,
     }}>
-      <Section title="このクリップ">
-        <Row k="収録時間" v={fmtDuration(summary.durationSec)} />
+      <Section title="この 1 本">
+        <Row k="長さ" v={fmtDuration(summary.durationSec)} />
         <Row k="フレーム数" v={summary.frames.toLocaleString()} />
-        <Row k="実効 FPS" v={summary.fps.toFixed(1)} />
-        <Row k="収録スタック" v={summary.recordingConfig} />
-        <Row k="端末" v={summary.device ?? "—"} />
+        <Row k="1 秒あたりのコマ数" v={summary.fps.toFixed(1)} />
+        <Row k="撮影に使った端末" v={summary.device ?? "—"} />
         <Row k="OS" v={summary.osVersion ?? "—"} />
       </Section>
 
-      <Section title="空間">
-        <Row k="歩行距離" v={`${summary.pathLengthM.toFixed(1)} m`} />
-        <Row k="床面カバー" v={`${summary.areaM2.toFixed(1)} m²`} />
-        <Row k="移動範囲 (x, y, z)" v={
-          summary.trajectoryBBoxMax.map((mx, i) => `${(mx - summary.trajectoryBBoxMin[i]).toFixed(1)}`).join(" / ") + " m"
+      <Section title="歩いた場所">
+        <Row k="歩いた距離" v={`${summary.pathLengthM.toFixed(1)} m`} />
+        <Row k="歩いた範囲" v={`${summary.areaM2.toFixed(1)} m²`} />
+        <Row k="縦・横・高さ" v={
+          (["x", "z", "y"] as const)
+            .map((axis) => {
+              const i = { x: 0, y: 1, z: 2 }[axis];
+              return (summary.trajectoryBBoxMax[i] - summary.trajectoryBBoxMin[i]).toFixed(1);
+            })
+            .join(" × ") + " m"
         } />
       </Section>
 
-      <Section title="手・トラッキング">
+      <Section title="認識のよさ">
         <Row k="手が映っていた割合" v={`${(summary.handDetectionRate * 100).toFixed(1)}%`} />
-        <Row k="トラッキング正常率" v={`${(summary.trackingNormalRate * 100).toFixed(1)}%`} />
+        <Row k="位置合わせが安定していた割合" v={`${(summary.trackingNormalRate * 100).toFixed(1)}%`} />
       </Section>
 
       {cam && (
@@ -58,12 +63,12 @@ export default function SummaryBlock({ summary }: Props) {
           <Row k="視野角" v={cam.field_of_view_deg ? `${cam.field_of_view_deg.toFixed(1)}°` : "—"} />
           <Row k="レンズ" v={cam.lens ?? "—"} />
           {cam.depth && (
-            <Row k="LiDAR 深度" v={`${cam.depth.width} × ${cam.depth.height}`} />
+            <Row k="LiDAR の解像度" v={`${cam.depth.width} × ${cam.depth.height}`} />
           )}
         </Section>
       )}
 
-      <Section title="出力サイズ">
+      <Section title="ファイルサイズ">
         {Object.entries(summary.assets).map(([name, stats]) => (
           <Row key={name} k={name} v={fmtBytes(stats.bytes)} />
         ))}

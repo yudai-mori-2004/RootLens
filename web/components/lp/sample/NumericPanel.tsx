@@ -20,9 +20,9 @@ interface Props {
 }
 
 const TRACKING_LABEL: Record<number, string> = {
-  0: "not available",
-  1: "limited",
-  2: "normal",
+  0: "見失い中",
+  1: "不安定",
+  2: "安定",
 };
 
 const TRACKING_COLOR: Record<number, string> = {
@@ -47,12 +47,12 @@ export default function NumericPanel({ data }: Props) {
       fontFamily: "'JetBrains Mono', 'SF Mono', ui-monospace, monospace", fontSize: 11,
     }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        <Card label="加速度 (m/s²)" values={[
+        <Card label="動きの強さ (m/s²)" values={[
           ["x", accel[0]],
           ["y", accel[1]],
           ["z", accel[2]],
         ]} />
-        <Card label="角速度 (rad/s)" values={[
+        <Card label="回転の速さ (rad/s)" values={[
           ["x", gyro[0]],
           ["y", gyro[1]],
           ["z", gyro[2]],
@@ -60,16 +60,16 @@ export default function NumericPanel({ data }: Props) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <div style={cardBoxStyle}>
-          <div style={cardLabelStyle}>手の検出</div>
+          <div style={cardLabelStyle}>手が映っているか</div>
           <div style={{
             fontSize: 18, fontWeight: 600,
             color: handOn ? "#7be89c" : "#666",
           }}>
-            {handOn ? "detected" : "—"}
+            {handOn ? "映っている" : "—"}
           </div>
         </div>
         <div style={cardBoxStyle}>
-          <div style={cardLabelStyle}>トラッキング</div>
+          <div style={cardLabelStyle}>カメラの位置合わせ</div>
           <div style={{ fontSize: 18, fontWeight: 600, color: TRACKING_COLOR[tracking] ?? "#e8ebf2" }}>
             {TRACKING_LABEL[tracking] ?? String(tracking)}
           </div>
@@ -77,13 +77,13 @@ export default function NumericPanel({ data }: Props) {
       </div>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
         <SeriesCanvas
-          label="accel xyz"
+          label="動きの強さ x/y/z"
           data={data}
           idxNow={idx}
           field="accel"
         />
         <SeriesCanvas
-          label="gyro xyz"
+          label="回転の速さ x/y/z"
           data={data}
           idxNow={idx}
           field="gyro"

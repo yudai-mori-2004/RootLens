@@ -60,7 +60,7 @@ function Header({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
       <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#f4f1fa" }}>
-        サンプルデータ
+        サンプル
       </h1>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {pipelines.map((p) => {
@@ -105,7 +105,7 @@ function Placeholder({ label, description }: { label: string; description: strin
       alignItems: "center", justifyContent: "center",
       color: "#7a8090", gap: 8, padding: 24, textAlign: "center",
     }}>
-      <div style={{ fontSize: 14, color: "#e8ebf2" }}>{label} は準備中です。</div>
+      <div style={{ fontSize: 14, color: "#e8ebf2" }}>{label} のサンプルはまだありません。</div>
       <div style={{ fontSize: 12, maxWidth: 480 }}>{description}</div>
     </div>
   );
@@ -136,7 +136,7 @@ function LoadedViewer({ assets, label }: { assets: NonNullable<PipelineOption["a
   if (error) {
     return (
       <div style={{ color: "#ff3d80", padding: 24 }}>
-        {label} の JSON 素材の取得に失敗しました。 通信状況を確認して再読み込みしてください。
+        データを読み込めませんでした。時間を置いて再読み込みしてみてください。
       </div>
     );
   }
@@ -144,7 +144,7 @@ function LoadedViewer({ assets, label }: { assets: NonNullable<PipelineOption["a
   if (!summary || !trajectory || !timeseries) {
     return (
       <div style={{ minHeight: 400, color: "#7a8090", padding: 24 }}>
-        読み込み中...
+        読み込み中…
       </div>
     );
   }
@@ -184,16 +184,16 @@ function PanelGrid({
       border: "1px solid #1a1d24",
       overflow: "hidden",
     }}>
-      <PanelCell title="RGB">
+      <PanelCell title="カメラ映像">
         <RgbPanel src={rgbUrl} />
       </PanelCell>
-      <PanelCell title="Depth (LiDAR)">
+      <PanelCell title="LiDAR 深度">
         <DepthPanel src={depthUrl} />
       </PanelCell>
-      <PanelCell title="3D シーン" minHeight={360}>
+      <PanelCell title="部屋の 3D モデルと歩いた道" minHeight={360}>
         <ScenePanel meshUrl={meshUrl} trajectory={trajectory} />
       </PanelCell>
-      <PanelCell title="センサ数値" minHeight={360}>
+      <PanelCell title="センサーの値" minHeight={360}>
         <NumericPanel data={timeseries} />
       </PanelCell>
     </div>

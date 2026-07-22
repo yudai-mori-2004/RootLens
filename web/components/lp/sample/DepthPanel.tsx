@@ -39,7 +39,7 @@ export default function DepthPanel({ src, aspectRatio = 4 / 3 }: Props) {
         width: "100%", aspectRatio, background: "#0b0d11",
         color: "#666", fontSize: 12,
       }}>
-        depth (LiDAR) 収録なし
+        深度データはこのクリップには含まれていません
       </div>
     );
   }
