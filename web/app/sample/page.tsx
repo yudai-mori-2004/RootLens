@@ -1,50 +1,21 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getLocale } from "next-intl/server";
 import SiteLayout from "../../components/shared/SiteLayout";
 import s from "../../components/lp/lp.module.css";
 
 export const metadata: Metadata = {
-  title: "RootLens Sample Datasets",
-  description: "Public sample datasets from RootLens.",
+  title: "RootLens Sample Dataset",
+  description: "Public sample dataset from RootLens.",
 };
 
 const CONTENT = {
   ja: {
     title: "サンプルデータ",
-    intro: "RootLensが公開しているサンプルデータセットです。バージョンごとに内容が独立しているので、各ページで詳細を確認してダウンロードしてください。",
-    samples: [
-      {
-        href: "/sample/v0.1.3",
-        title: "Sample v0.1.3",
-        summary:
-          "一人称視点の家事クリップ47本、約5時間、26 GB。生の映像にWiLoR 3Dハンドポーズと端末上の2Dハンドランドマークを同梱。",
-      },
-      {
-        href: "/sample/v0.1",
-        title: "Sample v0.1",
-        summary:
-          "一人称視点の家事動画48本、約1 GB。LeRobotDataset v3.0形式で、フレームごとの3Dハンドポーズと行動ラベル付き。",
-      },
-    ],
+    body: "新しいショーケースページを準備中です。RGB / LiDAR 深度 / 3D 空間・軌跡 / センサ数値を、同じ 1 クリップから 4 パネルで同期表示する予定です。",
   },
   en: {
-    title: "Sample Datasets",
-    intro: "Public sample datasets from RootLens. Each version is independently scoped; open one for details and download.",
-    samples: [
-      {
-        href: "/sample/v0.1.3",
-        title: "Sample v0.1.3",
-        summary:
-          "47 egocentric housework clips, approximately 5 hours, 26 GB. Raw videos with WiLoR 3D hand pose and on-device 2D hand landmarks.",
-      },
-      {
-        href: "/sample/v0.1",
-        title: "Sample v0.1",
-        summary:
-          "48 first-person housework clips, approximately 1 GB. LeRobotDataset v3.0 format with per-frame 3D hand pose and action labels.",
-      },
-    ],
+    title: "Sample data",
+    body: "A new showcase page is in preparation. It will present a single clip through four synchronized panels: RGB, LiDAR depth, 3D scene with trajectory, and sensor readouts.",
   },
 } as const;
 
@@ -58,22 +29,7 @@ export default async function Page() {
         <section className={s.section}>
           <div className={s.sectionInner}>
             <h1 className={s.sectionTitle}>{c.title}</h1>
-            <p className={s.prose}>{c.intro}</p>
-          </div>
-        </section>
-
-        <section className={s.section}>
-          <div className={s.sectionInner}>
-            <ul className={s.bulletList}>
-              {c.samples.map((item) => (
-                <li key={item.href} className={s.bulletItem}>
-                  <Link href={item.href}>
-                    <strong>{item.title}</strong>
-                  </Link>{" "}
-                  – {item.summary}
-                </li>
-              ))}
-            </ul>
+            <p className={s.prose}>{c.body}</p>
           </div>
         </section>
       </div>
