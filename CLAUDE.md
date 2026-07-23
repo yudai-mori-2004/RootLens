@@ -21,8 +21,7 @@ root-lens/
 ├── tools/              web / app 以外の周辺 dev / ops ツール
 │   ├── modal/          納品パイプライン (1 ディレクトリ = 1 パイプライン。 各 README に入出力と実行)
 │   │   ├── fpvlabs/        raw arkit → 顔ぼかし + MCAP (FPV Labs 手渡し。 現運用の中心)
-│   │   ├── sample-drive/   raw + MCAP → 共有ドライブの公開サンプル一式 (ぼかし済み rgb + mcap + manifest)
-│   │   └── score-wilor/    旧 score 3 層 + WiLoR 手ポーズ (= legacy、 現運用外)
+│   │   └── sample-drive/   raw + MCAP → 共有ドライブの公開サンプル一式 (ぼかし済み rgb + mcap + manifest)
 │   ├── lp-sample/       raw arkit → LP /sample ビューアの 6 素材 (rootlens-public。 Modal 実行)
 │   ├── sample-select/   サンプル選定用の統計 + サムネ (納品物なし。 Modal 実行)
 │   ├── egoblur_probe.py 新クリップで EgoBlur 閾値を検証するローカルハーネス
