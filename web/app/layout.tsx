@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Anton, Noto_Sans_JP, DotGothic16 } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
-import { getLocale } from "next-intl/server";
+import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -58,7 +58,11 @@ export default async function RootLayout({
   return (
     <html lang={locale}>
       <body className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} ${notoSansJp.variable} ${dotGothic.variable}`}>
-        <NextIntlClientProvider locale={locale} messages={{}}>
+        {/* messages を渡さないと useTranslations() をクライアントで使う画面が全部
+            キーを素で出す (=/sample の 4 パネルビューアで起きた実障害)。
+            getMessages() は現在 locale の messages/*.json 全体を返す。 全部渡しても
+            SSR 直後の payload に混ざるだけで、 next-intl が namespace ごとに tree-shake する。 */}
+        <NextIntlClientProvider locale={locale} messages={await getMessages()}>
           {children}
         </NextIntlClientProvider>
       </body>

@@ -186,10 +186,7 @@ function PanelGrid({
 }) {
   const t = useTranslations("pages.sample.panels");
   return (
-    // 3 段構成: 1) RGB / Depth の 2 カラム、 2) 3D シーンを幅いっぱい、
-    // 3) センサーの値を幅いっぱい (グラフが横に伸びるのでこの方が読みやすい)。
-    // かつては 2x2 でセンサーを右下に置いていたが、 隣の 3D シーンの高さに引きずられて
-    // 空間が余り、 逆に横方向は 1 カラム分に切られて詰まって見えた。
+    // 2x2: 上段 RGB / Depth、 下段 3D シーン / センサー。
     <div style={{
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
@@ -205,29 +202,27 @@ function PanelGrid({
       <PanelCell title={t("depth")}>
         <DepthPanel src={depthUrl} />
       </PanelCell>
-      <PanelCell title={t("scene")} minHeight={320} span={2}>
+      <PanelCell title={t("scene")} minHeight={320}>
         <ScenePanel meshUrl={meshUrl} trajectory={trajectory} />
       </PanelCell>
-      <PanelCell title={t("numeric")} span={2}>
+      <PanelCell title={t("numeric")} minHeight={320}>
         <NumericPanel data={timeseries} />
       </PanelCell>
     </div>
   );
 }
 
-function PanelCell({ title, children, minHeight, span }: {
+function PanelCell({ title, children, minHeight }: {
   title: string;
   children: React.ReactNode;
   minHeight?: number;
-  /** グリッドカラムの跨ぎ数 (2 で全幅)。 3 行目の 3D シーン / センサーは 2 カラム跨ぎで幅いっぱいにする。 */
-  span?: number;
 }) {
   return (
     <div style={{
       background: "#0b0d11",
       display: "flex", flexDirection: "column",
       minHeight,
-      gridColumn: span ? `span ${span}` : undefined,
+      minWidth: 0,   // grid セルが中身の intrinsic width で膨らむのを防ぐ (= 兄弟セルの潰れ防止)
     }}>
       <div style={{
         fontSize: 9, letterSpacing: 1.5, textTransform: "uppercase", color: "#7a8090",
@@ -235,7 +230,7 @@ function PanelCell({ title, children, minHeight, span }: {
       }}>
         {title}
       </div>
-      <div style={{ flex: 1, display: "flex" }}>
+      <div style={{ flex: 1, display: "flex", minWidth: 0 }}>
         {children}
       </div>
     </div>

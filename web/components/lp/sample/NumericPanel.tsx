@@ -1,16 +1,9 @@
 "use client";
 
-// センサーの値パネル。 現時刻の左右の手の映り (アイコン) + 動きの強さと回転の速さの時系列グラフ。
-//
-// 上段: 右手・左手アイコン。 映っていれば白、 映ってなければグレー。 面積で状態を示す。
-// 下段: 動きの強さ (accel xyz) と 回転の速さ (gyro xyz)、 過去 10 秒の折れ線。
-//       高さは固定 (px)。 Y スケールはウィンドウ内の実データに合わせて自動で伸縮する
-//       (= キャンバスが縦に伸びないので、 パネル全体が高くならない)。
-//
-// リアルタイム値のテキストカードと 「トラッキング状態」 の boolean 表示は廃止。
-// 数字だけが変わっていくカードは情報密度が低く、 グラフで十分。
+// センサーの値パネル。 現時刻の左右の手の映り (アイコン) + 動きの強さと回転の速さの
+// 時系列グラフ 2 枚。 高さは固定 (px)、 Y スケールはウィンドウ内の実データに追従する。
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { usePlayhead } from "./TimeContext";
 import type { TimeSeriesData } from "./types";
@@ -27,19 +20,16 @@ export default function NumericPanel({ data }: Props) {
   const t = useTranslations("pages.sample.numeric");
   const state = usePlayhead();
   const idx = Math.min(data.hands.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
-
-  // 手の左右の判定はハンドトラッキングの左右ラベルまではこのパネルまで届いていないので、
-  // 「1 本以上」 か「2 本」 かで代替する。 hands boolean は現状 「1 本以上」 の flag なので
-  // 2 本判定用に別チャンネルを追加したくなったら timeseries を拡張する。
-  // ここではとりあえず 「片手だけ映っている」 か 「両手映っている」 かを見せられる形にしておく。
   const handOn = !!data.hands[idx];
 
   return (
     <div style={{
       display: "flex", flexDirection: "column",
+      width: "100%",
       background: "#0b0d11", color: "#e8ebf2",
       padding: 12, gap: 10,
       fontFamily: "'JetBrains Mono', 'SF Mono', ui-monospace, monospace", fontSize: 11,
+      minWidth: 0,
     }}>
       <HandRow
         leftOn={handOn}
@@ -54,7 +44,6 @@ export default function NumericPanel({ data }: Props) {
   );
 }
 
-// 手の映り 2 個。 白 = 映っている、 灰 = 映っていない。
 function HandRow({ leftOn, rightOn, title, leftLabel, rightLabel }: {
   leftOn: boolean;
   rightOn: boolean;
@@ -68,8 +57,11 @@ function HandRow({ leftOn, rightOn, title, leftLabel, rightLabel }: {
       borderBottom: "1px solid rgba(255,255,255,0.06)",
       paddingBottom: 8,
     }}>
-      <div style={labelStyle}>{title}</div>
-      <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+      <div style={{
+        fontSize: 9, color: "#7a8090",
+        textTransform: "uppercase", letterSpacing: 1,
+      }}>{title}</div>
+      <div style={{ display: "flex", gap: 10, marginLeft: "auto" }}>
         <HandIcon on={leftOn} side="left" label={leftLabel} />
         <HandIcon on={rightOn} side="right" label={rightLabel} />
       </div>
@@ -77,40 +69,24 @@ function HandRow({ leftOn, rightOn, title, leftLabel, rightLabel }: {
   );
 }
 
+// シンプルな塗り手のシルエット (親指付きの片面ミトン風)。 5 本指の細部は 22px では
+// 潰れて読みにくいので、 「手が映っているか」 だけを一目で伝えるシルエット 1 枚にする。
+// 右手は左右反転。
 function HandIcon({ on, side, label }: { on: boolean; side: "left" | "right"; label: string }) {
-  // Lucide の "Hand" アイコン (ISC ライセンス)。 open palm のストロークデザインで、
-  // color prop で白 / 灰の切替が素直にできる。 右手用は左右反転。
   const color = on ? "#ffffff" : "#3a3f4a";
   return (
     <svg
-      width={22}
-      height={22}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color}
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{
-        transform: side === "right" ? "scaleX(-1)" : undefined,
-        display: "block",
-      }}
+      width={22} height={22} viewBox="0 0 24 24"
+      style={{ transform: side === "right" ? "scaleX(-1)" : undefined, display: "block" }}
       aria-label={label}
     >
-      <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-      <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
-      <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
-      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15V9a2 2 0 0 1 2-2h.5" />
+      <path
+        d="M8 22a4 4 0 0 1-4-4v-6l1.5-1.5v6l1-.5v-9a1.5 1.5 0 0 1 3 0v6l1-.5v-9a1.5 1.5 0 0 1 3 0v9l1 .5v-7a1.5 1.5 0 0 1 3 0v7l1 .5v-5a1.5 1.5 0 0 1 3 0v9a4 4 0 0 1-4 4z"
+        fill={color}
+      />
     </svg>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 9,
-  color: "#7a8090",
-  textTransform: "uppercase",
-  letterSpacing: 1,
-};
 
 function SeriesCanvas({ data, idxNow, field, label }: {
   data: TimeSeriesData;
@@ -119,30 +95,42 @@ function SeriesCanvas({ data, idxNow, field, label }: {
   label: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
+  // 親のリサイズを ResizeObserver で拾う。 これが無いと、 パネルの初期レンダー時の
+  // 幅で canvas.width が固定され、 後で親が広がっても描画バッファは古い幅のまま = 右側が
+  // 引き伸ばされた黒 (というより「描画が右まで届かない黒」) として見える。 idxNow の変化
+  // (30 Hz) だけを頼りに再描画するのでは、 幅変化のタイミングが取れない。
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
+    const update = () => {
+      const rect = c.getBoundingClientRect();
+      setSize({ w: rect.width, h: rect.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(c);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c || size.w === 0 || size.h === 0) return;
     const dpr = window.devicePixelRatio || 1;
-    const rect = c.getBoundingClientRect();
-    c.width = rect.width * dpr;
-    c.height = rect.height * dpr;
+    // 描画バッファは実寸 × dpr。 setState で幅が変わったときも含めて毎回更新する。
+    c.width = Math.max(1, Math.floor(size.w * dpr));
+    c.height = Math.max(1, Math.floor(size.h * dpr));
     const ctx = c.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const w = rect.width;
-    const h = rect.height;
-
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, size.w, size.h);
 
     const samples = Math.floor(WINDOW_S * data.hz);
     const start = Math.max(0, idxNow - samples);
     const end = idxNow;
-    const n = end - start;
-    if (n <= 1) return;
+    const totalSpan = samples;  // 常に固定 (= 未来側にも余白を残さない: 現在時刻が右端)
 
-    // Y スケール: このウィンドウ内の実データの絶対値ピーク基準。 小さすぎる (= 静止) ときは
-    // 発散防止のため最低値を敷く (accel は 3、 gyro は 2)。 これで枠 (固定高さ) 内に必ず収まる。
+    // Y スケール: このウィンドウ内の実データの絶対値ピーク基準。 静止時は最低値を敷く。
     const minRange = field === "accel" ? 3 : 2;
     let peak = 0;
     for (let i = start; i <= end; i++) {
@@ -156,37 +144,43 @@ function SeriesCanvas({ data, idxNow, field, label }: {
     ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, h / 2);
-    ctx.lineTo(w, h / 2);
+    ctx.moveTo(0, size.h / 2);
+    ctx.lineTo(size.w, size.h / 2);
     ctx.stroke();
 
-    // 見出し (小さく左上)
+    // 見出し
     ctx.fillStyle = "#7a8090";
     ctx.font = "9px ui-monospace";
     ctx.fillText(label, 4, 10);
 
-    // 各チャンネル
+    if (end <= start) return;
+
+    // 各チャンネル。 「現在」 が右端に来るように、 x はサンプル数 / totalSpan (= 固定) で
+    // マップする。 これで再生初期 (端まで埋まっていない) のときも、 右側にちゃんと最新値が
+    // 貼り付いて、 左側が未使用の状態になる (自然なオシロスコープの見え方)。
     for (let ch = 0; ch < 3; ch++) {
       ctx.strokeStyle = CHANNEL_COLORS[ch];
       ctx.lineWidth = 1;
       ctx.beginPath();
+      let drew = false;
       for (let i = start; i <= end; i++) {
-        const x = ((i - start) / n) * w;
         const v = data.imu[field][i]?.[ch] ?? 0;
-        const y = h / 2 - (v / yMax) * (h / 2 - 8);
-        if (i === start) ctx.moveTo(x, y);
+        // 現在時刻 (i=end) を右端 (x=w) に。 過去は左へ。
+        const x = size.w - ((end - i) / totalSpan) * size.w;
+        const y = size.h / 2 - (v / yMax) * (size.h / 2 - 8);
+        if (!drew) { ctx.moveTo(x, y); drew = true; }
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
     }
-  }, [idxNow, data, field, label]);
+  }, [idxNow, data, field, label, size.w, size.h]);
 
   return (
     <canvas
       ref={canvasRef}
       style={{
         width: "100%",
-        height: GRAPH_HEIGHT_PX,          // 固定高さ (枠が広がらない)
+        height: GRAPH_HEIGHT_PX,
         background: "rgba(255,255,255,0.02)",
         border: "1px solid rgba(255,255,255,0.06)",
         borderRadius: 4,
