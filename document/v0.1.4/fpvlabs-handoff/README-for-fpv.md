@@ -61,7 +61,7 @@ jq -r 'select(.domain=="bakery") | .contentHash' rootlens-data/manifest.jsonl
 
 ## Notes
 
-- The MCAP layout matches stera-sdk's MCAPReader topic configuration (same topics,
-  schemas, and encodings), so `stera.data.mcap` reads it directly.
-- The recorded workers have consented to filming and to this data use. Incidental
-  bystanders are face-blurred before delivery.
+- Recording is limited to back-of-house work areas, with no audio. Recorded workers
+  give prior written consent, every upload is logged with the consent scopes it was
+  made under (collection, AI-training use, licensing, cross-border transfer), and
+  faces are blurred before delivery.
