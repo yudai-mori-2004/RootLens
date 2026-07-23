@@ -27,8 +27,7 @@ root-lens/
 │   │   ├── session-thumbs/ rgb.mp4 → サンプル選定用サムネ 5 枚 (rootlens-public)
 │   │   └── score-wilor/    旧 score 3 層 + WiLoR 手ポーズ (= legacy、 現運用外)
 │   ├── egoblur_probe.py 新クリップで EgoBlur 閾値を検証するローカルハーネス
-│   ├── asset-gen/       LP イラスト / SFX 生成
-│   └── lp-sample/       LP のサンプル動画パイプライン
+│   └── asset-gen/       LP イラスト / SFX / 撮影トグルマーカー生成
 │
 └── document/
     ├── legal/          法務正本 (ja 正 + en ミラー。 gen-legal.mjs のビルド入力)
