@@ -76,9 +76,47 @@
         "deliveryFormatLabel": "ファイル",
         "deliveryFormatValue": "session.mcap (顔ぼかし済み、MCAP に ROS2 メッセージを格納)",
         "deliveryBytesLabel": "サイズ",
-        "deliveryContentsLabel": "含まれるデータ",
-        "deliveryContentsValue": "映像 (JPEG 系列) / LiDAR 深度と信頼度 / カメラの位置と向き (6DoF) / IMU / トラッキング状態 / 手のランドマーク / メッシュ",
         "deliveryPending": "取引先向けのファイルはまだ生成されていません"
+      },
+      "contents": {
+        "section": "コンテンツ",
+        "intro": "納品する session.mcap に含まれる時系列トピックの内訳です。",
+        "depthUnavailable": "LiDAR 非搭載端末で撮影したクリップには含まれません。",
+        "tabs": {
+          "video": "映像",
+          "depth": "深度",
+          "pose": "6DoF 姿勢",
+          "imu": "IMU",
+          "tracking": "トラッキング"
+        },
+        "labels": {
+          "topic": "トピック",
+          "messageType": "メッセージ型",
+          "encoding": "エンコード",
+          "resolution": "解像度",
+          "rate": "レート",
+          "unit": "単位",
+          "range": "レンジ",
+          "coordinateSystem": "座標系",
+          "contents": "内容",
+          "confidence": "信頼度",
+          "processing": "後処理",
+          "states": "状態値",
+          "limitedReasons": "limited 時の理由"
+        },
+        "values": {
+          "videoEncoding": "JPEG (品質 85、フレーム単位)",
+          "videoProcessing": "顔ぼかし (EgoBlur、Meta gen2)",
+          "depthUnit": "mm (0 = 欠損)",
+          "depthConfidence": "0 = 低 / 1 = 中 / 2 = 高",
+          "poseContents": "位置 (xyz, m) + クォータニオン (x, y, z, w)",
+          "poseCoord": "ARKit world (重力方向に揃えた右手系)",
+          "imuAccel": "加速度 m/s² (userAcceleration + gravity)",
+          "imuGyro": "角速度 rad/s",
+          "imuCoord": "iOS CoreMotion デバイス座標系",
+          "trackingStates": "0 = notAvailable / 1 = limited / 2 = normal",
+          "trackingReasons": "initializing / relocalizing / excessiveMotion / insufficientFeatures"
+        }
       }
     }
   },

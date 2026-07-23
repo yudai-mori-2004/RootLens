@@ -76,9 +76,47 @@
         "deliveryFormatLabel": "File",
         "deliveryFormatValue": "session.mcap (faces blurred, ROS2 messages in an MCAP container)",
         "deliveryBytesLabel": "Size",
-        "deliveryContentsLabel": "Included streams",
-        "deliveryContentsValue": "Video (JPEG series) · LiDAR depth + confidence · 6DoF camera pose · IMU · Tracking state · Hand landmarks · Mesh",
         "deliveryPending": "The deliverable file has not been generated yet"
+      },
+      "contents": {
+        "section": "Contents",
+        "intro": "Time-series topics inside the delivered session.mcap.",
+        "depthUnavailable": "Not included in clips recorded on devices without LiDAR.",
+        "tabs": {
+          "video": "Video",
+          "depth": "Depth",
+          "pose": "6DoF Pose",
+          "imu": "IMU",
+          "tracking": "Tracking"
+        },
+        "labels": {
+          "topic": "Topic",
+          "messageType": "Message type",
+          "encoding": "Encoding",
+          "resolution": "Resolution",
+          "rate": "Rate",
+          "unit": "Unit",
+          "range": "Range",
+          "coordinateSystem": "Coordinate frame",
+          "contents": "Fields",
+          "confidence": "Confidence",
+          "processing": "Post-processing",
+          "states": "State values",
+          "limitedReasons": "Reasons when limited"
+        },
+        "values": {
+          "videoEncoding": "JPEG (quality 85, per frame)",
+          "videoProcessing": "Face blur (EgoBlur, Meta gen2)",
+          "depthUnit": "mm (0 = missing)",
+          "depthConfidence": "0 = low / 1 = medium / 2 = high",
+          "poseContents": "position (xyz, m) + quaternion (x, y, z, w)",
+          "poseCoord": "ARKit world (gravity-aligned right-handed)",
+          "imuAccel": "acceleration m/s² (userAcceleration + gravity)",
+          "imuGyro": "angular velocity rad/s",
+          "imuCoord": "iOS CoreMotion device frame",
+          "trackingStates": "0 = notAvailable / 1 = limited / 2 = normal",
+          "trackingReasons": "initializing / relocalizing / excessiveMotion / insufficientFeatures"
+        }
       }
     }
   },

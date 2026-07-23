@@ -1,11 +1,8 @@
 "use client";
 
-// クリップ全体の統計表示。 4 パネルの下に置く、 静的な事実のブロック。
-// セクション: この 1 本 / 歩いた場所 / 認識のよさ / カメラ / 納品するもの (session.mcap)。
-//
-// 「納品するもの」 は取引先に渡す最終形式 (fpvlabs パイプラインの session.mcap = 顔ぼかし +
-// Stera 互換 MCAP) を明示する。 LP に置いてある rgb.mp4 / depth.mp4 / mesh.glb 等は
-// あくまでビジュアライザ配信用のビューアセットで、 商品ではない。 混同を避けるため出さない。
+// クリップ全体のわかりやすいサマリー 4 セクション: この 1 本 / 歩いた場所 / 認識のよさ /
+// カメラ。 わかりやすさ寄りの数字だけを並べる。 納品ファイルの内訳 (トピック別スペック) は
+// ContentsSection で別枠に扱う (= サマリーと厳密なスペックシートを混ぜない)。
 
 import { useLocale, useTranslations } from "next-intl";
 import type { SummaryData } from "./types";
@@ -25,18 +22,10 @@ function fmtDuration(sec: number, locale: string): string {
   return `${m}分${s.toString().padStart(2, "0")}秒`;
 }
 
-function fmtBytes(b: number): string {
-  if (b >= 1e9) return `${(b / 1e9).toFixed(2)} GB`;
-  if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`;
-  if (b >= 1e3) return `${(b / 1e3).toFixed(1)} KB`;
-  return `${b} B`;
-}
-
 export default function SummaryBlock({ summary }: Props) {
   const t = useTranslations("pages.sample.summary");
   const locale = useLocale();
   const cam = summary.camera;
-  const delivery = summary.delivery;
 
   return (
     <div style={{
@@ -81,18 +70,6 @@ export default function SummaryBlock({ summary }: Props) {
           )}
         </Section>
       )}
-
-      <Section title={t("deliverySection")}>
-        {delivery ? (
-          <>
-            <Row k={t("deliveryFormatLabel")} v={t("deliveryFormatValue")} />
-            <Row k={t("deliveryBytesLabel")} v={fmtBytes(delivery.bytes)} />
-            <Row k={t("deliveryContentsLabel")} v={t("deliveryContentsValue")} />
-          </>
-        ) : (
-          <div style={{ color: "#7a8090", fontSize: 12 }}>{t("deliveryPending")}</div>
-        )}
-      </Section>
     </div>
   );
 }

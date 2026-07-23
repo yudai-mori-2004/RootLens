@@ -15,6 +15,7 @@ import ScenePanel from "./ScenePanel";
 import NumericPanel from "./NumericPanel";
 import TimelineBar from "./TimelineBar";
 import SummaryBlock from "./SummaryBlock";
+import ContentsSection from "./ContentsSection";
 import type { PipelineOption, SummaryData, TimeSeriesData, TrajectoryData } from "./types";
 
 interface Props {
@@ -171,6 +172,7 @@ function LoadedViewer({ assets, label }: { assets: NonNullable<PipelineOption["a
       />
       <TimelineBar />
       <SummaryBlock summary={summary} />
+      <ContentsSection summary={summary} />
     </TimeProvider>
   );
 }
