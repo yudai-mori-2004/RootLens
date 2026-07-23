@@ -20,17 +20,28 @@ import datetime as dt
 import io
 import json
 import os
+import subprocess
 import tempfile
+
+# ドライブ用 rgb.mp4 の再エンコード設定。 LP のショーケース (showcase.py) と揃える。
+SAMPLE_RGB_BITRATE_KBPS = 5000
 
 try:
     import modal
 
+    # このドライブは公開想定なので、 サンプル rgb.mp4 は必ず顔ぼかし済みでないといけない。
+    # 本筋の工程 (fpvlabs.py) はそのままで、 このアップローダの中だけで MCAP のぼかし済み JPEG
+    # 列を取り出して mp4 に再エンコードする経路を敷く。 EgoBlur の再実行はしない
+    # (= 納品物と完全に同じぼかしを保証、 GPU / 計算コストゼロ)。 ffmpeg + mcap ライブラリだけ要る。
     image = (
         modal.Image.debian_slim(python_version="3.11")
+        .apt_install("ffmpeg")
         .pip_install(
             "boto3",
             "google-api-python-client",
             "google-auth",
+            "mcap",
+            "mcap-ros2-support",
         )
     )
 
@@ -162,6 +173,50 @@ def _r2_client():
 # メイン: 1 セッションを R2 から取ってきて Drive に置く
 # ══════════════════════════════════════════════════════════════════════
 
+def _blurred_rgb_from_mcap(mcap_path: str, meta: dict, out_mp4: str) -> dict:
+    """MCAP の /camera/rgb/compressed (顔ぼかし済み JPEG 列) を H.264 mp4 に再エンコードする。
+    ぼかしは fpvlabs 側で適用済みなので再実行しない (= 納品物と完全に同じぼかし結果を保証、
+    追加の GPU 計算ゼロ)。 fps は metadata の recording_rate_hz に合わせる (MCAP のタイムスタンプ
+    と ±10ms 程度でずれるが、 サンプル再生上は判別不能)。
+    ⚠ 装着者以外が映る現場 (パン屋等) では絶対に生 rgb を Drive に出さない。 この関数が唯一の
+      Drive 用 rgb 経路。"""
+    from mcap.reader import make_reader
+    from mcap_ros2.decoder import DecoderFactory
+
+    fps = float((meta.get("capture_settings") or {}).get("recording_rate_hz") or 15)
+
+    cmd = [
+        "ffmpeg", "-y", "-v", "error",
+        "-f", "image2pipe", "-vcodec", "mjpeg",
+        "-framerate", f"{fps:.6f}",
+        "-i", "-",
+        "-c:v", "libx264", "-preset", "medium",
+        "-b:v", f"{SAMPLE_RGB_BITRATE_KBPS}k",
+        "-pix_fmt", "yuv420p",
+        "-an",
+        "-movflags", "+faststart",
+        out_mp4,
+    ]
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    assert proc.stdin is not None
+    frame_count = 0
+    try:
+        with open(mcap_path, "rb") as fh:
+            reader = make_reader(fh, decoder_factories=[DecoderFactory()])
+            for _, _, _, ros_msg in reader.iter_decoded_messages(
+                    topics=["/camera/rgb/compressed"]):
+                proc.stdin.write(ros_msg.data)  # data フィールドが JPEG bytes
+                frame_count += 1
+    finally:
+        proc.stdin.close()
+    rc = proc.wait()
+    if rc != 0:
+        raise RuntimeError(f"ffmpeg exited {rc} while encoding blurred rgb")
+    if frame_count == 0:
+        raise RuntimeError("mcap contained no /camera/rgb/compressed frames")
+    return {"bytes": os.path.getsize(out_mp4), "frames": frame_count, "fps": fps}
+
+
 def _session_dirname(content_hash: str, meta: dict) -> str:
     """YYYY-MM-DD_HHMM_<hash8>/。 recording 開始時刻は metadata から拾えないので、
     R2 の rgb.mp4 のオブジェクト作成時刻を代替に使う (= 装着端末が PUT した時刻)。"""
@@ -203,22 +258,27 @@ def _upload_session(content_hash: str, domain: str) -> dict:
         session_name = _session_dirname(content_hash, meta)
         session_id = _find_or_create_folder(drive, session_name, pipeline_id)
 
-        uploaded = []
-
-        # ── rgb.mp4 (プレビュー用に生をそのまま) ──
-        rgb_path = os.path.join(tmp, "rgb.mp4")
-        s3.download_file(bucket_raw, f"raw/{content_hash}/rgb.mp4", rgb_path)
-        uploaded.append(_upload_file(drive, session_id, "rgb.mp4", rgb_path, "video/mp4"))
-
-        # ── session.mcap (fpvlabs パイプラインの成果物 = 納品本体) ──
+        # ── session.mcap を先に落とす。 rgb.mp4 のぼかし済み映像はここから取り出すので必須。 ──
         mcap_path = os.path.join(tmp, "session.mcap")
         try:
             s3.download_file(bucket_fpv, f"{content_hash}/session.mcap", mcap_path)
-            uploaded.append(_upload_file(drive, session_id, "session.mcap", mcap_path,
-                                         "application/octet-stream"))
         except Exception as e:
-            # fpvlabs 未処理のセッションは MCAP なしで rgb だけ置く (= 後で埋める)。
-            print(f"[warn] no session.mcap for {content_hash[:8]}: {e}")
+            raise RuntimeError(
+                f"session.mcap missing for {content_hash[:8]}. "
+                f"drive upload requires the blurred JPEG stream from mcap; "
+                f"run fpvlabs first: {e}"
+            )
+
+        uploaded = []
+
+        # ── rgb.mp4 (ぼかし済み。 MCAP 内の /camera/rgb/compressed から取り出して再エンコード) ──
+        rgb_path = os.path.join(tmp, "rgb.mp4")
+        rgb_stats = _blurred_rgb_from_mcap(mcap_path, meta, rgb_path)
+        uploaded.append(_upload_file(drive, session_id, "rgb.mp4", rgb_path, "video/mp4"))
+
+        # ── session.mcap (fpvlabs パイプラインの成果物 = 納品本体) ──
+        uploaded.append(_upload_file(drive, session_id, "session.mcap", mcap_path,
+                                     "application/octet-stream"))
 
         # ── manifest.json (human-readable な要約。 このドライブは公開想定なので、
         #    取引先名や内部インフラの命名を含む項目は入れない: sourceBucket / deliveryBucket /
