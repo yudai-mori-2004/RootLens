@@ -38,10 +38,11 @@
 #      https://github.com/facebookresearch/EgoBlur を clone するので、 gen2 ソースは自動で入る。
 #
 # 実行:
-#   ローカル:  python tools/modal/fpvlabs.py <content_hash>   (R2 creds は env で、 ぼかしオン)
-#   Modal:    modal run tools/modal/fpvlabs.py --content-hash <hash>            (ぼかしオン)
-#             modal run tools/modal/fpvlabs.py --content-hash <hash> --no-blur  (ぼかしオフ)
-#   deploy:   modal deploy tools/modal/fpvlabs.py
+#   ローカル:  python tools/modal/fpvlabs/fpvlabs.py <content_hash>   (R2 creds は env で、 ぼかしオン)
+#   Modal:    modal run --detach tools/modal/fpvlabs/fpvlabs.py --content-hash <hash>            (ぼかしオン)
+#             modal run --detach tools/modal/fpvlabs/fpvlabs.py --content-hash <hash> --no-blur  (ぼかしオフ)
+#             (--detach: クライアント切断やセッション終了でジョブを道連れにしない)
+#   deploy:   modal deploy tools/modal/fpvlabs/fpvlabs.py
 
 from __future__ import annotations
 

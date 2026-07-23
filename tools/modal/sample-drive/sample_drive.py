@@ -8,8 +8,7 @@
 # YYYY-MM-DD_HHMM_<hash8>/ で、 recording_started_at と content_hash から一意に決まる。
 #
 # 実行:
-#   modal run tools/modal/drive/upload.py --content-hash <hash> --domain home
-#   modal run tools/modal/drive/upload.py --all --domain home     (== account_id ごとに全部)
+#   modal run --detach tools/modal/sample-drive/sample_drive.py --content-hash <hash> --domain home
 #
 # 権限: サービスアカウント datasets-writer@rootlens-503301.iam.gserviceaccount.com が
 #   共有ドライブに「コンテンツ管理者」で招待されている前提。 招待が漏れると 404 になる。
@@ -45,7 +44,7 @@ try:
         )
     )
 
-    app = modal.App("rootlens-drive-upload")
+    app = modal.App("rootlens-sample-drive")
 
     @app.function(
         image=image,

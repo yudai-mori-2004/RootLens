@@ -1,6 +1,6 @@
 // /sample のショーケースビューアが読む JSON の型。
 //
-// スキーマは tools/modal/showcase/showcase.py が吐く物と 1:1 に一致する。
+// スキーマは tools/modal/sample-viewer/sample_viewer.py が吐く物と 1:1 に一致する。
 // 変えるときは両方 (Python 出力 + この型) を同時に触ること。
 
 export interface AssetStats {

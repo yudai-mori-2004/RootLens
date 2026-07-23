@@ -5,7 +5,7 @@
 # ので、 装着端末側の回線を消費しない (= フィールドから触れる)。
 #
 # 実行:
-#   modal run tools/modal/showcase/score.py --hashes hashA,hashB,hashC
+#   modal run tools/modal/session-stats/session_stats.py --hashes hashA,hashB,hashC
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ try:
         modal.Image.debian_slim(python_version="3.11")
         .pip_install("numpy<2", "boto3")
     )
-    app = modal.App("rootlens-showcase-score")
+    app = modal.App("rootlens-session-stats")
 
     @app.function(
         image=image,
@@ -46,12 +46,19 @@ try:
             fp = os.path.join(tmp, "frames.jsonl")
             mp = os.path.join(tmp, "metadata.json")
             # 旧録画は frames.jsonl の代わりに realtime_handpose.jsonl。 まず新名で試して、
-            # 404 なら旧名にフォールバック (fpvlabs.py と同じ扱い)。
+            # 404 なら旧名にフォールバック (fpvlabs.py と同じ扱い)。 どちらも欠けている
+            # 半端な収録は "missing" マークで返し、 バッチ .map() を落とさない。
             try:
                 s3.download_file(bucket, f"raw/{content_hash}/frames.jsonl", fp)
             except Exception:
-                s3.download_file(bucket, f"raw/{content_hash}/realtime_handpose.jsonl", fp)
-            s3.download_file(bucket, f"raw/{content_hash}/metadata.json", mp)
+                try:
+                    s3.download_file(bucket, f"raw/{content_hash}/realtime_handpose.jsonl", fp)
+                except Exception:
+                    return {"contentHash": content_hash, "missing": "frames.jsonl"}
+            try:
+                s3.download_file(bucket, f"raw/{content_hash}/metadata.json", mp)
+            except Exception:
+                return {"contentHash": content_hash, "missing": "metadata.json"}
 
             frames_ts, hands_present, tracking_normal, xyz = [], 0, 0, []
             with open(fp) as f:
