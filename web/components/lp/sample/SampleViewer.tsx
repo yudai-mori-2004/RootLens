@@ -58,7 +58,7 @@ export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }:
         nowShowing={t("nowShowing")}
       />
       {pipeline.available && session ? (
-        <LoadedViewer key={session.id} assets={session.assets} label={pipeline.label} />
+        <LoadedViewer key={session.id} assets={session.assets} range={session.range} label={pipeline.label} />
       ) : (
         <Placeholder label={pipeline.label} description={pipeline.description} placeholderTail={t("placeholder")} />
       )}
@@ -207,7 +207,11 @@ function Placeholder({ label, description, placeholderTail }: {
   );
 }
 
-function LoadedViewer({ assets, label }: { assets: SessionOption["assets"]; label: string }) {
+function LoadedViewer({ assets, range, label }: {
+  assets: SessionOption["assets"];
+  range?: SessionOption["range"];
+  label: string;
+}) {
   const t = useTranslations("pages.sample");
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [trajectory, setTrajectory] = useState<TrajectoryData | null>(null);
@@ -247,7 +251,10 @@ function LoadedViewer({ assets, label }: { assets: SessionOption["assets"]; labe
   }
 
   return (
-    <TimeProvider durationSec={summary.durationSec}>
+    <TimeProvider
+      durationSec={summary.durationSec}
+      range={range ? { start: range.startSec, end: range.endSec } : undefined}
+    >
       <PanelGrid
         rgbUrl={assets.rgb}
         depthUrl={assets.depth}

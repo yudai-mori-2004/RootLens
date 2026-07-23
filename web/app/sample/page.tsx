@@ -12,15 +12,16 @@ const R2_PUBLIC = "https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev";
 // ブラウザで再生できる形に変換したキャッシュ (lp-sample/<hash8>/) を読んでいるだけ。
 const DRIVE_SAMPLES_URL = "https://drive.google.com/drive/folders/13ej8wsVq3LdC99pT21mIPj5nv50mkeJM";
 
-// arkit パイプラインで切替表示するセッション (= ドライブ samples/<domain>/arkit/ の全フォルダ)。
-// stamp と driveId はドライブの実フォルダと 1:1。 先頭が初期表示。
+// LP ビューアで見せるセッション (= ドライブ samples/ の中から見せ方を決めた 1 本)。
+// range は LP 上で再生を許す時間窓: 店内が広く映る区間を避け、 見せたい作業だけに絞る。
+// UI 側の制限のみで、 データ本体 (ドライブの rgb / mcap) は全編のまま。
+// stamp と driveId はドライブの実フォルダと 1:1。
 const ARKIT_SESSIONS = [
-  { hash8: "24aa0d6f", domain: "bakery", stamp: "2026-07-20_1440", driveId: "1tUahNWo_dg9_QHYWDDTg9REK5kUUQrjB" },
-  { hash8: "66be33ca", domain: "bakery", stamp: "2026-07-21_1451", driveId: "1APgSN7EAzJqehH2KwTLIaF82x8gp5iSK" },
-  { hash8: "3fd59dfa", domain: "bakery", stamp: "2026-07-21_1534", driveId: "1wMgQaeScWNx17zM1tmkEpOMz3Ast_97b" },
-  { hash8: "9726042b", domain: "home", stamp: "2026-07-08_0427", driveId: "1oiBvpZOWEnS10JQqLhn5fUW8ybXU4dnD" },
-  { hash8: "4b467914", domain: "home", stamp: "2026-07-10_1744", driveId: "17Y2owARuPy8M10XnhQvoMdj_Gj3wraF1" },
-  { hash8: "85327fd1", domain: "home", stamp: "2026-07-10_1755", driveId: "1S_DHiM0a-cMbkYhz3zeAO9Z37DDFlxZf" },
+  {
+    hash8: "24aa0d6f", domain: "bakery", stamp: "2026-07-20_1440",
+    driveId: "1tUahNWo_dg9_QHYWDDTg9REK5kUUQrjB",
+    range: { startSec: 14 * 60 + 49, endSec: 23 * 60 + 50 },
+  },
 ] as const;
 
 // "2026-07-20_1440" → "7/20 14:40" (ドライブのフォルダ名と同じ UTC 表記を短縮しただけ)
@@ -58,6 +59,7 @@ async function buildPipelines(): Promise<PipelineOption[]> {
       path: `samples/${s.domain}/arkit/${s.stamp}_${s.hash8}`,
       url: `https://drive.google.com/drive/folders/${s.driveId}`,
     },
+    range: s.range,
   }));
   return [
     {

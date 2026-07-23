@@ -8,11 +8,15 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 
-/** 再生ヘッドの状態。 t は「クリップ先頭からの秒数」 で、 durationSec は summary.json 由来。 */
+/** 再生ヘッドの状態。 t は「クリップ先頭からの秒数」 で、 durationSec は summary.json 由来。
+ *  rangeStart / rangeEnd はシークと再生を許す時間窓 (スクラバはこの範囲を 0..100% として描く)。
+ *  窓の外もデータとしては存在する (= ドライブでは全編配布) が、 LP の UI では触れない。 */
 interface PlayheadState {
   t: number;
   playing: boolean;
   durationSec: number;
+  rangeStart: number;
+  rangeEnd: number;
 }
 
 /** Context に流すのは値ではなく「購読口」。 状態変更で React ツリー全体が再描画されるのを避ける。 */
@@ -28,18 +32,24 @@ const Ctx = createContext<Store | null>(null);
 
 interface Props {
   durationSec: number;
+  /** 再生を許す時間窓 (クリップ先頭からの秒)。 未指定なら [0, durationSec] 全編。 */
+  range?: { start: number; end: number };
   children: ReactNode;
 }
 
-export function TimeProvider({ durationSec, children }: Props) {
-  const stateRef = useRef<PlayheadState>({ t: 0, playing: false, durationSec });
+export function TimeProvider({ durationSec, range, children }: Props) {
+  const rangeStart = Math.max(0, range?.start ?? 0);
+  const rangeEnd = Math.min(range?.end ?? durationSec, durationSec);
+  const stateRef = useRef<PlayheadState>({
+    t: rangeStart, playing: false, durationSec, rangeStart, rangeEnd,
+  });
   const listenersRef = useRef(new Set<() => void>());
 
-  // durationSec の props 変更を反映 (別 slug に切替えたときの想定)。
+  // durationSec / range の props 変更を反映 (別セッションに切替えたときの想定)。
   useEffect(() => {
-    stateRef.current = { ...stateRef.current, durationSec };
+    stateRef.current = { ...stateRef.current, durationSec, rangeStart, rangeEnd };
     listenersRef.current.forEach((l) => l());
-  }, [durationSec]);
+  }, [durationSec, rangeStart, rangeEnd]);
 
   const store = useRef<Store>({
     get: () => stateRef.current,
@@ -48,9 +58,16 @@ export function TimeProvider({ durationSec, children }: Props) {
       return () => { listenersRef.current.delete(l); };
     },
     setTime: (t) => {
-      const clamped = Math.max(0, Math.min(stateRef.current.durationSec, t));
-      if (stateRef.current.t === clamped) return;
-      stateRef.current = { ...stateRef.current, t: clamped };
+      const { rangeStart: lo, rangeEnd: hi } = stateRef.current;
+      const clamped = Math.max(lo, Math.min(hi, t));
+      // 窓の終端に達したら自動停止 (video 自体は end の先も進もうとするので UI 側で止める)。
+      const hitEnd = clamped >= hi && stateRef.current.playing;
+      if (stateRef.current.t === clamped && !hitEnd) return;
+      stateRef.current = {
+        ...stateRef.current,
+        t: clamped,
+        playing: hitEnd ? false : stateRef.current.playing,
+      };
       listenersRef.current.forEach((l) => l());
     },
     setPlaying: (p) => {
@@ -59,7 +76,10 @@ export function TimeProvider({ durationSec, children }: Props) {
       listenersRef.current.forEach((l) => l());
     },
     toggle: () => {
-      stateRef.current = { ...stateRef.current, playing: !stateRef.current.playing };
+      const s = stateRef.current;
+      // 窓の終端で止まった状態から再度再生したら、 窓の先頭に巻き戻して始める。
+      const restart = !s.playing && s.t >= s.rangeEnd - 0.05;
+      stateRef.current = { ...s, playing: !s.playing, t: restart ? s.rangeStart : s.t };
       listenersRef.current.forEach((l) => l());
     },
   }).current;

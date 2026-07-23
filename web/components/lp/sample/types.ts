@@ -110,6 +110,9 @@ export interface SessionOption {
   assets: ShowcaseAssetUrls;
   /** ドライブ上の対応セッション (= サンプルの正への参照)。 */
   drive: { path: string; url: string };
+  /** LP 上で再生とシークを許す時間窓 (クリップ先頭からの秒)。 未指定なら全編。
+   *  UI 側の制限のみで、 データ本体 (ドライブの rgb / mcap) は全編のまま。 */
+  range?: { startSec: number; endSec: number };
 }
 
 /** ヘッダーの「収録スタック」 切替ボタンで表示するオプション。 arkit がデフォルト、

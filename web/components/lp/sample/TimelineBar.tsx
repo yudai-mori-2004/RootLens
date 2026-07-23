@@ -3,7 +3,8 @@
 // 4 パネル共通のタイムラインスクラバ + 再生ボタン。
 // - Track クリック / ドラッグで再生位置をシーク (RGB video → onSeeked 経由で他パネルにも伝搬)。
 // - 再生ボタンは Store の playing をトグル。 RGB video 側が状態遷移を吸い上げる。
-// - 現在時刻を mm:ss / total の形で表示。
+// - 表示は再生窓 (rangeStart..rangeEnd) 基準: バーは窓を 0..100% として描き、
+//   時刻も窓先頭からの相対 mm:ss / 窓の長さで出す。 窓の外へはシークできない。
 
 import { useCallback, useEffect, useRef } from "react";
 import { usePlayhead, usePlayheadControls, usePlaying } from "./TimeContext";
@@ -25,9 +26,10 @@ export default function TimelineBar() {
     const el = trackRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;  // レイアウト前の 0 幅で frac が NaN になるのを防ぐ
     const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    setTime(frac * state.durationSec);
-  }, [setTime, state.durationSec]);
+    setTime(state.rangeStart + frac * (state.rangeEnd - state.rangeStart));
+  }, [setTime, state.rangeStart, state.rangeEnd]);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -42,7 +44,8 @@ export default function TimelineBar() {
     };
   }, [seekToClientX]);
 
-  const frac = state.durationSec > 0 ? state.t / state.durationSec : 0;
+  const span = state.rangeEnd - state.rangeStart;
+  const frac = span > 0 ? Math.max(0, Math.min(1, (state.t - state.rangeStart) / span)) : 0;
 
   return (
     <div style={{
@@ -87,7 +90,7 @@ export default function TimelineBar() {
         fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 12,
         minWidth: 88, textAlign: "right", fontVariantNumeric: "tabular-nums",
       }}>
-        {fmtSec(state.t)} / {fmtSec(state.durationSec)}
+        {fmtSec(state.t - state.rangeStart)} / {fmtSec(span)}
       </div>
     </div>
   );
