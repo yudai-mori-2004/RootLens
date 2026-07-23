@@ -16,7 +16,7 @@ interface Props {
   summary: SummaryData;
 }
 
-type TabId = "video" | "depth" | "pose" | "imu" | "tracking";
+type TabId = "video" | "depth" | "pose" | "imu";
 
 export default function ContentsSection({ summary }: Props) {
   const t = useTranslations("pages.sample.contents");
@@ -73,18 +73,10 @@ export default function ContentsSection({ summary }: Props) {
         [L("topic"), "/device/imu"],
         [L("messageType"), "sensor_msgs/Imu"],
         [L("rate"), imuRate],
-        ["accel", V("imuAccel")],
-        ["gyro", V("imuGyro")],
+        [L("orientation"), V("imuOrientation")],
+        [L("linearAcceleration"), V("imuAccel")],
+        [L("angularVelocity"), V("imuGyro")],
         [L("coordinateSystem"), V("imuCoord")],
-      ],
-    },
-    {
-      id: "tracking",
-      rows: [
-        [L("topic"), "/camera/tracking_state"],
-        [L("rate"), videoFps],
-        [L("states"), V("trackingStates")],
-        [L("limitedReasons"), V("trackingReasons")],
       ],
     },
   ];

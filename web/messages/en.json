@@ -86,8 +86,7 @@
           "video": "Video",
           "depth": "Depth",
           "pose": "6DoF Pose",
-          "imu": "IMU",
-          "tracking": "Tracking"
+          "imu": "IMU"
         },
         "labels": {
           "topic": "Topic",
@@ -101,21 +100,21 @@
           "contents": "Fields",
           "confidence": "Confidence",
           "processing": "Post-processing",
-          "states": "State values",
-          "limitedReasons": "Reasons when limited"
+          "orientation": "Orientation",
+          "linearAcceleration": "Linear acceleration",
+          "angularVelocity": "Angular velocity"
         },
         "values": {
-          "videoEncoding": "JPEG (quality 85, per frame)",
-          "videoProcessing": "Face blur (EgoBlur, Meta gen2)",
+          "videoEncoding": "JPEG (quality 85, encoded per frame)",
+          "videoProcessing": "Meta's open-source EgoBlur model (Aria Gen2 face detector, arXiv:2308.13093) detects faces; an elliptical blur is applied over each detection",
           "depthUnit": "mm (0 = missing)",
           "depthConfidence": "0 = low / 1 = medium / 2 = high",
           "poseContents": "position (xyz, m) + quaternion (x, y, z, w)",
-          "poseCoord": "ARKit world (gravity-aligned right-handed)",
-          "imuAccel": "acceleration m/s² (userAcceleration + gravity)",
-          "imuGyro": "angular velocity rad/s",
-          "imuCoord": "iOS CoreMotion device frame",
-          "trackingStates": "0 = notAvailable / 1 = limited / 2 = normal",
-          "trackingReasons": "initializing / relocalizing / excessiveMotion / insufficientFeatures"
+          "poseCoord": "ARKit world frame (Y-axis = gravity, right-handed)",
+          "imuOrientation": "quaternion (x, y, z, w), iOS CoreMotion attitude",
+          "imuAccel": "m/s² (gravity included)",
+          "imuGyro": "rad/s",
+          "imuCoord": "Device body frame (iOS CoreMotion)"
         }
       }
     }
