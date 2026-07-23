@@ -15,16 +15,16 @@ const DRIVE_SAMPLES_URL = "https://drive.google.com/drive/folders/13ej8wsVq3LdC9
 // LP ビューアで見せるセッション (= ドライブ samples/ の中から見せ方を決めた 1 本)。
 // range は LP 上で再生を許す時間窓: 店内が広く映る区間を避け、 見せたい作業だけに絞る。
 // UI 側の制限のみで、 データ本体 (ドライブの rgb / mcap) は全編のまま。
-// stamp と driveId はドライブの実フォルダと 1:1。
+// stamp は録画開始時刻 (UTC)。 stamp と driveId はドライブの実フォルダと 1:1。
 const ARKIT_SESSIONS = [
   {
-    hash8: "24aa0d6f", domain: "bakery", stamp: "2026-07-20_1440",
+    hash8: "24aa0d6f", domain: "bakery", stamp: "2026-07-18_0441",
     driveId: "1tUahNWo_dg9_QHYWDDTg9REK5kUUQrjB",
     range: { startSec: 14 * 60 + 49, endSec: 23 * 60 + 50 },
   },
 ] as const;
 
-// "2026-07-20_1440" → "7/20 14:40" (ドライブのフォルダ名と同じ UTC 表記を短縮しただけ)
+// "2026-07-18_0441" → "7/18 04:41" (ドライブのフォルダ名と同じ録画開始時刻 UTC の短縮表記)
 function stampLabel(stamp: string): string {
   const [date, hm] = stamp.split("_");
   const [, m, d] = date.split("-");

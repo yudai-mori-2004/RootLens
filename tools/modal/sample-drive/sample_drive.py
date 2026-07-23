@@ -5,10 +5,11 @@
 # の形に配置する。 R2 → Drive は Modal 内で完結し、 装着端末側の回線を消費しない。
 #
 # 冪等: 同 session-dir が既に存在すれば中のファイルを上書き。 session-dir 名は
-# YYYY-MM-DD_HHMM_<hash8>/ で、 recording_started_at と content_hash から一意に決まる。
+# YYYY-MM-DD_HHMM_<hash8>/ で、 clips.recorded_at (= 録画開始の壁時計 UTC) と
+# content_hash から一意に決まる。 domain も DB (accounts) から解決する。
 #
 # 実行:
-#   modal run --detach tools/modal/sample-drive/sample_drive.py --content-hash <hash> --domain home
+#   modal run --detach tools/modal/sample-drive/sample_drive.py --content-hash <hash>
 #
 # 権限: サービスアカウント datasets-writer@rootlens-503301.iam.gserviceaccount.com が
 #   共有ドライブに「コンテンツ管理者」で招待されている前提。 招待が漏れると 404 になる。
@@ -37,6 +38,7 @@ try:
         .apt_install("ffmpeg")
         .pip_install(
             "boto3",
+            "psycopg2-binary",  # clips / accounts 照合 (時刻とドメインの解決) 用
             "google-api-python-client",
             "google-auth",
             "mcap",
@@ -54,15 +56,16 @@ try:
         secrets=[
             modal.Secret.from_name("r2-creds"),
             modal.Secret.from_name("google-drive"),
+            modal.Secret.from_name("supabase-db"),  # DATABASE_URL (clips / accounts 照合用)
         ],
     )
-    def upload_one(content_hash: str, domain: str) -> dict:
-        return _upload_session(content_hash, domain)
+    def upload_one(content_hash: str) -> dict:
+        return _upload_session(content_hash)
 
     @app.local_entrypoint()
-    def main(content_hash: str, domain: str):
-        """--content-hash <hash> --domain home|bakery"""
-        print(json.dumps(upload_one.remote(content_hash, domain), indent=2))
+    def main(content_hash: str):
+        """--content-hash <hash> (domain は DB の accounts から解決)"""
+        print(json.dumps(upload_one.remote(content_hash), indent=2))
 
 except ImportError:
     modal = None
@@ -216,23 +219,48 @@ def _blurred_rgb_from_mcap(mcap_path: str, meta: dict, out_mp4: str) -> dict:
     return {"bytes": os.path.getsize(out_mp4), "frames": frame_count, "fps": fps}
 
 
-def _session_dirname(content_hash: str, meta: dict) -> str:
-    """YYYY-MM-DD_HHMM_<hash8>/。 recording 開始時刻は metadata から拾えないので、
-    R2 の rgb.mp4 のオブジェクト作成時刻を代替に使う (= 装着端末が PUT した時刻)。"""
-    ts = meta.get("_created_at_iso")
-    if ts:
-        try:
-            t = dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
-            stamp = t.strftime("%Y-%m-%d_%H%M")
-        except ValueError:
-            stamp = "unknown"
-    else:
-        stamp = "unknown"
-    return f"{stamp}_{content_hash[:8]}"
+def _clip_row(content_hash: str) -> dict:
+    """clips + accounts から現場と時刻を引く (= フォルダ名と manifest の源泉)。
+    未登録クリップ / accounts 行なし / recorded_at 未記録はすべて fail-loud
+    (recorded_at は fpvlabs.py か gen_manifest.py が rgb.mp4 の mvhd から埋める)。"""
+    import psycopg2
+
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "select c.recorded_at, c.created_at, a.domain"
+                " from clips c left join accounts a on a.id = c.account_id"
+                " where c.content_hash = %s",
+                (content_hash,),
+            )
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    if not row:
+        raise RuntimeError(f"clip not registered in DB: {content_hash}")
+    recorded_at, created_at, domain = row
+    if domain is None:
+        raise RuntimeError("account has no accounts row (domain/site); insert it first")
+    if recorded_at is None:
+        raise RuntimeError(
+            "clips.recorded_at is null; run fpvlabs (or gen_manifest.py) first so the"
+            " folder name can carry the real recording time")
+    return {"recorded_at": recorded_at, "created_at": created_at, "domain": domain}
 
 
-def _upload_session(content_hash: str, domain: str) -> dict:
+def _session_dirname(content_hash: str, recorded_at: "dt.datetime") -> str:
+    """YYYY-MM-DD_HHMM_<hash8>/。 clips.recorded_at (= rgb.mp4 の mvhd 由来の
+    録画開始時刻、 UTC) から決める。"""
+    return f"{recorded_at.strftime('%Y-%m-%d_%H%M')}_{content_hash[:8]}"
+
+
+def _upload_session(content_hash: str) -> dict:
     from googleapiclient.errors import HttpError
+
+    # 現場 (domain) と時刻は DB が正。 GPU こそ使わないが、 大きな転送が始まる前に fail-loud。
+    clip = _clip_row(content_hash)
+    domain = clip["domain"]
 
     s3 = _r2_client()
     bucket_raw = os.environ.get("R2_BUCKET_RAW_ARKIT", "rootlens-raw-arkit")
@@ -246,15 +274,12 @@ def _upload_session(content_hash: str, domain: str) -> dict:
     pipeline_id = _find_or_create_folder(drive, "arkit", domain_id)
 
     with tempfile.TemporaryDirectory() as tmp:
-        # ── metadata.json (先に読む: dirname と manifest に使う) ──
+        # ── metadata.json (manifest のカメラ情報に使う) ──
         meta_path = os.path.join(tmp, "metadata.json")
         s3.download_file(bucket_raw, f"raw/{content_hash}/metadata.json", meta_path)
         with open(meta_path) as fh:
             meta = json.load(fh)
-        # rgb.mp4 の R2 上の Last-Modified を dirname に使う。
-        head = s3.head_object(Bucket=bucket_raw, Key=f"raw/{content_hash}/rgb.mp4")
-        meta["_created_at_iso"] = head["LastModified"].isoformat()
-        session_name = _session_dirname(content_hash, meta)
+        session_name = _session_dirname(content_hash, clip["recorded_at"])
         session_id = _find_or_create_folder(drive, session_name, pipeline_id)
 
         # ── session.mcap を先に落とす。 rgb.mp4 のぼかし済み映像はここから取り出すので必須。 ──
@@ -280,8 +305,7 @@ def _upload_session(content_hash: str, domain: str) -> dict:
                                      "application/octet-stream"))
 
         # ── manifest.json (human-readable な要約。 このドライブは公開想定なので、
-        #    取引先名や内部インフラの命名を含む項目は入れない: sourceBucket / deliveryBucket /
-        #    appVersion は削除、 タイムスタンプ名も R2 由来を伏せた recordedAt に変更) ──
+        #    取引先名や内部インフラの命名を含む項目は入れない: バケット名や appVersion は載せない) ──
         manifest = {
             "contentHash": content_hash,
             "recordingConfig": meta.get("recording_config", "arkit"),
@@ -289,7 +313,8 @@ def _upload_session(content_hash: str, domain: str) -> dict:
             "os": meta.get("os_version"),
             "camera": meta.get("camera"),
             "captureSettings": meta.get("capture_settings"),
-            "recordedAt": meta["_created_at_iso"],
+            "recordedAt": clip["recorded_at"].isoformat(),
+            "uploadedAt": clip["created_at"].isoformat(),
             "driveFolder": session_name,
         }
         man_path = os.path.join(tmp, "manifest.json")
