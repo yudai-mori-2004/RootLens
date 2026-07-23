@@ -51,8 +51,8 @@ progress/
 app/modules/sensor-session/android/build/
 
 # tools/ build artifacts
-tools/**/__pycache__/
-tools/**/*.pyc
+__pycache__/
+*.pyc
 tools/**/.venv/
 
 # Rust build artifacts (どのクレートでも target/ は無視)
