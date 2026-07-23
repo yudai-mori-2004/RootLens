@@ -106,12 +106,12 @@
         },
         "values": {
           "videoEncoding": "JPEG (quality 85, encoded per frame)",
-          "videoProcessing": "Meta's open-source EgoBlur model (Aria Gen2 face detector, arXiv:2308.13093) detects faces; an elliptical blur is applied over each detection",
+          "videoProcessing": "EgoBlur gen2",
           "depthUnit": "mm (0 = missing)",
           "depthConfidence": "0 = low / 1 = medium / 2 = high",
           "poseContents": "position (xyz, m) + quaternion (x, y, z, w)",
           "poseCoord": "ARKit world frame (Y-axis = gravity, right-handed)",
-          "imuOrientation": "quaternion (x, y, z, w), iOS CoreMotion attitude",
+          "imuOrientation": "quaternion (x, y, z, w) — attitude from iOS CoreMotion sensor fusion",
           "imuAccel": "m/s² (gravity included)",
           "imuGyro": "rad/s",
           "imuCoord": "Device body frame (iOS CoreMotion)"

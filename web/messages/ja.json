@@ -106,12 +106,12 @@
         },
         "values": {
           "videoEncoding": "JPEG (品質 85、1 フレームずつ独立)",
-          "videoProcessing": "Meta の OSS モデル EgoBlur (Aria Gen2 用の顔検出モデル、arXiv:2308.13093) で顔を検出、楕円ぼかしを適用",
+          "videoProcessing": "EgoBlur gen2",
           "depthUnit": "mm (0 = 欠損)",
           "depthConfidence": "0 = 低 / 1 = 中 / 2 = 高",
           "poseContents": "位置 (xyz, m) + クォータニオン (x, y, z, w)",
           "poseCoord": "ARKit ワールド座標系 (Y 軸が重力方向、右手座標系)",
-          "imuOrientation": "クォータニオン (x, y, z, w)、iOS CoreMotion の attitude",
+          "imuOrientation": "クォータニオン (x, y, z, w) — iOS CoreMotion がセンサーフュージョンで算出した attitude",
           "imuAccel": "m/s² (重力を含む)",
           "imuGyro": "rad/s",
           "imuCoord": "デバイス本体座標系 (iOS CoreMotion)"
