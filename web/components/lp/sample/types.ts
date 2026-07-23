@@ -99,6 +99,19 @@ export interface ShowcaseAssetUrls {
   summary: string;
 }
 
+/** ビューアで切替表示できる 1 セッション = ドライブ samples/ 配下の 1 フォルダに対応。 */
+export interface SessionOption {
+  /** セッション id (= content_hash 先頭 8 桁。 ドライブのフォルダ名末尾と同じ)。 */
+  id: string;
+  /** 撮影ドメインの表示ラベル (i18n 済み文字列。 例: パン屋)。 */
+  domainLabel: string;
+  /** 撮影日時の短縮表示 (ドライブのフォルダ名と同じ UTC 表記。 例: 7/20 14:40)。 */
+  when: string;
+  assets: ShowcaseAssetUrls;
+  /** ドライブ上の対応セッション (= サンプルの正への参照)。 */
+  drive: { path: string; url: string };
+}
+
 /** ヘッダーの「収録スタック」 切替ボタンで表示するオプション。 arkit がデフォルト、
  *  今後 mentra 等を足すたびに配列に追加する。 available=false のものはプレースホルダー。 */
 export interface PipelineOption {
@@ -106,8 +119,6 @@ export interface PipelineOption {
   label: string;
   description: string;
   available: boolean;
-  /** available=true のときの実データ URL (slug 単位)。 */
-  assets?: ShowcaseAssetUrls;
-  /** このビューアが表示しているドライブ上のセッション (= サンプルの正への参照)。 */
-  drive?: { path: string; url: string };
+  /** available=true のときの切替可能セッション一覧 (先頭が初期表示)。 */
+  sessions?: SessionOption[];
 }

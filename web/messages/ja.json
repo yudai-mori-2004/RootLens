@@ -25,6 +25,10 @@
       "pageTitle": "サンプル",
       "driveCta": "すべてのサンプルデータ (Google Drive)",
       "nowShowing": "このビューアで再生中",
+      "domains": {
+        "home": "自宅",
+        "bakery": "パン屋"
+      },
       "pipelines": {
         "arkit": {
           "label": "iPhone (LiDAR あり)",

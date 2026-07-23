@@ -16,7 +16,7 @@ import NumericPanel from "./NumericPanel";
 import TimelineBar from "./TimelineBar";
 import SummaryBlock from "./SummaryBlock";
 import ContentsSection from "./ContentsSection";
-import type { PipelineOption, SummaryData, TimeSeriesData, TrajectoryData } from "./types";
+import type { PipelineOption, SessionOption, SummaryData, TimeSeriesData, TrajectoryData } from "./types";
 
 interface Props {
   pipelines: PipelineOption[];
@@ -36,6 +36,10 @@ export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }:
     () => pipelines.find((p) => p.id === pipelineId) ?? pipelines[0],
     [pipelines, pipelineId],
   );
+  // セッション選択はパイプラインをまたいで持ち越さない: 一覧に無い id なら先頭に落ちる。
+  const sessions = pipeline.sessions ?? [];
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const session = sessions.find((s) => s.id === sessionId) ?? sessions[0] ?? null;
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", padding: "24px 20px 48px" }}>
@@ -48,11 +52,13 @@ export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }:
         preparingBadge={t("preparingBadge")}
         driveUrl={driveUrl}
         driveCta={t("driveCta")}
-        drive={pipeline.drive}
+        sessions={sessions}
+        activeSession={session}
+        onSessionChange={setSessionId}
         nowShowing={t("nowShowing")}
       />
-      {pipeline.available && pipeline.assets ? (
-        <LoadedViewer assets={pipeline.assets} label={pipeline.label} />
+      {pipeline.available && session ? (
+        <LoadedViewer key={session.id} assets={session.assets} label={pipeline.label} />
       ) : (
         <Placeholder label={pipeline.label} description={pipeline.description} placeholderTail={t("placeholder")} />
       )}
@@ -62,7 +68,7 @@ export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }:
 
 function Header({
   pipelines, active, onChange, description, pageTitle, preparingBadge,
-  driveUrl, driveCta, drive, nowShowing,
+  driveUrl, driveCta, sessions, activeSession, onSessionChange, nowShowing,
 }: {
   pipelines: PipelineOption[];
   active: string;
@@ -72,7 +78,9 @@ function Header({
   preparingBadge: string;
   driveUrl: string;
   driveCta: string;
-  drive?: PipelineOption["drive"];
+  sessions: SessionOption[];
+  activeSession: SessionOption | null;
+  onSessionChange: (id: string) => void;
   nowShowing: string;
 }) {
   return (
@@ -134,11 +142,37 @@ function Header({
       <p style={{ margin: 0, color: "#a8afbe", fontSize: 13, lineHeight: 1.6, maxWidth: 900 }}>
         {description}
       </p>
-      {drive && (
+      {sessions.length > 1 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {sessions.map((s) => {
+            const isActive = s.id === activeSession?.id;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => onSessionChange(s.id)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: `1px solid ${isActive ? "#ffe600" : "#2c3140"}`,
+                  background: "transparent",
+                  color: isActive ? "#ffe600" : "#a8afbe",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                {s.domainLabel} {s.when}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {activeSession && (
         <div style={{ fontSize: 12, color: "#7a8090" }}>
           {nowShowing}:{" "}
           <a
-            href={drive.url}
+            href={activeSession.drive.url}
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -146,7 +180,7 @@ function Header({
               textDecoration: "underline", textUnderlineOffset: 3,
             }}
           >
-            {drive.path} ↗
+            {activeSession.drive.path} ↗
           </a>
         </div>
       )}
@@ -173,7 +207,7 @@ function Placeholder({ label, description, placeholderTail }: {
   );
 }
 
-function LoadedViewer({ assets, label }: { assets: NonNullable<PipelineOption["assets"]>; label: string }) {
+function LoadedViewer({ assets, label }: { assets: SessionOption["assets"]; label: string }) {
   const t = useTranslations("pages.sample");
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [trajectory, setTrajectory] = useState<TrajectoryData | null>(null);

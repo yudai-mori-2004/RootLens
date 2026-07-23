@@ -25,6 +25,10 @@
       "pageTitle": "Sample",
       "driveCta": "All sample data (Google Drive)",
       "nowShowing": "Now playing",
+      "domains": {
+        "home": "Home",
+        "bakery": "Bakery"
+      },
       "pipelines": {
         "arkit": {
           "label": "iPhone (LiDAR)",
