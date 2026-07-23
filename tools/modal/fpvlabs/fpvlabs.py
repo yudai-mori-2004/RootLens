@@ -855,7 +855,7 @@ def _clip_db_row(content_hash: str) -> dict:
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "select c.account_id, c.duration_ms, a.domain, a.site"
+                "select c.account_id, c.duration_ms, c.recorded_at, a.domain, a.site"
                 " from clips c left join accounts a on a.id = c.account_id"
                 " where c.content_hash = %s",
                 (content_hash,),
@@ -865,13 +865,59 @@ def _clip_db_row(content_hash: str) -> dict:
         conn.close()
     if not row:
         raise RuntimeError(f"clip not registered in DB: {content_hash}")
-    account_id, duration_ms, domain, site = row
+    account_id, duration_ms, recorded_at, domain, site = row
     if domain is None:
         raise RuntimeError(
             f"account {account_id} has no accounts row; "
             f"insert (id, domain, site) before delivering its clips")
     return {"account_id": str(account_id), "duration_ms": duration_ms,
-            "domain": domain, "site": site}
+            "recorded_at": recorded_at, "domain": domain, "site": site}
+
+
+_QT_EPOCH = dt.datetime(1904, 1, 1, tzinfo=dt.timezone.utc)
+
+
+def _mp4_creation_time(path: str) -> dt.datetime | None:
+    """QuickTime ヘッダ (mvhd) の creation_time = 録画開始の壁時計 (UTC)。
+    AVAssetWriter は moov をファイル末尾に書くので末尾 16MB から探す。
+    mdat のバイト列がたまたま 'mvhd' に一致した誤検出は年代の妥当性 (2020-2035) で捨てる。"""
+    import struct
+
+    size = os.path.getsize(path)
+    with open(path, "rb") as fh:
+        fh.seek(max(0, size - 16_000_000))
+        buf = fh.read()
+        i = buf.rfind(b"mvhd")
+        if i < 0:
+            # 一部の録画は moov が先頭側にある (中断復旧などで書き直された個体)。
+            fh.seek(0)
+            buf = fh.read(16_000_000)
+            i = buf.rfind(b"mvhd")
+    if i < 0:
+        return None
+    version = buf[i + 4]
+    if version == 0:
+        secs = struct.unpack(">I", buf[i + 8:i + 12])[0]
+    else:
+        secs = struct.unpack(">Q", buf[i + 8:i + 16])[0]
+    ts = _QT_EPOCH + dt.timedelta(seconds=secs)
+    return ts if 2020 <= ts.year <= 2035 else None
+
+
+def _set_clip_recorded_at(content_hash: str, recorded_at: dt.datetime) -> None:
+    import psycopg2
+
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "update clips set recorded_at = %s"
+                " where content_hash = %s and recorded_at is null",
+                (recorded_at, content_hash),
+            )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
@@ -896,13 +942,15 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select c.content_hash, c.duration_ms, c.created_at, a.domain, a.site"
+                    "select c.content_hash, c.duration_ms, c.created_at, c.recorded_at,"
+                    " a.domain, a.site"
                     " from clips c left join accounts a on a.id = c.account_id"
                     " where c.content_hash = any(%s)",
                     (list(sessions),),
                 )
-                rows = {h: {"duration_ms": d, "created_at": c, "domain": dom, "site": site}
-                        for h, d, c, dom, site in cur.fetchall()}
+                rows = {h: {"duration_ms": d, "created_at": c, "recorded_at": r,
+                            "domain": dom, "site": site}
+                        for h, d, c, r, dom, site in cur.fetchall()}
         finally:
             conn.close()
 
@@ -917,10 +965,12 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
         camera = meta.get("camera") or {}
         settings = meta.get("capture_settings") or {}
         uploaded = db_row["created_at"] if db_row else None
-        # recordedAt: アプリが metadata.json に録画開始の壁時計 (recording_started_at) を
-        # 書くようになったらそれが正。 無い収録は「アップロード時刻 − 尺」で録画開始を近似する。
-        recorded = meta.get("recording_started_at")
-        if not recorded and uploaded is not None:
+        # recordedAt の正は clips.recorded_at (= rgb.mp4 の mvhd 由来)。 mvhd が読めなかった
+        # 行だけ「アップロード時刻 − 尺」で録画開始を近似する。
+        recorded = db_row["recorded_at"] if db_row else None
+        if recorded is not None:
+            recorded = recorded.isoformat()
+        elif uploaded is not None:
             recorded = (uploaded - dt.timedelta(
                 milliseconds=(db_row["duration_ms"] or 0))).isoformat()
         entries.append({
@@ -982,6 +1032,13 @@ def process_session(content_hash: str, blur: bool = True,
         if not os.path.exists(os.path.join(session_dir, "frames.jsonl")) and \
            not os.path.exists(os.path.join(session_dir, "realtime_handpose.jsonl")):
             raise RuntimeError(f"required input missing: raw/{content_hash}/frames.jsonl (or legacy realtime_handpose.jsonl)")
+
+        # 録画開始時刻が未記録なら、 落としてきた rgb.mp4 の mvhd から読んで DB に埋める
+        # (= manifest の recordedAt の源泉。 追加ダウンロードなしで手に入る)。
+        if db_row["recorded_at"] is None:
+            rec = _mp4_creation_time(os.path.join(session_dir, "rgb.mp4"))
+            if rec is not None:
+                _set_clip_recorded_at(content_hash, rec)
 
         out_path = os.path.join(tmp, "session.mcap")
         result = build_mcap(session_dir, out_path, blur=blur,

@@ -27,6 +27,11 @@ export const clips = pgTable(
     /// 行作成時刻 (= 登録 ≒ アップロード完了時刻)。
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 
+    /// 録画開始時刻 (= raw rgb.mp4 の QuickTime mvhd creation_time、 UTC)。 撮影から
+    /// アップロードまで数十時間空くことがあるため created_at とは別に持つ。
+    /// 納品パイプラインが raw を読むついでに埋める (nullable = まだ読んでいない)。
+    recordedAt: timestamp("recorded_at", { withTimezone: true }),
+
     // ── 撮影ファクト (端末申告) ───────────────────────────────────────
     /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit')。
     recordingConfig: text("recording_config").notNull(),

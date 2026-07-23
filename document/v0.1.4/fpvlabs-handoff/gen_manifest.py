@@ -32,6 +32,33 @@ def r2_client():
     )
 
 
+QT_EPOCH = dt.datetime(1904, 1, 1, tzinfo=dt.timezone.utc)
+
+
+def mp4_creation_time_from_r2(s3, bucket: str, key: str) -> dt.datetime | None:
+    """raw rgb.mp4 の mvhd creation_time (= 録画開始の壁時計 UTC) を末尾 16MB の
+    レンジ読みで取り出す (fpvlabs.py の _mp4_creation_time と同じ規則)。"""
+    import struct
+
+    size = s3.head_object(Bucket=bucket, Key=key)["ContentLength"]
+    buf = s3.get_object(Bucket=bucket, Key=key,
+                        Range=f"bytes={max(0, size - 16_000_000)}-")["Body"].read()
+    i = buf.rfind(b"mvhd")
+    if i < 0:
+        # 一部の録画は moov が先頭側にある (中断復旧などで書き直された個体)。
+        buf = s3.get_object(Bucket=bucket, Key=key, Range="bytes=0-15999999")["Body"].read()
+        i = buf.rfind(b"mvhd")
+    if i < 0:
+        return None
+    version = buf[i + 4]
+    if version == 0:
+        secs = struct.unpack(">I", buf[i + 8:i + 12])[0]
+    else:
+        secs = struct.unpack(">Q", buf[i + 8:i + 16])[0]
+    ts = QT_EPOCH + dt.timedelta(seconds=secs)
+    return ts if 2020 <= ts.year <= 2035 else None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bucket", default=os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs"))
@@ -56,13 +83,34 @@ def main():
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select c.content_hash, c.duration_ms, c.created_at, a.domain, a.site"
+                    "select c.content_hash, c.duration_ms, c.created_at, c.recorded_at,"
+                    " a.domain, a.site"
                     " from clips c left join accounts a on a.id = c.account_id"
                     " where c.content_hash = any(%s)",
                     (list(sessions),),
                 )
-                rows = {h: {"duration_ms": d, "created_at": c, "domain": dom, "site": site}
-                        for h, d, c, dom, site in cur.fetchall()}
+                rows = {h: {"duration_ms": d, "created_at": c, "recorded_at": r,
+                            "domain": dom, "site": site}
+                        for h, d, c, r, dom, site in cur.fetchall()}
+
+            # clips.recorded_at が未記録のセッションは raw の mvhd から読んで埋める
+            # (通常はパイプラインが埋めるので、 ここに来るのは導入前の在庫だけ)。
+            for h, row in rows.items():
+                if row["recorded_at"] is not None:
+                    continue
+                rec = mp4_creation_time_from_r2(s3, bucket_raw, f"raw/{h}/rgb.mp4")
+                if rec is None:
+                    print(f"  ⚠ {h[:8]}: mvhd が読めない (recordedAt は推定値になる)")
+                    continue
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "update clips set recorded_at = %s"
+                        " where content_hash = %s and recorded_at is null",
+                        (rec, h),
+                    )
+                conn.commit()
+                row["recorded_at"] = rec
+                print(f"  ✓ {h[:8]}: recorded_at = {rec.isoformat()}")
         finally:
             conn.close()
 
@@ -82,10 +130,12 @@ def main():
         camera = meta.get("camera") or {}
         settings = meta.get("capture_settings") or {}
         uploaded = db_row["created_at"] if db_row else None
-        # recordedAt: アプリが書く壁時計 (recording_started_at) があればそれ、
-        # 無ければ「アップロード時刻 − 尺」で録画開始を近似 (fpvlabs.py と同じ規則)。
-        recorded = meta.get("recording_started_at")
-        if not recorded and uploaded is not None:
+        # recordedAt の正は clips.recorded_at (= mvhd 由来)。 読めなかった行だけ
+        # 「アップロード時刻 − 尺」で録画開始を近似 (fpvlabs.py と同じ規則)。
+        recorded = db_row["recorded_at"] if db_row else None
+        if recorded is not None:
+            recorded = recorded.isoformat()
+        elif uploaded is not None:
             recorded = (uploaded - dt.timedelta(
                 milliseconds=(db_row["duration_ms"] or 0))).isoformat()
         entries.append({
