@@ -111,7 +111,7 @@
           "depthConfidence": "0 = 低 / 1 = 中 / 2 = 高",
           "poseContents": "位置 (xyz, m) + クォータニオン (x, y, z, w)",
           "poseCoord": "ARKit ワールド座標系 (Y 軸が重力方向、右手座標系)",
-          "imuOrientation": "クォータニオン (x, y, z, w) — iOS CoreMotion がセンサーフュージョンで算出した attitude",
+          "imuOrientation": "クォータニオン (x, y, z, w)",
           "imuAccel": "m/s² (重力を含む)",
           "imuGyro": "rad/s",
           "imuCoord": "デバイス本体座標系 (iOS CoreMotion)"
