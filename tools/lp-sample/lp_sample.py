@@ -1,4 +1,4 @@
-# pipeline-sample-viewer: raw セッション → LP /sample の 4 パネル同期ビューア用素材。
+# lp-sample: raw セッション → LP /sample の 4 パネル同期ビューア用素材。
 #
 # rootlens-raw-arkit/raw/<content_hash>/ を読み、 ビューアが必要とする 6 つのアセットを
 # 組み立てて rootlens-public/lp-sample/<slug>/ に配置する。
@@ -15,11 +15,11 @@
 # fpvlabs.py の MCAP 経由で JPEG を抜く経路を追加する (要検討)。
 #
 # 実行:
-#   Modal:  modal run --detach tools/modal/sample-viewer/sample_viewer.py \
+#   Modal:  modal run --detach tools/lp-sample/lp_sample.py \
 #             --content-hash <hash> --slug arkit-home-01
-#           modal run --detach tools/modal/sample-viewer/sample_viewer.py \
+#           modal run --detach tools/lp-sample/lp_sample.py \
 #             --content-hash <hash> --slug test-01 --target-bucket rootlens-public-staging
-#   ローカル: SAMPLE_VIEWER_LOCAL=1 python tools/modal/sample-viewer/sample_viewer.py <hash> <slug>
+#   ローカル: LP_SAMPLE_LOCAL=1 python tools/lp-sample/lp_sample.py <hash> <slug>
 #
 # 検証: --target-bucket <bucket> で本番以外の書けるバケットへ切り替え (fpvlabs.py と同じ流儀)。
 
@@ -36,7 +36,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-PIPELINE_VERSION = "sample-viewer-1"
+PIPELINE_VERSION = "lp-sample-1"
 
 # アセット出力先バケット (書き先)。 --target-bucket で上書きできる。
 DEFAULT_TARGET_BUCKET = "rootlens-public"
@@ -305,7 +305,7 @@ def build_mesh(src_jsonl: str, out_glb: str) -> dict:
     bb_max = verts_all.max(axis=0).tolist()
 
     gltf = {
-        "asset": {"version": "2.0", "generator": f"rootlens-sample-viewer/{PIPELINE_VERSION}"},
+        "asset": {"version": "2.0", "generator": f"rootlens-lp-sample/{PIPELINE_VERSION}"},
         "scene": 0,
         "scenes": [{"nodes": [0]}],
         "nodes": [{"mesh": 0}],
@@ -712,7 +712,7 @@ try:
         )
     )
 
-    app = modal.App("rootlens-sample-viewer")
+    app = modal.App("rootlens-lp-sample")
 
     @app.function(
         image=image,
@@ -732,7 +732,7 @@ except ImportError:
     modal = None
 
 
-if __name__ == "__main__" and (modal is None or os.environ.get("SAMPLE_VIEWER_LOCAL")):
+if __name__ == "__main__" and (modal is None or os.environ.get("LP_SAMPLE_LOCAL")):
     import sys
 
     if len(sys.argv) < 3:

@@ -19,13 +19,12 @@ root-lens/
 ├── app/                React Native (= Expo)。 撮影端末アプリ
 │
 ├── tools/              web / app 以外の周辺 dev / ops ツール
-│   ├── modal/          Modal パイプライン (1 ディレクトリ = 1 パイプライン。 各 README に入出力と実行)
+│   ├── modal/          納品パイプライン (1 ディレクトリ = 1 パイプライン。 各 README に入出力と実行)
 │   │   ├── fpvlabs/        raw arkit → 顔ぼかし + MCAP (FPV Labs 手渡し。 現運用の中心)
-│   │   ├── sample-viewer/  raw arkit → LP /sample ビューアの 6 素材 (rootlens-public)
-│   │   ├── sample-drive/   raw + MCAP → 共有ドライブのサンプル一式 (ぼかし済み rgb + mcap + manifest)
-│   │   ├── session-stats/  frames.jsonl → サンプル選定用の統計 JSON (stdout)
-│   │   ├── session-thumbs/ rgb.mp4 → サンプル選定用サムネ 5 枚 (rootlens-public)
+│   │   ├── sample-drive/   raw + MCAP → 共有ドライブの公開サンプル一式 (ぼかし済み rgb + mcap + manifest)
 │   │   └── score-wilor/    旧 score 3 層 + WiLoR 手ポーズ (= legacy、 現運用外)
+│   ├── lp-sample/       raw arkit → LP /sample ビューアの 6 素材 (rootlens-public。 Modal 実行)
+│   ├── sample-select/   サンプル選定用の統計 + サムネ (納品物なし。 Modal 実行)
 │   ├── egoblur_probe.py 新クリップで EgoBlur 閾値を検証するローカルハーネス
 │   └── asset-gen/       LP イラスト / SFX / 撮影トグルマーカー生成
 │

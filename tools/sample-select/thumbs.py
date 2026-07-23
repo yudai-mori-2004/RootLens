@@ -2,7 +2,7 @@
 # サンプルクリップ候補を目視で比較するためのだけの道具。
 #
 # 実行:
-#   modal run tools/modal/session-thumbs/session_thumbs.py --content-hash <hash>
+#   modal run tools/sample-select/thumbs.py --content-hash <hash>
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ try:
         .apt_install("ffmpeg")
         .pip_install("boto3")
     )
-    app = modal.App("rootlens-session-thumbs")
+    app = modal.App("rootlens-sample-select-thumbs")
 
     @app.function(
         image=image,

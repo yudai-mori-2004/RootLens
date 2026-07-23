@@ -5,7 +5,7 @@
 # ので、 装着端末側の回線を消費しない (= フィールドから触れる)。
 #
 # 実行:
-#   modal run tools/modal/session-stats/session_stats.py --hashes hashA,hashB,hashC
+#   modal run tools/sample-select/stats.py --hashes hashA,hashB,hashC
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ try:
         modal.Image.debian_slim(python_version="3.11")
         .pip_install("numpy<2", "boto3")
     )
-    app = modal.App("rootlens-session-stats")
+    app = modal.App("rootlens-sample-select-stats")
 
     @app.function(
         image=image,
