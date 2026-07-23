@@ -1,10 +1,9 @@
 # RootLens data access
 
-Recordings live in a Cloudflare R2 bucket. One recording per folder: `<id>/session.mcap`
-plus a small `<id>/meta.json` with its attributes. `manifest.jsonl` at the bucket root
-aggregates every recording's attributes (one JSON object per line) so you can filter
-without listing folders. New recordings are added over time; re-run the download later
-to pick them up — the manifest is kept up to date automatically.
+Recordings live in a Cloudflare R2 bucket. One recording per folder: `<id>/session.mcap`.
+`manifest.jsonl` at the bucket root lists every recording's attributes (one JSON object
+per line) so you can filter without listing folders. New recordings are added over time;
+re-run the download later to pick them up — the manifest is kept up to date automatically.
 
 ## Access
 
@@ -35,7 +34,7 @@ has not been created yet (step 1).
 
 ## Manifest fields
 
-Each line of `manifest.jsonl` (and each `<id>/meta.json`) describes one recording:
+Each line of `manifest.jsonl` describes one recording:
 
 | field | meaning |
 |---|---|
@@ -47,8 +46,11 @@ Each line of `manifest.jsonl` (and each `<id>/meta.json`) describes one recordin
 | `fps` | RGB frame rate |
 | `resolution` | RGB frame size, `WxH` |
 | `device`, `osVersion` | capture device |
-| `blurred`, `faceDetector` | whether faces are blurred and by which detector |
+| `blurred` | faces are blurred (always `true` in this bucket) |
 | `mcapBytes` | size of `session.mcap` |
+
+Face-blur details (detector, threshold, pipeline version) are recorded inside each
+MCAP on the `/rootlens/processing_info` topic.
 
 ## Notes
 

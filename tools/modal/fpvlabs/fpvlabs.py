@@ -57,9 +57,9 @@ PIPELINE_VERSION = "fpvlabs-4"  # MCAP の processing_info に記録される変
 
 # ─── manifest (バケット同梱の属性テーブル) ─────────────────────────
 # 納品バケットはフラットな <hash>/session.mcap のまま、 セッションの属性 (ドメイン等) は
-# <hash>/meta.json サイドカー + それを集約した manifest.jsonl (バケット直下) で伝える。
-# サイドカーは hash 単位なので並列実行で競合しない。 manifest は毎回全サイドカーから
-# 作り直す (= last-writer-wins でも収束し、 取りこぼしは次の実行が自己修復する)。
+# バケット直下の manifest.jsonl 1 ファイルで伝える。 中身は毎回 DB + R2 の実状態から
+# まるごと再生成する派生物 (= どこにもメモを持たない)。 全再生成なので並列実行が
+# 同時に書いても last-writer-wins で収束し、 取りこぼしは次の実行が自己修復する。
 #
 # account_id → 撮影ドメインの対応。 新しい現場のアカウントができたらここに 1 行足す
 # (document/v0.1.4/fpvlabs-handoff/gen_manifest.py にも同じ表があるので揃える)。
@@ -869,46 +869,64 @@ def _clip_db_row(content_hash: str) -> dict:
     return {"account_id": str(row[0]), "duration_ms": row[1]}
 
 
-def build_session_meta(content_hash: str, meta: dict, db_row: dict,
-                       recorded_at_iso: str, mcap_bytes: int,
-                       blur: bool, face_detector: str) -> dict:
-    """<hash>/meta.json の中身 (= manifest.jsonl の 1 行)。 スキーマを変えるときは
-    README-for-fpv.md の表と gen_manifest.py を同時に更新する。"""
-    account = db_row["account_id"]
-    dom = ACCOUNT_DOMAINS.get(account)
-    if dom is None:
-        raise RuntimeError(
-            f"account {account} not in ACCOUNT_DOMAINS; add the new site mapping first")
-    camera = meta.get("camera") or {}
-    settings = meta.get("capture_settings") or {}
-    return {
-        "contentHash": content_hash,
-        "domain": dom["domain"],
-        "site": dom["site"],
-        "recordedAt": recorded_at_iso,
-        "durationSec": round((db_row["duration_ms"] or 0) / 1000.0, 3),
-        "fps": settings.get("recording_rate_hz"),
-        "resolution": (f"{camera.get('width')}x{camera.get('height')}"
-                       if camera.get("width") else None),
-        "device": meta.get("device_model"),
-        "osVersion": meta.get("os_version"),
-        "blurred": blur,
-        "faceDetector": face_detector if blur else None,
-        "mcapBytes": mcap_bytes,
-    }
+def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
+    """manifest.jsonl を DB + R2 の実状態からまるごと作り直す。 行の材料:
+    <hash>/session.mcap の一覧 (サイズ) + clips テーブル (domain / 尺 / 登録時刻)
+    + raw metadata.json (fps / 解像度 / 端末)。 raw や DB 行が欠けたセッションも
+    行自体は残して欠損フィールドを null にする (集計を止めない)。
+    スキーマを変えるときは README-for-fpv.md の表と gen_manifest.py を同時に更新する。"""
+    import psycopg2
 
-
-def regenerate_manifest(s3, bucket: str) -> int:
-    """バケット内の全 <hash>/meta.json を集約して manifest.jsonl を書き直す。
-    recordedAt 昇順。 戻り値は行数。"""
-    entries = []
+    sessions: dict[str, int] = {}
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=bucket):
         for obj in page.get("Contents") or []:
             key = obj["Key"]
-            if key.endswith("/meta.json") and key.count("/") == 1:
-                body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
-                entries.append(json.loads(body))
+            if key.endswith("/session.mcap") and key.count("/") == 1:
+                sessions[key.split("/")[0]] = obj["Size"]
+
+    rows: dict[str, dict] = {}
+    if sessions:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "select content_hash, account_id, duration_ms, created_at from clips"
+                    " where content_hash = any(%s)",
+                    (list(sessions),),
+                )
+                rows = {h: {"account_id": str(a), "duration_ms": d, "created_at": c}
+                        for h, a, d, c in cur.fetchall()}
+        finally:
+            conn.close()
+
+    entries = []
+    for h, mcap_bytes in sessions.items():
+        db_row = rows.get(h)
+        try:
+            body = s3.get_object(Bucket=bucket_raw, Key=f"raw/{h}/metadata.json")["Body"].read()
+            meta = json.loads(body)
+        except Exception:
+            meta = {}
+        dom = ACCOUNT_DOMAINS.get(db_row["account_id"]) if db_row else None
+        camera = meta.get("camera") or {}
+        settings = meta.get("capture_settings") or {}
+        entries.append({
+            "contentHash": h,
+            "domain": dom["domain"] if dom else None,
+            "site": dom["site"] if dom else None,
+            # 登録時刻 = アップロード完了直後の POST /api/clips 時刻。 撮影時刻の近似として使う。
+            "recordedAt": db_row["created_at"].isoformat() if db_row else None,
+            "durationSec": round((db_row["duration_ms"] or 0) / 1000.0, 3) if db_row else None,
+            "fps": settings.get("recording_rate_hz"),
+            "resolution": (f"{camera.get('width')}x{camera.get('height')}"
+                           if camera.get("width") else None),
+            "device": meta.get("device_model"),
+            "osVersion": meta.get("os_version"),
+            # 本番バケットには blur なしを置けない (process_session のガードで保証)。
+            "blurred": True,
+            "mcapBytes": mcap_bytes,
+        })
     entries.sort(key=lambda e: (e.get("recordedAt") or "", e["contentHash"]))
     lines = "".join(json.dumps(e, ensure_ascii=False, separators=(",", ":")) + "\n"
                     for e in entries)
@@ -929,9 +947,14 @@ def process_session(content_hash: str, blur: bool = True,
     bucket_raw = os.environ.get("R2_BUCKET_RAW_ARKIT", "rootlens-raw-arkit")
     bucket_out = target_bucket or os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
 
+    # 本番の納品バケットにはぼかし無しを置かない (= manifest の blurred: true を構造的に保証)。
+    if not blur and bucket_out == os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs"):
+        raise RuntimeError("refusing --no-blur into the production delivery bucket; use --target-bucket")
+
     # DB 照合とドメイン解決は GPU を回す前に済ませる (未登録 / 未知アカウントで即死させる)。
     db_row = _clip_db_row(content_hash)
-    if ACCOUNT_DOMAINS.get(db_row["account_id"]) is None:
+    domain = ACCOUNT_DOMAINS.get(db_row["account_id"])
+    if domain is None:
         raise RuntimeError(
             f"account {db_row['account_id']} not in ACCOUNT_DOMAINS; add the new site mapping first")
 
@@ -960,21 +983,9 @@ def process_session(content_hash: str, blur: bool = True,
         s3.upload_file(out_path, bucket_out, out_key, ExtraArgs={"ContentType": "application/octet-stream"})
         result["outputKey"] = f"{bucket_out}/{out_key}"
 
-        # 属性サイドカー + manifest を更新 (方式は冒頭の manifest セクションのコメント参照)。
-        with open(os.path.join(session_dir, "metadata.json")) as fh:
-            meta = json.load(fh)
-        head = s3.head_object(Bucket=bucket_raw, Key=f"raw/{content_hash}/rgb.mp4")
-        session_meta = build_session_meta(
-            content_hash, meta, db_row,
-            recorded_at_iso=head["LastModified"].isoformat(),
-            mcap_bytes=os.path.getsize(out_path),
-            blur=blur, face_detector=face_detector,
-        )
-        s3.put_object(Bucket=bucket_out, Key=f"{content_hash}/meta.json",
-                      Body=json.dumps(session_meta, ensure_ascii=False, indent=2).encode("utf-8"),
-                      ContentType="application/json")
-        result["manifestEntries"] = regenerate_manifest(s3, bucket_out)
-        result["domain"] = session_meta["domain"]
+        # manifest を DB + R2 の実状態から再生成 (方式は冒頭の manifest セクションのコメント参照)。
+        result["manifestEntries"] = regenerate_manifest(s3, bucket_out, bucket_raw)
+        result["domain"] = domain["domain"]
         return result
 
 

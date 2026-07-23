@@ -55,19 +55,20 @@
 
 ## manifest.jsonl (自動)
 
-処理のたびに `<hash>/meta.json` (属性サイドカー) が書かれ、バケット直下の `manifest.jsonl`
-(全セッションの属性表: domain / site / 尺 / fps / 解像度 / 端末 / ぼかし有無…) が
-全サイドカーから再生成される。FPV 側は普段の `rclone copy` で一緒に受け取る。
+処理のたびに、バケット直下の `manifest.jsonl` (全セッションの属性表: domain / site /
+尺 / fps / 解像度 / 端末…) が **DB + R2 の実状態からまるごと再生成**される。属性を
+どこにもメモしない派生物なので、並列実行でも収束し、セッションフォルダは
+`<hash>/session.mcap` だけのまま汚れない。FPV 側は普段の `rclone copy` で一緒に受け取る。
 フィールドの意味は `README-for-fpv.md` の表が正。
 
 - 新しい現場のアカウントを作ったら、`fpvlabs.py` と `gen_manifest.py` の
   `ACCOUNT_DOMAINS` に 1 行ずつ足す。未登録アカウントのクリップは GPU が回る前に
   fail-loud で止まる。
-- 補修 (機構導入前セッションのバックフィル / 並列実行直後に行が欠けたとき):
+- 本番バケットへの `--no-blur` は実行拒否される (= manifest の `blurred: true` を保証)。
+- パイプラインを回さずに再生成したいとき (セッションを消した直後など):
   ```
   python document/v0.1.4/fpvlabs-handoff/gen_manifest.py
   ```
-  サイドカーの無いセッションだけ埋めて manifest を作り直す。`--rebuild` で全部作り直し。
 
 ## オプション
 
