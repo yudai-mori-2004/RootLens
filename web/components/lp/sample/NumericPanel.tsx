@@ -19,10 +19,14 @@ interface Props {
 export default function NumericPanel({ data }: Props) {
   const t = useTranslations("pages.sample.numeric");
   const state = usePlayhead();
-  // 左右別 boolean。 手のランドマークが左右どちらとも識別できたフレームで true になる。
-  const idx = Math.min(data.hands.left.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
-  const leftOn = !!data.hands.left[idx];
-  const rightOn = !!data.hands.right[idx];
+  // hands は左右別 boolean 配列に揃えている ({left, right})。 旧スキーマ (単一 boolean 配列) が
+  // 古いキャッシュから返ってくる可能性があるので、 その時は両手同じフラグに落として耐える。
+  const handsShape = Array.isArray((data as unknown as { hands: unknown }).hands)
+    ? { left: data.hands as unknown as boolean[], right: data.hands as unknown as boolean[] }
+    : data.hands;
+  const idx = Math.min(handsShape.left.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
+  const leftOn = !!handsShape.left[idx];
+  const rightOn = !!handsShape.right[idx];
 
   return (
     <div style={{
