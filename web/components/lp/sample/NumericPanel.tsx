@@ -148,10 +148,29 @@ function SeriesCanvas({ data, idxNow, field, label }: {
     ctx.lineTo(size.w, size.h / 2);
     ctx.stroke();
 
-    // 見出し
+    // 見出し (左上)
     ctx.fillStyle = "#7a8090";
     ctx.font = "9px ui-monospace";
     ctx.fillText(label, 4, 10);
+
+    // 凡例 (右上): 色ドット + x / y / z のラベル。 チャンネルとグラフの色を対応付ける。
+    const legendPad = 4;
+    const swatch = 6;
+    const gap = 3;
+    const items = ["x", "y", "z"];
+    // 右から詰めて描く。 各要素は [swatch][gap][文字幅+gap]。
+    let cursorX = size.w - legendPad;
+    for (let ch = 2; ch >= 0; ch--) {
+      const label = items[ch];
+      const textW = ctx.measureText(label).width;
+      cursorX -= textW;
+      ctx.fillStyle = "#7a8090";
+      ctx.fillText(label, cursorX, 10);
+      cursorX -= gap + swatch;
+      ctx.fillStyle = CHANNEL_COLORS[ch];
+      ctx.fillRect(cursorX, 10 - swatch, swatch, swatch);
+      cursorX -= gap * 2;
+    }
 
     if (end <= start) return;
 

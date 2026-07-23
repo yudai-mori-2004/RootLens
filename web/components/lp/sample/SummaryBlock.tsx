@@ -71,10 +71,11 @@ export default function SummaryBlock({ summary }: Props) {
       </Section>
 
       {cam && (
+        // lens は Apple 内部呼称 (現状全クリップ "wide" 固定) で、 FOV と情報が重複するため
+        // 表示しない。 一般スペックとして意味があるのは 解像度 / FOV / 深度解像度。
         <Section title={t("cameraSection")}>
           <Row k={t("resolutionLabel")} v={`${cam.width ?? "?"} × ${cam.height ?? "?"}`} />
           <Row k={t("fovLabel")} v={cam.field_of_view_deg ? `${cam.field_of_view_deg.toFixed(1)}°` : "—"} />
-          <Row k={t("lensLabel")} v={cam.lens ?? "—"} />
           {cam.depth && (
             <Row k={t("depthResolutionLabel")} v={`${cam.depth.width} × ${cam.depth.height}`} />
           )}

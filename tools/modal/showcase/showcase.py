@@ -649,7 +649,7 @@ def process_session(content_hash: str, slug: str,
             fpv_bucket = os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
             head = s3.head_object(Bucket=fpv_bucket, Key=f"{content_hash}/session.mcap")
             delivery = {"format": "session.mcap", "bytes": int(head["ContentLength"]),
-                        "blurred": True, "spec": "stera-sdk MCAP (ROS2 messages)"}
+                        "blurred": True, "spec": "MCAP container with ROS2 messages"}
         except Exception:
             pass
 

@@ -12,7 +12,7 @@
 
 import { Suspense, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, useGLTF } from "@react-three/drei";
+import { GizmoHelper, GizmoViewport, OrbitControls, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import { useTranslations } from "next-intl";
 import { usePlayhead } from "./TimeContext";
@@ -57,6 +57,16 @@ export default function ScenePanel({ meshUrl, trajectory }: Props) {
 
         {/* Ground grid: スケール感を掴むため。 1 m 目盛り。 */}
         <gridHelper args={[20, 20, "#333", "#222"]} position={[0, -1.5, 0]} />
+
+        {/* 軸のガイド (= 右下の小さなキューブ)。 現在のカメラの向きに追従して回転するので、
+            回した後でも どちらが X / Y / Z か即座に分かる。 色は Three.js の慣習に合わせて
+            X=赤 / Y=緑 / Z=青。 */}
+        <GizmoHelper alignment="bottom-right" margin={[56, 56]}>
+          <GizmoViewport
+            axisColors={["#ff3d80", "#7be89c", "#5aa8ff"]}
+            labelColor="#0b0d11"
+          />
+        </GizmoHelper>
       </Canvas>
     </div>
   );
