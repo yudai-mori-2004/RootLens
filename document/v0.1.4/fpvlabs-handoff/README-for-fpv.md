@@ -1,7 +1,10 @@
 # RootLens data access
 
-Recordings live in a Cloudflare R2 bucket. One recording per folder: `<id>/session.mcap`.
-New recordings are added over time; re-run the download later to pick them up.
+Recordings live in a Cloudflare R2 bucket. One recording per folder: `<id>/session.mcap`
+plus a small `<id>/meta.json` with its attributes. `manifest.jsonl` at the bucket root
+aggregates every recording's attributes (one JSON object per line) so you can filter
+without listing folders. New recordings are added over time; re-run the download later
+to pick them up — the manifest is kept up to date automatically.
 
 ## Access
 
@@ -29,6 +32,23 @@ Needs [rclone](https://rclone.org/install/). The access credentials are sent by 
 
 If you see `didn't find section in config file ("rootlens")`, the config file above
 has not been created yet (step 1).
+
+## Manifest fields
+
+Each line of `manifest.jsonl` (and each `<id>/meta.json`) describes one recording:
+
+| field | meaning |
+|---|---|
+| `contentHash` | recording id = the folder name |
+| `domain` | kind of work filmed: `home` (household chores) / `bakery` (bakery work) |
+| `site` | recording location id within the domain (e.g. `bakery-01`) |
+| `recordedAt` | upload completion time, ISO 8601 UTC |
+| `durationSec` | recording length in seconds |
+| `fps` | RGB frame rate |
+| `resolution` | RGB frame size, `WxH` |
+| `device`, `osVersion` | capture device |
+| `blurred`, `faceDetector` | whether faces are blurred and by which detector |
+| `mcapBytes` | size of `session.mcap` |
 
 ## Notes
 

@@ -16,6 +16,11 @@
   ```
   `references/egoblur/ego_blur_face_gen2.jit` は Meta EgoBlur gen2 の顔検出モデル (400MB)。
   gen2 のソースコードは Modal image ビルド時に GitHub から clone するので不要。
+- **DB シークレットを Modal に置く** (= manifest のドメイン解決で `clips` テーブルを引く):
+  ```
+  set -a; source web/.env.local; set +a
+  modal secret create supabase-db DATABASE_URL="$DATABASE_URL"
+  ```
 - FPV への配布経路をひらく:
   1. Cloudflare ダッシュボード → R2 → Manage R2 API Tokens → Create API Token。
      Permissions = **Object Read only**、対象バケット = **rootlens-fpvlabs のみ**。
@@ -47,6 +52,22 @@
    これで出力完了。FPV 側は次の `rclone copy` で自動的に拾う。
 
    コスト目安: A10G で 1 時間クリップ ≈ ¥50-100 前後 (実測で調整)。
+
+## manifest.jsonl (自動)
+
+処理のたびに `<hash>/meta.json` (属性サイドカー) が書かれ、バケット直下の `manifest.jsonl`
+(全セッションの属性表: domain / site / 尺 / fps / 解像度 / 端末 / ぼかし有無…) が
+全サイドカーから再生成される。FPV 側は普段の `rclone copy` で一緒に受け取る。
+フィールドの意味は `README-for-fpv.md` の表が正。
+
+- 新しい現場のアカウントを作ったら、`fpvlabs.py` と `gen_manifest.py` の
+  `ACCOUNT_DOMAINS` に 1 行ずつ足す。未登録アカウントのクリップは GPU が回る前に
+  fail-loud で止まる。
+- 補修 (機構導入前セッションのバックフィル / 並列実行直後に行が欠けたとき):
+  ```
+  python document/v0.1.4/fpvlabs-handoff/gen_manifest.py
+  ```
+  サイドカーの無いセッションだけ埋めて manifest を作り直す。`--rebuild` で全部作り直し。
 
 ## オプション
 
