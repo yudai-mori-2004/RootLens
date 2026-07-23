@@ -39,7 +39,7 @@ Each line of `manifest.jsonl` describes one recording:
 | field | meaning |
 |---|---|
 | `contentHash` | recording id = the folder name |
-| `domain` | kind of work filmed: `home` (household chores) / `bakery` (bakery work) |
+| `domain` | kind of work filmed: `home` (household chores) / `bakery` (bakery work) ...|
 | `site` | recording location id within the domain (e.g. `bakery-01`) |
 | `recordedAt` | recording start time, ISO 8601 UTC (read from the video container) |
 | `uploadedAt` | upload completion time, ISO 8601 UTC |
