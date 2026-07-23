@@ -53,7 +53,15 @@ Each line of `manifest.jsonl` describes one recording:
 Face-blur details (detector, threshold, pipeline version) are recorded inside each
 MCAP on the `/rootlens/processing_info` topic.
 
+Example — list bakery recordings only:
+
+```bash
+jq -r 'select(.domain=="bakery") | .contentHash' rootlens-data/manifest.jsonl
+```
+
 ## Notes
 
-- Each `session.mcap` is validated with stera-sdk's format check before handoff.
-- Faces are blurred, and everyone appearing has consented to being filmed.
+- The MCAP layout matches stera-sdk's MCAPReader topic configuration (same topics,
+  schemas, and encodings), so `stera.data.mcap` reads it directly.
+- The recorded workers have consented to filming and to this data use. Incidental
+  bystanders are face-blurred before delivery.
