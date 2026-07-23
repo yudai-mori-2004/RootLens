@@ -23,6 +23,8 @@
         "description": "Video, LiDAR depth, 3D scene with trajectory, and sensor readouts — all synchronized from a single recording."
       },
       "pageTitle": "Sample",
+      "driveCta": "All sample data (Google Drive)",
+      "nowShowing": "Now playing",
       "pipelines": {
         "arkit": {
           "label": "iPhone (LiDAR)",

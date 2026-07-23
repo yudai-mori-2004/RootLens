@@ -20,11 +20,13 @@ import type { PipelineOption, SummaryData, TimeSeriesData, TrajectoryData } from
 
 interface Props {
   pipelines: PipelineOption[];
+  /** サンプルデータの正 (共有ドライブ samples/) への URL。 最上部の CTA に出す。 */
+  driveUrl: string;
   /** 初期表示するパイプライン ID (無指定なら available=true の最初のもの)。 */
   initialPipelineId?: string;
 }
 
-export default function SampleViewer({ pipelines, initialPipelineId }: Props) {
+export default function SampleViewer({ pipelines, driveUrl, initialPipelineId }: Props) {
   const t = useTranslations("pages.sample");
   const firstAvail = useMemo(() => pipelines.find((p) => p.available), [pipelines]);
   const [pipelineId, setPipelineId] = useState<string>(
@@ -44,6 +46,10 @@ export default function SampleViewer({ pipelines, initialPipelineId }: Props) {
         description={pipeline.description}
         pageTitle={t("pageTitle")}
         preparingBadge={t("preparingBadge")}
+        driveUrl={driveUrl}
+        driveCta={t("driveCta")}
+        drive={pipeline.drive}
+        nowShowing={t("nowShowing")}
       />
       {pipeline.available && pipeline.assets ? (
         <LoadedViewer assets={pipeline.assets} label={pipeline.label} />
@@ -56,6 +62,7 @@ export default function SampleViewer({ pipelines, initialPipelineId }: Props) {
 
 function Header({
   pipelines, active, onChange, description, pageTitle, preparingBadge,
+  driveUrl, driveCta, drive, nowShowing,
 }: {
   pipelines: PipelineOption[];
   active: string;
@@ -63,12 +70,40 @@ function Header({
   description: string;
   pageTitle: string;
   preparingBadge: string;
+  driveUrl: string;
+  driveCta: string;
+  drive?: PipelineOption["drive"];
+  nowShowing: string;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
-      <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#f4f1fa" }}>
-        {pageTitle}
-      </h1>
+      {/* 最上部: タイトルと、 サンプルデータの正 (ドライブ) への導線。 このページで再生して
+          いるのはその中の 1 本にすぎない、 という主従を崩さない。 */}
+      <div style={{
+        display: "flex", flexWrap: "wrap", alignItems: "center",
+        justifyContent: "space-between", gap: 12,
+      }}>
+        <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: "#f4f1fa" }}>
+          {pageTitle}
+        </h1>
+        <a
+          href={driveUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            padding: "10px 18px",
+            borderRadius: 999,
+            background: "#ffe600",
+            color: "#131519",
+            fontSize: 13,
+            fontWeight: 700,
+            textDecoration: "none",
+            display: "inline-flex", alignItems: "center", gap: 6,
+          }}
+        >
+          {driveCta} ↗
+        </a>
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {pipelines.map((p) => {
           const isActive = p.id === active;
@@ -99,6 +134,22 @@ function Header({
       <p style={{ margin: 0, color: "#a8afbe", fontSize: 13, lineHeight: 1.6, maxWidth: 900 }}>
         {description}
       </p>
+      {drive && (
+        <div style={{ fontSize: 12, color: "#7a8090" }}>
+          {nowShowing}:{" "}
+          <a
+            href={drive.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: "#e8ebf2", fontFamily: "monospace",
+              textDecoration: "underline", textUnderlineOffset: 3,
+            }}
+          >
+            {drive.path} ↗
+          </a>
+        </div>
+      )}
     </div>
   );
 }

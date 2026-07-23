@@ -1,25 +1,21 @@
-# lp-sample: raw セッション → LP /sample の 4 パネル同期ビューア用素材。
+# lp-sample: ドライブ公開サンプルの 1 セッション → LP /sample ビューア用の配信キャッシュ。
 #
-# rootlens-raw-arkit/raw/<content_hash>/ を読み、 ビューアが必要とする 6 つのアセットを
-# 組み立てて rootlens-public/lp-sample/<slug>/ に配置する。
-# パイプラインは冪等: 同じ入力なら同じキーに同じ内容が上書きされる。
+# サンプルデータの正は共有ドライブ (samples/<domain>/<pipeline>/<セッション>/)。 LP の /sample は
+# その中の 1 本を選んでスキーマとスペックを見せるビューアで、 ここで作る 6 アセットは
+# ブラウザ再生のためのビュー変換にすぎない。 出力キーはドライブのフォルダ名末尾と同じ
+# <hash8> (= content_hash 先頭 8 桁) にして、 どのサンプルを表示しているかを id で辿れるようにする。
 #
-#   入力: raw/<hash>/{rgb.mp4, frames.jsonl, imu.jsonl, metadata.json, depth.tar, mesh.jsonl}
-#   出力: lp-sample/<slug>/{rgb.mp4, depth.mp4, mesh.glb, trajectory.json, timeseries.json, summary.json}
+#   入力: rootlens-raw-arkit の raw/<hash>/{frames.jsonl, imu.jsonl, metadata.json, depth.tar, mesh.jsonl}
+#         + rootlens-fpvlabs の <hash>/session.mcap (ぼかし済み映像の源泉。 無ければ実行拒否)
+#   出力: rootlens-public の lp-sample/<hash8>/{rgb.mp4, depth.mp4, mesh.glb,
+#         trajectory.json, timeseries.json, summary.json}
 #
-# 出力キーは --slug で決める (= 人間が読む短い名前。 例: arkit-home-01)。 hash ベースにしないのは、
-# LP の URL がハッシュのままだと共有時に何のセッションか読み取れないため。
-#
-# 顔ぼかしは今のところ再実行しない: 最初のサンプルは装着者自身の家事映像で第三者が映らないため、
-# raw rgb.mp4 をそのまま LP ビットレートに再エンコードする。 将来的にぼかしが必要な場合は
-# fpvlabs.py の MCAP 経由で JPEG を抜く経路を追加する (要検討)。
+# rgb.mp4 は raw ではなく MCAP のぼかし済み JPEG 列から再構成する (sample-drive と同じ経路)。
+# 公開に出る映像はぼかし済みへ一本化し、 raw の未ぼかし rgb には触らない。
 #
 # 実行:
-#   Modal:  modal run --detach tools/lp-sample/lp_sample.py \
-#             --content-hash <hash> --slug arkit-home-01
-#           modal run --detach tools/lp-sample/lp_sample.py \
-#             --content-hash <hash> --slug test-01 --target-bucket rootlens-public-staging
-#   ローカル: LP_SAMPLE_LOCAL=1 python tools/lp-sample/lp_sample.py <hash> <slug>
+#   Modal:  modal run --detach tools/lp-sample/lp_sample.py --content-hash <hash>
+#   ローカル: LP_SAMPLE_LOCAL=1 python tools/lp-sample/lp_sample.py <hash> [target_bucket]
 #
 # 検証: --target-bucket <bucket> で本番以外の書けるバケットへ切り替え (fpvlabs.py と同じ流儀)。
 
@@ -36,7 +32,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-PIPELINE_VERSION = "lp-sample-1"
+PIPELINE_VERSION = "lp-sample-2"
 
 # アセット出力先バケット (書き先)。 --target-bucket で上書きできる。
 DEFAULT_TARGET_BUCKET = "rootlens-public"
@@ -53,10 +49,9 @@ OUTPUT_FILES = [
 ]
 
 # ─── 定数: 素材ごとのエンコード設定 ─────────────────────────────────
-# RGB は LP ページの帯域予算に合わせて 5 Mbps。 ソースの 12 Mbps から落とす。
-# faststart で moov を先頭に (= プログレッシブ再生で頭からすぐ再生)。
+# RGB は sample-drive の rgb.mp4 と同じ 5 Mbps H.264 + faststart (= ドライブで配る映像と
+# 同じ源泉・同じ設定で作り、 LP の帯域予算にも収める)。
 RGB_BITRATE_KBPS = 5000
-RGB_MAX_HEIGHT = 1080  # 1440p 収録は 1080p にダウンスケール (帯域と閲覧解像度の妥協点)
 
 # depth のダイナミックレンジ (mm)。 屋内なら 5 m でだいたい収まる。
 # これを超える値は 5000mm にクランプ、 0 mm(欠損) は黒。
@@ -87,18 +82,18 @@ def _r2_client():
     )
 
 
+# raw の rgb.mp4 は意図的に含めない: 未ぼかしなので、 映像は fpvlabs MCAP 経由でしか読まない。
 SESSION_FILES = [
-    "rgb.mp4",
     "frames.jsonl",
     "realtime_handpose.jsonl",  # 旧録画は frames.jsonl の代わりにこの名前
     "imu.jsonl",
     "metadata.json",
     "depth.tar",       # LiDAR デバイスのみ
     "mesh.jsonl",      # LiDAR デバイスのみ
-    "pointcloud.jsonl",  # 参考。 現状の showcase では使わない (mesh を優先)
+    "pointcloud.jsonl",  # 参考。 現状のビューアでは使わない (mesh を優先)
 ]
 
-REQUIRED_INPUTS = ["rgb.mp4", "metadata.json"]  # 手ポーズ系はどちらかがあれば OK (下でチェック)
+REQUIRED_INPUTS = ["metadata.json"]  # 手ポーズ系はどちらかがあれば OK (下でチェック)
 
 
 def download_raw(s3, bucket_raw: str, content_hash: str, dest_dir: str) -> dict[str, str]:
@@ -124,31 +119,49 @@ def download_raw(s3, bucket_raw: str, content_hash: str, dest_dir: str) -> dict[
 
 
 # ══════════════════════════════════════════════════════════════════════
-# rgb.mp4 (LP ビットレートに再エンコード + faststart)
+# rgb.mp4 (fpvlabs MCAP のぼかし済み JPEG 列から再構成)
 # ══════════════════════════════════════════════════════════════════════
 
-def build_rgb(src_mp4: str, out_mp4: str) -> dict:
-    """5 Mbps H.264、 最大 1080p、 faststart で再エンコード。
-    ソースが 1440p の場合はダウンスケール、 1080p 以下ならそのまま。"""
-    # -vf scale='iw*min(1,1080/ih)':-2 = 高さが 1080 を超えるなら 1080 に、 それ以下は元寸法を保持。
-    # -2 = 偶数に丸める (H.264 の要件)。
-    vf = f"scale='if(gt(ih,{RGB_MAX_HEIGHT}),trunc(iw*{RGB_MAX_HEIGHT}/ih/2)*2,iw)':'if(gt(ih,{RGB_MAX_HEIGHT}),{RGB_MAX_HEIGHT},ih)'"
+def build_rgb_from_mcap(mcap_path: str, meta: dict, out_mp4: str) -> dict:
+    """MCAP の /camera/rgb/compressed (顔ぼかし済み JPEG 列) を H.264 mp4 に再エンコードする。
+    sample-drive の rgb.mp4 と同じ源泉・同じ設定 (= LP で再生する映像とドライブで配る映像が
+    同じセッションの同じぼかし結果になる)。 fps は metadata の recording_rate_hz
+    (MCAP のタイムスタンプと ±10ms 程度ずれるが、 再生上は判別不能)。"""
+    from mcap.reader import make_reader
+    from mcap_ros2.decoder import DecoderFactory
+
+    fps = float((meta.get("capture_settings") or {}).get("recording_rate_hz") or 15)
+
     cmd = [
         "ffmpeg", "-y", "-v", "error",
-        "-i", src_mp4,
-        "-vf", vf,
-        "-c:v", "libx264",
-        "-preset", "medium",
+        "-f", "image2pipe", "-vcodec", "mjpeg",
+        "-framerate", f"{fps:.6f}",
+        "-i", "-",
+        "-c:v", "libx264", "-preset", "medium",
         "-b:v", f"{RGB_BITRATE_KBPS}k",
-        "-maxrate", f"{int(RGB_BITRATE_KBPS * 1.3)}k",
-        "-bufsize", f"{RGB_BITRATE_KBPS * 2}k",
         "-pix_fmt", "yuv420p",
-        "-an",                     # 音声トラックなし (録画に音声は無い)
-        "-movflags", "+faststart",  # moov を先頭に
+        "-an",                      # 音声トラックなし (録画に音声は無い)
+        "-movflags", "+faststart",  # moov を先頭に (= プログレッシブ再生で頭からすぐ再生)
         out_mp4,
     ]
-    subprocess.run(cmd, check=True)
-    return {"bytes": os.path.getsize(out_mp4)}
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    assert proc.stdin is not None
+    frame_count = 0
+    try:
+        with open(mcap_path, "rb") as fh:
+            reader = make_reader(fh, decoder_factories=[DecoderFactory()])
+            for _, _, _, ros_msg in reader.iter_decoded_messages(
+                    topics=["/camera/rgb/compressed"]):
+                proc.stdin.write(ros_msg.data)  # data フィールドが JPEG bytes
+                frame_count += 1
+    finally:
+        proc.stdin.close()
+    rc = proc.wait()
+    if rc != 0:
+        raise RuntimeError(f"ffmpeg exited {rc} while encoding blurred rgb")
+    if frame_count == 0:
+        raise RuntimeError("mcap contained no /camera/rgb/compressed frames")
+    return {"bytes": os.path.getsize(out_mp4), "frames": frame_count, "fps": fps}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -606,32 +619,45 @@ def build_summary(session_files: dict[str, str], asset_stats: dict[str, dict], o
 # メインエントリ
 # ══════════════════════════════════════════════════════════════════════
 
-def process_session(content_hash: str, slug: str,
+def process_session(content_hash: str,
                     target_bucket: str | None = None) -> dict:
-    """raw/<hash>/ を取得 → 6 アセットを組み立てて lp-sample/<slug>/ に put。
-    冪等: 同 slug への再実行は同キーへの上書き。"""
+    """raw/<hash>/ + fpvlabs の session.mcap を取得 → 6 アセットを組み立てて
+    lp-sample/<hash8>/ に put。 冪等: 再実行は同キーへの上書き。"""
     s3 = _r2_client()
     bucket_raw = os.environ.get("R2_BUCKET_RAW_ARKIT", "rootlens-raw-arkit")
+    bucket_fpv = os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
     bucket_out = target_bucket or os.environ.get("R2_BUCKET_PUBLIC", DEFAULT_TARGET_BUCKET)
+    slug = content_hash[:8]  # ドライブのセッションフォルダ名末尾と同じ id 表記
 
     with tempfile.TemporaryDirectory() as tmp:
         session_dir = os.path.join(tmp, "session")
         os.makedirs(session_dir)
         session_files = download_raw(s3, bucket_raw, content_hash, session_dir)
 
+        # session.mcap (必須): 公開に出る映像はぼかし済みの MCAP 経由のみ。
+        mcap_path = os.path.join(tmp, "session.mcap")
+        try:
+            s3.download_file(bucket_fpv, f"{content_hash}/session.mcap", mcap_path)
+        except Exception as e:
+            raise RuntimeError(
+                f"session.mcap missing for {content_hash[:8]}. "
+                f"the LP rgb is rebuilt from the blurred JPEG stream in the mcap; "
+                f"run fpvlabs first: {e}"
+            )
+
+        with open(session_files["metadata.json"]) as f:
+            meta = json.load(f)
+
         out_dir = os.path.join(tmp, "assets")
         os.makedirs(out_dir)
 
         asset_stats: dict[str, dict] = {}
 
-        # rgb (必須)
+        # rgb (必須。 ぼかし済み MCAP から再構成)
         rgb_out = os.path.join(out_dir, "rgb.mp4")
-        asset_stats["rgb.mp4"] = build_rgb(session_files["rgb.mp4"], rgb_out)
+        asset_stats["rgb.mp4"] = build_rgb_from_mcap(mcap_path, meta, rgb_out)
 
-        # 動画の fps を frames.jsonl から見積もる (depth.mp4 も同じ fps で作る)。
-        # 中身は metadata の recording_fps がもっとも信頼できる (= 実効レート)。
-        with open(session_files["metadata.json"]) as f:
-            meta = json.load(f)
+        # depth.mp4 の fps は metadata の recording_fps がもっとも信頼できる (= 実効レート)。
         fps = float(meta.get("camera", {}).get("recording_fps") or meta.get("camera", {}).get("fps") or 30.0)
 
         # depth (LiDAR 時のみ)。 無ければアセットも出さない。
@@ -655,16 +681,9 @@ def process_session(content_hash: str, slug: str,
             ts_out,
         )
 
-        # fpvlabs バケットに置かれている納品 MCAP のサイズを取得 (顔ぼかし + Stera 互換 MCAP)。
-        # 存在しなければ delivery=None (= fpvlabs パイプラインをまだ回していないクリップ)。
-        delivery = None
-        try:
-            fpv_bucket = os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs")
-            head = s3.head_object(Bucket=fpv_bucket, Key=f"{content_hash}/session.mcap")
-            delivery = {"format": "session.mcap", "bytes": int(head["ContentLength"]),
-                        "blurred": True, "spec": "MCAP container with ROS2 messages"}
-        except Exception:
-            pass
+        # 納品形式 = fpvlabs の session.mcap。 rgb の再構成に使ったローカルファイルがそのまま実体。
+        delivery = {"format": "session.mcap", "bytes": os.path.getsize(mcap_path),
+                    "blurred": True, "spec": "MCAP container with ROS2 messages"}
 
         sum_out = os.path.join(out_dir, "summary.json")
         asset_stats["summary.json"] = build_summary(session_files, asset_stats, sum_out, delivery=delivery)
@@ -709,6 +728,8 @@ try:
             "numpy<2",
             "Pillow",
             "boto3",
+            "mcap",
+            "mcap-ros2-support",
         )
     )
 
@@ -721,12 +742,12 @@ try:
         cpu=4.0,
         secrets=[modal.Secret.from_name("r2-creds")],
     )
-    def showcase_process(content_hash: str, slug: str, target_bucket: str = "") -> dict:
-        return process_session(content_hash, slug, target_bucket=target_bucket or None)
+    def lp_sample_process(content_hash: str, target_bucket: str = "") -> dict:
+        return process_session(content_hash, target_bucket=target_bucket or None)
 
     @app.local_entrypoint()
-    def main(content_hash: str, slug: str, target_bucket: str = ""):
-        print(json.dumps(showcase_process.remote(content_hash, slug, target_bucket), indent=2))
+    def main(content_hash: str, target_bucket: str = ""):
+        print(json.dumps(lp_sample_process.remote(content_hash, target_bucket), indent=2))
 
 except ImportError:
     modal = None
@@ -735,10 +756,9 @@ except ImportError:
 if __name__ == "__main__" and (modal is None or os.environ.get("LP_SAMPLE_LOCAL")):
     import sys
 
-    if len(sys.argv) < 3:
-        print("usage: python showcase.py <content_hash> <slug> [target_bucket]", file=sys.stderr)
+    if len(sys.argv) < 2:
+        print("usage: python lp_sample.py <content_hash> [target_bucket]", file=sys.stderr)
         sys.exit(1)
     hash_ = sys.argv[1]
-    slug_ = sys.argv[2]
-    target_ = sys.argv[3] if len(sys.argv) > 3 else None
-    print(json.dumps(process_session(hash_, slug_, target_bucket=target_), indent=2))
+    target_ = sys.argv[2] if len(sys.argv) > 2 else None
+    print(json.dumps(process_session(hash_, target_bucket=target_), indent=2))

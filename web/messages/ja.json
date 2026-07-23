@@ -23,6 +23,8 @@
         "description": "映像・LiDAR 深度・3D 空間と歩いた道・センサー値を、同じ 1 本のクリップから同期表示します。"
       },
       "pageTitle": "サンプル",
+      "driveCta": "すべてのサンプルデータ (Google Drive)",
+      "nowShowing": "このビューアで再生中",
       "pipelines": {
         "arkit": {
           "label": "iPhone (LiDAR あり)",

@@ -75,9 +75,9 @@ export interface SummaryData {
   handDetectionRate: number;
   trackingNormalRate: number;
   assets: Record<string, AssetStats>;
-  /** 取引先に納品する形式 (fpvlabs パイプラインの session.mcap = 顔ぼかし + Stera 互換 MCAP)。
-   *  showcase.py が fpvlabs バケットの ContentLength を head_object で取ってサマリに埋める。
-   *  fpvlabs をまだ回していないクリップでは null (LP 側で「準備中」 表示にする)。 */
+  /** 取引先に納品する形式 (fpvlabs パイプラインの session.mcap = 顔ぼかし済み MCAP)。
+   *  lp_sample.py が入力に使った session.mcap のファイルサイズをそのまま埋める。
+   *  旧世代の summary.json では null がありうる (LP 側で「準備中」 表示にする)。 */
   delivery: {
     format: string;
     bytes: number;
@@ -87,6 +87,7 @@ export interface SummaryData {
 }
 
 /** /sample にぶら下がる 1 個のショーケース = 1 個の slug ぶんの URL 集合。
+ *  slug はドライブのセッションフォルダ名末尾と同じ id (= content_hash 先頭 8 桁)。
  *  R2 public bucket からの絶対 URL を持たせる (= LP は静的に配信するだけ)。 */
 export interface ShowcaseAssetUrls {
   slug: string;
@@ -107,4 +108,6 @@ export interface PipelineOption {
   available: boolean;
   /** available=true のときの実データ URL (slug 単位)。 */
   assets?: ShowcaseAssetUrls;
+  /** このビューアが表示しているドライブ上のセッション (= サンプルの正への参照)。 */
+  drive?: { path: string; url: string };
 }
