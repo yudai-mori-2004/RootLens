@@ -65,3 +65,5 @@ jq -r 'select(.domain=="bakery") | .contentHash' rootlens-data/manifest.jsonl
   give prior written consent, every upload is logged with the consent scopes it was
   made under (collection, AI-training use, licensing, cross-border transfer), and
   faces are blurred before delivery.
+- Consent evidence is kept per recording as an append-only log and can be produced
+  for any `contentHash` on request.
