@@ -34,8 +34,8 @@ export interface TimeSeriesData {
     /** [x, y, z] rad/s、 各サンプル 1 行。 */
     gyro: [number, number, number][];
   };
-  /** 各サンプル時点で装着者の手が 1 つ以上映っていたか。 */
-  hands: boolean[];
+  /** 各サンプル時点で装着者の左手 / 右手それぞれが映っていたか (handedness で分離)。 */
+  hands: { left: boolean[]; right: boolean[] };
   /** ARKit の trackingState (0=notAvailable, 1=limited, 2=normal)。 */
   tracking: number[];
 }

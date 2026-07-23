@@ -434,25 +434,35 @@ def build_trajectory(src_frames: str, out_json: str) -> dict:
 # ══════════════════════════════════════════════════════════════════════
 
 def build_timeseries(src_frames: str, src_imu: str | None, out_json: str) -> dict:
-    """30 Hz の共通時刻軸に IMU 6 軸 + 手検出 + トラッキング状態を並べる。
+    """30 Hz の共通時刻軸に IMU 6 軸 + 手検出 (左右別) + トラッキング状態を並べる。
     出力スキーマ:
       { hz, t0_ns,
         imu:      { accel: [[x,y,z], ...], gyro: [[x,y,z], ...] },  # imu.jsonl から nearest-neighbor リサンプル
-        hands:    [ hasHand: bool, ... ],                             # frames.jsonl の hands の有無
+        hands:    { left: [bool, ...], right: [bool, ...] },        # frames.jsonl の handedness で分離
         tracking: [ state_int, ... ],                                 # 0=notAvailable / 1=limited / 2=normal
       }
     ソースが 100 Hz IMU + 30 Hz frames と非同期なので、 frames のタイムスタンプに近い IMU 値を持ってくる。"""
     import bisect
 
-    # frames を全部読む (時刻・手検出・トラッキング状態を 30 Hz で拾う)。
+    # frames を全部読む (時刻・手の左右別検出・トラッキング状態を 30 Hz で拾う)。
+    # hands は左右別に分けておく: UI が「左手だけ」「右手だけ」「両手」「なし」を出せるようにする。
     frame_ts_ns = []
-    frame_has_hand = []
+    frame_hand_left = []
+    frame_hand_right = []
     frame_tracking = []
     with open(src_frames) as f:
         for line in f:
             row = json.loads(line)
             frame_ts_ns.append(row["timestamp_ns"])
-            frame_has_hand.append(bool(row.get("hands") or []))
+            has_left = has_right = False
+            for h in (row.get("hands") or []):
+                side = h.get("handedness")
+                if side == "left":
+                    has_left = True
+                elif side == "right":
+                    has_right = True
+            frame_hand_left.append(has_left)
+            frame_hand_right.append(has_right)
             frame_tracking.append(int(row.get("tracking_state", 0)))
 
     # imu を全部読む (100 Hz なので frames の 3 倍程度)。 IMU が無い場合は accel/gyro 空配列。
@@ -502,7 +512,10 @@ def build_timeseries(src_frames: str, src_imu: str | None, out_json: str) -> dic
         "hz": TIMESERIES_TARGET_HZ,
         "t0_ns": t0,
         "imu": {"accel": accel_out, "gyro": gyro_out},
-        "hands": [frame_has_hand[i] for i in kept_indices],
+        "hands": {
+            "left": [frame_hand_left[i] for i in kept_indices],
+            "right": [frame_hand_right[i] for i in kept_indices],
+        },
         "tracking": [frame_tracking[i] for i in kept_indices],
     }
     with open(out_json, "w") as fh:

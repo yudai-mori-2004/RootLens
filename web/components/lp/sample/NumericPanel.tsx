@@ -19,8 +19,10 @@ interface Props {
 export default function NumericPanel({ data }: Props) {
   const t = useTranslations("pages.sample.numeric");
   const state = usePlayhead();
-  const idx = Math.min(data.hands.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
-  const handOn = !!data.hands[idx];
+  // 左右別 boolean。 手のランドマークが左右どちらとも識別できたフレームで true になる。
+  const idx = Math.min(data.hands.left.length - 1, Math.max(0, Math.floor(state.t * data.hz)));
+  const leftOn = !!data.hands.left[idx];
+  const rightOn = !!data.hands.right[idx];
 
   return (
     <div style={{
@@ -32,8 +34,8 @@ export default function NumericPanel({ data }: Props) {
       minWidth: 0,
     }}>
       <HandRow
-        leftOn={handOn}
-        rightOn={handOn}
+        leftOn={leftOn}
+        rightOn={rightOn}
         title={t("hands")}
         leftLabel={t("leftHand")}
         rightLabel={t("rightHand")}
