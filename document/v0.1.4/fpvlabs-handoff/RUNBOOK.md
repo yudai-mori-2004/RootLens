@@ -61,8 +61,12 @@
 `<hash>/session.mcap` だけのまま汚れない。FPV 側は普段の `rclone copy` で一緒に受け取る。
 フィールドの意味は `README-for-fpv.md` の表が正。
 
-- 新しい現場のアカウントを作ったら、`fpvlabs.py` と `gen_manifest.py` の
-  `ACCOUNT_DOMAINS` に 1 行ずつ足す。未登録アカウントのクリップは GPU が回る前に
+- domain / site の正は DB の `accounts` テーブル (匿名の現場コードのみ。店名は置かない)。
+  新しい現場のアカウントを `scripts/create_account.mjs` で発行したら 1 行入れる:
+  ```sql
+  INSERT INTO accounts (id, domain, site) VALUES ('<auth uuid>', '<domain>', '<domain>-01');
+  ```
+  `accounts` に行が無いアカウント (テスト端末など) のクリップは GPU が回る前に
   fail-loud で止まる。
 - 本番バケットへの `--no-blur` は実行拒否される (= manifest の `blurred: true` を保証)。
 - パイプラインを回さずに再生成したいとき (セッションを消した直後など):

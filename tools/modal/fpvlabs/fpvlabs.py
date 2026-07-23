@@ -46,6 +46,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import io
 import json
 import os
@@ -61,13 +62,8 @@ PIPELINE_VERSION = "fpvlabs-4"  # MCAP の processing_info に記録される変
 # まるごと再生成する派生物 (= どこにもメモを持たない)。 全再生成なので並列実行が
 # 同時に書いても last-writer-wins で収束し、 取りこぼしは次の実行が自己修復する。
 #
-# account_id → 撮影ドメインの対応。 新しい現場のアカウントができたらここに 1 行足す
-# (document/v0.1.4/fpvlabs-handoff/gen_manifest.py にも同じ表があるので揃える)。
-# 未登録アカウントのクリップは GPU を回す前に fail-loud で止める。
-ACCOUNT_DOMAINS = {
-    "936e39a7-6afb-418e-9b9a-b300258497df": {"domain": "home", "site": "home-01"},
-    "5e195f17-6413-4b82-825d-da314fcb6a33": {"domain": "bakery", "site": "bakery-01"},
-}
+# domain / site の正は DB の accounts テーブル (account_id → 匿名の現場コード)。
+# accounts に行が無いアカウント (テスト端末など) のクリップは GPU を回す前に fail-loud で止める。
 
 # ─── EgoBlur (既定) ──────────────────────────────────────────────
 # Stera-10M と同じ検出器 (Meta gen2 EgoBlur、 arXiv:2308.13093)。
@@ -850,15 +846,18 @@ def _r2_client():
 
 
 def _clip_db_row(content_hash: str) -> dict:
-    """clips テーブルから account_id と端末計測の尺を引く。 未登録は fail-loud
-    (= POST /api/clips を通っていないアップロードを黙って納品しない)。"""
+    """clips に accounts (現場属性) を join して引く。 未登録クリップ
+    (= POST /api/clips を通っていないアップロード) と、 accounts に行が無い
+    アカウント (= テスト端末など納品対象外) はどちらも fail-loud。"""
     import psycopg2
 
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "select account_id, duration_ms from clips where content_hash = %s",
+                "select c.account_id, c.duration_ms, a.domain, a.site"
+                " from clips c left join accounts a on a.id = c.account_id"
+                " where c.content_hash = %s",
                 (content_hash,),
             )
             row = cur.fetchone()
@@ -866,7 +865,13 @@ def _clip_db_row(content_hash: str) -> dict:
         conn.close()
     if not row:
         raise RuntimeError(f"clip not registered in DB: {content_hash}")
-    return {"account_id": str(row[0]), "duration_ms": row[1]}
+    account_id, duration_ms, domain, site = row
+    if domain is None:
+        raise RuntimeError(
+            f"account {account_id} has no accounts row; "
+            f"insert (id, domain, site) before delivering its clips")
+    return {"account_id": str(account_id), "duration_ms": duration_ms,
+            "domain": domain, "site": site}
 
 
 def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
@@ -891,12 +896,13 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select content_hash, account_id, duration_ms, created_at from clips"
-                    " where content_hash = any(%s)",
+                    "select c.content_hash, c.duration_ms, c.created_at, a.domain, a.site"
+                    " from clips c left join accounts a on a.id = c.account_id"
+                    " where c.content_hash = any(%s)",
                     (list(sessions),),
                 )
-                rows = {h: {"account_id": str(a), "duration_ms": d, "created_at": c}
-                        for h, a, d, c in cur.fetchall()}
+                rows = {h: {"duration_ms": d, "created_at": c, "domain": dom, "site": site}
+                        for h, d, c, dom, site in cur.fetchall()}
         finally:
             conn.close()
 
@@ -908,15 +914,21 @@ def regenerate_manifest(s3, bucket: str, bucket_raw: str) -> int:
             meta = json.loads(body)
         except Exception:
             meta = {}
-        dom = ACCOUNT_DOMAINS.get(db_row["account_id"]) if db_row else None
         camera = meta.get("camera") or {}
         settings = meta.get("capture_settings") or {}
+        uploaded = db_row["created_at"] if db_row else None
+        # recordedAt: アプリが metadata.json に録画開始の壁時計 (recording_started_at) を
+        # 書くようになったらそれが正。 無い収録は「アップロード時刻 − 尺」で録画開始を近似する。
+        recorded = meta.get("recording_started_at")
+        if not recorded and uploaded is not None:
+            recorded = (uploaded - dt.timedelta(
+                milliseconds=(db_row["duration_ms"] or 0))).isoformat()
         entries.append({
             "contentHash": h,
-            "domain": dom["domain"] if dom else None,
-            "site": dom["site"] if dom else None,
-            # 登録時刻 = アップロード完了直後の POST /api/clips 時刻。 撮影時刻の近似として使う。
-            "recordedAt": db_row["created_at"].isoformat() if db_row else None,
+            "domain": db_row["domain"] if db_row else None,
+            "site": db_row["site"] if db_row else None,
+            "recordedAt": recorded,
+            "uploadedAt": uploaded.isoformat() if uploaded else None,
             "durationSec": round((db_row["duration_ms"] or 0) / 1000.0, 3) if db_row else None,
             "fps": settings.get("recording_rate_hz"),
             "resolution": (f"{camera.get('width')}x{camera.get('height')}"
@@ -951,12 +963,8 @@ def process_session(content_hash: str, blur: bool = True,
     if not blur and bucket_out == os.environ.get("R2_BUCKET_FPVLABS", "rootlens-fpvlabs"):
         raise RuntimeError("refusing --no-blur into the production delivery bucket; use --target-bucket")
 
-    # DB 照合とドメイン解決は GPU を回す前に済ませる (未登録 / 未知アカウントで即死させる)。
+    # DB 照合とドメイン解決は GPU を回す前に済ませる (未登録 / 属性未設定で即死させる)。
     db_row = _clip_db_row(content_hash)
-    domain = ACCOUNT_DOMAINS.get(db_row["account_id"])
-    if domain is None:
-        raise RuntimeError(
-            f"account {db_row['account_id']} not in ACCOUNT_DOMAINS; add the new site mapping first")
 
     with tempfile.TemporaryDirectory() as tmp:
         session_dir = os.path.join(tmp, "session")
@@ -985,7 +993,7 @@ def process_session(content_hash: str, blur: bool = True,
 
         # manifest を DB + R2 の実状態から再生成 (方式は冒頭の manifest セクションのコメント参照)。
         result["manifestEntries"] = regenerate_manifest(s3, bucket_out, bucket_raw)
-        result["domain"] = domain["domain"]
+        result["domain"] = db_row["domain"]
         return result
 
 

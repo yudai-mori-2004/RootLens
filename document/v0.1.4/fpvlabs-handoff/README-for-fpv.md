@@ -41,7 +41,8 @@ Each line of `manifest.jsonl` describes one recording:
 | `contentHash` | recording id = the folder name |
 | `domain` | kind of work filmed: `home` (household chores) / `bakery` (bakery work) |
 | `site` | recording location id within the domain (e.g. `bakery-01`) |
-| `recordedAt` | upload completion time, ISO 8601 UTC |
+| `recordedAt` | recording start time, ISO 8601 UTC (estimated from upload time for early sessions) |
+| `uploadedAt` | upload completion time, ISO 8601 UTC |
 | `durationSec` | recording length in seconds |
 | `fps` | RGB frame rate |
 | `resolution` | RGB frame size, `WxH` |

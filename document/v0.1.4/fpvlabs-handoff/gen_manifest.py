@@ -6,6 +6,7 @@ manifest は fpvlabs.py が処理のたびに DB + R2 の実状態から作り�
 (= セッションをバケットから消した直後や、 スキーマ変更を反映したいとき用)。
 
 スキーマは fpvlabs.py の regenerate_manifest と同一に保つ (変えるときは両方 + README-for-fpv.md)。
+domain / site の正は DB の accounts テーブル。
 
 実行 (リポジトリ直下):
   set -a; source web/.env.local; set +a
@@ -14,14 +15,9 @@ manifest は fpvlabs.py が処理のたびに DB + R2 の実状態から作り�
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import os
-
-# fpvlabs.py の ACCOUNT_DOMAINS と揃える (新しい現場のアカウントは両方に足す)。
-ACCOUNT_DOMAINS = {
-    "936e39a7-6afb-418e-9b9a-b300258497df": {"domain": "home", "site": "home-01"},
-    "5e195f17-6413-4b82-825d-da314fcb6a33": {"domain": "bakery", "site": "bakery-01"},
-}
 
 
 def r2_client():
@@ -60,12 +56,13 @@ def main():
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "select content_hash, account_id, duration_ms, created_at from clips"
-                    " where content_hash = any(%s)",
+                    "select c.content_hash, c.duration_ms, c.created_at, a.domain, a.site"
+                    " from clips c left join accounts a on a.id = c.account_id"
+                    " where c.content_hash = any(%s)",
                     (list(sessions),),
                 )
-                rows = {h: {"account_id": str(a), "duration_ms": d, "created_at": c}
-                        for h, a, d, c in cur.fetchall()}
+                rows = {h: {"duration_ms": d, "created_at": c, "domain": dom, "site": site}
+                        for h, d, c, dom, site in cur.fetchall()}
         finally:
             conn.close()
 
@@ -74,22 +71,29 @@ def main():
         db_row = rows.get(h)
         if not db_row:
             print(f"  ⚠ {h[:8]}: clips テーブルに未登録 (欠損フィールドは null)")
+        elif db_row["domain"] is None:
+            print(f"  ⚠ {h[:8]}: accounts に現場属性の行が無い (domain/site は null)")
         try:
             body = s3.get_object(Bucket=bucket_raw, Key=f"raw/{h}/metadata.json")["Body"].read()
             meta = json.loads(body)
         except Exception:
             print(f"  ⚠ {h[:8]}: raw metadata.json が読めない (欠損フィールドは null)")
             meta = {}
-        dom = ACCOUNT_DOMAINS.get(db_row["account_id"]) if db_row else None
-        if db_row and dom is None:
-            print(f"  ⚠ {h[:8]}: account {db_row['account_id']} not in ACCOUNT_DOMAINS")
         camera = meta.get("camera") or {}
         settings = meta.get("capture_settings") or {}
+        uploaded = db_row["created_at"] if db_row else None
+        # recordedAt: アプリが書く壁時計 (recording_started_at) があればそれ、
+        # 無ければ「アップロード時刻 − 尺」で録画開始を近似 (fpvlabs.py と同じ規則)。
+        recorded = meta.get("recording_started_at")
+        if not recorded and uploaded is not None:
+            recorded = (uploaded - dt.timedelta(
+                milliseconds=(db_row["duration_ms"] or 0))).isoformat()
         entries.append({
             "contentHash": h,
-            "domain": dom["domain"] if dom else None,
-            "site": dom["site"] if dom else None,
-            "recordedAt": db_row["created_at"].isoformat() if db_row else None,
+            "domain": db_row["domain"] if db_row else None,
+            "site": db_row["site"] if db_row else None,
+            "recordedAt": recorded,
+            "uploadedAt": uploaded.isoformat() if uploaded else None,
             "durationSec": round((db_row["duration_ms"] or 0) / 1000.0, 3) if db_row else None,
             "fps": settings.get("recording_rate_hz"),
             "resolution": (f"{camera.get('width')}x{camera.get('height')}"

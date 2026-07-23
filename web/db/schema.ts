@@ -2,12 +2,13 @@ import {
   pgTable, text, integer, bigint, timestamp, index, jsonb, uuid,
 } from "drizzle-orm/pg-core";
 
-// v0.1.4 (task 13 適用後): 「データを取って id に紐づけるだけの機械」 の最小 schema。
+// v0.1.4: 「データを取って id に紐づけるだけの機械」 の最小 schema。
 //
-// public スキーマは clips と consent_events の 2 テーブルのみ。 アカウントは Supabase Auth
-// (auth.users) が持ち、 このスキーマにアカウントテーブルは無い。 現場名・契約・振込先などの
-// 意味論は一切 DB に置かず、 運営の台帳 (freee 取引先メモ等) で uuid ↔ 実世界を対応させる
-// (= 店名非公表の構造的保証。 詳細は document/v0.1.4/tasks/13-supabase-auth-accounts/)。
+// public スキーマは clips / consent_events / accounts の 3 テーブル。 アカウントの実体は
+// Supabase Auth (auth.users) が持ち、 accounts はその撮影運用属性 (domain / site の匿名コード)
+// だけを載せる。 店名・契約・振込先などの実世界対応は一切 DB に置かず、 運営の台帳
+// (freee 取引先メモ等) で uuid ↔ 実世界を対応させる (= 店名非公表の構造的保証。
+// 詳細は document/v0.1.4/tasks/13-supabase-auth-accounts/)。
 
 export const clips = pgTable(
   "clips",
@@ -47,6 +48,18 @@ export const clips = pgTable(
 
 export type Clip = typeof clips.$inferSelect;
 export type NewClip = typeof clips.$inferInsert;
+
+/// 撮影アカウントの現場属性 (= 納品 manifest の domain / site の正)。 id は auth.users.id。
+/// site は "bakery-01" のような匿名コードのみ (実世界との対応は台帳側に置く)。
+/// 行が無いアカウント (テスト端末など) のクリップは納品パイプラインが実行前に拒否する。
+export const accounts = pgTable("accounts", {
+  id: uuid("id").primaryKey(),
+  domain: text("domain").notNull(),
+  site: text("site").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Account = typeof accounts.$inferSelect;
 
 /// 同意イベントログ (= document/legal/consent-log-spec/ja.md が正典。
 /// task 13 での差分: subject の識別子を pubkey から account_id (uuid) に置換)。
