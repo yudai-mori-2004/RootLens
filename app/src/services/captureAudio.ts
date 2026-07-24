@@ -41,6 +41,13 @@ let speechSeqCounter = 0;
 let lastDoneSpeechSeq = 0;
 let lastDoneSpeechAt = 0;
 
+// 直近で cue の再生 (または停止操作) が終わった時刻。 音声コマンドゲートの残響猶予に使う。
+let lastCueFinishedAt = 0;
+
+// 音声認識の結果は実音声より 0.5〜1.5 秒ほど遅れて届く。 再生終了の直後はまだ
+// 「アプリ自身の声の認識結果」 が到着しうる時間帯なので、 この猶予内の一致も捨てる。
+const SPEECH_ECHO_HOLDOFF_MS = 2000;
+
 // TTS の声は現在の locale に追従する (= ja は ja-JP、 en は en-US)。
 // rate/pitch は発話時に毎回現 locale で組む (= 言語切替後に開いた撮影で正しい声になる)。
 function ttsOptions(): Speech.SpeechOptions {
@@ -97,6 +104,7 @@ async function drain(): Promise<void> {
     } catch {
       // 個別 cue の失敗は無視 (= 音声で UX を止めない)
     }
+    lastCueFinishedAt = Date.now();
     item.resolve();
     // ⚠ 世代が変わっても loop は抜けない: clearAudioQueue 後に積まれた新世代の cue は
     //    この loop が続けて再生する。 (以前はここで break していて、 クリア直後に積まれた
@@ -132,10 +140,13 @@ export function getLastSpeechDone(): { seq: number; at: number } {
   return { seq: lastDoneSpeechSeq, at: lastDoneSpeechAt };
 }
 
-/** 音声キューが再生中 / 未消化か (= スピーカーが鳴っている可能性)。 音声コマンドのリスナーが
- *  「アプリ自身の TTS を聞き取って誤発火する」 のを防ぐゲートに使う。 */
-export function isAudioBusy(): boolean {
-  return draining || queue.length > 0;
+/** 音声コマンドのゲート: 再生中 (= スピーカーが鳴っている可能性) に加え、 再生終了後
+ *  SPEECH_ECHO_HOLDOFF_MS の間も true。 認識結果は実音声より遅れて届くので、 再生中の
+ *  判定だけだと「TTS が言い終わった直後」 にアプリ自身の声の認識結果が滑り込む
+ *  (= 停止ヒントの「撮影ストップ」 で録画が止まり、 完了案内の「撮影スタート」 で
+ *  勝手に録画が始まる)。 この猶予がその取りこぼしを塞ぐ。 */
+export function isVoiceCommandGateClosed(): boolean {
+  return draining || queue.length > 0 || Date.now() - lastCueFinishedAt < SPEECH_ECHO_HOLDOFF_MS;
 }
 
 /** 保留中の cue を全破棄 + 現在の TTS / SFX を停止する (= 状態が切り替わった時・退場時)。
@@ -146,5 +157,6 @@ export function clearAudioQueue(): void {
   queue = [];
   Speech.stop();
   stopAllSfx();
+  lastCueFinishedAt = Date.now();
   for (const it of pending) it.resolve();
 }

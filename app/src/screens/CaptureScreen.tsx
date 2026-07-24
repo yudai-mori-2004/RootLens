@@ -73,7 +73,7 @@ import {
   type HandTrackEvent,
 } from '../dataflow';
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
-import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isAudioBusy } from '../services/captureAudio';
+import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isVoiceCommandGateClosed } from '../services/captureAudio';
 import { applyCaptureSettingsToNative, loadCaptureSettings } from '../services/captureSettings';
 import { GestureStabilizer, frameGesture } from '../domain/gestureDetect';
 import {
@@ -348,7 +348,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       sink({ step: 'capture', level: 'warn', message: `音声コマンド開始失敗: ${errMsg(e)}` }),
     );
     const sub = subscribeVoiceCommand((e) => {
-      if (isAudioBusy()) return;
+      // 再生中 + 再生終了直後の猶予内は捨てる: 認識結果は実音声より遅れて届くので、
+      // busy 判定だけだと停止ヒント自身の「撮影ストップ」 が録画を止める (実測 ~7 秒停止事故)。
+      if (isVoiceCommandGateClosed()) return;
       voiceCmdRef.current = { cmd: e.command, at: Date.now() };
     });
     // Siri と音声入力が両方オフの端末ではオンデバイス認識自体が動かない (= native 側が
