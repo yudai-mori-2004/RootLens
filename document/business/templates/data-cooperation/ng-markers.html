@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* ぼかしマーカーのステッカーシート。 校正ラベルの流儀: マーカー = 基準器、 下半分は
+     「ゾーンの縮尺図 + 寸法の数字」 だけで語る。 文字は寸法と最小限の注記のみ。 */
+  @page { size:A4; margin:0; }
+  *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  :root{
+    --ink:#111111;
+    --ink2:#333333;
+    --gray:#777777;
+    --cut:#C8C8C8;
+    --mosaic-a:#9a9a9a;
+    --mosaic-b:#c9c9c9;
+    --mosaic-c:#e9e9e9;
+  }
+  html,body{ background:#fff; color:var(--ink);
+    font-family:"Noto Sans CJK JP","Hiragino Sans",sans-serif;
+    -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
+  .page{ position:relative; width:210mm; height:297mm; overflow:hidden; background:#fff;
+    page-break-after:always; }
+  .grid{ position:absolute; inset:0; display:grid;
+    grid-template-columns:94mm 94mm; grid-auto-rows:112mm; gap:6mm;
+    justify-content:center; align-content:center; }
+
+  /* ── ステッカー 1 枚 (94 × 112mm) ── */
+  .sticker{ position:relative; border:1.1mm solid var(--ink); background:#fff;
+    outline:0.3mm dashed var(--cut); outline-offset:1.2mm; /* 切り取りガイド */ }
+
+  /* ArUco: 黒枠実寸 70mm (= パイプラインの換算基準)。 周囲 ≥10mm がクワイエットゾーン。 */
+  .aruco{ display:block; width:70mm; height:70mm; margin:9mm auto 0; image-rendering:pixelated; }
+
+  /* ── 下段: 左 = 縮尺図 / 右 = 寸法の数字 ── */
+  .strip{ position:absolute; left:0; right:0; top:81mm; bottom:8.5mm;
+    display:flex; align-items:center; gap:4mm; padding:0 6mm; }
+  .diagram{ flex:none; height:22.5mm; width:auto; }
+  .dim{ flex:1; text-align:right; line-height:0.95; white-space:nowrap; }
+  .dim .pre{ display:block; font-size:3.6mm; font-weight:800; color:var(--ink2); letter-spacing:0.4mm; margin-bottom:1.2mm; }
+  .dim .num{ font-size:11mm; font-weight:900; letter-spacing:-0.2mm; }
+  .dim .num.small{ font-size:8.6mm; }
+  .dim .num.xsmall{ font-size:6.6mm; }
+  .dim .unit{ font-size:4.6mm; font-weight:900; margin-left:0.6mm; }
+
+  /* ── 最下段: 意味の一行 + 識別 (= 図のレーンとは分離した白帯) ── */
+  .foot{ position:absolute; left:1.1mm; right:1.1mm; bottom:1.1mm; height:6.6mm;
+    padding:0 5mm; background:#fff;
+    display:flex; align-items:center; gap:1.8mm; }
+  .foot img{ height:4.2mm; }
+  .foot .say{ font-size:2.9mm; font-weight:800; color:var(--ink2); letter-spacing:0.2mm; }
+  .foot .id{ margin-left:auto; font-size:2.5mm; font-weight:700; color:var(--gray); letter-spacing:0.3mm; }
+
+  svg text{ font-family:"Noto Sans CJK JP","Hiragino Sans",sans-serif; }
+</style>
+</head>
+<body>
+
+<!-- SVG 共通定義: モザイクパターン + 寸法線の矢じり -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <pattern id="mosaic" width="2" height="2" patternUnits="userSpaceOnUse">
+      <rect width="2" height="2" fill="var(--mosaic-c)"/>
+      <rect width="1" height="1" fill="var(--mosaic-a)"/>
+      <rect x="1" y="1" width="1" height="1" fill="var(--mosaic-b)"/>
+    </pattern>
+    <marker id="arr" viewBox="0 0 4 4" refX="3.2" refY="2" markerWidth="4" markerHeight="4" orient="auto">
+      <path d="M0,0 L4,2 L0,4 z" fill="#111"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 4 4" refX="0.8" refY="2" markerWidth="4" markerHeight="4" orient="auto">
+      <path d="M4,0 L0,2 L4,4 z" fill="#111"/>
+    </marker>
+  </defs>
+</svg>
+
+<div class="page">
+  <div class="grid">
+
+    <!-- No.0 円 半径25cm: 表示ゾーン d24mm / ミニマーカー 3.4mm (実寸比) -->
+    <div class="sticker">
+      <img class="aruco" src="../assets/ng/aruco-0.png" alt="">
+      <div class="strip">
+        <svg class="diagram" width="34mm" height="26mm" viewBox="0 0 34 26">
+          <circle cx="14" cy="12" r="12" fill="url(#mosaic)" stroke="#111" stroke-width="0.45"/>
+          <line x1="14" y1="12" x2="26" y2="12" stroke="#111" stroke-width="0.35" marker-end="url(#arr)"/>
+          <image href="../assets/ng/aruco-0.png" x="12.3" y="10.3" width="3.4" height="3.4"/>
+          <line x1="13.2" y1="10.8" x2="7" y2="4.8" stroke="#555" stroke-width="0.25"/>
+          <rect x="0.6" y="1.2" width="13.4" height="3.6" rx="0.6" fill="#fff" opacity="0.92"/>
+          <text x="1.4" y="3.9" font-size="2.5" font-weight="700" fill="#555">このシール</text>
+        </svg>
+        <div class="dim"><span class="pre">まわりをぼかす</span><span class="num">半径25</span><span class="unit">cm</span></div>
+      </div>
+      <div class="foot">
+        <img src="../assets/icon-no-video.png" alt="">
+        <span class="say">映像で自動ぼかし</span>
+        <span class="id">RootLens No.0</span>
+      </div>
+    </div>
+
+    <!-- No.1 円 半径50cm: ミニマーカー 2.2mm -->
+    <div class="sticker">
+      <img class="aruco" src="../assets/ng/aruco-1.png" alt="">
+      <div class="strip">
+        <svg class="diagram" width="34mm" height="26mm" viewBox="0 0 34 26">
+          <circle cx="14" cy="12" r="12" fill="url(#mosaic)" stroke="#111" stroke-width="0.45"/>
+          <line x1="14" y1="12" x2="26" y2="12" stroke="#111" stroke-width="0.35" marker-end="url(#arr)"/>
+          <image href="../assets/ng/aruco-1.png" x="12.9" y="10.9" width="2.2" height="2.2"/>
+          <line x1="13.2" y1="10.8" x2="7" y2="4.8" stroke="#555" stroke-width="0.25"/>
+          <rect x="0.6" y="1.2" width="13.4" height="3.6" rx="0.6" fill="#fff" opacity="0.92"/>
+          <text x="1.4" y="3.9" font-size="2.5" font-weight="700" fill="#555">このシール</text>
+        </svg>
+        <div class="dim"><span class="pre">まわりをぼかす</span><span class="num">半径50</span><span class="unit">cm</span></div>
+      </div>
+      <div class="foot">
+        <img src="../assets/icon-no-video.png" alt="">
+        <span class="say">映像で自動ぼかし</span>
+        <span class="id">RootLens No.1</span>
+      </div>
+    </div>
+
+    <!-- No.2 円 半径1m: ミニマーカー 2.2mm (下限。 実寸比では 0.8mm) -->
+    <div class="sticker">
+      <img class="aruco" src="../assets/ng/aruco-2.png" alt="">
+      <div class="strip">
+        <svg class="diagram" width="34mm" height="26mm" viewBox="0 0 34 26">
+          <circle cx="14" cy="12" r="12" fill="url(#mosaic)" stroke="#111" stroke-width="0.45"/>
+          <line x1="14" y1="12" x2="26" y2="12" stroke="#111" stroke-width="0.35" marker-end="url(#arr)"/>
+          <image href="../assets/ng/aruco-2.png" x="12.9" y="10.9" width="2.2" height="2.2"/>
+          <line x1="13.2" y1="10.8" x2="7" y2="4.8" stroke="#555" stroke-width="0.25"/>
+          <rect x="0.6" y="1.2" width="13.4" height="3.6" rx="0.6" fill="#fff" opacity="0.92"/>
+          <text x="1.4" y="3.9" font-size="2.5" font-weight="700" fill="#555">このシール</text>
+        </svg>
+        <div class="dim"><span class="pre">まわりをぼかす</span><span class="num">半径1</span><span class="unit">m</span></div>
+      </div>
+      <div class="foot">
+        <img src="../assets/icon-no-video.png" alt="">
+        <span class="say">映像で自動ぼかし</span>
+        <span class="id">RootLens No.2</span>
+      </div>
+    </div>
+
+    <!-- No.10 矩形 40×30cm: 表示 32×24mm / ミニマーカー 5.6mm -->
+    <div class="sticker">
+      <img class="aruco" src="../assets/ng/aruco-10.png" alt="">
+      <div class="strip">
+        <svg class="diagram" width="40mm" height="26mm" viewBox="0 0 40 26">
+          <rect x="2" y="1" width="32" height="24" fill="url(#mosaic)" stroke="#111" stroke-width="0.45"/>
+          <line x1="4.4" y1="23" x2="31.6" y2="23" stroke="#111" stroke-width="0.3"
+                marker-start="url(#arrR)" marker-end="url(#arr)"/>
+          <line x1="32" y1="3.4" x2="32" y2="22.6" stroke="#111" stroke-width="0.3"
+                marker-start="url(#arrR)" marker-end="url(#arr)"/>
+          <image href="../assets/ng/aruco-10.png" x="15.2" y="10.2" width="5.6" height="5.6"/>
+          <line x1="16.4" y1="10.6" x2="9.5" y2="5" stroke="#555" stroke-width="0.25"/>
+          <rect x="3.2" y="1.8" width="13.4" height="3.6" rx="0.6" fill="#fff" opacity="0.92"/>
+          <text x="4" y="4.5" font-size="2.5" font-weight="700" fill="#555">このシール</text>
+        </svg>
+        <div class="dim"><span class="pre">この範囲をぼかす</span><span class="num small">40×30</span><span class="unit">cm</span></div>
+      </div>
+      <div class="foot">
+        <img src="../assets/icon-no-video.png" alt="">
+        <span class="say">映像で自動ぼかし</span>
+        <span class="id">RootLens No.10</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="page">
+  <div class="grid">
+
+    <!-- No.11 矩形 90×60cm: 表示 36×24mm / ミニマーカー 2.8mm -->
+    <div class="sticker">
+      <img class="aruco" src="../assets/ng/aruco-11.png" alt="">
+      <div class="strip">
+        <svg class="diagram" width="42mm" height="26mm" viewBox="0 0 42 26">
+          <rect x="2" y="1" width="36" height="24" fill="url(#mosaic)" stroke="#111" stroke-width="0.45"/>
+          <line x1="4.4" y1="23" x2="35.6" y2="23" stroke="#111" stroke-width="0.3"
+                marker-start="url(#arrR)" marker-end="url(#arr)"/>
+          <line x1="36" y1="3.4" x2="36" y2="22.6" stroke="#111" stroke-width="0.3"
+                marker-start="url(#arrR)" marker-end="url(#arr)"/>
+          <image href="../assets/ng/aruco-11.png" x="18.6" y="11.6" width="2.8" height="2.8"/>
+          <line x1="19.4" y1="11.8" x2="11" y2="5" stroke="#555" stroke-width="0.25"/>
+          <rect x="3.2" y="1.8" width="13.4" height="3.6" rx="0.6" fill="#fff" opacity="0.92"/>
+          <text x="4" y="4.5" font-size="2.5" font-weight="700" fill="#555">このシール</text>
+        </svg>
+        <div class="dim"><span class="pre">この範囲をぼかす</span><span class="num small">90×60</span><span class="unit">cm</span></div>
+      </div>
+      <div class="foot">
+        <img src="../assets/icon-no-video.png" alt="">
+        <span class="say">映像で自動ぼかし</span>
+        <span class="id">RootLens No.11</span>
+      </div>
+    </div>
+
+    <!-- No.12 矩形 180×90cm: 表示 44×22mm / ミニマーカー 2.2mm (下限。 実寸比では 1.7mm) -->
+    <div class="sticker">
+      <img class="aruco" src="../assets/ng/aruco-12.png" alt="">
+      <div class="strip">
+        <svg class="diagram" width="48mm" height="26mm" viewBox="0 0 48 26">
+          <rect x="2" y="2" width="44" height="22" fill="url(#mosaic)" stroke="#111" stroke-width="0.45"/>
+          <line x1="4.4" y1="22" x2="43.6" y2="22" stroke="#111" stroke-width="0.3"
+                marker-start="url(#arrR)" marker-end="url(#arr)"/>
+          <line x1="44" y1="4.4" x2="44" y2="21.6" stroke="#111" stroke-width="0.3"
+                marker-start="url(#arrR)" marker-end="url(#arr)"/>
+          <image href="../assets/ng/aruco-12.png" x="22.9" y="11.9" width="2.2" height="2.2"/>
+          <line x1="23.6" y1="12.1" x2="13" y2="5.6" stroke="#555" stroke-width="0.25"/>
+          <rect x="3.6" y="2.6" width="13.4" height="3.6" rx="0.6" fill="#fff" opacity="0.92"/>
+          <text x="4.4" y="5.3" font-size="2.5" font-weight="700" fill="#555">このシール</text>
+        </svg>
+        <div class="dim"><span class="pre">この範囲をぼかす</span><span class="num xsmall">180×90</span><span class="unit">cm</span></div>
+      </div>
+      <div class="foot">
+        <img src="../assets/icon-no-video.png" alt="">
+        <span class="say">映像で自動ぼかし</span>
+        <span class="id">RootLens No.12</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

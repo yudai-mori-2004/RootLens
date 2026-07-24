@@ -85,8 +85,9 @@
 検出が途切れても前後 3 秒はゾーンを維持する (遮蔽・モーションブラー対策)。 マーカーが
 1 つも映っていないセッションでは挙動は従来と同一。
 
-- シート: `document/business/templates/data-cooperation/ng-markers-*.png`
-  (`tools/asset-gen/gen-ng-markers.py` で生成)。 **必ず原寸 (等倍) で印刷する**。 黒枠 70mm が
+- シート: `document/business/templates/data-cooperation/ng-markers.pdf`
+  (紙面は同名 .html、 マーカー画像は `tools/asset-gen/gen-ng-markers.py`、 PDF 化は
+  `document/business/build.sh data-cooperation`)。 **必ず原寸 (等倍) で印刷する**。 黒枠 70mm が
   ゾーンの cm → px 換算の基準なので、 拡大縮小するとぼかし範囲がずれる。 厨房ではラミネート推奨。
 - 限界: ステンレス等の鏡面反射に映り込んだ内容までは守れない。 万一の露出は提供前の
   確認・削除 (合意書 第 10 条) が受け皿。 店主に「絶対」 とは言わない。
