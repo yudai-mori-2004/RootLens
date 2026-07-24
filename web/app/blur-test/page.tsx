@@ -75,19 +75,24 @@ function zoneFromMarker(corners: { x: number; y: number }[], def: ZoneDef): Zone
   if (def.shape === "circle") {
     return { kind: "circle", cx, cy, r: def.rCm * pxPerCm };
   }
+  // 本番 (fpvlabs.py) と同じ軸の取り方: u = マーカー上辺、 v = 左辺。 斜め視では
+  // 直交しない = ゾーンは平行四辺形になり、 面の射影に追従する。
   let ux = corners[1].x - corners[0].x;
   let uy = corners[1].y - corners[0].y;
   const un = Math.hypot(ux, uy) || 1;
   ux /= un; uy /= un;
+  let vx = corners[3].x - corners[0].x;
+  let vy = corners[3].y - corners[0].y;
+  const vn = Math.hypot(vx, vy) || 1;
+  vx /= vn; vy /= vn;
   // 紙の微妙な傾きでゾーンが斜めになると不自然なので ±20° は画像軸にスナップ (fpvlabs.py と同じ)。
   const ang = (Math.atan2(uy, ux) * 180) / Math.PI;
   const snapped = Math.round(ang / 90) * 90;
   if (Math.abs(ang - snapped) <= 20) {
     const rad = (snapped * Math.PI) / 180;
     ux = Math.cos(rad); uy = Math.sin(rad);
+    vx = -uy; vy = ux;
   }
-  const vx = -uy;
-  const vy = ux;
   const hw = (def.wCm * pxPerCm) / 2;
   const hh = (def.hCm * pxPerCm) / 2;
   return {
@@ -119,7 +124,8 @@ function blurredCopy(src: HTMLCanvasElement): HTMLCanvasElement {
   out.height = src.height;
   const ctx = out.getContext("2d")!;
   if (typeof ctx.filter === "string") {
-    ctx.filter = `blur(${Math.max(24, Math.round(src.width / 25))}px)`;
+    // 本番はフレーム半分の箱ぼかし (= ほぼ平坦) なので、 強度もそれに寄せる。
+    ctx.filter = `blur(${Math.max(48, Math.round(Math.max(src.width, src.height) / 10))}px)`;
     ctx.drawImage(src, 0, 0);
   } else {
     const tiny = document.createElement("canvas");
