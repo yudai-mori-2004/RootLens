@@ -524,6 +524,14 @@ def _ng_zone_from_corners(corners, zone_def):
     v = c[3] - c[0]
     u = u / (np.linalg.norm(u) + 1e-6)
     v = v / (np.linalg.norm(v) + 1e-6)
+    # 壁や棚のシールは紙の微妙な傾き (吊り下げ・検出ノイズ) を拾うとゾーンが斜めになって
+    # 不自然なので、 ±20° 以内は画像軸にスナップする。 それ以上は意図的な斜め貼りとして追従。
+    ang = float(np.degrees(np.arctan2(u[1], u[0])))
+    snapped = round(ang / 90.0) * 90.0
+    if abs(ang - snapped) <= 20.0:
+        rad = np.radians(snapped)
+        u = np.array([np.cos(rad), np.sin(rad)], dtype=np.float32)
+        v = np.array([-u[1], u[0]], dtype=np.float32)
     hw = zone_def["w_cm"] * px_per_cm / 2.0
     hh = zone_def["h_cm"] * px_per_cm / 2.0
     pts = np.stack([
@@ -591,7 +599,8 @@ def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]
 
 
 def _apply_zone_blur(rgb, zones):
-    """マーカーゾーンを顔ぼかしと同じ強いブラーで塗りつぶす (rgb: HxWx3、 色空間は不問)。"""
+    """マーカーゾーンを顔ぼかし (EgoBlur 適用部) と同じ強いブラーで塗りつぶす
+    (rgb: HxWx3、 色空間は不問)。"""
     import cv2
     import numpy as np
 
