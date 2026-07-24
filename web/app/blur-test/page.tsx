@@ -15,7 +15,7 @@ interface ArucoMarker {
   corners: { x: number; y: number }[];
 }
 interface ArGlobal {
-  Detector: new (opts: { dictionaryName: string }) => {
+  Detector: new (opts: { dictionaryName: string; maxHammingDistance?: number }) => {
     detect(image: { width: number; height: number; data: Uint8ClampedArray }): ArucoMarker[];
   };
 }
@@ -41,7 +41,10 @@ function ensureAruco(): Promise<ArGlobal> {
 
 const MARKER_CM = 7.0;
 const ZONE_SCALE = 1.15;
-const MAX_DIM = 2000;
+// 検出は原寸 (上限 4200px) で行い、 表示だけ縮小する。 遠く・小さく写ったマーカーは
+// 縮小画像だと消えるため、 検出解像度がそのまま検出距離になる。
+const DETECT_MAX = 4200;
+const DISPLAY_MAX = 2000;
 
 type ZoneDef =
   | { shape: "circle"; rCm: number; label: string }
@@ -149,21 +152,45 @@ export default function Page() {
       });
       URL.revokeObjectURL(url);
 
-      const scale = Math.min(1, MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.round(img.naturalWidth * scale);
-      const h = Math.round(img.naturalHeight * scale);
+      const AR = await ensureAruco();
+      // ハミング距離 2 まで許容 (辞書既定は厳格一致で、 小さく写ったマーカーを落とす)。
+      // カタログ外 id は下で捨てるので誤検出の実害はない。
+      const detector = new AR.Detector({ dictionaryName: "ARUCO_4X4_1000", maxHammingDistance: 2 });
 
+      const detectAt = (dim: number) => {
+        const s = Math.min(1, dim / Math.max(img.naturalWidth, img.naturalHeight));
+        const dw = Math.round(img.naturalWidth * s);
+        const dh = Math.round(img.naturalHeight * s);
+        const c = document.createElement("canvas");
+        c.width = dw;
+        c.height = dh;
+        const cctx = c.getContext("2d")!;
+        cctx.drawImage(img, 0, 0, dw, dh);
+        const found = detector
+          .detect(cctx.getImageData(0, 0, dw, dh))
+          .filter((m) => ZONES[m.id] !== undefined);
+        return { found, dw };
+      };
+
+      // 原寸で検出 → 見つからなければ半分の解像度でリトライ (ブレ・ノイズには縮小が効くことがある)。
+      let pass = detectAt(DETECT_MAX);
+      if (pass.found.length === 0) pass = detectAt(DETECT_MAX / 2);
+      const detectW = pass.dw;
+
+      const dispScale = Math.min(1, DISPLAY_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * dispScale);
+      const h = Math.round(img.naturalHeight * dispScale);
       const src = document.createElement("canvas");
       src.width = w;
       src.height = h;
-      const srcCtx = src.getContext("2d")!;
-      srcCtx.drawImage(img, 0, 0, w, h);
+      src.getContext("2d")!.drawImage(img, 0, 0, w, h);
 
-      const AR = await ensureAruco();
-      const detector = new AR.Detector({ dictionaryName: "ARUCO_4X4_1000" });
-      const markers = detector
-        .detect(srcCtx.getImageData(0, 0, w, h))
-        .filter((m) => ZONES[m.id] !== undefined);
+      // 検出座標系 → 表示座標系 (ゾーン計算は相似なので座標を先に縮めれば足りる)
+      const k = w / detectW;
+      const markers = pass.found.map((m) => ({
+        id: m.id,
+        corners: m.corners.map((p) => ({ x: p.x * k, y: p.y * k })),
+      }));
 
       const canvas = canvasRef.current!;
       canvas.width = w;
