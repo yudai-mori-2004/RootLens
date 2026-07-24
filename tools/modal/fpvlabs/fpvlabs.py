@@ -580,6 +580,7 @@ def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]
     """rgb.mp4 を 1 パス走査して撮影禁止マーカーを検出し、 フレーム番号 → ぼかしゾーン一覧の
     予定表を返す。 検出の切れ目は前後 hold_frames まで最寄りの目撃ジオメトリで埋める
     (= 遮蔽・モーションブラー・画角外れの取りこぼし対策。 バッチ処理なので過去方向にも伸ばせる)。
+    孤立した単発目撃はノイズとして捨てる (下のコメント参照)。
     マーカーが 1 つも映っていないセッションでは空 dict (= 後段の挙動は従来と同一)。"""
     import cv2
     import numpy as np  # noqa: F401  (cv2.aruco が内部で要求)
@@ -614,6 +615,20 @@ def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]
     finally:
         cap.release()
     total_frames = i
+
+    # 単発の孤立目撃はテクスチャノイズとして捨てる。 現場にはメジャーの黒窓やキーボードの
+    # キー格子など 4x4 として復号できる模様が多く、 ビット化けでまれにカタログ id に化ける。
+    # 本物のステッカーは連続フレームの目撃列になるので、 同一 id の別の目撃が hold_frames
+    # 以内に 1 つも無い目撃はゾーン化しない。
+    for mid in list(sightings):
+        seen = sightings[mid]
+        kept = [s for k, s in enumerate(seen)
+                if (k > 0 and s[0] - seen[k - 1][0] <= hold_frames)
+                or (k + 1 < len(seen) and seen[k + 1][0] - s[0] <= hold_frames)]
+        if kept:
+            sightings[mid] = kept
+        else:
+            del sightings[mid]
 
     # 目撃列 → 予定表: 各目撃の前後 hold_frames を受け持ち区間にする。 隣の目撃と重なる範囲は
     # 中点で分担する (= 常に最寄りのジオメトリが使われ、 同一 id の二重登録も起きない)。
