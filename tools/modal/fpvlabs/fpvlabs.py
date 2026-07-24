@@ -629,6 +629,19 @@ def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]
             sightings[mid] = kept
         else:
             del sightings[mid]
+        if len(kept) != len(seen):
+            print(f"[ng] id={mid}: dropped {len(seen) - len(kept)} isolated sighting(s) as noise", flush=True)
+
+    # 残った目撃列をクラスタ単位でログに出す (= どの時間帯に何が映ったか後から追える)。
+    for mid, seen in sightings.items():
+        clusters: list[list[int]] = []
+        for f, _ in seen:
+            if clusters and f - clusters[-1][1] <= hold_frames:
+                clusters[-1][1] = f
+            else:
+                clusters.append([f, f])
+        spans = ", ".join(f"{a}..{b}" for a, b in clusters)
+        print(f"[ng] id={mid}: {len(seen)} sightings in {len(clusters)} cluster(s): frames {spans}", flush=True)
 
     # 目撃列 → 予定表: 各目撃の前後 hold_frames を受け持ち区間にする。 隣の目撃と重なる範囲は
     # 中点で分担する (= 常に最寄りのジオメトリが使われ、 同一 id の二重登録も起きない)。
