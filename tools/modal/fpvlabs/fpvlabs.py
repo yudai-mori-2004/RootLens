@@ -507,38 +507,43 @@ def _make_face_backend(face_detector: str):
 
 
 def _ng_zone_from_corners(corners, zone_def):
-    """ArUco の 4 隅 (4,2) から画面上のぼかしゾーンを作る。 マーカー実寸と画面上の辺長の比で
-    cm → px を換算する (= 相似。 距離推定も内部パラメータも不要)。 rect はマーカーの辺ベクトルを
-    軸に取るので、 貼った向きに追従する。"""
+    """ArUco の 4 隅 (4,2) から画面上のぼかしゾーンを作る。 マーカーの上辺・左辺ベクトルを
+    「面上の 1cm」 に換算したアフィン写像として使い、 ゾーンをその写像に通す
+    (= 距離推定も内部パラメータも不要な一次近似)。 rect は平行四辺形、 circle は楕円になり、
+    どちらも面の射影に追従する。 円は面内回転に不変なので、 シールが傾いて貼られても形は変わらない。"""
     import numpy as np
 
     c = np.asarray(corners, dtype=np.float32).reshape(4, 2)
     side_px = float(np.mean([np.linalg.norm(c[k] - c[(k + 1) % 4]) for k in range(4)]))
     if side_px <= 1.0:
         return None
-    px_per_cm = side_px / NG_MARKER_SIZE_CM * NG_MARKER_ZONE_SCALE
     center = c.mean(axis=0)
+    # 1cm が画面上でどれだけ動くか (上辺方向 / 左辺方向)。 軸ごとのスケールを保つ完全アフィン。
+    U = (c[1] - c[0]) / NG_MARKER_SIZE_CM * NG_MARKER_ZONE_SCALE
+    V = (c[3] - c[0]) / NG_MARKER_SIZE_CM * NG_MARKER_ZONE_SCALE
+
     if zone_def["shape"] == "circle":
-        return ("circle", float(center[0]), float(center[1]), zone_def["r_cm"] * px_per_cm)
-    u = c[1] - c[0]
-    v = c[3] - c[0]
-    u = u / (np.linalg.norm(u) + 1e-6)
-    v = v / (np.linalg.norm(v) + 1e-6)
+        # 面上の円をアフィンで写す = 楕円。 32 角形で近似する。
+        ts = np.linspace(0.0, 2.0 * np.pi, 32, endpoint=False)
+        r = zone_def["r_cm"]
+        pts = center + np.outer(np.cos(ts) * r, U) + np.outer(np.sin(ts) * r, V)
+        return ("poly", pts.astype(np.int32))
+
     # 壁や棚のシールは紙の微妙な傾き (吊り下げ・検出ノイズ) を拾うとゾーンが斜めになって
     # 不自然なので、 ±20° 以内は画像軸にスナップする。 それ以上は意図的な斜め貼りとして追従。
-    ang = float(np.degrees(np.arctan2(u[1], u[0])))
+    ang = float(np.degrees(np.arctan2(U[1], U[0])))
     snapped = round(ang / 90.0) * 90.0
     if abs(ang - snapped) <= 20.0:
         rad = np.radians(snapped)
-        u = np.array([np.cos(rad), np.sin(rad)], dtype=np.float32)
-        v = np.array([-u[1], u[0]], dtype=np.float32)
-    hw = zone_def["w_cm"] * px_per_cm / 2.0
-    hh = zone_def["h_cm"] * px_per_cm / 2.0
+        U = np.array([np.cos(rad), np.sin(rad)], dtype=np.float32) * float(np.linalg.norm(U))
+        V = np.array([-np.sin(rad), np.cos(rad)], dtype=np.float32) * float(np.linalg.norm(V))
+    hw = zone_def["w_cm"] / 2.0
+    hh = zone_def["h_cm"] / 2.0
     pts = np.stack([
-        center - u * hw - v * hh,
-        center + u * hw - v * hh,
-        center + u * hw + v * hh,
-        center - u * hw + v * hh,
+        center - U * hw - V * hh,
+        center + U * hw - V * hh,
+        center + U * hw + V * hh,
+        center - U * hw + V * hh,
     ])
     return ("poly", pts.astype(np.int32))
 
@@ -607,11 +612,7 @@ def _apply_zone_blur(rgb, zones):
     h, w = rgb.shape[:2]
     mask = np.zeros((h, w), np.uint8)
     for zone in zones:
-        if zone[0] == "circle":
-            _, cx, cy, r = zone
-            cv2.circle(mask, (int(round(cx)), int(round(cy))), max(1, int(round(r))), 255, -1)
-        else:
-            cv2.fillConvexPoly(mask, zone[1], 255)
+        cv2.fillConvexPoly(mask, zone[1], 255)
     if not mask.any():
         return rgb
     blurred = cv2.blur(rgb, (max(1, h // 2), max(1, w // 2)))

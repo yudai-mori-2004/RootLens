@@ -59,62 +59,57 @@ const ZONES: Record<number, ZoneDef> = {
   12: { shape: "rect", wCm: 180, hCm: 90, label: "縦90cm×横180cm" },
 };
 
-type Zone =
-  | { kind: "circle"; cx: number; cy: number; r: number }
-  | { kind: "poly"; pts: { x: number; y: number }[] };
+type Zone = { pts: { x: number; y: number }[] };
 
+// 本番 (fpvlabs.py の _ng_zone_from_corners) と同一の式。 マーカーの上辺・左辺ベクトルを
+// 「面上の 1cm」 のアフィン写像として使い、 rect は平行四辺形、 circle は楕円 (32 角形) になる。
 function zoneFromMarker(corners: { x: number; y: number }[], def: ZoneDef): Zone {
-  const side =
-    corners.reduce((acc, p, i) => {
-      const q = corners[(i + 1) % 4];
-      return acc + Math.hypot(q.x - p.x, q.y - p.y);
-    }, 0) / 4;
-  const pxPerCm = (side / MARKER_CM) * ZONE_SCALE;
   const cx = corners.reduce((a, p) => a + p.x, 0) / 4;
   const cy = corners.reduce((a, p) => a + p.y, 0) / 4;
+  const k = ZONE_SCALE / MARKER_CM;
+  let Ux = (corners[1].x - corners[0].x) * k;
+  let Uy = (corners[1].y - corners[0].y) * k;
+  let Vx = (corners[3].x - corners[0].x) * k;
+  let Vy = (corners[3].y - corners[0].y) * k;
+
   if (def.shape === "circle") {
-    return { kind: "circle", cx, cy, r: def.rCm * pxPerCm };
+    const pts = [];
+    for (let i = 0; i < 32; i++) {
+      const t = (i / 32) * Math.PI * 2;
+      const a = Math.cos(t) * def.rCm;
+      const b = Math.sin(t) * def.rCm;
+      pts.push({ x: cx + a * Ux + b * Vx, y: cy + a * Uy + b * Vy });
+    }
+    return { pts };
   }
-  // 本番 (fpvlabs.py) と同じ軸の取り方: u = マーカー上辺、 v = 左辺。 斜め視では
-  // 直交しない = ゾーンは平行四辺形になり、 面の射影に追従する。
-  let ux = corners[1].x - corners[0].x;
-  let uy = corners[1].y - corners[0].y;
-  const un = Math.hypot(ux, uy) || 1;
-  ux /= un; uy /= un;
-  let vx = corners[3].x - corners[0].x;
-  let vy = corners[3].y - corners[0].y;
-  const vn = Math.hypot(vx, vy) || 1;
-  vx /= vn; vy /= vn;
+
   // 紙の微妙な傾きでゾーンが斜めになると不自然なので ±20° は画像軸にスナップ (fpvlabs.py と同じ)。
-  const ang = (Math.atan2(uy, ux) * 180) / Math.PI;
+  const ang = (Math.atan2(Uy, Ux) * 180) / Math.PI;
   const snapped = Math.round(ang / 90) * 90;
   if (Math.abs(ang - snapped) <= 20) {
     const rad = (snapped * Math.PI) / 180;
-    ux = Math.cos(rad); uy = Math.sin(rad);
-    vx = -uy; vy = ux;
+    const lu = Math.hypot(Ux, Uy);
+    const lv = Math.hypot(Vx, Vy);
+    Ux = Math.cos(rad) * lu; Uy = Math.sin(rad) * lu;
+    Vx = -Math.sin(rad) * lv; Vy = Math.cos(rad) * lv;
   }
-  const hw = (def.wCm * pxPerCm) / 2;
-  const hh = (def.hCm * pxPerCm) / 2;
+  const hw = def.wCm / 2;
+  const hh = def.hCm / 2;
   return {
-    kind: "poly",
     pts: [
-      { x: cx - ux * hw - vx * hh, y: cy - uy * hw - vy * hh },
-      { x: cx + ux * hw - vx * hh, y: cy + uy * hw - vy * hh },
-      { x: cx + ux * hw + vx * hh, y: cy + uy * hw + vy * hh },
-      { x: cx - ux * hw + vx * hh, y: cy - uy * hw + vy * hh },
+      { x: cx - Ux * hw - Vx * hh, y: cy - Uy * hw - Vy * hh },
+      { x: cx + Ux * hw - Vx * hh, y: cy + Uy * hw - Vy * hh },
+      { x: cx + Ux * hw + Vx * hh, y: cy + Uy * hw + Vy * hh },
+      { x: cx - Ux * hw + Vx * hh, y: cy - Uy * hw + Vy * hh },
     ],
   };
 }
 
 function tracePath(ctx: CanvasRenderingContext2D, zone: Zone) {
   ctx.beginPath();
-  if (zone.kind === "circle") {
-    ctx.arc(zone.cx, zone.cy, zone.r, 0, Math.PI * 2);
-  } else {
-    ctx.moveTo(zone.pts[0].x, zone.pts[0].y);
-    for (const p of zone.pts.slice(1)) ctx.lineTo(p.x, p.y);
-    ctx.closePath();
-  }
+  ctx.moveTo(zone.pts[0].x, zone.pts[0].y);
+  for (const p of zone.pts.slice(1)) ctx.lineTo(p.x, p.y);
+  ctx.closePath();
 }
 
 /** src をぼかした全面画像を作る。 ctx.filter が無い環境では縮小 → 拡大の簡易ブラー。 */
