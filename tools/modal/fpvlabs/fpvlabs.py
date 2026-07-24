@@ -506,11 +506,21 @@ def _make_face_backend(face_detector: str):
 # ─── 撮影禁止マーカー (= 検出プリパス + ゾーンぼかし) ─────────────────
 
 
+# 遠近採用の条件: ゾーン各点の射影分母 W の比がこれを超えたら (= ゾーン内で 15% 以上の
+# 奥行き変化)、 アフィンではなくホモグラフィでゾーンを面に貼り付ける。
+NG_PERSP_MIN_RATIO = 1.15
+# 安全弁: W 比がこれを超える外挿は数値的に暴れている (地平線に近い) とみなしてアフィンへ落とす。
+NG_PERSP_MAX_RATIO = 4.0
+
+
 def _ng_zone_from_corners(corners, zone_def):
-    """ArUco の 4 隅 (4,2) から画面上のぼかしゾーンを作る。 マーカーの上辺・左辺ベクトルを
-    「面上の 1cm」 に換算したアフィン写像として使い、 ゾーンをその写像に通す
-    (= 距離推定も内部パラメータも不要な一次近似)。 rect は平行四辺形、 circle は楕円になり、
-    どちらも面の射影に追従する。 円は面内回転に不変なので、 シールが傾いて貼られても形は変わらない。"""
+    """ArUco の 4 隅 (4,2) から画面上のぼかしゾーンを作る。
+
+    基本はマーカーの上辺・左辺ベクトルを「面上の 1cm」 としたアフィン写像 (rect = 平行四辺形、
+    circle = 楕円)。 遠近が実際に効いている場合 (ゾーン内の射影分母の変化が NG_PERSP_MIN_RATIO 超)
+    は 4 隅のホモグラフィでゾーンを面に貼り付ける = 奥ほど縮む。 外挿が数値的に暴れるケース
+    (分母の符号反転・比が NG_PERSP_MAX_RATIO 超・非有限) はガードで検知してアフィンへ落とすので、
+    露出方向に壊れない性質は保たれる。"""
     import numpy as np
 
     c = np.asarray(corners, dtype=np.float32).reshape(4, 2)
@@ -518,33 +528,51 @@ def _ng_zone_from_corners(corners, zone_def):
     if side_px <= 1.0:
         return None
     center = c.mean(axis=0)
-    # 1cm が画面上でどれだけ動くか (上辺方向 / 左辺方向)。 軸ごとのスケールを保つ完全アフィン。
-    U = (c[1] - c[0]) / NG_MARKER_SIZE_CM * NG_MARKER_ZONE_SCALE
-    V = (c[3] - c[0]) / NG_MARKER_SIZE_CM * NG_MARKER_ZONE_SCALE
 
+    # ── ゾーンの面上オフセット (cm、 マーカー中心原点、 余裕率込み) ──
     if zone_def["shape"] == "circle":
-        # 面上の円をアフィンで写す = 楕円。 32 角形で近似する。
         ts = np.linspace(0.0, 2.0 * np.pi, 32, endpoint=False)
-        r = zone_def["r_cm"]
-        pts = center + np.outer(np.cos(ts) * r, U) + np.outer(np.sin(ts) * r, V)
-        return ("poly", pts.astype(np.int32))
+        offs = np.stack([np.cos(ts), np.sin(ts)], axis=1) * (zone_def["r_cm"] * NG_MARKER_ZONE_SCALE)
+    else:
+        hw = zone_def["w_cm"] / 2.0 * NG_MARKER_ZONE_SCALE
+        hh = zone_def["h_cm"] / 2.0 * NG_MARKER_ZONE_SCALE
+        offs = np.array([[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], dtype=np.float32)
 
-    # 壁や棚のシールは紙の微妙な傾き (吊り下げ・検出ノイズ) を拾うとゾーンが斜めになって
-    # 不自然なので、 ±20° 以内は画像軸にスナップする。 それ以上は意図的な斜め貼りとして追従。
-    ang = float(np.degrees(np.arctan2(U[1], U[0])))
-    snapped = round(ang / 90.0) * 90.0
-    if abs(ang - snapped) <= 20.0:
-        rad = np.radians(snapped)
-        U = np.array([np.cos(rad), np.sin(rad)], dtype=np.float32) * float(np.linalg.norm(U))
-        V = np.array([-np.sin(rad), np.cos(rad)], dtype=np.float32) * float(np.linalg.norm(V))
-    hw = zone_def["w_cm"] / 2.0
-    hh = zone_def["h_cm"] / 2.0
-    pts = np.stack([
-        center - U * hw - V * hh,
-        center + U * hw - V * hh,
-        center + U * hw + V * hh,
-        center - U * hw + V * hh,
-    ])
+    # ── ホモグラフィ (単位正方形 → マーカー 4 隅、 Heckbert の閉形式) ──
+    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = c
+    dx1, dx2, dx3 = x1 - x2, x3 - x2, x0 - x1 + x2 - x3
+    dy1, dy2, dy3 = y1 - y2, y3 - y2, y0 - y1 + y2 - y3
+    den = dx1 * dy2 - dx2 * dy1
+    if abs(den) > 1e-9:
+        g = (dx3 * dy2 - dx2 * dy3) / den
+        h2 = (dx1 * dy3 - dx3 * dy1) / den
+        a = x1 - x0 + g * x1
+        b = x3 - x0 + h2 * x3
+        d = y1 - y0 + g * y1
+        e = y3 - y0 + h2 * y3
+        uv = offs / NG_MARKER_SIZE_CM + 0.5  # 面上 cm → マーカー基準の単位正方形座標
+        W = g * uv[:, 0] + h2 * uv[:, 1] + 1.0
+        if np.all(W > 1e-6):
+            ratio = float(W.max() / W.min())
+            if NG_PERSP_MIN_RATIO < ratio <= NG_PERSP_MAX_RATIO:
+                X = (a * uv[:, 0] + b * uv[:, 1] + x0) / W
+                Y = (d * uv[:, 0] + e * uv[:, 1] + y0) / W
+                if np.all(np.isfinite(X)) and np.all(np.isfinite(Y)):
+                    return ("poly", np.stack([X, Y], axis=1).astype(np.int32))
+
+    # ── アフィン経路 (正面寄り、 またはホモグラフィのガード落ち) ──
+    U = (c[1] - c[0]) / NG_MARKER_SIZE_CM  # 面上 1cm → px (上辺方向)
+    V = (c[3] - c[0]) / NG_MARKER_SIZE_CM
+    if zone_def["shape"] != "circle":
+        # 紙の微妙な傾き (吊り下げ・検出ノイズ) でゾーンが斜めになると不自然なので、
+        # ±20° 以内は画像軸にスナップ。 円は面内回転に不変なのでスナップ不要。
+        ang = float(np.degrees(np.arctan2(U[1], U[0])))
+        snapped = round(ang / 90.0) * 90.0
+        if abs(ang - snapped) <= 20.0:
+            rad = np.radians(snapped)
+            U = np.array([np.cos(rad), np.sin(rad)], dtype=np.float32) * float(np.linalg.norm(U))
+            V = np.array([-np.sin(rad), np.cos(rad)], dtype=np.float32) * float(np.linalg.norm(V))
+    pts = center + np.outer(offs[:, 0], U) + np.outer(offs[:, 1], V)
     return ("poly", pts.astype(np.int32))
 
 

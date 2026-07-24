@@ -61,47 +61,78 @@ const ZONES: Record<number, ZoneDef> = {
 
 type Zone = { pts: { x: number; y: number }[] };
 
-// 本番 (fpvlabs.py の _ng_zone_from_corners) と同一の式。 マーカーの上辺・左辺ベクトルを
-// 「面上の 1cm」 のアフィン写像として使い、 rect は平行四辺形、 circle は楕円 (32 角形) になる。
+// 遠近採用の条件とガード (fpvlabs.py の NG_PERSP_* と同値)。
+const PERSP_MIN_RATIO = 1.15;
+const PERSP_MAX_RATIO = 4.0;
+
+// 本番 (fpvlabs.py の _ng_zone_from_corners) と同一の式。 遠近が効いている場合は
+// 4 隅のホモグラフィでゾーンを面に貼り付け (= 奥ほど縮む)、 それ以外・ガード落ちは
+// 上辺・左辺ベクトルのアフィン (rect = 平行四辺形、 circle = 楕円)。
 function zoneFromMarker(corners: { x: number; y: number }[], def: ZoneDef): Zone {
   const cx = corners.reduce((a, p) => a + p.x, 0) / 4;
   const cy = corners.reduce((a, p) => a + p.y, 0) / 4;
-  const k = ZONE_SCALE / MARKER_CM;
-  let Ux = (corners[1].x - corners[0].x) * k;
-  let Uy = (corners[1].y - corners[0].y) * k;
-  let Vx = (corners[3].x - corners[0].x) * k;
-  let Vy = (corners[3].y - corners[0].y) * k;
 
+  // ── ゾーンの面上オフセット (cm、 マーカー中心原点、 余裕率込み) ──
+  const offs: { x: number; y: number }[] = [];
   if (def.shape === "circle") {
-    const pts = [];
     for (let i = 0; i < 32; i++) {
       const t = (i / 32) * Math.PI * 2;
-      const a = Math.cos(t) * def.rCm;
-      const b = Math.sin(t) * def.rCm;
-      pts.push({ x: cx + a * Ux + b * Vx, y: cy + a * Uy + b * Vy });
+      offs.push({ x: Math.cos(t) * def.rCm * ZONE_SCALE, y: Math.sin(t) * def.rCm * ZONE_SCALE });
     }
-    return { pts };
+  } else {
+    const hw = (def.wCm / 2) * ZONE_SCALE;
+    const hh = (def.hCm / 2) * ZONE_SCALE;
+    offs.push({ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh });
   }
 
-  // 紙の微妙な傾きでゾーンが斜めになると不自然なので ±20° は画像軸にスナップ (fpvlabs.py と同じ)。
-  const ang = (Math.atan2(Uy, Ux) * 180) / Math.PI;
-  const snapped = Math.round(ang / 90) * 90;
-  if (Math.abs(ang - snapped) <= 20) {
-    const rad = (snapped * Math.PI) / 180;
-    const lu = Math.hypot(Ux, Uy);
-    const lv = Math.hypot(Vx, Vy);
-    Ux = Math.cos(rad) * lu; Uy = Math.sin(rad) * lu;
-    Vx = -Math.sin(rad) * lv; Vy = Math.cos(rad) * lv;
+  // ── ホモグラフィ (単位正方形 → マーカー 4 隅、 Heckbert の閉形式) ──
+  const [p0, p1, p2, p3] = corners;
+  const dx1 = p1.x - p2.x, dx2 = p3.x - p2.x, dx3 = p0.x - p1.x + p2.x - p3.x;
+  const dy1 = p1.y - p2.y, dy2 = p3.y - p2.y, dy3 = p0.y - p1.y + p2.y - p3.y;
+  const den = dx1 * dy2 - dx2 * dy1;
+  if (Math.abs(den) > 1e-9) {
+    const g = (dx3 * dy2 - dx2 * dy3) / den;
+    const h2 = (dx1 * dy3 - dx3 * dy1) / den;
+    const a = p1.x - p0.x + g * p1.x;
+    const b = p3.x - p0.x + h2 * p3.x;
+    const d = p1.y - p0.y + g * p1.y;
+    const e = p3.y - p0.y + h2 * p3.y;
+    const uv = offs.map((o) => ({ u: o.x / MARKER_CM + 0.5, v: o.y / MARKER_CM + 0.5 }));
+    const Ws = uv.map((q) => g * q.u + h2 * q.v + 1);
+    if (Ws.every((W) => W > 1e-6)) {
+      const ratio = Math.max(...Ws) / Math.min(...Ws);
+      if (ratio > PERSP_MIN_RATIO && ratio <= PERSP_MAX_RATIO) {
+        const pts = uv.map((q, i) => ({
+          x: (a * q.u + b * q.v + p0.x) / Ws[i],
+          y: (d * q.u + e * q.v + p0.y) / Ws[i],
+        }));
+        if (pts.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) {
+          return { pts };
+        }
+      }
+    }
   }
-  const hw = def.wCm / 2;
-  const hh = def.hCm / 2;
+
+  // ── アフィン経路 (正面寄り、 またはホモグラフィのガード落ち) ──
+  let Ux = (p1.x - p0.x) / MARKER_CM;
+  let Uy = (p1.y - p0.y) / MARKER_CM;
+  let Vx = (p3.x - p0.x) / MARKER_CM;
+  let Vy = (p3.y - p0.y) / MARKER_CM;
+  if (def.shape !== "circle") {
+    // 紙の微妙な傾きでゾーンが斜めになると不自然なので ±20° は画像軸にスナップ。
+    // 円は面内回転に不変なのでスナップ不要。
+    const ang = (Math.atan2(Uy, Ux) * 180) / Math.PI;
+    const snapped = Math.round(ang / 90) * 90;
+    if (Math.abs(ang - snapped) <= 20) {
+      const rad = (snapped * Math.PI) / 180;
+      const lu = Math.hypot(Ux, Uy);
+      const lv = Math.hypot(Vx, Vy);
+      Ux = Math.cos(rad) * lu; Uy = Math.sin(rad) * lu;
+      Vx = -Math.sin(rad) * lv; Vy = Math.cos(rad) * lv;
+    }
+  }
   return {
-    pts: [
-      { x: cx - Ux * hw - Vx * hh, y: cy - Uy * hw - Vy * hh },
-      { x: cx + Ux * hw - Vx * hh, y: cy + Uy * hw - Vy * hh },
-      { x: cx + Ux * hw + Vx * hh, y: cy + Uy * hw + Vy * hh },
-      { x: cx - Ux * hw + Vx * hh, y: cy - Uy * hw + Vy * hh },
-    ],
+    pts: offs.map((o) => ({ x: cx + o.x * Ux + o.y * Vx, y: cy + o.x * Uy + o.y * Vy })),
   };
 }
 
