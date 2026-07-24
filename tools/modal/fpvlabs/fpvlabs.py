@@ -54,7 +54,7 @@ import tarfile
 import tempfile
 import time
 
-PIPELINE_VERSION = "fpvlabs-4"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
+PIPELINE_VERSION = "fpvlabs-5"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
 
 # ─── manifest (バケット同梱の属性テーブル) ─────────────────────────
 # 納品バケットはフラットな <hash>/session.mcap のまま、 セッションの属性 (ドメイン等) は
@@ -88,6 +88,26 @@ EGOBLUR_JIT_PATH = "/egoblur_model/ego_blur_face_gen2.jit"  # modal volume の m
 # 家事映像で手や床を顔と誤検出しやすいので、 EgoBlur が使えない場合の緊急時のみ。
 # min_detection_confidence は 0.9 まで上げて誤検出を潰す (実測で 0.9 なら誤爆ゼロ)。
 FACE_BLUR_MIN_CONFIDENCE = 0.9
+
+# ─── 撮影禁止マーカー (ArUco) ────────────────────────────────────
+# 店側が「映したくない場所」 に貼る物理ステッカー。 検出とぼかしは納品パイプライン (= ここ) だけで
+# 行い、 マーカー周囲の実寸ゾーンを塗りつぶす。 ArUco なのは同寸の QR よりセルが大きく、 数倍の
+# 距離やモーションブラー越しでも検出できるため。 シートは tools/asset-gen/gen-ng-markers.py で
+# 生成し、 原寸印刷が前提 (= マーカー実寸がゾーンの cm → px 換算の基準)。
+NG_MARKER_DICT = "DICT_4X4_50"
+NG_MARKER_SIZE_CM = 7.0      # 印刷したマーカー黒枠 1 辺の実寸 (= gen-ng-markers.py の出力と一致させる)
+NG_MARKER_HOLD_S = 3.0       # 検出が途切れても前後この秒数はゾーンを維持 (遮蔽・検出抜け対策)
+NG_MARKER_ZONE_SCALE = 1.15  # ゾーンを少し広げて適用 (境界の取りこぼし対策。 顔ぼかしと同率)
+# id → ぼかしゾーン (シートの表記と 1:1 に保つ)。 circle はマーカー中心の半径 r_cm、
+# rect はマーカー中心に置く w_cm × h_cm (貼った向きに追従)。
+NG_MARKER_ZONES: dict[int, dict] = {
+    0: {"shape": "circle", "r_cm": 25.0},
+    1: {"shape": "circle", "r_cm": 50.0},
+    2: {"shape": "circle", "r_cm": 100.0},
+    10: {"shape": "rect", "w_cm": 40.0, "h_cm": 30.0},
+    11: {"shape": "rect", "w_cm": 90.0, "h_cm": 60.0},
+    12: {"shape": "rect", "w_cm": 180.0, "h_cm": 90.0},
+}
 
 # ─── ROS2 msgdef (= mcap_ros2 に register する連結スキーマ) ────────────
 
@@ -483,6 +503,114 @@ def _make_face_backend(face_detector: str):
     raise ValueError(f"unknown face_detector: {face_detector}")
 
 
+# ─── 撮影禁止マーカー (= 検出プリパス + ゾーンぼかし) ─────────────────
+
+
+def _ng_zone_from_corners(corners, zone_def):
+    """ArUco の 4 隅 (4,2) から画面上のぼかしゾーンを作る。 マーカー実寸と画面上の辺長の比で
+    cm → px を換算する (= 相似。 距離推定も内部パラメータも不要)。 rect はマーカーの辺ベクトルを
+    軸に取るので、 貼った向きに追従する。"""
+    import numpy as np
+
+    c = np.asarray(corners, dtype=np.float32).reshape(4, 2)
+    side_px = float(np.mean([np.linalg.norm(c[k] - c[(k + 1) % 4]) for k in range(4)]))
+    if side_px <= 1.0:
+        return None
+    px_per_cm = side_px / NG_MARKER_SIZE_CM * NG_MARKER_ZONE_SCALE
+    center = c.mean(axis=0)
+    if zone_def["shape"] == "circle":
+        return ("circle", float(center[0]), float(center[1]), zone_def["r_cm"] * px_per_cm)
+    u = c[1] - c[0]
+    v = c[3] - c[0]
+    u = u / (np.linalg.norm(u) + 1e-6)
+    v = v / (np.linalg.norm(v) + 1e-6)
+    hw = zone_def["w_cm"] * px_per_cm / 2.0
+    hh = zone_def["h_cm"] * px_per_cm / 2.0
+    pts = np.stack([
+        center - u * hw - v * hh,
+        center + u * hw - v * hh,
+        center + u * hw + v * hh,
+        center - u * hw + v * hh,
+    ])
+    return ("poly", pts.astype(np.int32))
+
+
+def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]:
+    """rgb.mp4 を 1 パス走査して撮影禁止マーカーを検出し、 フレーム番号 → ぼかしゾーン一覧の
+    予定表を返す。 検出の切れ目は前後 hold_frames まで最寄りの目撃ジオメトリで埋める
+    (= 遮蔽・モーションブラー・画角外れの取りこぼし対策。 バッチ処理なので過去方向にも伸ばせる)。
+    マーカーが 1 つも映っていないセッションでは空 dict (= 後段の挙動は従来と同一)。"""
+    import cv2
+    import numpy as np  # noqa: F401  (cv2.aruco が内部で要求)
+
+    aruco = cv2.aruco
+    dictionary = aruco.getPredefinedDictionary(getattr(aruco, NG_MARKER_DICT))
+    if hasattr(aruco, "ArucoDetector"):
+        detector = aruco.ArucoDetector(dictionary, aruco.DetectorParameters())
+        detect = detector.detectMarkers
+    else:  # opencv < 4.7 の旧 API
+        params = aruco.DetectorParameters_create()
+        detect = lambda gray: aruco.detectMarkers(gray, dictionary, parameters=params)  # noqa: E731
+
+    sightings: dict[int, list] = {}  # marker id → [(frame_idx, zone), ...] (frame 昇順)
+    cap = cv2.VideoCapture(video_path)
+    try:
+        i = 0
+        while True:
+            ok, bgr = cap.read()
+            if not ok:
+                break
+            corners, ids, _ = detect(cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY))
+            if ids is not None:
+                for c, mid in zip(corners, ids.reshape(-1).tolist()):
+                    zone_def = NG_MARKER_ZONES.get(int(mid))
+                    if zone_def is None:
+                        continue
+                    zone = _ng_zone_from_corners(c, zone_def)
+                    if zone is not None:
+                        sightings.setdefault(int(mid), []).append((i, zone))
+            i += 1
+    finally:
+        cap.release()
+    total_frames = i
+
+    # 目撃列 → 予定表: 各目撃の前後 hold_frames を受け持ち区間にする。 隣の目撃と重なる範囲は
+    # 中点で分担する (= 常に最寄りのジオメトリが使われ、 同一 id の二重登録も起きない)。
+    schedule: dict[int, list] = {}
+    for seen in sightings.values():
+        for k, (f, zone) in enumerate(seen):
+            lo = f - hold_frames
+            hi = min(f + hold_frames, total_frames - 1)
+            if k > 0:
+                lo = max(lo, (seen[k - 1][0] + f + 1) // 2)
+            if k + 1 < len(seen):
+                hi = min(hi, (f + seen[k + 1][0]) // 2)
+            for fi in range(max(0, lo), hi + 1):
+                schedule.setdefault(fi, []).append(zone)
+    return schedule
+
+
+def _apply_zone_blur(rgb, zones):
+    """マーカーゾーンを顔ぼかしと同じ強いブラーで塗りつぶす (rgb: HxWx3、 色空間は不問)。"""
+    import cv2
+    import numpy as np
+
+    h, w = rgb.shape[:2]
+    mask = np.zeros((h, w), np.uint8)
+    for zone in zones:
+        if zone[0] == "circle":
+            _, cx, cy, r = zone
+            cv2.circle(mask, (int(round(cx)), int(round(cy))), max(1, int(round(r))), 255, -1)
+        else:
+            cv2.fillConvexPoly(mask, zone[1], 255)
+    if not mask.any():
+        return rgb
+    blurred = cv2.blur(rgb, (max(1, h // 2), max(1, w // 2)))
+    out = rgb.copy()
+    out[mask > 0] = blurred[mask > 0]
+    return out
+
+
 # ─── MCAP 組み立て本体 (= ストリーミング。 フレームをメモリに溜めない) ──
 
 
@@ -522,6 +650,15 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
     # 顔ぼかし (= blur=True のときだけ初期化)。 既定は EgoBlur (GPU、 Stera-10M と同じ)。
     face_backend = _make_face_backend(face_detector) if blur else None
 
+    # 撮影禁止マーカーの検出プリパス (CPU)。 顔ぼかしとは独立で、 --no-blur でも必ず適用する
+    # (= 店側プライバシーの装置なので落とせない)。 実効 fps は frames.jsonl の実測から。
+    dur_s = (int(frames_meta[-1]["timestamp_ns"]) - int(frames_meta[0]["timestamp_ns"])) / 1e9
+    eff_fps = (len(frames_meta) - 1) / dur_s if dur_s > 0 else 30.0
+    ng_schedule = detect_ng_marker_zones(
+        os.path.join(session_dir, "rgb.mp4"),
+        hold_frames=max(1, int(round(NG_MARKER_HOLD_S * eff_fps))),
+    )
+
     stats = {"rgb": 0, "depth": 0, "confidence": 0, "pose": 0, "imu": 0, "tracking": 0, "point_cloud": 0, "mesh_anchors": 0}
 
     with open(out_path, "wb") as out_f:
@@ -552,6 +689,8 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
             "blur_threshold": blur_meta["threshold"],
             "blur_resize": blur_meta["resize"],
             "jpeg_quality": jpeg_quality,
+            "ng_marker_dict": NG_MARKER_DICT,
+            "ng_marker_zone_frames": len(ng_schedule),
             "source": "rootlens raw session",
             "device_model": meta.get("device_model"),
             "app_version": meta.get("app_version"),
@@ -663,6 +802,9 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
             else:
                 rgb_batch = [cv2.cvtColor(b, cv2.COLOR_BGR2RGB) for b in bgr_batch]
             for idx, out_rgb in zip(i_batch, rgb_batch):
+                zones = ng_schedule.get(idx)
+                if zones:
+                    out_rgb = _apply_zone_blur(out_rgb, zones)
                 ok_enc, jpg = cv2.imencode(".jpg", cv2.cvtColor(out_rgb, cv2.COLOR_RGB2BGR),
                                            [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality])
                 if not ok_enc:
@@ -821,6 +963,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         "blur": blur,
         "faceDetector": face_detector if blur else None,
         "detectionsTotal": detections_total,
+        "ngMarkerZoneFrames": len(ng_schedule),
         "durationMs": int((time.time() - t0) * 1000),
         "outputBytes": os.path.getsize(out_path),
         "jsonlFrames": len(frames_meta),
