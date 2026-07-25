@@ -616,10 +616,10 @@ def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]
         cap.release()
     total_frames = i
 
-    # 単発の孤立目撃はテクスチャノイズとして捨てる。 現場にはメジャーの黒窓やキーボードの
-    # キー格子など 4x4 として復号できる模様が多く、 ビット化けでまれにカタログ id に化ける。
-    # 本物のステッカーは連続フレームの目撃列になるので、 同一 id の別の目撃が hold_frames
-    # 以内に 1 つも無い目撃はゾーン化しない。
+    # 単発の孤立目撃はノイズとして捨てる。 環境中の高コントラストな模様が偶発的に
+    # カタログ id へ復号されることがあり、 それは孤立フレームにしかならない。 物理的に
+    # 貼られたステッカーは連続フレームの目撃列になるので、 同一 id の別の目撃が
+    # hold_frames 以内に 1 つも無い目撃はゾーン化しない。
     for mid in list(sightings):
         seen = sightings[mid]
         kept = [s for k, s in enumerate(seen)
