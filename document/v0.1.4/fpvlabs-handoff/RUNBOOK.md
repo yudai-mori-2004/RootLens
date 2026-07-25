@@ -57,6 +57,11 @@
    成果物はゼロになる) ので、 一斉投入はゲート到達時の全損額を最大化する。
    バッチ前に modal.com の Usage 残量と概算コストを見比べること。
 
+   ⚠ ローカル発の `modal run` は Mac のスリープでも死ぬ (CLI 切断 → Modal 側が function を
+   停止して `ConflictError: function ... is stopped`)。 夜間・長時間バッチは
+   `caffeinate -i modal run ...` で包むか `modal run --detach` を使う。 この失敗は
+   アップロード前に起きるので、 R2 の既存オブジェクトは壊れない (再実行すればよい)。
+
 ## manifest.jsonl (自動)
 
 処理のたびに、バケット直下の `manifest.jsonl` (全セッションの属性表: domain / site /
@@ -116,6 +121,22 @@ modal run tools/modal/fpvlabs/fpvlabs.py --content-hash <hash> --target-bucket r
 ```
 
 結果を rclone や boto3 で落として目視 → 良ければ `--target-bucket` を外して本番に反映。
+
+ローカルからの R2 アクセスは 2 系統あるので注意:
+
+- rclone remote `rootlens:` は **rootlens-fpvlabs 専用トークン** (FPV に渡しているものと同じ
+  スコープ)。 rootlens-public / rootlens-raw-arkit は 403 になる。
+- raw や public を読み書きするときは `web/.env.local` の `R2_ACCESS_KEY_ID` /
+  `R2_SECRET_ACCESS_KEY` / `R2_ACCOUNT_ID` を使う (設定ファイルを汚さない ephemeral 方式):
+  ```
+  set -a; source web/.env.local; set +a
+  export RCLONE_S3_PROVIDER=Cloudflare RCLONE_S3_REGION=auto \
+         RCLONE_S3_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+         RCLONE_S3_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" RCLONE_S3_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+  rclone lsf ":s3:rootlens-raw-arkit/raw/<hash>/"
+  ```
+- rootlens-public は公開バケットなので、 読むだけなら
+  `https://pub-494b37dbfc9645299042fcf51236d1fc.r2.dev/<key>` で無認証ダウンロードできる。
 
 ## 確認・トラブル時
 
