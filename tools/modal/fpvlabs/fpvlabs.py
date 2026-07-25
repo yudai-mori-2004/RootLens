@@ -96,7 +96,7 @@ FACE_BLUR_MIN_CONFIDENCE = 0.9
 # 生成し、 原寸印刷が前提 (= マーカー実寸がゾーンの cm → px 換算の基準)。
 NG_MARKER_DICT = "DICT_4X4_50"
 NG_MARKER_SIZE_CM = 7.0      # 印刷したマーカー黒枠 1 辺の実寸 (= gen-ng-markers.py の出力と一致させる)
-NG_MARKER_HOLD_S = 3.0       # 検出が途切れても前後この秒数はゾーンを維持 (遮蔽・検出抜け対策)
+NG_MARKER_CORROBORATE_S = 3.0  # 単発ノイズ棄却の裏付け窓 (同一 id の別目撃がこの秒数以内に必要)
 NG_MARKER_ZONE_SCALE = 1.15  # ゾーンを少し広げて適用 (境界の取りこぼし対策。 顔ぼかしと同率)
 # id → ぼかしゾーン (シートの表記と 1:1 に保つ)。 circle はマーカー中心の半径 r_cm、
 # rect はマーカー中心に置く w_cm × h_cm (貼った向きに追従)。
@@ -576,10 +576,10 @@ def _ng_zone_from_corners(corners, zone_def):
     return ("poly", pts.astype(np.int32))
 
 
-def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]:
+def detect_ng_marker_zones(video_path: str, corroborate_frames: int) -> dict[int, list]:
     """rgb.mp4 を 1 パス走査して撮影禁止マーカーを検出し、 フレーム番号 → ぼかしゾーン一覧の
-    予定表を返す。 検出の切れ目は前後 hold_frames まで最寄りの目撃ジオメトリで埋める
-    (= 遮蔽・モーションブラー・画角外れの取りこぼし対策。 バッチ処理なので過去方向にも伸ばせる)。
+    予定表を返す。 ゾーンを塗るのは実際にマーカーを目撃したフレームだけ (= カメラが動く
+    一人称映像では、 目撃時点のジオメトリを時間方向に延長しても正しい画面位置にならない)。
     孤立した単発目撃はノイズとして捨てる (下のコメント参照)。
     マーカーが 1 つも映っていないセッションでは空 dict (= 後段の挙動は従来と同一)。"""
     import cv2
@@ -614,17 +614,16 @@ def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]
             i += 1
     finally:
         cap.release()
-    total_frames = i
 
     # 単発の孤立目撃はノイズとして捨てる。 環境中の高コントラストな模様が偶発的に
     # カタログ id へ復号されることがあり、 それは孤立フレームにしかならない。 物理的に
     # 貼られたステッカーは連続フレームの目撃列になるので、 同一 id の別の目撃が
-    # hold_frames 以内に 1 つも無い目撃はゾーン化しない。
+    # corroborate_frames 以内に 1 つも無い目撃はゾーン化しない。
     for mid in list(sightings):
         seen = sightings[mid]
         kept = [s for k, s in enumerate(seen)
-                if (k > 0 and s[0] - seen[k - 1][0] <= hold_frames)
-                or (k + 1 < len(seen) and seen[k + 1][0] - s[0] <= hold_frames)]
+                if (k > 0 and s[0] - seen[k - 1][0] <= corroborate_frames)
+                or (k + 1 < len(seen) and seen[k + 1][0] - s[0] <= corroborate_frames)]
         if kept:
             sightings[mid] = kept
         else:
@@ -636,26 +635,18 @@ def detect_ng_marker_zones(video_path: str, hold_frames: int) -> dict[int, list]
     for mid, seen in sightings.items():
         clusters: list[list[int]] = []
         for f, _ in seen:
-            if clusters and f - clusters[-1][1] <= hold_frames:
+            if clusters and f - clusters[-1][1] <= corroborate_frames:
                 clusters[-1][1] = f
             else:
                 clusters.append([f, f])
         spans = ", ".join(f"{a}..{b}" for a, b in clusters)
         print(f"[ng] id={mid}: {len(seen)} sightings in {len(clusters)} cluster(s): frames {spans}", flush=True)
 
-    # 目撃列 → 予定表: 各目撃の前後 hold_frames を受け持ち区間にする。 隣の目撃と重なる範囲は
-    # 中点で分担する (= 常に最寄りのジオメトリが使われ、 同一 id の二重登録も起きない)。
+    # 目撃列 → 予定表: 目撃したフレームにそのままゾーンを載せる。
     schedule: dict[int, list] = {}
     for seen in sightings.values():
-        for k, (f, zone) in enumerate(seen):
-            lo = f - hold_frames
-            hi = min(f + hold_frames, total_frames - 1)
-            if k > 0:
-                lo = max(lo, (seen[k - 1][0] + f + 1) // 2)
-            if k + 1 < len(seen):
-                hi = min(hi, (f + seen[k + 1][0]) // 2)
-            for fi in range(max(0, lo), hi + 1):
-                schedule.setdefault(fi, []).append(zone)
+        for f, zone in seen:
+            schedule.setdefault(f, []).append(zone)
     return schedule
 
 
@@ -722,7 +713,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
     eff_fps = (len(frames_meta) - 1) / dur_s if dur_s > 0 else 30.0
     ng_schedule = detect_ng_marker_zones(
         os.path.join(session_dir, "rgb.mp4"),
-        hold_frames=max(1, int(round(NG_MARKER_HOLD_S * eff_fps))),
+        corroborate_frames=max(1, int(round(NG_MARKER_CORROBORATE_S * eff_fps))),
     )
 
     stats = {"rgb": 0, "depth": 0, "confidence": 0, "pose": 0, "imu": 0, "tracking": 0, "point_cloud": 0, "mesh_anchors": 0}
