@@ -61,13 +61,9 @@ const ZONES: Record<number, ZoneDef> = {
 
 type Zone = { pts: { x: number; y: number }[] };
 
-// 遠近採用の条件とガード (fpvlabs.py の NG_PERSP_* と同値)。
-const PERSP_MIN_RATIO = 1.15;
-const PERSP_MAX_RATIO = 4.0;
-
-// 本番 (fpvlabs.py の _ng_zone_from_corners) と同一の式。 遠近が効いている場合は
-// 4 隅のホモグラフィでゾーンを面に貼り付け (= 奥ほど縮む)、 それ以外・ガード落ちは
-// 上辺・左辺ベクトルのアフィン (rect = 平行四辺形、 circle = 楕円)。
+// 本番 (fpvlabs.py の _ng_zone_from_corners) と同一の式。 上辺・左辺ベクトルの
+// アフィン写像 (rect = 平行四辺形、 circle = 楕円)。 ゾーンは最大 ±15 マーカー幅の
+// 外挿なので、 数ピクセルの角の差分から推定する射影 (遠近) 成分は使わない。
 function zoneFromMarker(corners: { x: number; y: number }[], def: ZoneDef): Zone {
   const cx = corners.reduce((a, p) => a + p.x, 0) / 4;
   const cy = corners.reduce((a, p) => a + p.y, 0) / 4;
@@ -85,35 +81,7 @@ function zoneFromMarker(corners: { x: number; y: number }[], def: ZoneDef): Zone
     offs.push({ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh });
   }
 
-  // ── ホモグラフィ (単位正方形 → マーカー 4 隅、 Heckbert の閉形式) ──
-  const [p0, p1, p2, p3] = corners;
-  const dx1 = p1.x - p2.x, dx2 = p3.x - p2.x, dx3 = p0.x - p1.x + p2.x - p3.x;
-  const dy1 = p1.y - p2.y, dy2 = p3.y - p2.y, dy3 = p0.y - p1.y + p2.y - p3.y;
-  const den = dx1 * dy2 - dx2 * dy1;
-  if (Math.abs(den) > 1e-9) {
-    const g = (dx3 * dy2 - dx2 * dy3) / den;
-    const h2 = (dx1 * dy3 - dx3 * dy1) / den;
-    const a = p1.x - p0.x + g * p1.x;
-    const b = p3.x - p0.x + h2 * p3.x;
-    const d = p1.y - p0.y + g * p1.y;
-    const e = p3.y - p0.y + h2 * p3.y;
-    const uv = offs.map((o) => ({ u: o.x / MARKER_CM + 0.5, v: o.y / MARKER_CM + 0.5 }));
-    const Ws = uv.map((q) => g * q.u + h2 * q.v + 1);
-    if (Ws.every((W) => W > 1e-6)) {
-      const ratio = Math.max(...Ws) / Math.min(...Ws);
-      if (ratio > PERSP_MIN_RATIO && ratio <= PERSP_MAX_RATIO) {
-        const pts = uv.map((q, i) => ({
-          x: (a * q.u + b * q.v + p0.x) / Ws[i],
-          y: (d * q.u + e * q.v + p0.y) / Ws[i],
-        }));
-        if (pts.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) {
-          return { pts };
-        }
-      }
-    }
-  }
-
-  // ── アフィン経路 (正面寄り、 またはホモグラフィのガード落ち) ──
+  const [p0, p1, , p3] = corners;
   let Ux = (p1.x - p0.x) / MARKER_CM;
   let Uy = (p1.y - p0.y) / MARKER_CM;
   let Vx = (p3.x - p0.x) / MARKER_CM;

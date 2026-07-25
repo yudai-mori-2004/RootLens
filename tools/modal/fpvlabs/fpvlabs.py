@@ -506,21 +506,12 @@ def _make_face_backend(face_detector: str):
 # ─── 撮影禁止マーカー (= 検出プリパス + ゾーンぼかし) ─────────────────
 
 
-# 遠近採用の条件: ゾーン各点の射影分母 W の比がこれを超えたら (= ゾーン内で 15% 以上の
-# 奥行き変化)、 アフィンではなくホモグラフィでゾーンを面に貼り付ける。
-NG_PERSP_MIN_RATIO = 1.15
-# 安全弁: W 比がこれを超える外挿は数値的に暴れている (地平線に近い) とみなしてアフィンへ落とす。
-NG_PERSP_MAX_RATIO = 4.0
-
-
 def _ng_zone_from_corners(corners, zone_def):
     """ArUco の 4 隅 (4,2) から画面上のぼかしゾーンを作る。
 
-    基本はマーカーの上辺・左辺ベクトルを「面上の 1cm」 としたアフィン写像 (rect = 平行四辺形、
-    circle = 楕円)。 遠近が実際に効いている場合 (ゾーン内の射影分母の変化が NG_PERSP_MIN_RATIO 超)
-    は 4 隅のホモグラフィでゾーンを面に貼り付ける = 奥ほど縮む。 外挿が数値的に暴れるケース
-    (分母の符号反転・比が NG_PERSP_MAX_RATIO 超・非有限) はガードで検知してアフィンへ落とすので、
-    露出方向に壊れない性質は保たれる。"""
+    マーカーの上辺・左辺ベクトルを「面上の 1cm」 としたアフィン写像 (rect = 平行四辺形、
+    circle = 楕円)。 ゾーンは最大 ±15 マーカー幅の外挿なので、 数ピクセルの角の差分から
+    推定する射影 (遠近) 成分はノイズ増幅が大きく、 線形写像だけで貼る。"""
     import numpy as np
 
     c = np.asarray(corners, dtype=np.float32).reshape(4, 2)
@@ -538,29 +529,6 @@ def _ng_zone_from_corners(corners, zone_def):
         hh = zone_def["h_cm"] / 2.0 * NG_MARKER_ZONE_SCALE
         offs = np.array([[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]], dtype=np.float32)
 
-    # ── ホモグラフィ (単位正方形 → マーカー 4 隅、 Heckbert の閉形式) ──
-    (x0, y0), (x1, y1), (x2, y2), (x3, y3) = c
-    dx1, dx2, dx3 = x1 - x2, x3 - x2, x0 - x1 + x2 - x3
-    dy1, dy2, dy3 = y1 - y2, y3 - y2, y0 - y1 + y2 - y3
-    den = dx1 * dy2 - dx2 * dy1
-    if abs(den) > 1e-9:
-        g = (dx3 * dy2 - dx2 * dy3) / den
-        h2 = (dx1 * dy3 - dx3 * dy1) / den
-        a = x1 - x0 + g * x1
-        b = x3 - x0 + h2 * x3
-        d = y1 - y0 + g * y1
-        e = y3 - y0 + h2 * y3
-        uv = offs / NG_MARKER_SIZE_CM + 0.5  # 面上 cm → マーカー基準の単位正方形座標
-        W = g * uv[:, 0] + h2 * uv[:, 1] + 1.0
-        if np.all(W > 1e-6):
-            ratio = float(W.max() / W.min())
-            if NG_PERSP_MIN_RATIO < ratio <= NG_PERSP_MAX_RATIO:
-                X = (a * uv[:, 0] + b * uv[:, 1] + x0) / W
-                Y = (d * uv[:, 0] + e * uv[:, 1] + y0) / W
-                if np.all(np.isfinite(X)) and np.all(np.isfinite(Y)):
-                    return ("poly", np.stack([X, Y], axis=1).astype(np.int32))
-
-    # ── アフィン経路 (正面寄り、 またはホモグラフィのガード落ち) ──
     U = (c[1] - c[0]) / NG_MARKER_SIZE_CM  # 面上 1cm → px (上辺方向)
     V = (c[3] - c[0]) / NG_MARKER_SIZE_CM
     if zone_def["shape"] != "circle":
