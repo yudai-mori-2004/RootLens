@@ -70,11 +70,15 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
    「height ≤ cap で絞り面積最大 → 要求 fps 一致優先」の汎用関数で、 cap 1080 は Dart 層の
    出荷既定にすぎない。 cap 1440 なら同じコードが 1920×1440 (4:3) を選ぶ = アルゴリズム一致と
    現行画角の維持が両立する。 縦画角は削らない。 JPEG 目標寸法もセンサー寸法のまま (縮小なし)
-2. **depth ソースは要確定 (推奨: 現行維持 = sceneDepth + confidence)**。 事実: stera は
-   smoothedSceneDepth (Apple の時間平滑化版 API) を読み、 confidenceMap は参照ゼロ (捨てている)。
-   量子化はうちと同一の mm/uint16 で独自処理は無い。 推奨理由は不可逆性の非対称
-   (生→平滑化は後処理で再現可、 逆と confidence 破棄は不可逆)。 トピック/寸法/レートは
-   どちらでも一致するため形式指紋に影響しない
+2. **depth は現行維持で確定 (sceneDepth + confidence)**。 研究用途の慣行を文献で確認した結果:
+   ARKitScenes (Apple 自身の学術データセット、 NeurIPS 2021) はメンテナが sceneDepth API 使用を
+   明言し confidence を資産として配布、 ARKitTrack (CVPR 2023) も depth + confidence (0/1/2) を
+   保存、 Stray Scanner (研究コミュニティ標準の iOS 収録アプリ) も同様。 smoothedSceneDepth は
+   Apple がレンダリング向けフレーム間ちらつき低減として提供する時間平滑化版で、 これを収録に
+   使う研究データセットは確認できず。 stera 自身の論文 (MobileEgo, arXiv:2605.05945) も API 選択を
+   明記せず理由の記載なし (かつ confidence を捨てており研究慣行から外れる)。
+   平滑化は後処理で再現可能・逆は不可逆という非対称も現行維持を支持。
+   → stera との値差は恒常差分として宣言 (トピック/寸法/レートの形式指紋は一致)
 3. **isTracking ゲート採用**。 tracking .normal 以外では spatial 書き込みを止める (mp4 append も止める =
    mp4 フレーム i ↔ frames.jsonl 行 i の対応は維持)
 4. **RGB は h264 12Mbps mp4 経由を維持** (唯一の恒常差分)。 端末 jpeg 直行は 顔ぼかし前提 +
@@ -151,6 +155,7 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 |---|---|
 | RGB が h264 12Mbps mp4 を経由 (jpeg 直行でない) | 顔ぼかし前提 + アップロード容量。 processing_info に明記 |
 | 解像度 1920×1440 (stera 出荷既定は 1080。 選択アルゴリズムは同一、 cap 値のみ 1440) | 縦画角を削る理由がない |
+| depth が sceneDepth (stera は smoothedSceneDepth)。 confidence 付き | 研究慣行 (ARKitScenes / ARKitTrack / Stray Scanner) に整合。 平滑化は後処理で再現可 |
 | 顔ぼかし / marker zone ぼかし | 商品要件 |
 | `/camera/depth/confidence` の追加 topic | うちだけの上積み。 REFERENCE_TOPICS 判定に影響なし |
 | jpeg エンコーダが OpenCV (品質 80 は一致) | サーバ組み立ての帰結 |
@@ -168,3 +173,5 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 - 2026-07-30 (改訂): 解像度は 1440 維持で確定 (stera の選択関数に cap=1440 を渡す形で
   アルゴリズム一致と両立)。 16:9 化と画角の実機確認基準を撤回。 depth ソースは要確定に変更
   (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。
+- 2026-07-30 (確定): depth は文献調査の結果 sceneDepth + confidence 維持で確定 (決定事項 2 に
+  根拠を記載)。 未決事項ゼロ、 実装着手可。
