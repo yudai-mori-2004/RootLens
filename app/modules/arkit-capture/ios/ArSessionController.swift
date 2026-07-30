@@ -151,6 +151,26 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // Camera-IMU extrinsic estimator: aligns VIO angular velocity against the gyro
   // stream during normal recording, caches per device model across sessions.
   private lazy var camImuEstimator = CameraImuExtrinsicEstimator(deviceModel: self.currentDeviceModel())
+
+  // Live stream accounting for metadata. Each range is touched from a single
+  // queue (rgb/depth/pc on frameQueue, imu on motionQueue, ar frames on main);
+  // the stop path reads them after those queues drain.
+  private struct StreamRange {
+    var firstNs: Int64 = 0
+    var lastNs: Int64 = 0
+    var count = 0
+    mutating func record(_ tsNs: Int64) {
+      if count == 0 { firstNs = tsNs }
+      lastNs = tsNs
+      count += 1
+    }
+    var durationMs: Int64 { count > 0 ? (lastNs - firstNs) / 1_000_000 : 0 }
+  }
+  private var rgbRange = StreamRange()
+  private var depthRange = StreamRange()
+  private var pcRange = StreamRange()
+  private var imuRange = StreamRange()
+  private var arkitRange = StreamRange()
   // LiDAR depth (sceneDepth) streams into a single depth.tar (see DepthTarWriter).
   private var depthTarWriter: DepthTarWriter?
   private var frameIndexCounter: Int = 0
@@ -508,6 +528,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.prevArkitTs = -1
     self.metricsCacheTs = -1
     self.metricsCache = [:]
+    self.rgbRange = StreamRange()
+    self.depthRange = StreamRange()
+    self.pcRange = StreamRange()
+    self.imuRange = StreamRange()
+    self.arkitRange = StreamRange()
     UIDevice.current.isBatteryMonitoringEnabled = true
 
     if !sessionRunning { startSession() }
@@ -642,9 +667,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return dir
   }
 
-  /// Merge the extrinsic estimate and the IMU noise model into metadata.json at
-  /// stop (the estimate only exists ~20 s into the session, after the first-frame
-  /// metadata write). Noise densities are static per-family values, labeled so.
+  /// Merge everything only the stop path knows into metadata.json: the extrinsic
+  /// estimate (exists ~20 s into the session), the labeled IMU noise model, and
+  /// the per-stream accounting (counts, time ranges, expected slots, pauses).
   private func mergeEstimatorMetadata(into dir: URL) {
     let url = dir.appendingPathComponent("metadata.json")
     guard let data = try? Data(contentsOf: url),
@@ -674,6 +699,35 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "sample_rate_hz": captureSettings.imuRateHz,
       "source": "static_defaults",
     ] as [String: Any]
+    obj["total_rgb_frames"] = rgbRange.count
+    obj["total_depth_frames"] = depthRange.count
+    obj["total_pointcloud_frames"] = pcRange.count
+    obj["total_imu_samples"] = imuRange.count
+    obj["total_ar_frames"] = arkitRange.count
+    obj["rgb_append_fail_count"] = appendFailCount
+    obj["rgb_expected_frame_slots"] = rgbSampler.totalExpectedFrameCount
+    obj["depth_expected_frame_slots"] = depthSampler.totalExpectedFrameCount
+    obj["pointcloud_expected_frame_slots"] = pcSampler.totalExpectedFrameCount
+    obj["tracking_pause_count"] = trackingPauseCount
+    obj["tracking_pause_total_offset_ms"] = trackingPauseTotalNs / 1_000_000
+    obj["sampling_strategy"] = "timestamp_gate"
+    obj["sampling_strategy_detail"] = "deterministic_frame_schedule"
+    obj["arkit_native_fps"] = recordingSessionFps
+    obj["rgb_start_ns"] = rgbRange.firstNs
+    obj["rgb_end_ns"] = rgbRange.lastNs
+    obj["imu_start_ns"] = imuRange.firstNs
+    obj["imu_end_ns"] = imuRange.lastNs
+    obj["depth_start_ns"] = depthRange.firstNs
+    obj["depth_end_ns"] = depthRange.lastNs
+    obj["pointcloud_start_ns"] = pcRange.firstNs
+    obj["pointcloud_end_ns"] = pcRange.lastNs
+    obj["stream_durations_ms"] = [
+      "rgb": rgbRange.durationMs,
+      "imu": imuRange.durationMs,
+      "depth": depthRange.durationMs,
+      "pointcloud": pcRange.durationMs,
+      "ar_frames": arkitRange.durationMs,
+    ] as [String: Any]
     do {
       let out = try JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys])
       try out.write(to: url, options: .atomic)
@@ -690,6 +744,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   /// the frame's own.
   private func appendPerFrameStreams(frame: ARFrame, timestamp: Double) {
     let tsNs = Int64(timestamp * 1_000_000_000.0)
+    arkitRange.record(tsNs)
     let t = frame.camera.transform
     let qNow = simd_quatf(simd_float3x3(
       simd_make_float3(t.columns.0.x, t.columns.0.y, t.columns.0.z),
@@ -1136,6 +1191,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     guard let handle = sensorsFileHandle else { return }
     let frameIndex = frameIndexCounter
     frameIndexCounter += 1
+    rgbRange.record(row.tsNs)
 
     // Row schema:
     //   timestamp_ns: int (seconds × 1e9)
@@ -1179,6 +1235,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // consumer can mask low-confidence pixels. Rate selection already happened in
     // the delegate (depth sampler); a row carries buffers only when it was kept.
     if let depthMap = row.depthMap {
+      depthRange.record(row.tsNs)
       let confBuffer = row.confidenceMap
       let idx = frameIndex
       sensorFileQueue.async {
@@ -1192,6 +1249,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     if let pcHandle = pointCloudFileHandle,
        let cloud = row.pointCloud,
        !cloud.points.isEmpty {
+      pcRange.record(row.tsNs)
       var pts = [Float]()
       pts.reserveCapacity(cloud.points.count * 3)
       for pt in cloud.points {
@@ -1228,6 +1286,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     //   gyro:  {x, y, z}    rotationRate
     //   device_motion: {attitude, user_accel, gravity, rotation_rate}
     let tsNs: Int64 = Int64(motion.timestamp * 1_000_000_000.0)
+    imuRange.record(tsNs)
     camImuEstimator.pushImuSamples([GyroSample(
       timestampNs: tsNs,
       gyroX: Float(motion.rotationRate.x),
