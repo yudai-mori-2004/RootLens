@@ -107,10 +107,11 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
   と同式)、 `device_metrics.jsonl` (全 ARFrame、 500ms キャッシュ、 DeviceMetrics スキーマの
   フィールド)、 tracking_state/reason を全 ARFrame へ (arkit_imu 行に同乗させる)
 - A4. CameraImuExtrinsicEstimator + ImuIntrinsics を移植 (metadata に camera_imu_extrinsic ブロック、
-  imu_intrinsics は static_defaults / arkit_vio_derived の 2 種)。 機種名では代替不可
-  (公開された機種別値が存在せず、 効くのは実装公差由来の個体差 ~1° 弱)。
-  任意: リグ実機を静置収録し Allan 分散でノイズ密度・バイアスランダムウォークを実測、
-  source="measured" の imu_intrinsics に格上げ (実測すれば stera の静的定数にも勝てる)
+  imu_intrinsics は static_defaults / arkit_vio_derived の 2 種)。 位置づけ: 商品要件ではなく
+  「stera 形式パリティに同梱される無料の上積み + 運用 QA」。 機種指定で発注する買い手は
+  同型機で自前校正できる前提で動くため必須ではないが、 stera 自身が端末上推定を選んで
+  出荷しており、 移植すれば受動的に動く。 残差とドリフト値はリグ異常 (取付緩み・機体交換) の
+  検出に使える。 Allan 分散によるノイズ実測は要望が出たときだけ
 - A5. depth 変換を vDSP 系列 (vsmul ×1000 → vclip [0,65535] → vfixu16) に置換。 読み元は
   決定事項 2 の確定に従う。 confidence は現行どおり記録
 - A6. IMU: `startDeviceMotionUpdates(using: .xArbitraryZVertical, to:)` を明示、 OperationQueue の
