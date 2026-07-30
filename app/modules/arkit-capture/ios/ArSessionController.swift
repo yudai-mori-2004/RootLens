@@ -1287,7 +1287,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     //   device_motion: {attitude, user_accel, gravity, rotation_rate}
     let tsNs: Int64 = Int64(motion.timestamp * 1_000_000_000.0)
     imuRange.record(tsNs)
-    camImuEstimator.pushImuSamples([GyroSample(
+    camImuEstimator.pushGyroSamples([GyroSample(
       timestampNs: tsNs,
       gyroX: Float(motion.rotationRate.x),
       gyroY: Float(motion.rotationRate.y),
