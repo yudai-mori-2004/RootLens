@@ -208,6 +208,11 @@ FFI 経路の autoExposure 脱落。
   (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。
 - 2026-07-30 (確定): depth は文献調査の結果 sceneDepth + confidence 維持で確定 (決定事項 2 に
   根拠を記載)。
+- 2026-07-31 (完了): build 52 実機クリップで最終監査、 全項目クリーン・指摘ゼロ。
+  比力 +9.760 / ω スパイク 0 (max 1.39 rad/s)・ジャイロ整合 15.8% / pose・arkit orientation
+  両列の半球連続 / tracking (2,0,normal,none) / covariance 全て不明宣言 / 33.3ms 格子 /
+  metadata 計数と実数の全一致 / 受け手 SDK check_format 通過。 実機検証はここで完了。
+  残タスクは公開データセット実ファイルとのバイト級フィンガープリント比較のみ。
 - 2026-07-30 (再監査): 導出量の系統チェックで 3 件を追加検出・修正 (fpvlabs-7):
   (1) /device/imu の加速度符号が Apple 生値の慣例のまま (姿勢で世界系に回すと鉛直 -9.74)。
   REP 145 の比力 (静止時 +g) へ符号反転。 大きさは正しく符号だけの取り違い。
