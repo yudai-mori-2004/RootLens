@@ -205,6 +205,12 @@ FFI 経路の autoExposure 脱落。
   (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。
 - 2026-07-30 (確定): depth は文献調査の結果 sceneDepth + confidence 維持で確定 (決定事項 2 に
   根拠を記載)。
+- 2026-07-30 (実装): B (fpvlabs.py) 完了 + 合成/旧セッションのローカル検証で受け手 SDK の
+  check_format=True 通過を確認、 push 済み。 A1-A7 実装完了 (ローカルコミット、 実機テスト前に
+  つき未 push): ARKit 設定 / FrameSampler / arkit_imu + device_metrics ストリーム /
+  外部パラメータ推定器 / vDSP 深度 + IMU 明示化 / metadata 計測群。 カスタムスキーマ名は
+  rootlens/msg/* 名義 (コード内に外部実装への言及を残さない方針)。 残り: 実機ビルド +
+  E2E (--target-bucket) + フィンガープリント比較スクリプト。
 - 2026-07-30 (レビュー): 両実装の欠陥探索レビュー完了。 stera 側の欠陥 5 つを複製対象から除外
   (専用セクション)、 うち側の要修正を確認 (fpvlabs.py が IMU orientation 欠落時に (0,0,0,1) を
   無言で書く → 実装時に修正、 captureSettings 無ロック競合 → 実装時にロック追加)。
