@@ -19,7 +19,7 @@
 # メッセージは撮影時刻順にインターリーブして書く。 トピック一覧と型は CHANNELS を参照。
 # 主要な値の規約:
 #   /camera/pose             ARKit world、 ARKit-native 軸のまま
-#   /device/imu              m/s^2 (重力込みの比力 = REP 145)、 CoreMotion 軸、 covariance は全ゼロ = 不明
+#   /device/imu              比力 m/s^2 (REP 145: 静止時 +g)、 CoreMotion 軸、 covariance は全ゼロ = 不明
 #   /camera/depth            16UC1 (mm)。 /camera/depth/confidence は mono8 0=low/1=med/2=high
 #   /tf                      毎 pose: world→camera_link + camera_link→camera_optical_frame (180° X 回転)
 #   /trajectory              5 秒ごとの増分 Path (書くたびにバッファを空にする)
@@ -53,7 +53,7 @@ import tarfile
 import tempfile
 import time
 
-PIPELINE_VERSION = "fpvlabs-6"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
+PIPELINE_VERSION = "fpvlabs-7"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
 
 # ─── manifest (バケット同梱の属性テーブル) ─────────────────────────
 # 納品バケットはフラットな <hash>/session.mcap のまま、 セッションの属性 (ドメイン等) は
@@ -862,7 +862,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
             "source": "rootlens raw session",
             "device_model": meta.get("device_model"),
             "app_version": meta.get("app_version"),
-            "axes": "ARKit-native (pose: ARKit world; imu: CoreMotion device axes, m/s^2 incl. gravity)",
+            "axes": "ARKit-native (pose: ARKit world; imu: CoreMotion device axes, specific force m/s^2 per REP 145)",
         })}, first_ts)
 
         # ── camera↔IMU 外部パラメータ (収録側 metadata に推定値がある場合のみ) ──
@@ -917,8 +917,6 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         imu_i = 0
         arkit_i = 0
         metrics_i = 0
-        ori_var = float((np.pi / 180.0) ** 2)  # /arkit/imu の姿勢分散 (1 度)^2
-        ori_var_diag = [ori_var, 0.0, 0.0, 0.0, ori_var, 0.0, 0.0, 0.0, ori_var]
         no_estimate = [-1.0] + [0.0] * 8  # covariance 先頭 -1 = その量の推定なし
 
         def _flush_imu(upto_ts: int) -> None:
@@ -944,10 +942,12 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
                     "angular_velocity": {"x": float(gyr.get("x", 0.0)), "y": float(gyr.get("y", 0.0)),
                                          "z": float(gyr.get("z", 0.0))},
                     "angular_velocity_covariance": [0.0] * 9,
-                    # 重力込みの比力 (REP 145)。 収録は g 単位なので m/s^2 へ。
-                    "linear_acceleration": {"x": float(acc.get("x", 0.0)) * G_TO_MS2,
-                                            "y": float(acc.get("y", 0.0)) * G_TO_MS2,
-                                            "z": float(acc.get("z", 0.0)) * G_TO_MS2},
+                    # 比力 (REP 145: 静止時に鉛直上向き +g)。 CoreMotion の生値は
+                    # その符号反転 (静止・画面上向きで z = -1g) なので、 g 単位 → m/s^2 の
+                    # 換算と同時に符号を反す。
+                    "linear_acceleration": {"x": -float(acc.get("x", 0.0)) * G_TO_MS2,
+                                            "y": -float(acc.get("y", 0.0)) * G_TO_MS2,
+                                            "z": -float(acc.get("z", 0.0)) * G_TO_MS2},
                     "linear_acceleration_covariance": [0.0] * 9,
                 }, ts)
                 stats["imu"] += 1
@@ -964,7 +964,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
                     "header": {"stamp": _stamp(ts), "frame_id": "camera_link"},
                     "orientation": {"x": float(row.get("qx", 0.0)), "y": float(row.get("qy", 0.0)),
                                     "z": float(row.get("qz", 0.0)), "w": float(row.get("qw", 1.0))},
-                    "orientation_covariance": ori_var_diag,
+                    "orientation_covariance": [0.0] * 9,  # 実測していない不確かさは「不明」宣言
                     "angular_velocity": {"x": float(row.get("wx", 0.0)), "y": float(row.get("wy", 0.0)),
                                          "z": float(row.get("wz", 0.0))},
                     "angular_velocity_covariance": [0.0] * 9,
@@ -1007,6 +1007,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
         # /trajectory は増分 Path: 書くたびにバッファを空にする
         traj_buf: list[dict] = []
         traj_last_ts: int | None = None
+        prev_quat: dict | None = None
 
         depth_gen = _depth_entries()
         depth_next = next(depth_gen, None)
@@ -1016,7 +1017,7 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
 
         def _write_frame(idx: int, out_rgb) -> None:
             """1 フレーム分のメッセージ群を撮影時刻順の定位置へ書く。"""
-            nonlocal depth_next, pc_next, traj_last_ts, depth_info_written
+            nonlocal depth_next, pc_next, traj_last_ts, depth_info_written, prev_quat
             row = frames_meta[idx]
             ts = int(row["timestamp_ns"])
 
@@ -1037,6 +1038,12 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
             t4 = row["camera_transform"]  # row-major 4x4 (ARKit world ← camera)
             pos = {"x": float(t4[0][3]), "y": float(t4[1][3]), "z": float(t4[2][3])}
             quat = _rot_to_quat([r[:3] for r in t4[:3]])
+            # 半球連続化: q と -q は同一回転。 行列→四元数の分岐が行ごとに独立なので、
+            # 前フレームと符号を揃えて列としての連続性を保証する (微分する利用者の罠を消す)。
+            if prev_quat is not None and (quat["x"] * prev_quat["x"] + quat["y"] * prev_quat["y"]
+                                          + quat["z"] * prev_quat["z"] + quat["w"] * prev_quat["w"]) < 0:
+                quat = {k: -v for k, v in quat.items()}
+            prev_quat = quat
             pose_msg = {"header": {"stamp": _stamp(ts), "frame_id": "world"},
                         "pose": {"position": pos, "orientation": quat}}
             write("/camera/pose", pose_msg, ts)

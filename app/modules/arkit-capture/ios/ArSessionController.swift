@@ -746,10 +746,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let tsNs = Int64(timestamp * 1_000_000_000.0)
     arkitRange.record(tsNs)
     let t = frame.camera.transform
-    let qNow = simd_quatf(simd_float3x3(
+    var qNow = simd_quatf(simd_float3x3(
       simd_make_float3(t.columns.0.x, t.columns.0.y, t.columns.0.z),
       simd_make_float3(t.columns.1.x, t.columns.1.y, t.columns.1.z),
       simd_make_float3(t.columns.2.x, t.columns.2.y, t.columns.2.z)))
+    // Hemisphere continuity: q and -q encode the same rotation; align with the
+    // previous frame so the written orientation sequence never flips sign.
+    if let qPrev = prevArkitQuat, simd_dot(qPrev.vector, qNow.vector) < 0 {
+      qNow = simd_quatf(vector: -qNow.vector)
+    }
     var wx = 0.0
     var wy = 0.0
     var wz = 0.0

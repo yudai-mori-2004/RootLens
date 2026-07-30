@@ -208,6 +208,13 @@ FFI 経路の autoExposure 脱落。
   (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。
 - 2026-07-30 (確定): depth は文献調査の結果 sceneDepth + confidence 維持で確定 (決定事項 2 に
   根拠を記載)。
+- 2026-07-30 (再監査): 導出量の系統チェックで 3 件を追加検出・修正 (fpvlabs-7):
+  (1) /device/imu の加速度符号が Apple 生値の慣例のまま (姿勢で世界系に回すと鉛直 -9.74)。
+  REP 145 の比力 (静止時 +g) へ符号反転。 大きさは正しく符号だけの取り違い。
+  (2) 四元数列の半球不連続 (pose 列に dot<0 の継ぎ目)。 pose/tf は組み立て時、 arkit_imu の
+  orientation は収録時に前フレームと半球を揃える (同一回転の表記選択なので情報不変)。
+  (3) /arkit/imu の orientation_covariance に参照実装の合成定数 (1°)² を写していた →
+  方針どおり全ゼロ = 不明宣言へ。
 - 2026-07-30 (E2E): build 48/49 実機クリップ 2 本で全チャンネル・メッセージ単位の監査完了
   (check_format PASS、 8 ストリーム ts 一致、 fx per-frame 変動、 重力込み IMU 9.76、 深度/信頼度/
   メッシュ/軌跡 全数健全、 外部パラメータは nominal 並進 + 90°±0.35° 回転を実測復元)。
