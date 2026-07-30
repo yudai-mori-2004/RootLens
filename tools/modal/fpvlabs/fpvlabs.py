@@ -53,7 +53,7 @@ import tarfile
 import tempfile
 import time
 
-PIPELINE_VERSION = "fpvlabs-5"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
+PIPELINE_VERSION = "fpvlabs-6"  # MCAP の processing_info に記録される変換パイプラインの版。 変換の挙動を変えたら上げる。
 
 # ─── manifest (バケット同梱の属性テーブル) ─────────────────────────
 # 納品バケットはフラットな <hash>/session.mcap のまま、 セッションの属性 (ドメイン等) は
