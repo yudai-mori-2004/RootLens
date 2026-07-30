@@ -139,6 +139,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   // Sensor stream state (non-nil only while recording; output files append incrementally).
   private var sensorsFileHandle: FileHandle?
   private var imuFileHandle: FileHandle?
+  // Per-ARFrame streams (every frame while recording, independent of samplers):
+  // arkit_imu.jsonl = VIO-pose-derived orientation + angular velocity + tracking,
+  // device_metrics.jsonl = battery / thermal / cpu / memory (values cached 500 ms).
+  private var arkitImuFileHandle: FileHandle?
+  private var deviceMetricsFileHandle: FileHandle?
+  private var prevArkitQuat: simd_quatf?
+  private var prevArkitTs: Double = -1
+  private var metricsCacheTs: Double = -1
+  private var metricsCache: [String: Any] = [:]
   // LiDAR depth (sceneDepth) streams into a single depth.tar (see DepthTarWriter).
   private var depthTarWriter: DepthTarWriter?
   private var frameIndexCounter: Int = 0
@@ -434,6 +443,14 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       FileManager.default.createFile(atPath: pcURL.path, contents: nil)
       pcHandle = try FileHandle(forWritingTo: pcURL)
     }
+    let arkitImuURL = sessionDir.appendingPathComponent("arkit_imu.jsonl")
+    let metricsURL = sessionDir.appendingPathComponent("device_metrics.jsonl")
+    try removeIfExists(at: arkitImuURL)
+    try removeIfExists(at: metricsURL)
+    FileManager.default.createFile(atPath: arkitImuURL.path, contents: nil)
+    FileManager.default.createFile(atPath: metricsURL.path, contents: nil)
+    let arkitImuHandle = try FileHandle(forWritingTo: arkitImuURL)
+    let metricsHandle = try FileHandle(forWritingTo: metricsURL)
 
     // Depth streams into depth.tar during recording (lazily created on the first
     // depth frame). Here we only clear any leftovers from a previous run.
@@ -482,6 +499,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.pointCloudFileHandle = pcHandle
     self.depthTarWriter = DepthTarWriter(sessionDir: sessionDir)
     self.frameIndexCounter = 0
+    self.arkitImuFileHandle = arkitImuHandle
+    self.deviceMetricsFileHandle = metricsHandle
+    self.prevArkitQuat = nil
+    self.prevArkitTs = -1
+    self.metricsCacheTs = -1
+    self.metricsCache = [:]
+    UIDevice.current.isBatteryMonitoringEnabled = true
 
     if !sessionRunning { startSession() }
     handTracker.setRecordingMode(true)
@@ -537,6 +561,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         try self.imuFileHandle?.close()
         try self.pointCloudFileHandle?.synchronize()
         try self.pointCloudFileHandle?.close()
+        try self.arkitImuFileHandle?.synchronize()
+        try self.arkitImuFileHandle?.close()
+        try self.deviceMetricsFileHandle?.synchronize()
+        try self.deviceMetricsFileHandle?.close()
       } catch {
         sensorCloseError = error
       }
@@ -565,6 +593,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.sensorsFileHandle = nil
     self.imuFileHandle = nil
     self.pointCloudFileHandle = nil
+    self.arkitImuFileHandle = nil
+    self.deviceMetricsFileHandle = nil
     self.depthTarWriter = nil
     self.frameIndexCounter = 0
     self.writerFailureLogged = false
@@ -606,6 +636,139 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
                     ])
     }
     return dir
+  }
+
+  // MARK: - Per-ARFrame streams (arkit_imu.jsonl / device_metrics.jsonl)
+
+  /// Append one row per ARFrame to both per-frame streams. The orientation is the
+  /// VIO camera rotation; angular velocity comes from the quaternion delta between
+  /// consecutive frames. Metric values refresh every 500 ms; timestamps are always
+  /// the frame's own.
+  private func appendPerFrameStreams(frame: ARFrame, timestamp: Double) {
+    let tsNs = Int64(timestamp * 1_000_000_000.0)
+    let t = frame.camera.transform
+    let qNow = simd_quatf(simd_float3x3(
+      simd_make_float3(t.columns.0.x, t.columns.0.y, t.columns.0.z),
+      simd_make_float3(t.columns.1.x, t.columns.1.y, t.columns.1.z),
+      simd_make_float3(t.columns.2.x, t.columns.2.y, t.columns.2.z)))
+    var wx = 0.0
+    var wy = 0.0
+    var wz = 0.0
+    if let qPrev = prevArkitQuat, timestamp > prevArkitTs, prevArkitTs > 0 {
+      let dt = timestamp - prevArkitTs
+      let qDelta = simd_normalize(qNow * simd_inverse(qPrev))
+      let angle = Double(qDelta.angle)
+      if abs(angle) >= 1e-6 {
+        let axis = simd_normalize(qDelta.axis)
+        let scale = angle / dt
+        wx = Double(axis.x) * scale
+        wy = Double(axis.y) * scale
+        wz = Double(axis.z) * scale
+      }
+    }
+    prevArkitQuat = qNow
+    prevArkitTs = timestamp
+
+    let trackingPair = describeTrackingState(frame.camera.trackingState)
+    let arkitRow: [String: Any] = [
+      "timestamp_ns": tsNs,
+      "qx": Double(qNow.imag.x), "qy": Double(qNow.imag.y),
+      "qz": Double(qNow.imag.z), "qw": Double(qNow.real),
+      "wx": wx, "wy": wy, "wz": wz,
+      "tracking_state": arkitTrackingStateInt(frame.camera.trackingState),
+      "tracking_reason": trackingPair.reason,
+    ]
+
+    if timestamp - metricsCacheTs >= 0.5 || metricsCache.isEmpty {
+      metricsCacheTs = timestamp
+      let device = UIDevice.current
+      let thermal = ProcessInfo.processInfo.thermalState
+      metricsCache = [
+        "battery_level": Double(device.batteryLevel),
+        "battery_state": device.batteryState.rawValue,
+        "battery_state_str": Self.batteryStateString(device.batteryState),
+        "cpu_usage": currentCpuUsage(),
+        "memory_used_mb": currentFootprintMB(),
+        "memory_available_mb": availableMemoryMB(),
+        "thermal_state": thermal.rawValue,
+        "thermal_state_str": Self.thermalStateString(thermal),
+        "device_model": currentDeviceModel(),
+      ]
+    }
+    var metricsRow = metricsCache
+    metricsRow["timestamp_ns"] = tsNs
+
+    let arkitHandle = arkitImuFileHandle
+    let metricsHandle = deviceMetricsFileHandle
+    if arkitHandle == nil && metricsHandle == nil { return }
+    sensorFileQueue.async {
+      func writeLine(_ handle: FileHandle?, _ dict: [String: Any], _ name: String) {
+        guard let handle = handle else { return }
+        do {
+          let data = try JSONSerialization.data(withJSONObject: dict, options: [])
+          try handle.write(contentsOf: data)
+          try handle.write(contentsOf: Data("\n".utf8))
+        } catch {
+          NSLog("[ArkitCaptureController] %@ write failed: %@", name, "\(error)")
+        }
+      }
+      writeLine(arkitHandle, arkitRow, "arkit_imu.jsonl")
+      writeLine(metricsHandle, metricsRow, "device_metrics.jsonl")
+    }
+  }
+
+  static func batteryStateString(_ s: UIDevice.BatteryState) -> String {
+    switch s {
+    case .unplugged: return "unplugged"
+    case .charging:  return "charging"
+    case .full:      return "full"
+    case .unknown:   return "unknown"
+    @unknown default: return "unknown"
+    }
+  }
+
+  /// Sum of per-thread cpu_usage for this process (1.0 = one full core).
+  private func currentCpuUsage() -> Double {
+    var threadsList: thread_act_array_t?
+    var threadsCount = mach_msg_type_number_t(0)
+    guard task_threads(mach_task_self_, &threadsList, &threadsCount) == KERN_SUCCESS,
+          let list = threadsList else { return 0 }
+    defer {
+      vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: list)),
+                    vm_size_t(Int(threadsCount) * MemoryLayout<thread_t>.stride))
+    }
+    var total: Double = 0
+    for i in 0..<Int(threadsCount) {
+      var info = thread_basic_info()
+      var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<integer_t>.size)
+      let kr = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+          thread_info(list[i], thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
+        }
+      }
+      if kr == KERN_SUCCESS, info.flags & TH_FLAGS_IDLE == 0 {
+        total += Double(info.cpu_usage) / Double(TH_USAGE_SCALE)
+      }
+    }
+    return total
+  }
+
+  /// Resident footprint (phys_footprint) in MB.
+  private func currentFootprintMB() -> Double {
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+    let kr = withUnsafeMutablePointer(to: &info) {
+      $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+        task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+      }
+    }
+    guard kr == KERN_SUCCESS else { return 0 }
+    return Double(info.phys_footprint) / (1024.0 * 1024.0)
+  }
+
+  /// Memory the OS would still grant this process, in MB.
+  private func availableMemoryMB() -> Double {
+    return Double(os_proc_available_memory()) / (1024.0 * 1024.0)
   }
 
   // MARK: - Thermal monitoring (the long-recording safety valve)
@@ -1290,6 +1453,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     //    copyPixelBuffer).
     if !finishingWriter, let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter,
        let input = self.videoInput {
+      // Per-ARFrame streams run at full sensor rate, before any sampling.
+      appendPerFrameStreams(frame: frame, timestamp: timestamp)
+
       let tsNsForSampler = Int64(timestamp * 1_000_000_000.0)
       let tracking: Bool = {
         if case .normal = frame.camera.trackingState { return true }
