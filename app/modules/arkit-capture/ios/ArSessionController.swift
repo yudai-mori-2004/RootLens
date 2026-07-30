@@ -148,6 +148,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var prevArkitTs: Double = -1
   private var metricsCacheTs: Double = -1
   private var metricsCache: [String: Any] = [:]
+  // Camera-IMU extrinsic estimator: aligns VIO angular velocity against the gyro
+  // stream during normal recording, caches per device model across sessions.
+  private lazy var camImuEstimator = CameraImuExtrinsicEstimator(deviceModel: self.currentDeviceModel())
   // LiDAR depth (sceneDepth) streams into a single depth.tar (see DepthTarWriter).
   private var depthTarWriter: DepthTarWriter?
   private var frameIndexCounter: Int = 0
@@ -577,6 +580,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
 
     stopThermalMonitoring(mergingInto: dir)
+    mergeEstimatorMetadata(into: dir)
 
     // Capture diagnostics before resetting (they go into the error message on
     // failure; the unified log redacts NSLog as <private>, so the real OSStatus
@@ -638,6 +642,46 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return dir
   }
 
+  /// Merge the extrinsic estimate and the IMU noise model into metadata.json at
+  /// stop (the estimate only exists ~20 s into the session, after the first-frame
+  /// metadata write). Noise densities are static per-family values, labeled so.
+  private func mergeEstimatorMetadata(into dir: URL) {
+    let url = dir.appendingPathComponent("metadata.json")
+    guard let data = try? Data(contentsOf: url),
+          var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+      NSLog("[ArkitCaptureController] estimator metadata merge skipped (metadata.json unreadable)")
+      return
+    }
+    if let r = camImuEstimator.finalizedResult() ?? camImuEstimator.cachedValue() {
+      obj["camera_imu_extrinsic"] = [
+        "rotation_matrix_3x3": r.rotationRowMajor,
+        "translation_xyz_m": [r.translationXYZ.x, r.translationXYZ.y, r.translationXYZ.z],
+        "translation_source": r.translationSource.rawValue,
+        "estimation_method": r.estimationMethod,
+        "calibration_window_s": r.calibrationWindowS,
+        "rotation_residual_median_rad_s": r.rotationResidualMedianRadS,
+        "translation_residual_median_m_s2": r.translationResidualMedianMS2,
+        "rotation_samples": r.rotationSamples,
+        "drift_vs_cache_deg": r.driftVsCacheDeg,
+        "from_cache": r.fromCache,
+      ] as [String: Any]
+    }
+    obj["imu_intrinsics"] = [
+      "accel_noise_density": 2.0e-3,
+      "gyro_noise_density": 1.5e-4,
+      "accel_bias_random_walk": 5.0e-5,
+      "gyro_bias_random_walk": 1.0e-5,
+      "sample_rate_hz": captureSettings.imuRateHz,
+      "source": "static_defaults",
+    ] as [String: Any]
+    do {
+      let out = try JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys])
+      try out.write(to: url, options: .atomic)
+    } catch {
+      NSLog("[ArkitCaptureController] estimator metadata merge failed: %@", "\(error)")
+    }
+  }
+
   // MARK: - Per-ARFrame streams (arkit_imu.jsonl / device_metrics.jsonl)
 
   /// Append one row per ARFrame to both per-frame streams. The orientation is the
@@ -668,6 +712,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     prevArkitQuat = qNow
     prevArkitTs = timestamp
+
+    let poseVec: [Float] = [t.columns.3.x, t.columns.3.y, t.columns.3.z,
+                            qNow.imag.x, qNow.imag.y, qNow.imag.z, qNow.real]
+    camImuEstimator.pushCameraPose(timestampNs: tsNs, pose: poseVec)
+    if let solved = camImuEstimator.maybeFinalize(currentTimestampNs: tsNs) {
+      NSLog("[ArkitCaptureController] camera-IMU extrinsic finalized: residual=%.4f rad/s samples=%d window=%.1fs drift=%.2fdeg",
+            solved.rotationResidualMedianRadS, solved.rotationSamples,
+            solved.calibrationWindowS, solved.driftVsCacheDeg)
+    }
 
     let trackingPair = describeTrackingState(frame.camera.trackingState)
     let arkitRow: [String: Any] = [
@@ -1172,6 +1225,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     //   gyro:  {x, y, z}    rotationRate
     //   device_motion: {attitude, user_accel, gravity, rotation_rate}
     let tsNs: Int64 = Int64(motion.timestamp * 1_000_000_000.0)
+    camImuEstimator.pushImuSamples([GyroSample(
+      timestampNs: tsNs,
+      gyroX: Float(motion.rotationRate.x),
+      gyroY: Float(motion.rotationRate.y),
+      gyroZ: Float(motion.rotationRate.z))])
     let line: [String: Any] = [
       "timestamp_ns": tsNs,
       "accel": [
