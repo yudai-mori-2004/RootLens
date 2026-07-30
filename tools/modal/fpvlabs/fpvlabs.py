@@ -390,7 +390,29 @@ def _point_cloud2_msg(ts_ns: int, xyz_f32, confidence: float = 1.0) -> dict:
         "is_dense": True,
     }
 
-TRACKING_STATE_STR = {0: "notAvailable", 1: "limited", 2: "normal"}
+TRACKING_STATE_STR = {0: "not_available", 1: "limited", 2: "normal"}
+# 収録側の理由文字列 (ARKit enum 由来の camelCase) → 納品形式の (reason code, reason_str)。
+TRACKING_REASONS = {
+    "": (0, "none"),
+    "unknown": (0, "none"),
+    "initializing": (1, "initializing"),
+    "excessiveMotion": (2, "excessive_motion"),
+    "insufficientFeatures": (3, "insufficient_features"),
+    "relocalizing": (4, "relocalizing"),
+}
+
+
+def _tracking_msg(ts_ns: int, state: int, raw_reason: str) -> dict:
+    code, reason_str = TRACKING_REASONS.get(str(raw_reason), (0, "none"))
+    if state != 1:
+        code, reason_str = 0, "none"  # 理由は limited のときだけ意味を持つ
+    return {
+        "header": {"stamp": _stamp(ts_ns), "frame_id": "camera_link"},
+        "state": int(state),
+        "reason": code,
+        "state_str": TRACKING_STATE_STR.get(int(state), str(state)),
+        "reason_str": reason_str,
+    }
 G_TO_MS2 = 9.80665
 TRAJECTORY_INTERVAL_NS = 5_000_000_000  # /trajectory の増分書き出し間隔
 
@@ -972,14 +994,9 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
                     "linear_acceleration_covariance": no_estimate,  # 加速度は持たないストリーム
                 }, ts)
                 stats["arkit_imu"] += 1
-                state = int(row.get("tracking_state", 2))
-                write("/camera/tracking_state", {
-                    "header": {"stamp": _stamp(ts), "frame_id": "camera_link"},
-                    "state": state,
-                    "reason": 0,
-                    "state_str": TRACKING_STATE_STR.get(state, str(state)),
-                    "reason_str": str(row.get("tracking_reason", "")),
-                }, ts)
+                write("/camera/tracking_state",
+                      _tracking_msg(ts, int(row.get("tracking_state", 2)),
+                                    row.get("tracking_reason", "")), ts)
                 stats["tracking"] += 1
 
         def _flush_metrics(upto_ts: int, inclusive: bool) -> None:
@@ -1132,14 +1149,9 @@ def build_mcap(session_dir: str, out_path: str, blur: bool = True,
             if arkit_rows:
                 _flush_arkit(ts, inclusive=True)
             else:
-                state = int(row.get("tracking_state", 2))
-                write("/camera/tracking_state", {
-                    "header": {"stamp": _stamp(ts), "frame_id": "camera_link"},
-                    "state": state,
-                    "reason": 0,
-                    "state_str": TRACKING_STATE_STR.get(state, str(state)),
-                    "reason_str": str(row.get("tracking_reason", "")),
-                }, ts)
+                write("/camera/tracking_state",
+                      _tracking_msg(ts, int(row.get("tracking_state", 2)),
+                                    row.get("tracking_reason", "")), ts)
                 stats["tracking"] += 1
 
             # IMU はこのフレームまでの分をまとめて (収録側も ARFrame ごとの一括書き)
