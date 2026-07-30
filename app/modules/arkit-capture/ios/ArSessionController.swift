@@ -206,19 +206,18 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     NSLog("[ArkitCaptureController] capture settings applied: %@", json)
   }
 
-  // Output decimation.
-  // ⚠ RGB decimates by time (recTargetInterval / nextKeepTs), not by a fixed
-  //    frame stride. With a fixed stride, when thermal pressure makes iOS drop
-  //    the camera from 60 to 30 fps the output would halve to 15 fps; keeping
-  //    frames by wall-clock interval tracks the target rate whether the source
-  //    runs at 60 or 30 fps (observed on device).
-  private var recTargetInterval: Double = 1.0 / 30.0  // keep interval (seconds) = 1 / recordingRate
-  private var nextKeepTs: Double = 0                  // earliest timestamp to keep next (0 = nothing kept yet)
+  // Output decimation: one deterministic sampler per stream (see FrameSampler).
+  // RGB keeps sampling through tracking loss so the video stays continuous;
+  // depth / point cloud sample only while tracking is normal, and their slot
+  // grids shift past each outage so recoveries never burst.
+  private let rgbSampler = FrameSampler(targetFps: 30)
+  private let depthSampler = FrameSampler(targetFps: 30)
+  private let pcSampler = FrameSampler(targetFps: 30)
+  private var trackingPauseStartTs: Double = -1   // capture timestamp when tracking left .normal
+  private var trackingPauseCount = 0
+  private var trackingPauseTotalNs: Int64 = 0
   private var recFrameStride = 1        // nominal stride for metadata (sessionFps / recordingRate)
   private var recordingSessionFps: Double = 30.0  // sensor fps captured at startRecording (for metadata)
-  private var depthEveryWritten = 1     // one depth frame per M written frames
-  private var pcEveryWritten = 1        // one point cloud per M written frames
-  private var recArFrameCounter = 0
   private var pointCloudFileHandle: FileHandle?
 
   // Session running state.
@@ -449,19 +448,21 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       return 30.0
     }()
     recordingSessionFps = sessionFps
-    // RGB decimates by time: keep frames at the target recordingRate interval (tracks thermal throttling).
-    recTargetInterval = 1.0 / Double(max(1, captureSettings.recordingRate))
-    nextKeepTs = 0
     recFrameStride = max(1, Int((sessionFps / Double(max(1, captureSettings.recordingRate))).rounded())) // nominal value for metadata
-    // Depth / point cloud decimate further, counted in written (already rate-kept) frames.
-    let effectiveRate = Double(max(1, captureSettings.recordingRate))
-    let dRate = captureSettings.syncRate ? captureSettings.recordingRate
-      : min(captureSettings.depthRate, captureSettings.recordingRate)
-    let pRate = captureSettings.syncRate ? captureSettings.recordingRate
-      : min(captureSettings.pointCloudRate, captureSettings.recordingRate)
-    depthEveryWritten = max(1, Int((effectiveRate / Double(max(1, dRate))).rounded()))
-    pcEveryWritten = max(1, Int((effectiveRate / Double(max(1, pRate))).rounded()))
-    recArFrameCounter = 0
+    // One deterministic sampler per stream. Depth / point cloud rates cap at the
+    // RGB rate (a depth frame without its RGB row has no index to live under).
+    let rgbRate = max(1, captureSettings.recordingRate)
+    let dRate = captureSettings.syncRate ? rgbRate : min(captureSettings.depthRate, rgbRate)
+    let pRate = captureSettings.syncRate ? rgbRate : min(captureSettings.pointCloudRate, rgbRate)
+    rgbSampler.configure(targetFps: rgbRate)
+    depthSampler.configure(targetFps: max(1, dRate))
+    pcSampler.configure(targetFps: max(1, pRate))
+    rgbSampler.reset()
+    depthSampler.reset()
+    pcSampler.reset()
+    trackingPauseStartTs = -1
+    trackingPauseCount = 0
+    trackingPauseTotalNs = 0
 
     // metadata.json waits for the intrinsics to settle, so it is written on the
     // first frame (camera.intrinsics may be empty until the first didUpdate).
@@ -850,7 +851,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   }
 
   /// Capture the row data on the delegate thread (the ARFrame must still be valid).
-  private func makeFrameRowData(frame: ARFrame) -> FrameRowData {
+  private func makeFrameRowData(frame: ARFrame, keepDepth: Bool, keepPc: Bool) -> FrameRowData {
     let ts = frame.timestamp
     let t = frame.camera.transform        // simd_float4x4 (= column-major)
     let k = frame.camera.intrinsics       // simd_float3x3
@@ -885,7 +886,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       imuDict = [:]
     }
 
-    let depth = frame.sceneDepth
+    // Depth / point cloud are captured only when their sampler kept this frame.
+    let depth = keepDepth ? frame.sceneDepth : nil
     let depthDims: (w: Int, h: Int)? = depth.map {
       (CVPixelBufferGetWidth($0.depthMap), CVPixelBufferGetHeight($0.depthMap))
     }
@@ -901,7 +903,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       depthMap: depth?.depthMap,
       confidenceMap: depth?.confidenceMap,
       depthDims: depthDims,
-      pointCloud: frame.rawFeaturePoints
+      pointCloud: keepPc ? frame.rawFeaturePoints : nil
     )
   }
 
@@ -955,10 +957,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // conventional RGB-D depth/ layout (depth/<frameIndex:06>.png). The same
     // frame's confidence map (sceneDepth.confidenceMap: 0=low / 1=medium /
     // 2=high) sits beside it as confidence/<frameIndex:06>.png (8-bit), so a
-    // consumer can mask low-confidence pixels. When the depth rate is set below
-    // the RGB rate, decimation counts written frames (the index stays shared
-    // with the jsonl).
-    if let depthMap = row.depthMap, frameIndex % depthEveryWritten == 0 {
+    // consumer can mask low-confidence pixels. Rate selection already happened in
+    // the delegate (depth sampler); a row carries buffers only when it was kept.
+    if let depthMap = row.depthMap {
       let confBuffer = row.confidenceMap
       let idx = frameIndex
       sensorFileQueue.async {
@@ -970,7 +971,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     // pointcloud.jsonl: xyz as float32 LE and ids as uint64 LE, base64-encoded.
     // Coordinates are in world space, so accumulating rows yields a map.
     if let pcHandle = pointCloudFileHandle,
-       frameIndex % pcEveryWritten == 0,
        let cloud = row.pointCloud,
        !cloud.points.isEmpty {
       var pts = [Float]()
@@ -1290,15 +1290,34 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     //    copyPixelBuffer).
     if !finishingWriter, let adaptor = self.pixelBufferAdaptor, let writer = self.assetWriter,
        let input = self.videoInput {
-      // Time-based decimation: keep a frame only when the target interval has
-      // passed since the last kept one. When thermal pressure drops the camera
-      // from 60 to 30 fps, the output still tracks the target rate (a fixed
-      // stride halved to 15 fps in that situation). The 0.25-interval margin
-      // absorbs source jitter, so a 60 fps source decimates cleanly to 30.
-      if nextKeepTs == 0 { nextKeepTs = timestamp }
-      guard timestamp >= nextKeepTs - recTargetInterval * 0.25 else { return }
-      nextKeepTs += recTargetInterval
-      if nextKeepTs <= timestamp { nextKeepTs = timestamp + recTargetInterval } // a long gap must not bank frames
+      let tsNsForSampler = Int64(timestamp * 1_000_000_000.0)
+      let tracking: Bool = {
+        if case .normal = frame.camera.trackingState { return true }
+        return false
+      }()
+
+      // Tracking-outage bookkeeping: depth / point cloud sampling stops during an
+      // outage, and on recovery both slot grids shift past it (see FrameSampler).
+      // RGB keeps recording through the outage - the video must stay continuous.
+      if !tracking {
+        if trackingPauseStartTs < 0 { trackingPauseStartTs = timestamp }
+      } else if trackingPauseStartTs >= 0 {
+        let pauseNs = Int64((timestamp - trackingPauseStartTs) * 1_000_000_000.0)
+        depthSampler.recordTrackingPauseOffset(pauseNs)
+        pcSampler.recordTrackingPauseOffset(pauseNs)
+        trackingPauseCount += 1
+        trackingPauseTotalNs += pauseNs
+        trackingPauseStartTs = -1
+      }
+
+      // Deterministic slot grid: keep this frame only when it fills a new slot.
+      guard rgbSampler.shouldEncodeFrame(timestampNs: tsNsForSampler) else { return }
+
+      let settings = captureSettings
+      let keepDepth = tracking && settings.streamDepth
+        && depthSampler.shouldEncodeFrame(timestampNs: tsNsForSampler)
+      let keepPc = tracking && settings.streamPointCloud
+        && pcSampler.shouldEncodeFrame(timestampNs: tsNsForSampler)
 
       // Skip while the encoder cannot accept input or a stop is in progress (no buffer, no copy).
       if writer.status == .failed, !writerFailureLogged {
@@ -1325,7 +1344,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       // frames.jsonl rows and mp4 frames stay strictly 1:1. A row
       // without its frame would silently shift every later RGB timestamp in the
       // delivered data, so a dropped frame must also drop its row.
-      let rowData = self.makeFrameRowData(frame: frame)
+      let rowData = self.makeFrameRowData(frame: frame, keepDepth: keepDepth, keepPc: keepPc)
 
       frameQueue.async { [weak self] in
         guard let self = self else { return }
