@@ -171,6 +171,9 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 4. CRC ゼロ・無圧縮コンテナ (B6 参照)
 5. metadata の死にフィールド (bitrate=0、 actual_width=0、 実体のない frame_drop_log_path、
    arcoreFrameCount、 production_certified_mode_b 等)。 生きている計測群のみ移植する
+6. VIO 姿勢差分の角速度 (参照実装の emit): world 系の値を camera_link 名義で書き、 四元数の
+   二重被覆も未処理 (符号反転フレームで ~2π/dt のスパイク)。 うちは最短弧補正 + body-frame
+   デルタで実装 (実データ検証: ジャイロと外部パラメータ経由で整合 15%、 world 式は 108%)
 
 参考: stera 側の既知バグでこちらに影響しないもの — 同一プロセス 2 本目の録画で
 /camera/depth/camera_info 欠落 (depthIntrinsicsWritten 未リセット)、 設定デフォルトの 4 層不整合、
@@ -205,6 +208,11 @@ FFI 経路の autoExposure 脱落。
   (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。
 - 2026-07-30 (確定): depth は文献調査の結果 sceneDepth + confidence 維持で確定 (決定事項 2 に
   根拠を記載)。
+- 2026-07-30 (E2E): build 48/49 実機クリップ 2 本で全チャンネル・メッセージ単位の監査完了
+  (check_format PASS、 8 ストリーム ts 一致、 fx per-frame 変動、 重力込み IMU 9.76、 深度/信頼度/
+  メッシュ/軌跡 全数健全、 外部パラメータは nominal 並進 + 90°±0.35° 回転を実測復元)。
+  発見 2 件を修正: pipeline_version 上げ忘れ (fpvlabs-6)、 /arkit/imu の角速度が参照実装由来の
+  world 系 + 符号反転スパイク → body-frame + 最短弧へ (複製しないもの 6 に追記)。
 - 2026-07-30 (実装): B (fpvlabs.py) 完了 + 合成/旧セッションのローカル検証で受け手 SDK の
   check_format=True 通過を確認、 push 済み。 A1-A7 実装完了 (ローカルコミット、 実機テスト前に
   つき未 push): ARKit 設定 / FrameSampler / arkit_imu + device_metrics ストリーム /

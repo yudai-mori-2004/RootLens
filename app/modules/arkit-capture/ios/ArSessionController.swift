@@ -755,7 +755,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     var wz = 0.0
     if let qPrev = prevArkitQuat, timestamp > prevArkitTs, prevArkitTs > 0 {
       let dt = timestamp - prevArkitTs
-      let qDelta = simd_normalize(qNow * simd_inverse(qPrev))
+      // Shortest arc: q and -q encode the same rotation, so align hemispheres
+      // first or a matrix-to-quaternion branch change reads as a ~2pi spin.
+      let qPrevAligned = simd_dot(qPrev.vector, qNow.vector) < 0
+        ? simd_quatf(vector: -qPrev.vector) : qPrev
+      // Body-frame delta (q_prev^-1 * q_now): angular velocity in the camera
+      // frame, matching the stream's frame_id and comparable to a gyro.
+      let qDelta = simd_normalize(simd_inverse(qPrevAligned) * qNow)
       let angle = Double(qDelta.angle)
       if abs(angle) >= 1e-6 {
         let axis = simd_normalize(qDelta.axis)
