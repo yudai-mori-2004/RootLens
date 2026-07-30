@@ -50,6 +50,10 @@ v0.1.4 (簡素化スプリント)
                                     clips/consent_events を account_id (uuid) に紐づけ、 死骸 5 テーブル
                                     DROP + clips の PK を content_hash 化。 現場名等の意味論はサーバに
                                     置かず運営台帳 (freee) 側で管理。 詳細は 13-supabase-auth-accounts/
+  14. capture-flow-voice        ✅ 新 音声コマンド撮影フロー (CaptureFlow strategy 分離。 現行運用の正)
+  15. stera-native-parity       🔄 新 収録 + MCAP 組み立てを stera-app (FPV Labs 公開実装) と呼び出し
+                                    レベルで一致させる。 恒常差分は RGB の h264 経由と blur のみ。
+                                    差分表と決定事項は 15-stera-native-parity/
 ```
 
 凡例: ✅ = 完了、 🔄 = 進行中 / 未着手、 新 = 新規追加。
