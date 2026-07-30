@@ -79,8 +79,11 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
    明記せず理由の記載なし (かつ confidence を捨てており研究慣行から外れる)。
    平滑化は後処理で再現可能・逆は不可逆という非対称も現行維持を支持。
    → stera との値差は恒常差分として宣言 (トピック/寸法/レートの形式指紋は一致)
-3. **isTracking ゲート採用**。 tracking .normal 以外では spatial 書き込みを止める (mp4 append も止める =
-   mp4 フレーム i ↔ frames.jsonl 行 i の対応は維持)
+3. **isTracking ゲートは pose / depth / point_cloud のみ**。 tracking .normal 以外で無効なポーズ系を
+   書かないのは stera どおり。 ただし **RGB (mp4 append) は継続する** — stera は tracking 喪失中
+   RGB ごと欠落させるが (RecordingFrameOrchestrator.swift:151-157、 pause offset で恒久穴)、
+   映像の連続性は egocentric データの価値そのもので、 「タスクを途中で切るな」という買い手要件とも
+   衝突するため複製しない。 宣言差分
 4. **RGB は h264 12Mbps mp4 経由を維持** (唯一の恒常差分)。 端末 jpeg 直行は 顔ぼかし前提 +
    アップロード容量 4 倍と両立しない。 `/rootlens/processing_info` に h264 中継を明記する
 5. **tf の camera_link→optical 回転は Stera-10M 実データで確定してから実装**。 stera-app は
@@ -104,7 +107,10 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
   と同式)、 `device_metrics.jsonl` (全 ARFrame、 500ms キャッシュ、 DeviceMetrics スキーマの
   フィールド)、 tracking_state/reason を全 ARFrame へ (arkit_imu 行に同乗させる)
 - A4. CameraImuExtrinsicEstimator + ImuIntrinsics を移植 (metadata に camera_imu_extrinsic ブロック、
-  imu_intrinsics は static_defaults / arkit_vio_derived の 2 種)
+  imu_intrinsics は static_defaults / arkit_vio_derived の 2 種)。 機種名では代替不可
+  (公開された機種別値が存在せず、 効くのは実装公差由来の個体差 ~1° 弱)。
+  任意: リグ実機を静置収録し Allan 分散でノイズ密度・バイアスランダムウォークを実測、
+  source="measured" の imu_intrinsics に格上げ (実測すれば stera の静的定数にも勝てる)
 - A5. depth 変換を vDSP 系列 (vsmul ×1000 → vclip [0,65535] → vfixu16) に置換。 読み元は
   決定事項 2 の確定に従う。 confidence は現行どおり記録
 - A6. IMU: `startDeviceMotionUpdates(using: .xArbitraryZVertical, to:)` を明示、 OperationQueue の
@@ -122,15 +128,19 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
   tracking_state → imu バッチ → device_metrics
 - B2. スキーマを ROS2SchemaDefinitions.swift の**全文と同一に** (`stera/msg/...` 名を含む)。
   schema 12 本 + channel 17 本を stera の固定順で先行登録
-- B3. /device/imu: linear_acceleration = user_accel × **9.81** (重力除去)、 covariance =
-  ImuIntrinsics 式 ((2.0e-3)²·Hz / (1.5e-4)²·Hz / (2°)²)、 frame_id `imu_frame`
+- B3. /device/imu: frame_id は `imu_frame` に合わせる。 **値の意味論は合わせない**:
+  linear_acceleration は重力込み × 9.80665 を維持 (REP 145 準拠。 stera の userAcceleration×9.81 は
+  規約違反)、 covariance は全ゼロ = 「不明」を維持 (Imu.msg 明記の規約。 stera の静的定数由来の
+  合成値は複製しない。 Allan 実測が済んだら実測値に置換)
 - B4. camera_info を frames.jsonl の per-frame intrinsics から spatial フレーム毎に
 - B5. tf 毎フレーム 2 transform / trajectory 5 秒毎クリア / point_cloud 行毎 (x,y,z,confidence=1.0) /
   mesh 全統合 1 Marker + confidence 付き mesh_cloud / tracking_state・arkit_imu・metrics は
   新 raw から。 pose の quaternion は simd_quatf 相当の float32 経路に合わせる
-- B6. コンテナ: 無圧縮、 chunk 512KB、 library "fpv_labs/1.0"、 グローバル通番 sequence、
-  Metadata record `session_metadata` (dot-flatten)。 mcap_ros2 の既定 (zstd/1MB/seq0) を明示指定で
-  全て上書き。 足りなければ mcap 基底 Writer へ降りる
+- B6. コンテナ: schema/channel の名前・全文・登録順・Metadata record `session_metadata`
+  (dot-flatten) は合わせる。 **合わせないもの**: 圧縮と CRC は zstd + CRC 有効を維持
+  (stera の手書き writer は uncompressed_crc=0 / summary_crc=0 で破損検出不能 + サイズ倍増。
+  SDK 読者には透過)、 library 文字列は自分名義 (他実装の名乗りはしない)。 グローバル通番
+  sequence は mcap 基底 Writer で対応可能なら合わせ、 不可なら 0 のまま (読者に影響なし)
 - B7. jpeg 品質 85 → 80。 processing_info に h264 中継と jpeg エンコーダ差 (CIContext vs OpenCV) を明記
 
 ### C. 検証
@@ -149,6 +159,22 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
   新フィールド前提で fail-loud)
 - stera-app の死にコードの再現 (mp4 encoder 配線、 未出力ログ、 depth camera_info 欠落バグ)
 
+## コードレビュー確定: バグ互換で複製しない stera 挙動 (2026-07-30)
+
+両実装の欠陥探索レビューで確定した、 stera 側の欠陥 5 つ。 呼び出しレベル一致の対象から明示的に除外する。
+
+1. バックプレッシャ時の IMU サンプル破棄 (drainSamples が判定より前、 破棄分も metrics には
+   記録済み = metadata が MCAP に無い IMU を「あった」と報告する)。 うちの IMU 独立キューを維持
+2. tracking 喪失中の RGB 欠落 (決定事項 3 参照)
+3. IMU の重力除去 + 合成 covariance (B3 参照。 REP 145 / Imu.msg 規約準拠側に立つ)
+4. CRC ゼロ・無圧縮コンテナ (B6 参照)
+5. metadata の死にフィールド (bitrate=0、 actual_width=0、 実体のない frame_drop_log_path、
+   arcoreFrameCount、 production_certified_mode_b 等)。 生きている計測群のみ移植する
+
+参考: stera 側の既知バグでこちらに影響しないもの — 同一プロセス 2 本目の録画で
+/camera/depth/camera_info 欠落 (depthIntrinsicsWritten 未リセット)、 設定デフォルトの 4 層不整合、
+FFI 経路の autoExposure 脱落。
+
 ## 恒常差分 (宣言して残すもの)
 
 | 差分 | 理由 |
@@ -156,6 +182,9 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 | RGB が h264 12Mbps mp4 を経由 (jpeg 直行でない) | 顔ぼかし前提 + アップロード容量。 processing_info に明記 |
 | 解像度 1920×1440 (stera 出荷既定は 1080。 選択アルゴリズムは同一、 cap 値のみ 1440) | 縦画角を削る理由がない |
 | depth が sceneDepth (stera は smoothedSceneDepth)。 confidence 付き | 研究慣行 (ARKitScenes / ARKitTrack / Stray Scanner) に整合。 平滑化は後処理で再現可 |
+| IMU が重力込み ×9.80665、 covariance は「不明」宣言 | REP 145 / Imu.msg 準拠 (stera は規約違反側) |
+| RGB は tracking 喪失中も継続 | 映像連続性 = 商品価値。 買い手のタスク連続性要件 |
+| コンテナは zstd + CRC 有効、 library 自分名義 | 破損検出とサイズ。 SDK 読者に透過 |
 | 顔ぼかし / marker zone ぼかし | 商品要件 |
 | `/camera/depth/confidence` の追加 topic | うちだけの上積み。 REFERENCE_TOPICS 判定に影響なし |
 | jpeg エンコーダが OpenCV (品質 80 は一致) | サーバ組み立ての帰結 |
@@ -174,4 +203,9 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
   アルゴリズム一致と両立)。 16:9 化と画角の実機確認基準を撤回。 depth ソースは要確定に変更
   (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。
 - 2026-07-30 (確定): depth は文献調査の結果 sceneDepth + confidence 維持で確定 (決定事項 2 に
-  根拠を記載)。 未決事項ゼロ、 実装着手可。
+  根拠を記載)。
+- 2026-07-30 (レビュー): 両実装の欠陥探索レビュー完了。 stera 側の欠陥 5 つを複製対象から除外
+  (専用セクション)、 うち側の要修正を確認 (fpvlabs.py が IMU orientation 欠落時に (0,0,0,1) を
+  無言で書く → 実装時に修正、 captureSettings 無ロック競合 → 実装時にロック追加)。
+  決定論サンプラー / 外部パラメータ推定 / 生きた metadata 計測群 / readiness ゲートの採用を確定。
+  未決事項ゼロ、 実装着手可。
