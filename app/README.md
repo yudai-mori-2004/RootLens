@@ -23,9 +23,18 @@ without post-hoc synchronization.
 | `depth.tar` | LiDAR depth, one 16-bit PNG (millimeters) per frame under `depth/`, with the matching ARKit confidence map (8-bit, low/medium/high) under `confidence/`. LiDAR devices only |
 | `pointcloud.jsonl` | ARKit VIO feature points per frame, world coordinates, raw float32 bytes |
 | `mesh.jsonl` | ARKit scene-reconstruction mesh anchors, raw vertex and face buffers |
+| `arkit_imu.jsonl` | One row per ARFrame (full sensor rate, sampling-independent): VIO camera orientation quaternion, angular velocity from the quaternion delta between consecutive frames, tracking state and reason |
+| `device_metrics.jsonl` | One row per ARFrame: battery level/state, thermal state, per-thread CPU usage, resident memory footprint, grantable memory. Values refresh every 500 ms under each frame's own timestamp |
+
+`metadata.json` additionally gains, at stop: per-stream counts and time ranges,
+expected sampler slots, append failures, tracking-pause accounting, the
+camera-IMU extrinsic estimate (hand-eye solve over the session's first
+well-excited window, cached per device model), and a labeled static IMU noise
+model (`source: "static_defaults"`).
 
 Older clips name the per-frame track `realtime_handpose.jsonl`; the schema is
-identical.
+identical. Clips recorded before the per-ARFrame streams existed simply lack
+those two files; the delivery pipeline degrades their topics to empty channels.
 
 ### Data fidelity
 
