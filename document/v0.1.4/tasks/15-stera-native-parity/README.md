@@ -66,17 +66,24 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 
 ## 決定事項 (このタスクの前提)
 
-1. **videoFormat は stera アルゴリズムへ** (height cap 1080)。 収録が 1920×1080@30 の 16:9 になり、
-   現行 4:3 から**縦の画角が狭くなる**。 手元の収まりは実機で確認する (成功基準)
-2. **depth は smoothedSceneDepth へ** (時間フィルタ済み深度。 生値が要る日のために sceneDepth 併記はしない。
-   stera と同じものだけを記録する)
+1. **videoFormat は stera の選択関数を移植し、 cap=1440 で呼ぶ**。 preferredVideoFormat() は
+   「height ≤ cap で絞り面積最大 → 要求 fps 一致優先」の汎用関数で、 cap 1080 は Dart 層の
+   出荷既定にすぎない。 cap 1440 なら同じコードが 1920×1440 (4:3) を選ぶ = アルゴリズム一致と
+   現行画角の維持が両立する。 縦画角は削らない。 JPEG 目標寸法もセンサー寸法のまま (縮小なし)
+2. **depth ソースは要確定 (推奨: 現行維持 = sceneDepth + confidence)**。 事実: stera は
+   smoothedSceneDepth (Apple の時間平滑化版 API) を読み、 confidenceMap は参照ゼロ (捨てている)。
+   量子化はうちと同一の mm/uint16 で独自処理は無い。 推奨理由は不可逆性の非対称
+   (生→平滑化は後処理で再現可、 逆と confidence 破棄は不可逆)。 トピック/寸法/レートは
+   どちらでも一致するため形式指紋に影響しない
 3. **isTracking ゲート採用**。 tracking .normal 以外では spatial 書き込みを止める (mp4 append も止める =
    mp4 フレーム i ↔ frames.jsonl 行 i の対応は維持)
 4. **RGB は h264 12Mbps mp4 経由を維持** (唯一の恒常差分)。 端末 jpeg 直行は 顔ぼかし前提 +
    アップロード容量 4 倍と両立しない。 `/rootlens/processing_info` に h264 中継を明記する
-5. **tf の camera_link→optical 回転は要検証**。 stera-app は (x:1,y:0,z:0,w:0)、 stera-sdk 定数
-   R_OPTICAL_TO_LINK は (0.7071,0,0.7071,0) で**両者が矛盾**。 Stera-10M 実 MCAP を落として
-   実データ側に合わせる (実装前に必ず確認)
+5. **tf の camera_link→optical 回転は Stera-10M 実データで確定してから実装**。 stera-app は
+   (x:1,y:0,z:0,w:0) = ARKit カメラ→ROS optical の素直な軸反転 diag(1,−1,−1)。 stera-sdk 定数
+   R_OPTICAL_TO_LINK (0.7071,0,0.7071,0) はそれにカメラ上軸まわり 90° を重ねた値 (= 縦横の
+   向き扱いの混入疑い)。 ランドスケープ JPEG と幾何整合するのは app 値。 現行 fpvlabs.py は
+   SDK 値を書いており、 過去納品分は SDK 整合である点に注意
 6. うち独自の上積みは維持: 顔ぼかし / marker zone ぼかし / `/camera/depth/confidence` /
    hands (raw のみ、 MCAP 非同梱の判断は不変)
 
@@ -84,9 +91,9 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 
 ### A. app 側 (stera_recorder の翻訳。 ArSessionController の録画コアを再構成)
 
-- A1. ARKit 設定を ArSessionManagerImpl と同一に: planeDetection、 smoothedSceneDepth、
-  run() オプション除去、 videoFormat 選択アルゴリズム移植 (cap 1080)、 autoExposure 設定 +
-  1.5s 遅延ロック、 readiness ゲート (30 捨て + .normal×10、 録画開始条件)
+- A1. ARKit 設定を ArSessionManagerImpl と同一に: planeDetection、 frameSemantics (depth は
+  決定事項 2 の確定に従う)、 run() オプション除去、 videoFormat 選択アルゴリズム移植 (cap=1440)、
+  autoExposure 設定 + 1.5s 遅延ロック、 readiness ゲート (30 捨て + .normal×10、 録画開始条件)
 - A2. FrameSamplerImpl を移植し rgb/depth/pc の 3 本へ (決定論スケジュール + tracking-pause
   オフセット)。 depth/pc の「書込フレーム剰余」方式を廃止
 - A3. 新規 raw ストリーム: `arkit_imu.jsonl` (全 ARFrame: qNow と姿勢差分角速度、 emitArkitImuIfNeeded
@@ -94,8 +101,8 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
   フィールド)、 tracking_state/reason を全 ARFrame へ (arkit_imu 行に同乗させる)
 - A4. CameraImuExtrinsicEstimator + ImuIntrinsics を移植 (metadata に camera_imu_extrinsic ブロック、
   imu_intrinsics は static_defaults / arkit_vio_derived の 2 種)
-- A5. depth 変換を vDSP 系列 (vsmul ×1000 → vclip [0,65535] → vfixu16) に置換、 読み元を
-  smoothedSceneDepth へ。 confidence は現行どおり記録
+- A5. depth 変換を vDSP 系列 (vsmul ×1000 → vclip [0,65535] → vfixu16) に置換。 読み元は
+  決定事項 2 の確定に従う。 confidence は現行どおり記録
 - A6. IMU: `startDeviceMotionUpdates(using: .xArbitraryZVertical, to:)` を明示、 OperationQueue の
   name/maxConcurrent/qos を合わせる。 imu.jsonl の生値は現行維持 (user_accel と gravity を
   別々に持っているので MCAP 側で stera 式を正確に組める)
@@ -128,7 +135,6 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 - C2. Stera-10M 実セッションとのフィンガープリント比較スクリプト (トピック集合 / スキーマ名・全文 /
   channel 順 / 各トピック Hz / Imu covariance / PointCloud2 レイアウト / Marker フィールド /
   tf 回転値)。 差分は宣言済みリストと一致すること
-- C3. 16:9 化後の実機映像で手元の画角を確認 (店舗の作業姿勢で)
 
 ## やらないこと
 
@@ -144,6 +150,7 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 | 差分 | 理由 |
 |---|---|
 | RGB が h264 12Mbps mp4 を経由 (jpeg 直行でない) | 顔ぼかし前提 + アップロード容量。 processing_info に明記 |
+| 解像度 1920×1440 (stera 出荷既定は 1080。 選択アルゴリズムは同一、 cap 値のみ 1440) | 縦画角を削る理由がない |
 | 顔ぼかし / marker zone ぼかし | 商品要件 |
 | `/camera/depth/confidence` の追加 topic | うちだけの上積み。 REFERENCE_TOPICS 判定に影響なし |
 | jpeg エンコーダが OpenCV (品質 80 は一致) | サーバ組み立ての帰結 |
@@ -151,11 +158,13 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 
 ## 成功基準
 
-- C1〜C3 が全て通る
+- C1〜C2 が通る
 - 比較スクリプトの差分出力が「恒常差分」表と完全一致する (未宣言の差分ゼロ)
-- 装着リグでの実機収録 1 本 (16:9) を目視確認し、 手元が欠けない
 
 ## 進捗
 
 - 2026-07-30: stera-app / うち両実装の呼び出しレベル棚卸し完了、 差分と決定事項を本 README に固定。
   tf 回転の app/sdk 矛盾を発見 (決定事項 5)。 実装未着手。
+- 2026-07-30 (改訂): 解像度は 1440 維持で確定 (stera の選択関数に cap=1440 を渡す形で
+  アルゴリズム一致と両立)。 16:9 化と画角の実機確認基準を撤回。 depth ソースは要確定に変更
+  (推奨は sceneDepth + confidence 維持)。 tf 矛盾は「SDK 定数 = app 値 + カメラ上軸 90°」と判明。
