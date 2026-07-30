@@ -111,7 +111,7 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
   「stera 形式パリティに同梱される無料の上積み + 運用 QA」。 機種指定で発注する買い手は
   同型機で自前校正できる前提で動くため必須ではないが、 stera 自身が端末上推定を選んで
   出荷しており、 移植すれば受動的に動く。 残差とドリフト値はリグ異常 (取付緩み・機体交換) の
-  検出に使える。 Allan 分散によるノイズ実測は要望が出たときだけ
+  検出に使える。 ノイズ実測 (静置収録系のオペレーション) は行わない
 - A5. depth 変換を vDSP 系列 (vsmul ×1000 → vclip [0,65535] → vfixu16) に置換。 読み元は
   決定事項 2 の確定に従う。 confidence は現行どおり記録
 - A6. IMU: `startDeviceMotionUpdates(using: .xArbitraryZVertical, to:)` を明示、 OperationQueue の
@@ -132,7 +132,7 @@ depth camera_info はプロセス内 2 本目の録画で欠落する (フラグ
 - B3. /device/imu: frame_id は `imu_frame` に合わせる。 **値の意味論は合わせない**:
   linear_acceleration は重力込み × 9.80665 を維持 (REP 145 準拠。 stera の userAcceleration×9.81 は
   規約違反)、 covariance は全ゼロ = 「不明」を維持 (Imu.msg 明記の規約。 stera の静的定数由来の
-  合成値は複製しない。 Allan 実測が済んだら実測値に置換)
+  合成値は複製しない)
 - B4. camera_info を frames.jsonl の per-frame intrinsics から spatial フレーム毎に
 - B5. tf 毎フレーム 2 transform / trajectory 5 秒毎クリア / point_cloud 行毎 (x,y,z,confidence=1.0) /
   mesh 全統合 1 Marker + confidence 付き mesh_cloud / tracking_state・arkit_imu・metrics は
