@@ -46,6 +46,8 @@ const OUTPUT_FILES: OutputFileSpec[] = [
   { name: 'depth.tar', contentType: 'application/x-tar', required: false },
   { name: 'pointcloud.jsonl', contentType: 'application/x-ndjson', required: false },
   { name: 'mesh.jsonl', contentType: 'application/x-ndjson', required: false },
+  { name: 'arkit_imu.jsonl', contentType: 'application/x-ndjson', required: false },
+  { name: 'device_metrics.jsonl', contentType: 'application/x-ndjson', required: false },
 ];
 
 function ensureTrailingSlash(uri: string): string {

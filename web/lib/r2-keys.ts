@@ -25,7 +25,9 @@ export type RawSessionFilename =
   | "imu.jsonl"           // ARKit 構成のみ
   | "depth.tar"           // ARKit + LiDAR (Pro) のみ optional
   | "pointcloud.jsonl"    // ARKit 構成のみ optional (= VIO 特徴点群)
-  | "mesh.jsonl";         // ARKit + LiDAR (Pro) のみ optional (= シーン再構成メッシュ)
+  | "mesh.jsonl"          // ARKit + LiDAR (Pro) のみ optional (= シーン再構成メッシュ)
+  | "arkit_imu.jsonl"     // ARKit 構成のみ optional (= 全 ARFrame の VIO 姿勢由来角速度 + tracking)
+  | "device_metrics.jsonl"; // ARKit 構成のみ optional (= 全 ARFrame の 電池 / 熱 / CPU / メモリ)
 
 /// 構成ごとのアップロードファイルマニフェスト (= 端末の config.outputFiles と対応する server 側 contract)。
 /// 端末は presign に無い名前をアップロードしようとすると fail-loud する (= ズレ検出)。
@@ -47,6 +49,8 @@ export const RAW_SESSION_MANIFEST: Record<
     { filename: "depth.tar", contentType: "application/x-tar" },
     { filename: "pointcloud.jsonl", contentType: "application/x-ndjson" },
     { filename: "mesh.jsonl", contentType: "application/x-ndjson" },
+    { filename: "arkit_imu.jsonl", contentType: "application/x-ndjson" },
+    { filename: "device_metrics.jsonl", contentType: "application/x-ndjson" },
   ],
 };
 
