@@ -1,3 +1,4 @@
+import Accelerate
 import CoreGraphics
 import CoreVideo
 import Foundation
@@ -28,18 +29,35 @@ enum PixelEncoders {
 
     let floatStride = bytesPerRow / MemoryLayout<Float32>.size
     let floatPtr = base.assumingMemoryBound(to: Float32.self)
+    let pixelCount = width * height
 
-    // float32 (meters) → uint16 (millimeters)
-    var u16 = [UInt16](repeating: 0, count: width * height)
-    for y in 0..<height {
-      let srcRow = y * floatStride
-      let dstRow = y * width
-      for x in 0..<width {
-        let m = floatPtr[srcRow + x]
-        let mm = m.isNaN ? 0 : m * 1000.0
-        let clamped = max(0.0, min(65535.0, Double(mm)))
-        u16[dstRow + x] = UInt16(clamped)
+    // float32 (meters) → uint16 (millimeters), vectorized:
+    // vsmul ×1000 → non-finite scrub → vclip [0, 65535] → vfixu16 (truncate).
+    // The scrub stays scalar because vclip/vfixu16 leave NaN behavior undefined;
+    // 0 is the conventional RGB-D "no data" sentinel and must be deterministic.
+    var scratch = [Float](repeating: 0, count: pixelCount)
+    var scale: Float = 1000.0
+    scratch.withUnsafeMutableBufferPointer { dst in
+      guard let dstBase = dst.baseAddress else { return }
+      if floatStride == width {
+        vDSP_vsmul(floatPtr, 1, &scale, dstBase, 1, vDSP_Length(pixelCount))
+      } else {
+        for y in 0..<height {
+          vDSP_vsmul(floatPtr + y * floatStride, 1, &scale,
+                     dstBase + y * width, 1, vDSP_Length(width))
+        }
       }
+      for i in 0..<pixelCount where !dstBase[i].isFinite {
+        dstBase[i] = dstBase[i] > 0 ? 65535.0 : 0.0
+      }
+    }
+    var lo: Float = 0.0
+    var hi: Float = 65535.0
+    vDSP_vclip(scratch, 1, &lo, &hi, &scratch, 1, vDSP_Length(pixelCount))
+    var u16 = [UInt16](repeating: 0, count: pixelCount)
+    u16.withUnsafeMutableBufferPointer { dst in
+      guard let dstBase = dst.baseAddress else { return }
+      vDSP_vfixu16(scratch, 1, dstBase, 1, vDSP_Length(pixelCount))
     }
 
     let cs = CGColorSpaceCreateDeviceGray()

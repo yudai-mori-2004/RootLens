@@ -1013,8 +1013,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       return
     }
     motionManager.deviceMotionUpdateInterval = 1.0 / Double(max(1, captureSettings.imuRateHz))
+    motionQueue.name = "io.rootlens.arkit-capture.imu"
     motionQueue.maxConcurrentOperationCount = 1
-    motionManager.startDeviceMotionUpdates(to: motionQueue) { [weak self] motion, _ in
+    motionQueue.qualityOfService = .userInteractive
+    // Attitude reference is pinned explicitly: x arbitrary, z gravity-aligned.
+    motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: motionQueue) { [weak self] motion, _ in
       guard let self = self, let m = motion else { return }
       self.appendImuLine(motion: m)
     }
