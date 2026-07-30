@@ -151,6 +151,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   struct CaptureSettings {
     var resolution = "1440p"        // "1440p" (4:3, widest FoV) | "1080p" | "720p"
     var autoFocus = true
+    var autoExposure = true         // false locks exposure once the session settles
+    var arkitFps = 30               // requested sensor fps (30/60); the format picker prefers a match
     var recordingRate = 30          // output Hz for RGB / depth / point cloud (15/30/60)
     var syncRate = true             // false applies depthRate / pointCloudRate individually (≤ recordingRate)
     var depthRate = 30
@@ -162,7 +164,22 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     var streamMesh = true
   }
 
-  private(set) var captureSettings = CaptureSettings()
+  // Settings are written from the JS bridge thread and read on main / recording
+  // queues; the lock keeps the struct copy atomic.
+  private let settingsLock = NSLock()
+  private var _captureSettings = CaptureSettings()
+  private(set) var captureSettings: CaptureSettings {
+    get {
+      settingsLock.lock()
+      defer { settingsLock.unlock() }
+      return _captureSettings
+    }
+    set {
+      settingsLock.lock()
+      defer { settingsLock.unlock() }
+      _captureSettings = newValue
+    }
+  }
 
   /// Capture settings from JS (JSON). Apply from the next startSession / startRecording.
   func applyCaptureSettings(json: String) {
@@ -174,6 +191,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     var s = CaptureSettings()
     if let v = obj["resolution"] as? String { s.resolution = v }
     if let v = obj["autoFocus"] as? Bool { s.autoFocus = v }
+    if let v = obj["autoExposure"] as? Bool { s.autoExposure = v }
+    if let v = obj["arkitFps"] as? Int { s.arkitFps = v }
     if let v = obj["recordingRate"] as? Int { s.recordingRate = v }
     if let v = obj["syncRate"] as? Bool { s.syncRate = v }
     if let v = obj["depthRate"] as? Int { s.depthRate = v }
@@ -204,6 +223,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   // Session running state.
   private var sessionRunning = false
+
+  // Session readiness gate: discard the first frames (world frame still converging),
+  // then require a run of consecutive .normal tracking frames before recording may
+  // start. Guarantees every session opens on a stabilized coordinate frame.
+  private static let skipInitialFrames = 30
+  private static let minStableTrackingFrames = 10
+  private var readinessFramesSeen = 0
+  private var consecutiveNormalFrames = 0
+  private(set) var isSessionReady = false
 
   // Thermal-state log (recording only). events is touched only on sensorFileQueue.
   private var thermalObserver: NSObjectProtocol?
@@ -237,17 +265,18 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   func startSession() {
     if sessionRunning { return }
+    let settings = captureSettings
     let config = ARWorldTrackingConfiguration()
     config.worldAlignment = .gravity
-    config.providesAudioData = false
-    config.isAutoFocusEnabled = captureSettings.autoFocus
-    if captureSettings.streamDepth, ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+    config.planeDetection = [.horizontal, .vertical]
+    config.isAutoFocusEnabled = settings.autoFocus
+    if settings.streamDepth, ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
       config.frameSemantics.insert(.sceneDepth)
     }
-    if captureSettings.streamMesh, ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+    if settings.streamMesh, ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
       config.sceneReconstruction = .mesh
     }
-    let chosen = pickPreferredFormat(resolution: captureSettings.resolution)
+    let chosen = pickPreferredFormat(resolution: settings.resolution, requestedFps: settings.arkitFps)
     if let f = chosen {
       config.videoFormat = f
       let isUltra: Bool = {
@@ -260,8 +289,12 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     } else {
       NSLog("[ArkitCaptureController] using default ARWorldTracking video format")
     }
-    session.run(config, options: [.resetTracking, .removeExistingAnchors])
+    readinessFramesSeen = 0
+    consecutiveNormalFrames = 0
+    isSessionReady = false
+    session.run(config)
     sessionRunning = true
+    applyExposurePreferenceAfterSettle()
     // ⚠ Keep-awake and screen dim are deliberately not touched here. They belong
     //    to "while the capture screen is open", not to the ARSession's on/off:
     //    during an automatic cycle pause ARKit stops but the screen must not
@@ -269,10 +302,34 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     //    through setKeepAwake / setScreenDimmed from the capture screen lifecycle.
   }
 
+  /// Locks camera exposure after the session settles, when auto-exposure is off.
+  /// The delay lets the initial exposure convergence finish before freezing it.
+  private func applyExposurePreferenceAfterSettle() {
+    if captureSettings.autoExposure { return }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+      guard let self = self, self.sessionRunning else { return }
+      if #available(iOS 16.0, *) {
+        guard let device = ARWorldTrackingConfiguration.configurableCaptureDeviceForPrimaryCamera else {
+          NSLog("[ArkitCaptureController] exposure lock unavailable (no configurable device)")
+          return
+        }
+        do {
+          try device.lockForConfiguration()
+          device.exposureMode = .locked
+          device.unlockForConfiguration()
+          NSLog("[ArkitCaptureController] exposure locked")
+        } catch {
+          NSLog("[ArkitCaptureController] exposure lock failed: %@", "\(error)")
+        }
+      }
+    }
+  }
+
   func stopSession() {
     if !sessionRunning { return }
     session.pause()
     sessionRunning = false
+    isSessionReady = false
     // Drain any in-flight HandTracker work (Vision / ANE) and release the held
     // pixel buffer and hand output, so no ARKit frame IOSurface stays alive
     // after the session pauses and the camera can be re-acquired cleanly.
@@ -298,6 +355,10 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     if assetWriter != nil {
       throw NSError(domain: "ArkitCaptureController", code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "already recording"])
+    }
+    if !isSessionReady {
+      throw NSError(domain: "ArkitCaptureController", code: 7,
+                    userInfo: [NSLocalizedDescriptionKey: "AR session not ready (tracking not stabilized yet)"])
     }
 
     try FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
@@ -1135,6 +1196,21 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     let timestamp = frame.timestamp
     let segmentationBuffer = frame.segmentationBuffer
 
+    // Readiness gate: skip the initial convergence frames, then require a run of
+    // consecutive .normal tracking frames. Ready latches true for the session.
+    readinessFramesSeen += 1
+    if !isSessionReady && readinessFramesSeen > Self.skipInitialFrames {
+      if case .normal = frame.camera.trackingState {
+        consecutiveNormalFrames += 1
+        if consecutiveNormalFrames >= Self.minStableTrackingFrames {
+          isSessionReady = true
+          NSLog("[ArkitCaptureController] session ready (tracking stabilized)")
+        }
+      } else {
+        consecutiveNormalFrames = 0
+      }
+    }
+
     latestBufferLock.lock()
     latestPixelBuffer = pixelBuffer
     latestBufferLock.unlock()
@@ -1274,7 +1350,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
   /// Pick the video format for the requested resolution, preferring the 1x wide
   /// camera and the full-sensor 4:3 formats (widest field of view).
-  private func pickPreferredFormat(resolution: String) -> ARConfiguration.VideoFormat? {
+  /// Picks the capture format under a height cap: the largest sensor area whose
+  /// height fits the cap, preferring the requested fps among equals, else the
+  /// highest fps. "1440p" caps at 1440 and lands on the full-sensor 4:3 format
+  /// (widest FoV); "1080p" / "720p" cap at their 16:9 crops.
+  private func pickPreferredFormat(resolution: String, requestedFps: Int) -> ARConfiguration.VideoFormat? {
     let supported = ARWorldTrackingConfiguration.supportedVideoFormats
 
     if #available(iOS 16.0, *) {
@@ -1290,37 +1370,26 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       }
     }
 
-    // Only 1x (wide) camera formats are candidates.
-    var pool = supported
-    if #available(iOS 16.0, *) {
-      let wides = supported.filter { $0.captureDeviceType == .builtInWideAngleCamera }
-      if !wides.isEmpty { pool = wides }
+    let captureHeightLimit: CGFloat
+    switch resolution {
+    case "720p": captureHeightLimit = 720
+    case "1080p": captureHeightLimit = 1080
+    default: captureHeightLimit = 1440
     }
 
-    // Resolution setting. "720p" / "1080p" are 16:9 crops (narrower FoV); when no
-    // match exists, fall through to the default (full-sensor 4:3, widest FoV).
-    switch resolution {
-    case "720p":
-      if let f = pool.min(by: { abs($0.imageResolution.height - 720) < abs($1.imageResolution.height - 720) }),
-         abs(f.imageResolution.height - 720) <= 120 { return f }
-      fallthrough
-    case "1080p":
-      if let f = pool.min(by: { abs($0.imageResolution.height - 1080) < abs($1.imageResolution.height - 1080) }),
-         abs(f.imageResolution.height - 1080) <= 120 { return f }
-      fallthrough
-    default:
-      // "1440p": prefer full-sensor 4:3 (widest FoV). Same aspect means the same
-      // FoV, so the smallest such resolution is enough (1920x1440; 4K quadruples
-      // the file size). At equal resolution, prefer higher fps.
-      return pool.min { a, b in
-        let aspectA = a.imageResolution.height / a.imageResolution.width
-        let aspectB = b.imageResolution.height / b.imageResolution.width
-        if abs(aspectA - aspectB) > 0.01 { return aspectA > aspectB }
-        let areaA = a.imageResolution.width * a.imageResolution.height
-        let areaB = b.imageResolution.width * b.imageResolution.height
-        if areaA != areaB { return areaA < areaB }
-        return a.framesPerSecond > b.framesPerSecond
-      }
+    if captureHeightLimit >= 2160, #available(iOS 16.0, *),
+       let fourK = ARWorldTrackingConfiguration.recommendedVideoFormatFor4KResolution {
+      return fourK
     }
+    let withinCap = supported.filter { $0.imageResolution.height <= captureHeightLimit }
+    if withinCap.isEmpty { return nil }
+    let largestArea = withinCap.map { $0.imageResolution.width * $0.imageResolution.height }.max() ?? 0
+    let largest = withinCap.filter { $0.imageResolution.width * $0.imageResolution.height == largestArea }
+    if let match = largest.first(where: { Int($0.framesPerSecond) == requestedFps }) { return match }
+    return largest.max(by: { $0.framesPerSecond < $1.framesPerSecond })
+      ?? withinCap.max(by: {
+        ($0.imageResolution.width * $0.imageResolution.height)
+          < ($1.imageResolution.width * $1.imageResolution.height)
+      })
   }
 }
