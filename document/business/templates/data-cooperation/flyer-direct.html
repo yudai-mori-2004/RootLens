@@ -24,7 +24,7 @@
     display:flex; flex-direction:column; }
 
   /* ---------------- HERO ---------------- */
-  .hero{ position:relative; flex:none; height:60mm; overflow:visible; z-index:5;
+  .hero{ position:relative; flex:none; height:61mm; overflow:visible; z-index:5;
     background:var(--ink); color:#fff; }
   .heroPad{ position:relative; z-index:6; padding:6.5mm 14mm 0 14mm; height:100%; }
   .brand{ display:flex; align-items:center; gap:5px; margin-bottom:2.5mm; }
@@ -44,38 +44,41 @@
   .lead b{ font-weight:800; color:var(--ink); border-bottom:1.5px solid var(--ink); }
 
   /* 3 STEPS */
-  .steps{ margin-top:4.2mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
+  .steps{ margin-top:3.4mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
   .step{ position:relative; background:var(--paper); border:1.5px solid var(--ink);
-    border-radius:3px; padding:3.2mm 4.6mm 3.2mm; }
+    border-radius:3px; padding:2.9mm 4.6mm 2.9mm; }
   .step .num{ display:inline-block; font-size:14pt; font-weight:900; letter-spacing:.02em; color:var(--ink);
     padding-bottom:.5mm; border-bottom:2.5px solid var(--ink); }
   .step h3{ margin-top:1.8mm; font-size:11.5pt; font-weight:900; color:var(--ink); line-height:1.32; }
   .step p{ margin-top:1.8mm; font-size:8.5pt; line-height:1.62; color:var(--ink2); }
 
-  /* MATH */
-  .math{ position:relative; margin-top:4.8mm; background:var(--paper); border:1.5px solid var(--ink);
-    border-radius:3px; padding:4mm 7mm 3.8mm 10mm;
-    display:flex; align-items:center; justify-content:space-between; }
-  .math .tag{ position:absolute; top:-3.2mm; left:8mm; background:var(--ink); color:#fff; font-size:8.5pt;
+  /* デバイス */
+  .devices{ position:relative; margin-top:3.6mm; border:1.5px solid var(--ink); border-radius:3px;
+    padding:3.8mm 6mm 3.4mm; display:grid; grid-template-columns:1fr 1fr; gap:6mm; }
+  .devices .tag{ position:absolute; top:-3.2mm; left:8mm; background:var(--ink); color:#fff; font-size:8.5pt;
     font-weight:900; letter-spacing:.12em; padding:1mm 4mm; }
-  .math .cell{ text-align:center; }
-  .math .cell .lb{ font-size:8.8pt; font-weight:800; color:var(--ink); margin-bottom:1.2mm; letter-spacing:.02em; }
-  .math .cell .v{ font-size:20pt; font-weight:900; color:var(--ink); letter-spacing:-.01em; }
-  .math .cell .v .u{ font-size:10.5pt; margin-left:.5mm; }
-  .math .op{ font-size:16pt; font-weight:900; color:var(--ink); }
-  .math .cell.source{ background:var(--ink); color:#fff; border-radius:2px;
-    padding:2.8mm 7mm 3.2mm; }
-  .math .cell.source .lb{ color:#fff; }
-  .math .cell.source .v{ font-size:22pt; color:#fff; }
-  .math-note1{ margin-top:1.8mm; font-size:7.8pt; color:var(--gray); }
-  .math-note2{ margin-top:.4mm; font-size:7.8pt; color:var(--gray); }
+  .dev{ display:flex; align-items:center; gap:4mm; }
+  .dev .shot{ flex:none; width:28mm; height:19mm; background:#fff; border:1px solid var(--line2);
+    border-radius:2px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .dev .shot img{ width:100%; height:100%; object-fit:cover; filter:grayscale(1) contrast(1.05); }
+  .dev .shot.contain img{ width:auto; height:auto; max-width:100%; max-height:100%; object-fit:contain; }
+  .dev .tx{ flex:1; }
+  .dev h4{ font-size:10.5pt; font-weight:900; color:var(--ink); }
+  .dev p{ margin-top:1.2mm; font-size:8.1pt; line-height:1.55; color:var(--ink2); }
+
+  /* お試し撮影 */
+  .trial{ position:relative; margin-top:3.6mm; background:var(--ink); color:#fff; border-radius:3px;
+    padding:2.8mm 7mm 2.6mm; display:flex; align-items:center; gap:7mm; }
+  .trial .big{ flex:none; font-size:13.5pt; font-weight:900; color:#fff; letter-spacing:.01em; }
+  .trial .big .n{ font-size:21pt; margin:0 1mm; }
+  .trial p{ flex:1; font-size:8.2pt; line-height:1.6; color:#fff; opacity:.9; }
 
   /* 撮影実績 */
-  .proof{ position:relative; margin-top:4.2mm; border:1.5px solid var(--ink); border-radius:3px;
-    background:var(--tint2); padding:3.2mm 7mm 3.2mm 7mm; display:flex; align-items:center; gap:6mm; }
+  .proof{ position:relative; margin-top:3.4mm; border:1.5px solid var(--ink); border-radius:3px;
+    background:var(--tint2); padding:2.8mm 7mm 2.8mm 7mm; display:flex; align-items:center; gap:6mm; }
   .proof .tag{ position:absolute; top:-3.2mm; left:8mm; background:var(--ink); color:#fff; font-size:8.5pt;
     font-weight:900; letter-spacing:.12em; padding:1mm 4mm; }
-  .proof .ph{ flex:none; width:20mm; background:#fff; padding:1.6mm 1.6mm 1.2mm; border-radius:2px;
+  .proof .ph{ flex:none; width:18mm; background:#fff; padding:1.6mm 1.6mm 1.2mm; border-radius:2px;
     transform:rotate(2deg); box-shadow:3px 4px 0 rgba(17,17,17,.18); }
   .proof .ph img{ width:100%; display:block; filter:grayscale(1) contrast(1.05); }
   .proof .ph .cap{ padding:1.3mm 0 .3mm; text-align:center; font-size:7.6pt; font-weight:700; color:var(--ink); }
@@ -84,20 +87,20 @@
   .proof .tx p{ margin-top:1.8mm; font-size:8.6pt; line-height:1.68; color:var(--ink2); }
 
   /* FAQ */
-  .faqTitle{ margin-top:3.2mm; font-size:12.5pt; font-weight:900; color:var(--ink); }
+  .faqTitle{ margin-top:2.6mm; font-size:12.5pt; font-weight:900; color:var(--ink); }
   .faqTitle .mk{ position:relative; z-index:0; display:inline-block; padding:0 1mm; }
   .faqTitle .mk::before{ content:""; position:absolute; left:0; right:0; bottom:0; height:3mm; z-index:-1;
     background:var(--tint); }
-  .faq{ margin-top:2.4mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
-  .qa{ background:var(--paper); border:1px solid var(--line); border-radius:3px; padding:3mm 4.4mm 3mm; color:var(--ink); }
+  .faq{ margin-top:2.2mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
+  .qa{ background:var(--paper); border:1px solid var(--line); border-radius:3px; padding:2.6mm 4.2mm 2.6mm; color:var(--ink); }
   .qa .q{ display:block; font-size:9pt; font-weight:900; color:var(--ink);
     padding-bottom:1.5mm; margin-bottom:1.9mm; border-bottom:1.5px solid var(--ink); }
   .qa .q::before{ content:"Q. "; }
-  .qa p{ font-size:8.3pt; line-height:1.6; color:var(--ink2); }
+  .qa p{ font-size:8.2pt; line-height:1.55; color:var(--ink2); }
 
   /* CTA */
   .cta{ margin:auto -14mm 0; background:var(--ink); color:#fff;
-    padding:3mm 14mm 3mm; display:flex; align-items:center; gap:7mm; }
+    padding:2.8mm 14mm 2.8mm; display:flex; align-items:center; gap:7mm; }
   .cta .big{ flex:1.1; font-size:11.5pt; font-weight:900; line-height:1.4; color:#fff; }
   .cta .ct{ flex:1; }
   .cta .tel{ font-size:14pt; font-weight:900; letter-spacing:.02em; color:#fff; }
@@ -117,45 +120,58 @@
     <div class="heroPad">
       <div class="brand"><img src="../assets/rootlens_R.png" alt="RootLens"><span class="wm">RootLens</span></div>
       <span class="pill">大阪大学発スタートアップ</span>
-      <h1>日々の作業が、そのまま<br><span class="hl">臨時収入</span>になります。</h1>
-      <div class="sub">米国のロボット AI 企業より、日本の現場の作業映像を収集する案件を受注しております。</div>
+      <h1>ロボット研究の未来に、<br><span class="hl">現場から</span>関わってみませんか？</h1>
+      <div class="sub">日本の現場の作業映像を、ロボット・AI の学習データとして活かす取り組みです。</div>
     </div>
   </div>
 
   <!-- ===== BODY ===== -->
   <div class="bodyPad">
-    <div class="lead">RootLens は、現場で働く方の作業映像を、<b>ロボット・AI の研究開発を行う企業</b>へ販売する事業を運営しております。このたび、米国のロボット AI 企業より日本の現場の映像を購入したいとのご依頼があり、撮影にご協力いただける事業者様を募集しております。映像の用途は研究開発に限られ、店名や個人名が公表されることはありません。</div>
+    <div class="lead">RootLens は、現場で働く方の作業映像を、<b>ロボット・AI の研究開発を行う国内外の企業</b>へ提供する事業を運営しております。現在、複数の海外 AI 企業と、日本の現場データの提供に向けた協議を進めております。映像の用途は研究開発に限られ、店名や個人名が公表されることはありません。</div>
+
+    <!-- デバイス -->
+    <div class="devices">
+      <div class="tag">現場に合わせて選べます</div>
+      <div class="dev">
+        <div class="shot"><img src="../assets/device_rootcap.jpg" alt="RootCap"></div>
+        <div class="tx">
+          <h4>RootCap</h4>
+          <p>スマートフォンを頭部に装着する構成で、重さがあります。その分、還元は少し手厚くなります。</p>
+        </div>
+      </div>
+      <div class="dev">
+        <div class="shot contain"><img src="../assets/device_rootglass.jpg" alt="RootGlass"></div>
+        <div class="tx">
+          <h4>RootGlass</h4>
+          <p>メガネ型で軽量、負担の少ない装着感です。</p>
+        </div>
+      </div>
+    </div>
 
     <!-- STEPS -->
     <div class="steps">
       <div class="step">
         <div class="num">01</div>
         <h3>撮影</h3>
-        <p>スタッフの方にカメラ付きキャップを着用いただき、黙々と作業に取り組む様子を撮影します。</p>
+        <p>スタッフの方に RootCap または RootGlass を着用いただき、黙々と作業に取り組む様子を撮影します。</p>
       </div>
       <div class="step">
         <div class="num">02</div>
-        <h3>納品</h3>
-        <p>撮影動画をデータの買い手企業（米国 Cortex Robot 社）に納品します。その後、何時間のデータが承認されたかが通知されます。</p>
+        <h3>提供</h3>
+        <p>撮影した映像は、ロボット・AI の研究開発を行う企業へ、学習用データとして提供します。</p>
       </div>
       <div class="step">
         <div class="num">03</div>
-        <h3>お支払い</h3>
-        <p>買い手企業に承認された映像 1時間につき 700円 を、月次で銀行振込にてお支払いいたします。</p>
+        <h3>還元</h3>
+        <p>データの販売が軌道に乗り次第、ご協力いただいた現場へ還元する仕組みを準備しております。</p>
       </div>
     </div>
 
-    <!-- MATH -->
-    <div class="math">
-      <div class="tag">今回の案件</div>
-      <div class="cell"><div class="lb">承認 1時間につき</div><div class="v">700<span class="u">円</span></div></div>
-      <div class="op">×</div>
-      <div class="cell"><div class="lb">収集する時間</div><div class="v">100<span class="u">時間</span></div></div>
-      <div class="op">=</div>
-      <div class="cell source"><div class="lb">お支払い合計</div><div class="v">70,000<span class="u">円</span></div></div>
+    <!-- お試し撮影 -->
+    <div class="trial">
+      <div class="big">まずは<span class="n">5</span>時間のお試し撮影から</div>
+      <p>撮影機材はこちらでご用意し、設定から装着までご説明にうかがいます。撮影した映像は、ご提供の前に必ずご確認いただけます。</p>
     </div>
-    <div class="math-note1">※1 お支払いの対象は買い手企業に承認された映像の時間数であり、装着時間そのものではありません。</div>
-    <div class="math-note2">※2 本案件は、承認された映像の合計が 100時間に達した時点で一区切りとなります。<br>以降の撮影については、次の案件のご依頼にあわせて改めてご相談いたします。</div>
 
     <!-- 撮影実績 -->
     <div class="proof">
@@ -172,7 +188,7 @@
     <div class="faq">
       <div class="qa">
         <span class="q">スタッフの負担について</span>
-        <p>頭部にスマートフォンとバッテリーを取り付ける構造のため、人によっては重いと感じる場合がございます。撮影の開始・停止は、いつでもスタッフ本人のご判断で行えます。</p>
+        <p>RootCap は頭部に機材を取り付ける構造のため、人によっては重いと感じる場合がございます。RootGlass はメガネ型で軽量です。撮影の開始・停止は、いつでもスタッフ本人のご判断で行えます。</p>
       </div>
       <div class="qa">
         <span class="q">プライバシーについて</span>
@@ -186,7 +202,7 @@
 
     <!-- CTA -->
     <div class="cta">
-      <div class="big">ロボット研究の未来に、<br>現場から関わってみませんか？</div>
+      <div class="big">まずはお気軽に<br>ご連絡ください。</div>
       <div class="ct">
         <div class="tel"><span class="lb">TEL</span>090-6751-4015</div>
         <div class="ml"><span class="lb">MAIL</span>contact@rootlens.io</div>
