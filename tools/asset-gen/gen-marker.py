@@ -4,7 +4,7 @@
 # 待機中なら録画開始、録画中なら終了をトグルする。ジェスチャー・音声が通らない現場での
 # 決定的なフォールバック。カードは A6 300dpi 相当。厨房で使うのでラミネート推奨。
 #
-# デザインはブランドのインク紫 + ライム 1 色。QR の検出性が最優先なので、
+# デザインは白黒 (フライヤーと同じモノクロ言語)。QR の検出性が最優先なので、
 # QR 本体は白地プレートの内側に素のまま置き、装飾はプレートの外に限る。
 #
 # 使い方: python3 tools/asset-gen/gen-marker.py
@@ -22,9 +22,9 @@ PAYLOAD = "ROOTLENS:REC"
 # A6 300dpi 縦 (105 x 148 mm)
 CARD_W, CARD_H = 1240, 1748
 
-INK = (27, 7, 51)        # #1b0733
-BODY = (64, 53, 90)      # 説明文用の薄いインク
-LIME = (200, 255, 0)     # #c8ff00
+INK = (17, 17, 17)
+BODY = (51, 51, 51)      # 説明文用
+SHADOW = (200, 200, 200)  # 硬い影 (白黒)
 PAPER = (255, 255, 255)
 
 JP_FONT_CANDIDATES = [
@@ -84,10 +84,9 @@ def main() -> None:
     draw = ImageDraw.Draw(card)
 
     # 背景のドットグリッド (プレートと文字の下には残らないよう薄く)
-    dot = (27, 7, 51)
     for y in range(70, CARD_H - 40, 46):
         for x in range(70, CARD_W - 40, 46):
-            draw.ellipse((x - 2, y - 2, x + 2, y + 2), fill=(237, 233, 243))
+            draw.ellipse((x - 2, y - 2, x + 2, y + 2), fill=(236, 236, 236))
 
     # 外枠 (インクのフレーム)
     rounded_rect(draw, (26, 26, CARD_W - 26, CARD_H - 26), radius=22, outline=INK, width=8)
@@ -99,13 +98,13 @@ def main() -> None:
     draw.text((192, 74), "RootLens", font=wm_font, fill=INK)
 
     tag_font = load_jp_font(46)
-    tag_text = "撮影マーカー"
+    tag_text = "録画スイッチ"
     tw = int(draw.textlength(tag_text, font=tag_font))
     tag = Image.new("RGBA", (tw + 64, 46 + 40), (0, 0, 0, 0))
     tag_draw = ImageDraw.Draw(tag)
-    tag_draw.rectangle((8, 8, tw + 56, 46 + 32), fill=(27, 7, 51, 90))          # 硬い影
-    tag_draw.rectangle((0, 0, tw + 48, 46 + 24), fill=LIME + (255,))
-    tag_draw.text((24, 10), tag_text, font=tag_font, fill=INK)
+    tag_draw.rectangle((8, 8, tw + 56, 46 + 32), fill=SHADOW + (255,))           # 硬い影
+    tag_draw.rectangle((0, 0, tw + 48, 46 + 24), fill=INK + (255,))
+    tag_draw.text((24, 10), tag_text, font=tag_font, fill=PAPER)
     tag = tag.rotate(-4, expand=True, resample=Image.BICUBIC)
     card.paste(tag, (CARD_W - tag.width - 58, 52), tag)
 
@@ -125,7 +124,7 @@ def main() -> None:
     plate_x1, plate_y1 = plate_x0 + plate_w, plate_y0 + plate_h
 
     rounded_rect(draw, (plate_x0 + 16, plate_y0 + 16, plate_x1 + 16, plate_y1 + 16),
-                 radius=16, fill=LIME)                                           # 硬い影
+                 radius=16, fill=SHADOW)                                         # 硬い影
     rounded_rect(draw, (plate_x0, plate_y0, plate_x1, plate_y1),
                  radius=16, fill=PAPER, outline=INK, width=6)
 
@@ -134,30 +133,30 @@ def main() -> None:
     qr_ink.paste(Image.new("RGB", qr_big.size, INK), mask=qr_big.point(lambda v: 255 - v))
     card.paste(qr_ink, (plate_x0 + (plate_w - qr_size) // 2, plate_y0 + quiet))
 
-    # ── タイトル: さつえい 開始 / 終了 (開始・終了はライムのチップ) ──
-    title_font = load_jp_font(104)
-    chip_pad_x, chip_pad_y = 26, 14
-    y_title = plate_y1 + 92
+    # ── タイトル: 撮影 スタート / ストップ (チップは黒地白抜き) ──
+    title_font = load_jp_font(86)
+    chip_pad_x, chip_pad_y = 24, 12
+    y_title = plate_y1 + 96
 
     def chip_w(text: str) -> int:
         return int(draw.textlength(text, font=title_font)) + chip_pad_x * 2
 
-    lead_text = "さつえい "
+    lead_text = "撮影 "
     sep_text = " / "
     lead_w = int(draw.textlength(lead_text, font=title_font))
     sep_w = int(draw.textlength(sep_text, font=title_font))
-    total = lead_w + chip_w("開始") + sep_w + chip_w("終了")
+    total = lead_w + chip_w("スタート") + sep_w + chip_w("ストップ")
     x = (CARD_W - total) // 2
 
     draw.text((x, y_title), lead_text, font=title_font, fill=INK)
     x += lead_w
-    for i, word in enumerate(["開始", "終了"]):
+    for i, word in enumerate(["スタート", "ストップ"]):
         cw = chip_w(word)
-        rounded_rect(draw, (x + 6, y_title - chip_pad_y + 8, x + cw + 6, y_title + 104 + chip_pad_y + 2),
-                     radius=12, fill=(27, 7, 51))                                # 硬い影
-        rounded_rect(draw, (x, y_title - chip_pad_y, x + cw, y_title + 104 + chip_pad_y - 6),
-                     radius=12, fill=LIME)
-        draw.text((x + chip_pad_x, y_title - 4), word, font=title_font, fill=INK)
+        rounded_rect(draw, (x + 6, y_title - chip_pad_y + 8, x + cw + 6, y_title + 86 + chip_pad_y + 2),
+                     radius=10, fill=SHADOW)                                     # 硬い影
+        rounded_rect(draw, (x, y_title - chip_pad_y, x + cw, y_title + 86 + chip_pad_y - 6),
+                     radius=10, fill=INK)
+        draw.text((x + chip_pad_x, y_title - 4), word, font=title_font, fill=PAPER)
         x += cw
         if i == 0:
             draw.text((x, y_title), sep_text, font=title_font, fill=INK)
@@ -165,8 +164,8 @@ def main() -> None:
 
     # ── 説明 2 行 ──
     sub_font = load_jp_font(54)
-    sub_lines = ["このカードをカメラに見せると", "撮影が始まり、もう一度見せると終わります"]
-    y_sub = y_title + 210
+    sub_lines = ["カメラにかざすと撮影が始まります。", "もう一度かざすと止まります。"]
+    y_sub = y_title + 196
     for i, line in enumerate(sub_lines):
         lw = draw.textlength(line, font=sub_font)
         draw.text(((CARD_W - lw) / 2, y_sub + i * 82), line, font=sub_font, fill=BODY)
