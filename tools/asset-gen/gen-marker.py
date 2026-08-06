@@ -92,10 +92,13 @@ def main() -> None:
     rounded_rect(draw, (26, 26, CARD_W - 26, CARD_H - 26), radius=22, outline=INK, width=8)
 
     # ── ヘッダ: ロゴロックアップ + 傾けたライムのタグ ──
-    logo = ink_logo(repo_root, 96)
-    card.paste(logo, (78, 68), logo)
-    wm_font = load_latin_font(88)
-    draw.text((192, 74), "RootLens", font=wm_font, fill=INK)
+    logo_size = 130
+    logo = ink_logo(repo_root, logo_size)
+    logo_y = 62
+    card.paste(logo, (76, logo_y), logo)
+    wm_font = load_latin_font(112)
+    draw.text((76 + logo_size + 26, logo_y + logo_size / 2), "RootLens",
+              font=wm_font, fill=INK, anchor="lm")
 
     tag_font = load_jp_font(46)
     tag_text = "録画スイッチ"
@@ -106,7 +109,7 @@ def main() -> None:
     tag_draw.rectangle((0, 0, tw + 48, 46 + 24), fill=INK + (255,))
     tag_draw.text((24, 10), tag_text, font=tag_font, fill=PAPER)
     tag = tag.rotate(-4, expand=True, resample=Image.BICUBIC)
-    card.paste(tag, (CARD_W - tag.width - 58, 52), tag)
+    card.paste(tag, (CARD_W - tag.width - 58, 70), tag)
 
     # ── QR プレート (白地 + インク枠 + ライムの硬い影) ──
     qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, border=0)
@@ -114,7 +117,7 @@ def main() -> None:
     qr.make(fit=True)
     qr_img = qr.make_image(fill_color="black", back_color="white").convert("L")
 
-    plate_x0, plate_y0 = 130, 230
+    plate_x0, plate_y0 = 130, 262
     plate_w = CARD_W - plate_x0 * 2
     quiet = 72  # 端末検出用の quiet zone (≥4 モジュール相当)
     qr_size = plate_w - quiet * 2
@@ -136,7 +139,7 @@ def main() -> None:
     # ── タイトル: 撮影 スタート / ストップ (チップは黒地白抜き) ──
     title_font = load_jp_font(86)
     chip_pad_x, chip_pad_y = 24, 12
-    y_title = plate_y1 + 96
+    y_title = plate_y1 + 112
 
     def chip_w(text: str) -> int:
         return int(draw.textlength(text, font=title_font)) + chip_pad_x * 2
@@ -165,21 +168,10 @@ def main() -> None:
     # ── 説明 2 行 ──
     sub_font = load_jp_font(54)
     sub_lines = ["カメラにかざすと撮影が始まります。", "もう一度かざすと止まります。"]
-    y_sub = y_title + 196
+    y_sub = y_title + 214
     for i, line in enumerate(sub_lines):
         lw = draw.textlength(line, font=sub_font)
         draw.text(((CARD_W - lw) / 2, y_sub + i * 82), line, font=sub_font, fill=BODY)
-
-    # ── フッタ: rootlens.io ──
-    foot_font = load_latin_font(56)
-    foot = "rootlens.io"
-    tracking = 6
-    fw = sum(int(draw.textlength(c, font=foot_font)) + tracking for c in foot) - tracking
-    fx = (CARD_W - fw) / 2
-    fy = CARD_H - 150
-    for c in foot:
-        draw.text((fx, fy), c, font=foot_font, fill=INK)
-        fx += draw.textlength(c, font=foot_font) + tracking
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     card.save(out_path, dpi=(300, 300))
