@@ -1,0 +1,27 @@
+Mentra Live — Response to Claru capture requirements
+
+Device: Mentra Live
+
+Our response to the quality requirements you provided:
+
+• 0.5x–0.6x zoom (wide)
+→ Meets by published device specifications. Apple specifies a 120° field of view for the iPhone 15 Pro 0.5x Ultra Wide camera. Mentra specifies a 119° field of view and landscape orientation for the fixed wide-angle camera used by Mentra Live.
+
+• Landscape orientation, 1080p, 30fps, 8-bit (HDR off)
+→ Meets. The delivered footage is landscape 1920×1080, 30fps, 8-bit SDR, with HDR disabled.
+
+• Head-mounted, at forehead/eye level, angled slightly down
+→ Pending confirmation from the sample. Mentra Live is head-mounted at eye level and has a fixed camera angle. The sample will show the resulting framing of the hands and work area.
+
+• Hands visible in at least 80% of frames — we measure this per clip and it is the most common reason footage comes back
+→ Meets through per-clip QC. Hand visibility is measured for every clip, and clips below the 80% threshold are excluded from delivery.
+
+• RGB and IMU on a single hardware clock source, with the per-frame video↔IMU timestamps delivered alongside each clip
+→ Meets. Camera and IMU timestamps are derived from one hardware system counter. Android exposes the two streams through different clock representations; the accumulated suspend-time difference is measured for each clip and used to map both streams deterministically onto one common timeline. Each video frame is delivered with its timestamp on that timeline and the timestamps of the adjacent raw accelerometer and gyroscope samples.
+
+
+Related, and useful for us to know early: what video-to-IMU time offset does your stack actually measure, and how do you record it per clip? We would rather work to a figure you can evidence than pick one in the abstract.
+
+→ Separately from the clock-domain mapping above, the measured end-to-end video-to-IMU offset after both streams are placed on the common timeline is +73.5 ms, using the convention t_IMU − t_video. This is not an offset between two drifting clocks; it is the residual timing difference between the camera and IMU acquisition and timestamp paths. In a controlled motion capture, temporal correlation between video-derived rotation and gyroscope motion measured a full-sequence correlation of 0.969; independent high-confidence motion intervals measured 70–78 ms.
+
+→ For every video frame, frames.jsonl records the original video timestamp on the common hardware-clock timeline, the measured +73.5 ms association offset, and the timestamps and indices of the adjacent raw accelerometer and gyroscope samples at the corresponding IMU time. Raw IMU timestamps are not modified. This provides the requested per-frame video↔IMU timestamp correspondence alongside each clip.

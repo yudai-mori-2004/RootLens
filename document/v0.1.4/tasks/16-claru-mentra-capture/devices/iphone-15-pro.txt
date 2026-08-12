@@ -1,0 +1,30 @@
+iPhone 15 Pro — Response to Claru capture requirements
+
+Device: iPhone 15 Pro
+
+Our response to the quality requirements you provided:
+
+• 0.5x–0.6x zoom (wide)
+→ Does not meet in the iPhone RGB+LiDAR+IMU configuration. iOS does not expose the 0.5x camera as the RGB stream in the same ARKit session. Meeting the 0.5x requirement requires a separate RGB+IMU configuration using the iPhone 15 Pro Ultra Wide camera, without LiDAR depth or ARKit camera pose.
+
+• Landscape orientation, 1080p, 30fps, 8-bit (HDR off)
+→ Meets. The delivered footage is landscape 1920×1080, 30fps, H.264 8-bit SDR, with HDR disabled.
+
+• Head-mounted, at forehead/eye level, angled slightly down
+→ Meets. The iPhone is secured in a head mount at forehead/eye level with the camera angled slightly downward toward the hands and work area.
+
+• Hands visible in at least 80% of frames — we measure this per clip and it is the most common reason footage comes back
+→ Meets through per-clip QC. Hand visibility is measured for every clip, and clips below the 80% threshold are excluded from delivery.
+
+• RGB and IMU on a single hardware clock source, with the per-frame video↔IMU timestamps delivered alongside each clip
+→ Meets. Video frames use ARFrame capture timestamps and IMU samples use Core Motion timestamps. Both are expressed on the same monotonic device-uptime timeline. Each video frame is delivered with its timestamp in frames.jsonl, and the raw accelerometer and gyroscope samples are delivered with their timestamps in imu.jsonl.
+
+
+Related, and useful for us to know early: what video-to-IMU time offset does your stack actually measure, and how do you record it per clip? We would rather work to a figure you can evidence than pick one in the abstract.
+
+→ Our capture stack records the acquisition timestamps supplied by ARKit and Core Motion directly, without applying an additional fixed offset. On-device validation of this configuration on the iPhone 15 Pro, using temporal cross-correlation between inter-frame image motion and gyroscope magnitude, measured a video-to-IMU residual of approximately −2.93 ms, using the convention t_IMU − t_video. The measured video/gyroscope correlation was 0.96, with a 3.40 ms standard deviation across independent time windows. Because the absolute residual is smaller than the observed window-to-window variation, applying a fixed timestamp shift is not expected to improve alignment. The original acquisition timestamps are therefore delivered unchanged: frames.jsonl records the timestamp of every delivered video frame, and imu.jsonl records the raw accelerometer and gyroscope timestamps on the same timeline. These figures apply to the RGB+LiDAR+IMU configuration used for the sample; a separate 0.5x RGB+IMU configuration would require its own validation.
+
+
+On the iPhone 15 Pro the LiDAR is aligned to the wide camera, while 0.5x is the ultra-wide. How do you handle depth coverage at 0.5x — is the depth reprojected into the ultra-wide frame, or does that combination force a trade-off between the wider field of view and full-frame depth?
+
+→ iOS does not support recording the 0.5x camera and ARKit depth in the same session. It also does not provide a supported way to run a separate 0.5x camera session in parallel with an ARKit session. The depth is therefore not reprojected into a 0.5x frame. The available configurations are either Wide RGB+LiDAR+IMU+camera pose, or a separate 0.5x RGB+IMU configuration without LiDAR depth or camera pose.

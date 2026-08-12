@@ -54,6 +54,9 @@ v0.1.4 (簡素化スプリント)
   15. stera-native-parity       🔄 新 収録 + MCAP 組み立てを stera-app (FPV Labs 公開実装) と呼び出し
                                     レベルで一致させる。 恒常差分は RGB の h264 経由と blur のみ。
                                     差分表と決定事項は 15-stera-native-parity/
+  16. claru-mentra-capture      🔄 新 Mentra Live単体の1080p30 SDR + raw IMU収録。
+                                    per-frame RGB↔IMU timelineと同期証拠を保存し、未証明の
+                                    single physical clockをfail-loudに扱う。
 ```
 
 凡例: ✅ = 完了、 🔄 = 進行中 / 未着手、 新 = 新規追加。
