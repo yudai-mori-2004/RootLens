@@ -178,6 +178,15 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private let motionManager = CMMotionManager()
   private let motionQueue = OperationQueue()
 
+  // A short, user-initiated validation that compares pixel motion from the
+  // delivered ARFrames with Core Motion gyroscope samples. It measures an
+  // observable residual only; raw timestamps are never rewritten automatically.
+  private let timeValidationLock = NSLock()
+  private var activeTimeValidation: CameraImuTimeCalibrator?
+  private var activeTimeValidationCompletion: ((Swift.Result<[String: Any], Error>) -> Void)?
+
+  private static let timeValidationDefaultsPrefix = "io.rootlens.camera-imu-time-validation.v1."
+
   // MARK: - Capture settings (set from JS; apply from the next startSession / startRecording)
 
   struct CaptureSettings {
@@ -357,6 +366,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   }
 
   func stopSession() {
+    cancelCameraImuTimeValidation()
     if !sessionRunning { return }
     session.pause()
     sessionRunning = false
@@ -383,6 +393,13 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   ///   depth.tar / pointcloud.jsonl / mesh.jsonl  on supported devices / settings
   /// stopRecording flushes and closes every handle.
   func startRecording(sessionDir: URL) throws -> URL {
+    timeValidationLock.lock()
+    let validationRunning = activeTimeValidation != nil
+    timeValidationLock.unlock()
+    if validationRunning {
+      throw NSError(domain: "ArkitCaptureController", code: 20,
+                    userInfo: [NSLocalizedDescriptionKey: "RGB-IMU time validation is running"])
+    }
     if assetWriter != nil {
       throw NSError(domain: "ArkitCaptureController", code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "already recording"])
@@ -1078,6 +1095,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       NSLog("[ArkitCaptureController] CMDeviceMotion unavailable, skipping imu_high_rate")
       return
     }
+    if motionManager.isDeviceMotionActive { return }
     motionManager.deviceMotionUpdateInterval = 1.0 / Double(max(1, captureSettings.imuRateHz))
     motionQueue.name = "io.rootlens.arkit-capture.imu"
     motionQueue.maxConcurrentOperationCount = 1
@@ -1290,13 +1308,22 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
 
 
   private func appendImuLine(motion: CMDeviceMotion) {
+    let tsNs: Int64 = Int64(motion.timestamp * 1_000_000_000.0)
+    timeValidationLock.lock()
+    let validation = activeTimeValidation
+    timeValidationLock.unlock()
+    validation?.appendGyro(
+      timestampNs: tsNs,
+      x: motion.rotationRate.x,
+      y: motion.rotationRate.y,
+      z: motion.rotationRate.z)
+
     guard let handle = imuFileHandle else { return }
     // Row schema:
     //   timestamp_ns: int
     //   accel: {x, y, z}    userAccel + gravity (absolute acceleration, gravity included)
     //   gyro:  {x, y, z}    rotationRate
     //   device_motion: {attitude, user_accel, gravity, rotation_rate}
-    let tsNs: Int64 = Int64(motion.timestamp * 1_000_000_000.0)
     imuRange.record(tsNs)
     camImuEstimator.pushGyroSamples([GyroSample(
       timestampNs: tsNs,
@@ -1455,6 +1482,151 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     return identifier
   }
 
+  // MARK: - RGB-IMU timestamp validation
+
+  /// Measures the residual lag visible after ARKit/Core Motion have attached
+  /// their acquisition timestamps. This is a validation result, not a command
+  /// to alter the source timestamps or recorded files.
+  func startCameraImuTimeValidation(
+    durationSeconds: Double,
+    completion: @escaping (Swift.Result<[String: Any], Error>) -> Void
+  ) throws {
+    guard Thread.isMainThread else {
+      throw NSError(domain: "ArkitCaptureController", code: 21,
+                    userInfo: [NSLocalizedDescriptionKey: "RGB-IMU time validation must start on the main thread"])
+    }
+    guard assetWriter == nil else {
+      throw NSError(domain: "ArkitCaptureController", code: 22,
+                    userInfo: [NSLocalizedDescriptionKey: "Cannot validate RGB-IMU timing while recording"])
+    }
+    guard sessionRunning, session.currentFrame != nil else {
+      throw NSError(domain: "ArkitCaptureController", code: 23,
+                    userInfo: [NSLocalizedDescriptionKey: "Start the camera preview before RGB-IMU time validation"])
+    }
+    guard motionManager.isDeviceMotionAvailable else {
+      throw NSError(domain: "ArkitCaptureController", code: 24,
+                    userInfo: [NSLocalizedDescriptionKey: "Core Motion device motion is unavailable"])
+    }
+
+    let duration = min(45.0, max(15.0, durationSeconds))
+    let calibrator = CameraImuTimeCalibrator()
+    timeValidationLock.lock()
+    guard activeTimeValidation == nil else {
+      timeValidationLock.unlock()
+      throw NSError(domain: "ArkitCaptureController", code: 25,
+                    userInfo: [NSLocalizedDescriptionKey: "RGB-IMU time validation is already running"])
+    }
+    activeTimeValidation = calibrator
+    activeTimeValidationCompletion = completion
+    timeValidationLock.unlock()
+
+    startMotionUpdates()
+    DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self, weak calibrator] in
+      guard let self, let calibrator else { return }
+      self.finishCameraImuTimeValidation(calibrator)
+    }
+  }
+
+  func cancelCameraImuTimeValidation() {
+    timeValidationLock.lock()
+    guard let calibrator = activeTimeValidation else {
+      timeValidationLock.unlock()
+      return
+    }
+    let completion = activeTimeValidationCompletion
+    activeTimeValidation = nil
+    activeTimeValidationCompletion = nil
+    timeValidationLock.unlock()
+
+    calibrator.cancel()
+    stopMotionUpdates()
+    completion?(.failure(CameraImuTimeCalibrator.CalibrationError.cancelled))
+  }
+
+  func lastCameraImuTimeValidation() -> [String: Any]? {
+    let key = Self.timeValidationDefaultsPrefix + currentDeviceModel()
+    guard let data = UserDefaults.standard.data(forKey: key),
+          let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return nil
+    }
+    return value
+  }
+
+  private func finishCameraImuTimeValidation(_ calibrator: CameraImuTimeCalibrator) {
+    timeValidationLock.lock()
+    guard activeTimeValidation === calibrator else {
+      timeValidationLock.unlock()
+      return
+    }
+    timeValidationLock.unlock()
+    stopMotionUpdates()
+
+    calibrator.finish { [weak self, weak calibrator] result in
+      guard let self, let calibrator else { return }
+      DispatchQueue.main.async {
+        self.timeValidationLock.lock()
+        guard self.activeTimeValidation === calibrator else {
+          self.timeValidationLock.unlock()
+          return
+        }
+        let completion = self.activeTimeValidationCompletion
+        self.activeTimeValidation = nil
+        self.activeTimeValidationCompletion = nil
+        self.timeValidationLock.unlock()
+
+        switch result {
+        case .success(let estimate):
+          let value = self.makeTimeValidationDictionary(estimate)
+          let key = Self.timeValidationDefaultsPrefix + self.currentDeviceModel()
+          if let data = try? JSONSerialization.data(withJSONObject: value) {
+            UserDefaults.standard.set(data, forKey: key)
+          }
+          completion?(.success(value))
+        case .failure(let error):
+          completion?(.failure(error))
+        }
+      }
+    }
+  }
+
+  private func makeTimeValidationDictionary(_ estimate: CameraImuTimeCalibrator.Estimate) -> [String: Any] {
+    let format = (session.configuration as? ARWorldTrackingConfiguration)?.videoFormat
+    let width = Int(format?.imageResolution.width ?? currentSensorResolution().width)
+    let height = Int(format?.imageResolution.height ?? currentSensorResolution().height)
+    let fps = Int(format?.framesPerSecond ?? 0)
+    let cameraType: String = {
+      guard #available(iOS 16.0, *), let format else { return "unspecified" }
+      return format.captureDeviceType.rawValue
+    }()
+    let measuredAt = ISO8601DateFormatter().string(from: Date())
+    return [
+      "deviceModel": currentDeviceModel(),
+      "osVersion": UIDevice.current.systemVersion,
+      "measuredAt": measuredAt,
+      "videoWidth": width,
+      "videoHeight": height,
+      "videoFps": fps,
+      "cameraType": cameraType,
+      "imuRateHz": captureSettings.imuRateHz,
+      "videoTimestampSource": "ARFrame.timestamp",
+      "imuTimestampSource": "CMDeviceMotion.timestamp",
+      "method": "pixel_motion_vs_processed_rotation_rate",
+      "measurementKind": "residual_validation",
+      "timestampCorrectionApplied": false,
+      "signConvention": "image motion at video time t matches IMU at t + offset",
+      "videoToImuOffsetMs": estimate.videoToImuOffsetMs,
+      "standardDeviationMs": estimate.standardDeviationMs,
+      "rangeMinMs": estimate.rangeMinMs,
+      "rangeMaxMs": estimate.rangeMaxMs,
+      "peakCorrelation": estimate.peakCorrelation,
+      "visualSampleCount": estimate.visualSampleCount,
+      "gyroSampleCount": estimate.gyroSampleCount,
+      "windowCount": estimate.windowCount,
+      "durationSeconds": estimate.durationSeconds,
+      "quality": estimate.quality,
+    ]
+  }
+
   // MARK: - Snapshot
 
   func captureSnapshot(quality: CGFloat = 0.8) throws -> URL {
@@ -1508,6 +1680,23 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     latestBufferLock.lock()
     latestPixelBuffer = pixelBuffer
     latestBufferLock.unlock()
+
+    // RGB-IMU timestamp validation owns at most one copied frame at a time.
+    // ARKit recycles capturedImage, so Vision always receives an independent
+    // copy before work leaves this delegate callback.
+    timeValidationLock.lock()
+    let validation = activeTimeValidation
+    timeValidationLock.unlock()
+    if let validation {
+      let timestampNs = Int64(timestamp * 1_000_000_000.0)
+      if validation.reserveFrame(timestampNs: timestampNs) {
+        if let copy = copyPixelBuffer(pixelBuffer) {
+          validation.submitReservedFrame(copy, timestampNs: timestampNs)
+        } else {
+          validation.abandonReservedFrame()
+        }
+      }
+    }
 
     // HandTracker (own queue, drop-while-busy).
     self.handTrackerSkipCount += 1

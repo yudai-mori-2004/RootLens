@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
 
   s.source_files   = '**/*.{swift,h,m}'
 
-  s.frameworks = 'ARKit', 'CoreMotion', 'AVFoundation', 'CoreImage', 'CoreVideo', 'SceneKit', 'UIKit'
+  s.frameworks = 'ARKit', 'CoreMotion', 'AVFoundation', 'CoreImage', 'CoreVideo', 'SceneKit', 'UIKit', 'Vision'
 
   s.dependency 'ExpoModulesCore'
 end

@@ -117,6 +117,39 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       return ARWorldTrackingConfiguration.isSupported
     }
 
+    // Diagnostic only: measures any residual lag visible between the timestamps
+    // on delivered ARFrames and Core Motion samples. It never rewrites capture
+    // timestamps or creates an extra delivery-side file.
+    AsyncFunction("runCameraImuTimeValidation") { (durationSeconds: Double, promise: Promise) in
+      DispatchQueue.main.async {
+        do {
+          try ArkitCaptureController.shared.startCameraImuTimeValidation(
+            durationSeconds: durationSeconds
+          ) { result in
+            switch result {
+            case .success(let value):
+              promise.resolve(value)
+            case .failure(let error):
+              promise.reject("CAMERA_IMU_TIME_VALIDATION_ERROR", error.localizedDescription)
+            }
+          }
+        } catch {
+          promise.reject("CAMERA_IMU_TIME_VALIDATION_ERROR", error.localizedDescription)
+        }
+      }
+    }
+
+    AsyncFunction("cancelCameraImuTimeValidation") { (promise: Promise) in
+      DispatchQueue.main.async {
+        ArkitCaptureController.shared.cancelCameraImuTimeValidation()
+        promise.resolve(nil)
+      }
+    }
+
+    AsyncFunction("getCameraImuTimeValidation") { () -> [String: Any]? in
+      return ArkitCaptureController.shared.lastCameraImuTimeValidation()
+    }
+
     // Voice capture flow: listen for spoken start/stop commands. On-device
     // ja-JP recognition; transcripts are transient and never stored.
     AsyncFunction("startVoiceCommands") { (promise: Promise) in

@@ -9,10 +9,12 @@
 //
 // 行は Section が hairline で区切る (= 各行が罫線を持たない。 二重線を作らない)。
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -46,6 +48,19 @@ import {
 } from '../services/captureSettings';
 import type { LegalDocKey } from '../content/legalDocs.generated';
 import { CAPTURE_FLOWS } from './captureFlow';
+import {
+  ArkitCapturePreviewView,
+  cancelCameraImuTimeValidation,
+  getCameraImuTimeValidation,
+  runCameraImuTimeValidation,
+  setArkitCaptureSettings,
+  setArkitKeepAwake,
+  startArkitSession,
+  stopArkitSession,
+  type CameraImuTimeValidationResult,
+} from '../native/arkitCapture';
+
+type TimeValidationPhase = 'preparing' | 'ready' | 'running' | 'result' | 'error';
 
 export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
@@ -57,11 +72,26 @@ export const SettingsScreen: React.FC = () => {
   const [signingOut, setSigningOut] = useState(false);
   const [cacheSize, setCacheSize] = useState<number | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
+  const [timeValidationOpen, setTimeValidationOpen] = useState(false);
+  const [timeValidationPhase, setTimeValidationPhase] = useState<TimeValidationPhase>('preparing');
+  const [timeValidationResult, setTimeValidationResult] = useState<CameraImuTimeValidationResult | null>(null);
+  const [timeValidationError, setTimeValidationError] = useState('');
+  const [timeValidationCountdown, setTimeValidationCountdown] = useState(25);
+  const timeValidationRun = useRef(0);
+  const timeValidationTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 撮影設定 (= Stera 同構成)。 保存は即時、 適用は次の撮影画面オープンから。
   const [cs, setCs] = useState<CaptureSettings>({ ...DEFAULT_CAPTURE_SETTINGS });
   useEffect(() => {
     loadCaptureSettings().then(setCs).catch(() => {});
+    getCameraImuTimeValidation().then(setTimeValidationResult).catch(() => {});
+    return () => {
+      timeValidationRun.current += 1;
+      if (timeValidationTimer.current) clearInterval(timeValidationTimer.current);
+      void cancelCameraImuTimeValidation();
+      void stopArkitSession();
+      void setArkitKeepAwake(false);
+    };
   }, []);
   const updateCs = (patch: Partial<CaptureSettings>) => {
     setCs((cur) => {
@@ -143,6 +173,64 @@ export const SettingsScreen: React.FC = () => {
         },
       ],
     );
+  };
+
+  const openTimeValidation = async () => {
+    const run = ++timeValidationRun.current;
+    setTimeValidationOpen(true);
+    setTimeValidationPhase('preparing');
+    setTimeValidationError('');
+    try {
+      await setArkitCaptureSettings(JSON.stringify(cs));
+      await setArkitKeepAwake(true);
+      await startArkitSession();
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      if (timeValidationRun.current === run) setTimeValidationPhase('ready');
+    } catch (error) {
+      if (timeValidationRun.current !== run) return;
+      setTimeValidationError(error instanceof Error ? error.message : String(error));
+      setTimeValidationPhase('error');
+    }
+  };
+
+  const closeTimeValidation = () => {
+    timeValidationRun.current += 1;
+    if (timeValidationTimer.current) {
+      clearInterval(timeValidationTimer.current);
+      timeValidationTimer.current = null;
+    }
+    setTimeValidationOpen(false);
+    void cancelCameraImuTimeValidation();
+    void stopArkitSession();
+    void setArkitKeepAwake(false);
+  };
+
+  const startTimeValidation = async () => {
+    const run = ++timeValidationRun.current;
+    setTimeValidationCountdown(25);
+    setTimeValidationError('');
+    setTimeValidationPhase('running');
+    const startedAt = Date.now();
+    if (timeValidationTimer.current) clearInterval(timeValidationTimer.current);
+    timeValidationTimer.current = setInterval(() => {
+      const remaining = Math.max(0, 25 - Math.floor((Date.now() - startedAt) / 1000));
+      setTimeValidationCountdown(remaining);
+    }, 250);
+    try {
+      const result = await runCameraImuTimeValidation(25);
+      if (timeValidationRun.current !== run) return;
+      setTimeValidationResult(result);
+      setTimeValidationPhase('result');
+    } catch (error) {
+      if (timeValidationRun.current !== run) return;
+      setTimeValidationError(error instanceof Error ? error.message : String(error));
+      setTimeValidationPhase('error');
+    } finally {
+      if (timeValidationTimer.current) {
+        clearInterval(timeValidationTimer.current);
+        timeValidationTimer.current = null;
+      }
+    }
   };
 
   return (
@@ -324,6 +412,46 @@ export const SettingsScreen: React.FC = () => {
           ) : null}
         </Section>
 
+        <Section title={t('settings.section.sensorSync')}>
+          {timeValidationResult ? (
+            <>
+              <Row
+                label={t('settings.sensorSync.offset')}
+                value={formatSignedMs(timeValidationResult.videoToImuOffsetMs)}
+                mono
+              />
+              <Row
+                label={t('settings.sensorSync.repeatability')}
+                value={`σ ${timeValidationResult.standardDeviationMs.toFixed(2)} ms · ${formatSignedMs(timeValidationResult.rangeMinMs)}–${formatSignedMs(timeValidationResult.rangeMaxMs)}`}
+                mono
+              />
+              <Row
+                label={t('settings.sensorSync.quality')}
+                value={timeValidationResult.quality === 'good'
+                  ? t('settings.sensorSync.qualityGood')
+                  : t('settings.sensorSync.qualityReview')}
+              />
+              <Row
+                label={t('settings.sensorSync.configuration')}
+                value={`${timeValidationResult.videoWidth}×${timeValidationResult.videoHeight} @ ${timeValidationResult.videoFps} fps · IMU ${timeValidationResult.imuRateHz} Hz`}
+                mono
+              />
+              <Row
+                label={t('settings.sensorSync.measuredAt')}
+                value={formatMeasurementDate(timeValidationResult.measuredAt, locale)}
+              />
+            </>
+          ) : (
+            <Row label={t('settings.sensorSync.status')} value={t('settings.sensorSync.notMeasured')} />
+          )}
+          <ActionRow
+            label={timeValidationResult
+              ? t('settings.sensorSync.measureAgain')
+              : t('settings.sensorSync.measure')}
+            onPress={() => { void openTimeValidation(); }}
+          />
+        </Section>
+
         {/* ── 開発者向け (= debug provider 時のみ表示) ── */}
         {provider.id === 'debug' ? (
           <Section title={t('settings.section.developer')} tone="muted">
@@ -348,6 +476,90 @@ export const SettingsScreen: React.FC = () => {
       </ScrollView>
 
       <LegalDocModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
+      <Modal
+        visible={timeValidationOpen}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        onRequestClose={closeTimeValidation}
+      >
+        <View style={styles.validationRoot}>
+          {ArkitCapturePreviewView ? (
+            <ArkitCapturePreviewView style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.validationPreviewFallback]} />
+          )}
+          <View style={styles.validationScrim} />
+          <View style={styles.validationPanel}>
+            <Text style={styles.validationEyebrow}>{t('settings.sensorSync.modalEyebrow')}</Text>
+            <Text style={styles.validationTitle}>{t('settings.sensorSync.modalTitle')}</Text>
+
+            {timeValidationPhase === 'preparing' ? (
+              <View style={styles.validationStatus}>
+                <ActivityIndicator color={colors.accent} />
+                <Text style={styles.validationBody}>{t('settings.sensorSync.preparing')}</Text>
+              </View>
+            ) : null}
+
+            {timeValidationPhase === 'ready' ? (
+              <>
+                <Text style={styles.validationBody}>{t('settings.sensorSync.instructions')}</Text>
+                <Text style={styles.validationNote}>{t('settings.sensorSync.noCorrection')}</Text>
+                <Pressable style={styles.validationPrimary} onPress={() => { void startTimeValidation(); }}>
+                  <Text style={styles.validationPrimaryLabel}>{t('settings.sensorSync.start')}</Text>
+                </Pressable>
+              </>
+            ) : null}
+
+            {timeValidationPhase === 'running' ? (
+              <View style={styles.validationStatus}>
+                <Text style={styles.validationCountdown}>{timeValidationCountdown}</Text>
+                <Text style={styles.validationBody}>{t('settings.sensorSync.keepMoving')}</Text>
+              </View>
+            ) : null}
+
+            {timeValidationPhase === 'result' && timeValidationResult ? (
+              <>
+                <Text style={styles.validationResultValue}>
+                  {formatSignedMs(timeValidationResult.videoToImuOffsetMs)}
+                </Text>
+                <Text style={styles.validationResultLabel}>{t('settings.sensorSync.offset')}</Text>
+                <Text style={styles.validationBody}>
+                  {`σ ${timeValidationResult.standardDeviationMs.toFixed(2)} ms · r ${timeValidationResult.peakCorrelation.toFixed(2)} · ${timeValidationResult.windowCount} ${t('settings.sensorSync.windows')}`}
+                </Text>
+                <Text style={styles.validationNote}>
+                  {timeValidationResult.quality === 'good'
+                    ? t('settings.sensorSync.resultGood')
+                    : t('settings.sensorSync.resultReview')}
+                </Text>
+                <View style={styles.validationActions}>
+                  <Pressable style={styles.validationSecondary} onPress={() => { void startTimeValidation(); }}>
+                    <Text style={styles.validationSecondaryLabel}>{t('settings.sensorSync.measureAgain')}</Text>
+                  </Pressable>
+                  <Pressable style={styles.validationPrimary} onPress={closeTimeValidation}>
+                    <Text style={styles.validationPrimaryLabel}>{t('common.close')}</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : null}
+
+            {timeValidationPhase === 'error' ? (
+              <>
+                <Text style={styles.validationBody}>{t('settings.sensorSync.failed')}</Text>
+                <Text style={styles.validationError}>{timeValidationError}</Text>
+                <Pressable style={styles.validationPrimary} onPress={() => { void openTimeValidation(); }}>
+                  <Text style={styles.validationPrimaryLabel}>{t('settings.sensorSync.retry')}</Text>
+                </Pressable>
+              </>
+            ) : null}
+
+            {timeValidationPhase !== 'result' ? (
+              <Pressable style={styles.validationClose} onPress={closeTimeValidation}>
+                <Text style={styles.validationCloseLabel}>{t('common.cancel')}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -536,6 +748,19 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
+function formatSignedMs(value: number): string {
+  const sign = value >= 0 ? '+' : '−';
+  return `${sign}${Math.abs(value).toFixed(2)} ms`;
+}
+
+function formatMeasurementDate(iso: string, locale: Locale): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(date);
+}
+
 // ─── styles ─────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
@@ -696,4 +921,56 @@ const styles = StyleSheet.create({
     fontFamily: fonts.dot,
     fontSize: 12,
   },
+
+  validationRoot: { flex: 1, backgroundColor: '#05020A', alignItems: 'flex-end', justifyContent: 'center' },
+  validationPreviewFallback: { backgroundColor: '#120B1B' },
+  validationScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(5, 2, 10, 0.46)',
+  },
+  validationPanel: {
+    width: 430,
+    marginRight: spacing.xl,
+    padding: spacing.xl,
+    gap: spacing.md,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(10, 4, 22, 0.93)',
+    ...shadows.lg,
+  },
+  validationEyebrow: {
+    fontFamily: fonts.sansBold,
+    fontSize: 10,
+    letterSpacing: 1.6,
+    color: colors.accent,
+    textTransform: 'uppercase',
+  },
+  validationTitle: { fontFamily: fonts.serifLight, fontSize: 28, color: '#FFFFFF' },
+  validationBody: { ...typography.body, color: 'rgba(255,255,255,0.88)', lineHeight: 22 },
+  validationNote: { ...typography.caption, color: 'rgba(255,255,255,0.60)', lineHeight: 18 },
+  validationStatus: { minHeight: 150, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  validationCountdown: { fontFamily: fonts.mono, fontSize: 64, color: colors.accent },
+  validationResultValue: { fontFamily: fonts.mono, fontSize: 42, color: colors.accent },
+  validationResultLabel: { ...typography.captionMedium, color: 'rgba(255,255,255,0.60)' },
+  validationError: { ...typography.caption, color: colors.danger, lineHeight: 18 },
+  validationActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
+  validationPrimary: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 11,
+    borderRadius: radii.sm,
+    backgroundColor: colors.accent,
+  },
+  validationPrimaryLabel: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textOnInk },
+  validationSecondary: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 11,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  validationSecondaryLabel: { fontFamily: fonts.sansSemibold, fontSize: 13, color: '#FFFFFF' },
+  validationClose: { alignSelf: 'flex-end', paddingVertical: spacing.sm, paddingHorizontal: spacing.sm },
+  validationCloseLabel: { ...typography.captionMedium, color: 'rgba(255,255,255,0.60)' },
 });

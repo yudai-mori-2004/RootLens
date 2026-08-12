@@ -67,6 +67,35 @@ export interface PowerState {
   charging: boolean;
 }
 
+/** Result of a diagnostic comparison between pixel motion and Core Motion.
+ * It reports the observable residual; capture timestamps are not rewritten. */
+export interface CameraImuTimeValidationResult {
+  deviceModel: string;
+  osVersion: string;
+  measuredAt: string;
+  videoWidth: number;
+  videoHeight: number;
+  videoFps: number;
+  cameraType: string;
+  imuRateHz: number;
+  videoTimestampSource: 'ARFrame.timestamp';
+  imuTimestampSource: 'CMDeviceMotion.timestamp';
+  method: 'pixel_motion_vs_processed_rotation_rate';
+  measurementKind: 'residual_validation';
+  timestampCorrectionApplied: false;
+  signConvention: string;
+  videoToImuOffsetMs: number;
+  standardDeviationMs: number;
+  rangeMinMs: number;
+  rangeMaxMs: number;
+  peakCorrelation: number;
+  visualSampleCount: number;
+  gyroSampleCount: number;
+  windowCount: number;
+  durationSeconds: number;
+  quality: 'good' | 'review';
+}
+
 interface ArkitCaptureNativeModule {
   isAvailable(): Promise<boolean>;
   startSession(): Promise<void>;
@@ -86,6 +115,9 @@ interface ArkitCaptureNativeModule {
   getThermalState(): Promise<ThermalState>;
   getPowerState(): Promise<PowerState>;
   getMemoryFootprintMB(): Promise<number>;
+  runCameraImuTimeValidation(durationSeconds: number): Promise<CameraImuTimeValidationResult>;
+  cancelCameraImuTimeValidation(): Promise<void>;
+  getCameraImuTimeValidation(): Promise<CameraImuTimeValidationResult | null>;
   startVoiceCommands(): Promise<void>;
   stopVoiceCommands(): Promise<void>;
   addListener(eventName: string): void;
@@ -182,6 +214,26 @@ export async function getArkitMemoryFootprintMB(): Promise<number> {
 export async function getArkitPowerState(): Promise<PowerState> {
   if (!nativeModule) return { level: -1, charging: false };
   return nativeModule.getPowerState();
+}
+
+/** Run a short RGB-IMU residual validation using real ARFrame pixels and Core
+ * Motion samples. The native side persists the latest successful result for
+ * this device model. */
+export async function runCameraImuTimeValidation(
+  durationSeconds = 25,
+): Promise<CameraImuTimeValidationResult> {
+  if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
+  return nativeModule.runCameraImuTimeValidation(durationSeconds);
+}
+
+export async function cancelCameraImuTimeValidation(): Promise<void> {
+  if (!nativeModule) return;
+  return nativeModule.cancelCameraImuTimeValidation();
+}
+
+export async function getCameraImuTimeValidation(): Promise<CameraImuTimeValidationResult | null> {
+  if (!nativeModule) return null;
+  return nativeModule.getCameraImuTimeValidation();
 }
 
 /** Thermal-state changes (fires while recording). */
