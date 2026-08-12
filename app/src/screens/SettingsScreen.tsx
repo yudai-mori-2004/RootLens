@@ -548,6 +548,7 @@ export const SettingsScreen: React.FC = () => {
         visible={timeValidationOpen}
         animationType="fade"
         presentationStyle="fullScreen"
+        supportedOrientations={['landscape-right']}
         onRequestClose={closeTimeValidation}
       >
         <View style={styles.validationRoot}>
