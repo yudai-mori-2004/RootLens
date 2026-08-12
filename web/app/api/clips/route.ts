@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 const createSchema = z.object({
   contentHash: z.string().regex(/^[0-9a-f]{64}$/i, "sha256 hex 64 chars"),
   contentSize: z.number().int().positive(),
-  recordingConfig: z.enum(["ultra_wide", "arkit"]),
+  recordingConfig: z.enum(["ultra_wide", "arkit", "mentra"]),
   durationMs: z.number().int().positive().optional(),
   deviceModel: z.string().min(1).max(64).optional(),
   consentEventId: z.string().min(1).max(64).optional(),

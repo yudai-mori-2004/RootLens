@@ -1,8 +1,8 @@
-// クライアント (= iOS アプリ) と サーバ で共有する API 型定義。
+// 撮影端末アプリとサーバで共有するAPI型定義。
 // 認証は Authorization: Bearer <supabase JWT>。
 
 // ─── 撮影構成 ───────────────────────────────────────────────────
-export type RecordingConfig = "ultra_wide" | "arkit";
+export type RecordingConfig = "ultra_wide" | "arkit" | "mentra";
 
 // ─── ClipDto ─────────────────────────────────────────────────────
 // サーバの clip 行はアップロード完了後にしか作られないので、 状態機械は持たない
@@ -33,11 +33,11 @@ export interface CreateClipRequest {
   contentHash: string;
   /// rgb.mp4 (= raw、 blur 無し) のサイズ (bytes)
   contentSize: number;
-  /// 採用された撮影構成 (= 'ultra_wide' | 'arkit')
+  /// 採用された撮影構成 (= 'ultra_wide' | 'arkit' | 'mentra')
   recordingConfig: RecordingConfig;
   /// 録画尺 (ms)。 端末が record stop−start から算出。
   durationMs?: number;
-  /// 撮影端末の機種 (= "iPhone15,2" 等)。
+  /// 撮影端末の機種 (= "iPhone15,2"、 "Mentra Live" 等)。
   deviceModel?: string;
   /// アップロード同意イベント id (= POST /api/v1/consents の返り値)。
   consentEventId?: string;
@@ -47,6 +47,7 @@ export interface CreateClipRequest {
 /// 撮影構成が並走出力するファイル分の presigned PUT URL。 構成でバケット + ファイル集合が決まる:
 ///   ultra_wide → rootlens-raw        (rgb.mp4 / realtime_handpose.jsonl / metadata.json)
 ///   arkit      → rootlens-raw-arkit  (+ imu.jsonl / depth.tar)
+///   mentra     → rootlens-raw-arkit  (rgb / per-frame timestamps / imu)
 export type RawSessionFilename =
   | "rgb.mp4"
   | "frames.jsonl"

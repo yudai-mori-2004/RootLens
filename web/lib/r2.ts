@@ -13,6 +13,7 @@ import {
 // バケットは撮影構成ごとに分離する:
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= 既定 rootlens-raw-arkit、 env で上書き)
+//   mentra     → R2_BUCKET_RAW_ARKIT
 
 if (!process.env.R2_ACCOUNT_ID) {
   throw new Error("R2_ACCOUNT_ID is not set.");
@@ -38,7 +39,7 @@ const BUCKET_RAW_ARKIT = process.env.R2_BUCKET_RAW_ARKIT ?? "rootlens-raw-arkit"
 
 /// 撮影構成 → アップロード先バケット。
 export function rawBucketFor(config: RecordingConfigId): string {
-  return config === "arkit" ? BUCKET_RAW_ARKIT : BUCKET_RAW;
+  return config === "ultra_wide" ? BUCKET_RAW : BUCKET_RAW_ARKIT;
 }
 
 // key / prefix 命名関数は lib/r2-keys.ts に分離。 互換性のためここから再エクスポート。
