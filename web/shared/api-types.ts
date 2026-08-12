@@ -47,7 +47,7 @@ export interface CreateClipRequest {
 /// 撮影構成が並走出力するファイル分の presigned PUT URL。 構成でバケット + ファイル集合が決まる:
 ///   ultra_wide → rootlens-raw        (rgb.mp4 / realtime_handpose.jsonl / metadata.json)
 ///   arkit      → rootlens-raw-arkit  (+ imu.jsonl / depth.tar)
-///   mentra     → rootlens-raw-arkit  (rgb / per-frame timestamps / imu)
+///   mentra     → rootlens-raw-mentra (rgb / per-frame timestamps / imu)
 export type RawSessionFilename =
   | "rgb.mp4"
   | "frames.jsonl"

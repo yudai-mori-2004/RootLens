@@ -2,7 +2,8 @@
 //
 // アップロード済みクリップの rgb.mp4 は端末から消えている (= 容量) ので、 マイビデオの
 // 履歴ポップは R2 から直接ストリーミング再生する。 バケットは撮影構成で決まる
-// (ultra_wide → raw / arkit・mentra → raw-arkit)。 所有チェックは (content_hash, account_id) の一致。
+// (ultra_wide → raw / arkit → raw-arkit / mentra → raw-mentra)。
+// 所有チェックは (content_hash, account_id) の一致。
 
 import { NextResponse } from "next/server";
 import { eq, and } from "drizzle-orm";

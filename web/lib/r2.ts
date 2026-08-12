@@ -13,7 +13,7 @@ import {
 // バケットは撮影構成ごとに分離する:
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= 既定 rootlens-raw-arkit、 env で上書き)
-//   mentra     → R2_BUCKET_RAW_ARKIT
+//   mentra     → R2_BUCKET_RAW_MENTRA (= 既定 rootlens-raw-mentra、 env で上書き)
 
 if (!process.env.R2_ACCOUNT_ID) {
   throw new Error("R2_ACCOUNT_ID is not set.");
@@ -36,10 +36,13 @@ const r2 = new S3Client({
 
 const BUCKET_RAW = process.env.R2_BUCKET_RAW;
 const BUCKET_RAW_ARKIT = process.env.R2_BUCKET_RAW_ARKIT ?? "rootlens-raw-arkit";
+const BUCKET_RAW_MENTRA = process.env.R2_BUCKET_RAW_MENTRA ?? "rootlens-raw-mentra";
 
 /// 撮影構成 → アップロード先バケット。
 export function rawBucketFor(config: RecordingConfigId): string {
-  return config === "ultra_wide" ? BUCKET_RAW : BUCKET_RAW_ARKIT;
+  if (config === "ultra_wide") return BUCKET_RAW;
+  if (config === "arkit") return BUCKET_RAW_ARKIT;
+  return BUCKET_RAW_MENTRA;
 }
 
 // key / prefix 命名関数は lib/r2-keys.ts に分離。 互換性のためここから再エクスポート。
@@ -96,4 +99,4 @@ export async function presignRawGet(
   return await getSignedUrl(r2, cmd, { expiresIn: expiresInSec });
 }
 
-export { r2, BUCKET_RAW, BUCKET_RAW_ARKIT };
+export { r2, BUCKET_RAW, BUCKET_RAW_ARKIT, BUCKET_RAW_MENTRA };

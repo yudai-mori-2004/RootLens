@@ -4,8 +4,8 @@
 // バケットは撮影構成ごとに分離する:
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw、 超広角 RGB の raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= depth / IMU / 6DoF ポーズ等 ARKit 由来 raw)
-//   mentra     → R2_BUCKET_RAW_ARKIT  (= Mentra RGB / per-frame timestamp / IMU)
-// key prefix はどちらのバケットでも raw/<content_hash>/ で対称。
+//   mentra     → R2_BUCKET_RAW_MENTRA (= Mentra RGB / per-frame timestamp / IMU)
+// key prefix は各バケットとも raw/<content_hash>/ で対称。
 
 // ─── raw (= 端末アップロード) ───────────────────────────────────────────
 
