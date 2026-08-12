@@ -1,11 +1,13 @@
+import AVFoundation
 import CoreVideo
 import Foundation
 import Vision
 
-/// Measures the residual offset between the timestamps attached to delivered camera
-/// images and `CMDeviceMotion.timestamp`. The visual signal is derived only from
-/// consecutive pixel buffers; ARKit pose is deliberately not used because it is
-/// already the output of a visual-inertial estimator.
+/// Measures the residual offset between the timestamps attached to recorded camera
+/// images and `CMDeviceMotion.timestamp`. Capture itself goes through the production
+/// recorder; this analyzer runs only after the temporary clip has closed. ARKit pose
+/// is deliberately not used because it is already the output of a visual-inertial
+/// estimator.
 ///
 /// Sign convention:
 ///   physical image motion at video timestamp `t` matches IMU samples at
@@ -26,15 +28,18 @@ final class CameraImuTimeCalibrator {
   }
 
   enum CalibrationError: LocalizedError {
-    case cancelled
+    case invalidRecording(String)
+    case videoDecode(String)
     case insufficientVisualSamples(Int)
     case insufficientMotion
     case weakCorrelation(Double)
 
     var errorDescription: String? {
       switch self {
-      case .cancelled:
-        return "Camera-IMU time calibration was cancelled"
+      case .invalidRecording(let message):
+        return "Invalid RGB-IMU validation recording: \(message)"
+      case .videoDecode(let message):
+        return "Could not decode the RGB-IMU validation video: \(message)"
       case .insufficientVisualSamples(let count):
         return "Not enough usable image-motion samples (\(count)); keep a textured, stationary scene in view"
       case .insufficientMotion:
@@ -61,97 +66,109 @@ final class CameraImuTimeCalibrator {
     let correlation: Double
   }
 
-  private let processingQueue = DispatchQueue(
-    label: "io.rootlens.arkit-capture.time-calibration",
-    qos: .userInitiated)
-  private let stateLock = NSLock()
-  private let minimumFrameSpacingNs: Int64 = 45_000_000 // at most ~20 image registrations/s
-
-  private var accepting = true
-  private var cancelled = false
-  private var registrationBusy = false
-  private var lastAcceptedFrameNs: Int64 = 0
-  private var gyro: [GyroPoint] = []
-
-  // Accessed only on processingQueue.
   private var previousFrame: (buffer: CVPixelBuffer, timestampNs: Int64)?
   private var visual: [VisualInterval] = []
 
-  /// Reserves the next frame-processing slot. The caller must deep-copy the ARKit
-  /// pixel buffer before passing it to `submitReservedFrame`.
-  func reserveFrame(timestampNs: Int64) -> Bool {
-    stateLock.lock()
-    defer { stateLock.unlock() }
-    guard accepting, !registrationBusy else { return false }
-    if lastAcceptedFrameNs != 0,
-       timestampNs - lastAcceptedFrameNs < minimumFrameSpacingNs {
-      return false
+  /// Analyze a temporary clip produced by the normal RootLens recorder. The MP4
+  /// and frames.jsonl have a strict 1:1 frame contract, so decoded frame index i
+  /// receives the acquisition timestamp from frames row i.
+  static func analyzeRecording(at sessionDir: URL) throws -> Estimate {
+    let frameTimestamps = try readFrameTimestamps(
+      from: sessionDir.appendingPathComponent("frames.jsonl"))
+    let gyro = try readGyro(from: sessionDir.appendingPathComponent("imu.jsonl"))
+    guard frameTimestamps.count >= 60 else {
+      throw CalibrationError.insufficientVisualSamples(frameTimestamps.count)
     }
-    registrationBusy = true
-    lastAcceptedFrameNs = timestampNs
-    return true
-  }
+    guard gyro.count >= 300 else { throw CalibrationError.insufficientMotion }
 
-  func abandonReservedFrame() {
-    stateLock.lock()
-    registrationBusy = false
-    stateLock.unlock()
-  }
+    let videoURL = sessionDir.appendingPathComponent("rgb.mp4")
+    guard FileManager.default.fileExists(atPath: videoURL.path) else {
+      throw CalibrationError.invalidRecording("rgb.mp4 is missing")
+    }
+    let asset = AVURLAsset(url: videoURL)
+    guard let track = asset.tracks(withMediaType: .video).first else {
+      throw CalibrationError.invalidRecording("rgb.mp4 has no video track")
+    }
+    let reader: AVAssetReader
+    do {
+      reader = try AVAssetReader(asset: asset)
+    } catch {
+      throw CalibrationError.videoDecode(error.localizedDescription)
+    }
+    let output = AVAssetReaderTrackOutput(
+      track: track,
+      outputSettings: [
+        kCVPixelBufferPixelFormatTypeKey as String:
+          Int(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange),
+      ])
+    output.alwaysCopiesSampleData = false
+    guard reader.canAdd(output) else {
+      throw CalibrationError.videoDecode("AVAssetReader rejected the video output")
+    }
+    reader.add(output)
+    guard reader.startReading() else {
+      throw CalibrationError.videoDecode(reader.error?.localizedDescription ?? "reader did not start")
+    }
 
-  func submitReservedFrame(_ buffer: CVPixelBuffer, timestampNs: Int64) {
-    processingQueue.async { [weak self] in
-      guard let self else { return }
-      defer {
-        self.stateLock.lock()
-        self.registrationBusy = false
-        self.stateLock.unlock()
+    let analyzer = CameraImuTimeCalibrator()
+    var frameIndex = 0
+    var analyzedFrames = 0
+    var lastAnalyzedTimestampNs: Int64 = 0
+    let minimumFrameSpacingNs: Int64 = 45_000_000 // at most ~20 registrations/s
+    while let sample = output.copyNextSampleBuffer() {
+      guard frameIndex < frameTimestamps.count else { break }
+      let timestampNs = frameTimestamps[frameIndex]
+      frameIndex += 1
+      if lastAnalyzedTimestampNs != 0,
+         timestampNs - lastAnalyzedTimestampNs < minimumFrameSpacingNs {
+        continue
       }
-      self.processFrame(buffer, timestampNs: timestampNs)
+      guard let buffer = CMSampleBufferGetImageBuffer(sample) else { continue }
+      analyzer.processFrame(buffer, timestampNs: timestampNs)
+      lastAnalyzedTimestampNs = timestampNs
+      analyzedFrames += 1
+    }
+    if reader.status == .failed {
+      throw CalibrationError.videoDecode(reader.error?.localizedDescription ?? "reader failed")
+    }
+    guard analyzedFrames >= 60 else {
+      throw CalibrationError.insufficientVisualSamples(analyzedFrames)
+    }
+    return try solve(visual: analyzer.visual, gyro: gyro)
+  }
+
+  private static func readFrameTimestamps(from url: URL) throws -> [Int64] {
+    let rows = try readJsonLines(from: url)
+    let timestamps = rows.compactMap { ($0["timestamp_ns"] as? NSNumber)?.int64Value }
+    guard timestamps.count == rows.count else {
+      throw CalibrationError.invalidRecording("frames.jsonl contains a row without timestamp_ns")
+    }
+    return timestamps
+  }
+
+  private static func readGyro(from url: URL) throws -> [GyroPoint] {
+    let rows = try readJsonLines(from: url)
+    return rows.compactMap { row in
+      guard let timestamp = (row["timestamp_ns"] as? NSNumber)?.int64Value,
+            let gyro = row["gyro"] as? [String: Any],
+            let x = (gyro["x"] as? NSNumber)?.doubleValue,
+            let y = (gyro["y"] as? NSNumber)?.doubleValue,
+            let z = (gyro["z"] as? NSNumber)?.doubleValue else { return nil }
+      let magnitude = sqrt(x * x + y * y + z * z)
+      return magnitude.isFinite ? GyroPoint(timestampNs: timestamp, magnitude: magnitude) : nil
     }
   }
 
-  func appendGyro(timestampNs: Int64, x: Double, y: Double, z: Double) {
-    let magnitude = sqrt(x * x + y * y + z * z)
-    guard magnitude.isFinite else { return }
-    stateLock.lock()
-    if accepting {
-      gyro.append(GyroPoint(timestampNs: timestampNs, magnitude: magnitude))
+  private static func readJsonLines(from url: URL) throws -> [[String: Any]] {
+    guard FileManager.default.fileExists(atPath: url.path) else {
+      throw CalibrationError.invalidRecording("\(url.lastPathComponent) is missing")
     }
-    stateLock.unlock()
-  }
-
-  func cancel() {
-    stateLock.lock()
-    accepting = false
-    cancelled = true
-    stateLock.unlock()
-  }
-
-  /// Stops accepting samples, drains the last image-registration job, and solves
-  /// the offset on the processing queue.
-  func finish(completion: @escaping (Swift.Result<Estimate, Error>) -> Void) {
-    stateLock.lock()
-    accepting = false
-    let wasCancelled = cancelled
-    stateLock.unlock()
-
-    processingQueue.async { [weak self] in
-      guard let self else {
-        completion(.failure(CalibrationError.cancelled))
-        return
+    let data = try Data(contentsOf: url)
+    return try data.split(separator: 0x0A).map { line in
+      guard let row = try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else {
+        throw CalibrationError.invalidRecording("\(url.lastPathComponent) contains a non-object row")
       }
-      if wasCancelled {
-        completion(.failure(CalibrationError.cancelled))
-        return
-      }
-      self.stateLock.lock()
-      let gyroCopy = self.gyro
-      self.stateLock.unlock()
-      do {
-        completion(.success(try Self.solve(visual: self.visual, gyro: gyroCopy)))
-      } catch {
-        completion(.failure(error))
-      }
+      return row
     }
   }
 

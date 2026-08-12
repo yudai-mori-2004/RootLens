@@ -117,32 +117,22 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
       return ARWorldTrackingConfiguration.isSupported
     }
 
-    // Diagnostic only: measures any residual lag visible between the timestamps
-    // on delivered ARFrames and Core Motion samples. It never rewrites capture
-    // timestamps or creates an extra delivery-side file.
-    AsyncFunction("runCameraImuTimeValidation") { (durationSeconds: Double, promise: Promise) in
-      DispatchQueue.main.async {
+    // Analyze a short temporary recording made through the same startRecording /
+    // stopRecording path as production capture. Vision never competes with the
+    // live ARSession for its recycled pixel buffers.
+    AsyncFunction("analyzeCameraImuTimeValidation") { (sessionDirPath: String, promise: Promise) in
+      let path = sessionDirPath.replacingOccurrences(of: "file://", with: "")
+      DispatchQueue.global(qos: .userInitiated).async {
         do {
-          try ArkitCaptureController.shared.startCameraImuTimeValidation(
-            durationSeconds: durationSeconds
-          ) { result in
-            switch result {
-            case .success(let value):
-              promise.resolve(value)
-            case .failure(let error):
-              promise.reject("CAMERA_IMU_TIME_VALIDATION_ERROR", error.localizedDescription)
-            }
+          let estimate = try CameraImuTimeCalibrator.analyzeRecording(
+            at: URL(fileURLWithPath: path, isDirectory: true))
+          DispatchQueue.main.async {
+            let value = ArkitCaptureController.shared.storeCameraImuTimeValidation(estimate)
+            promise.resolve(value)
           }
         } catch {
           promise.reject("CAMERA_IMU_TIME_VALIDATION_ERROR", error.localizedDescription)
         }
-      }
-    }
-
-    AsyncFunction("cancelCameraImuTimeValidation") { (promise: Promise) in
-      DispatchQueue.main.async {
-        ArkitCaptureController.shared.cancelCameraImuTimeValidation()
-        promise.resolve(nil)
       }
     }
 

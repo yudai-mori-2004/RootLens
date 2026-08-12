@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import Constants from 'expo-constants';
+import { Camera } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,17 +51,20 @@ import type { LegalDocKey } from '../content/legalDocs.generated';
 import { CAPTURE_FLOWS } from './captureFlow';
 import {
   ArkitCapturePreviewView,
-  cancelCameraImuTimeValidation,
+  analyzeCameraImuTimeValidation,
   getCameraImuTimeValidation,
-  runCameraImuTimeValidation,
+  isArkitCaptureAvailable,
   setArkitCaptureSettings,
+  setArkitDisplayOrientation,
   setArkitKeepAwake,
+  startArkitRecording,
   startArkitSession,
+  stopArkitRecording,
   stopArkitSession,
   type CameraImuTimeValidationResult,
 } from '../native/arkitCapture';
 
-type TimeValidationPhase = 'preparing' | 'ready' | 'running' | 'result' | 'error';
+type TimeValidationPhase = 'preparing' | 'ready' | 'running' | 'analyzing' | 'result' | 'error';
 
 export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
@@ -79,19 +83,17 @@ export const SettingsScreen: React.FC = () => {
   const [timeValidationCountdown, setTimeValidationCountdown] = useState(25);
   const timeValidationRun = useRef(0);
   const timeValidationTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeValidationStart = useRef<Promise<string> | null>(null);
+  const timeValidationStop = useRef<Promise<string | null> | null>(null);
+  const timeValidationRecording = useRef(false);
+  const timeValidationSessionDir = useRef<string | null>(null);
+  const timeValidationCleanup = useRef<Promise<void> | null>(null);
 
   // 撮影設定 (= Stera 同構成)。 保存は即時、 適用は次の撮影画面オープンから。
   const [cs, setCs] = useState<CaptureSettings>({ ...DEFAULT_CAPTURE_SETTINGS });
   useEffect(() => {
     loadCaptureSettings().then(setCs).catch(() => {});
     getCameraImuTimeValidation().then(setTimeValidationResult).catch(() => {});
-    return () => {
-      timeValidationRun.current += 1;
-      if (timeValidationTimer.current) clearInterval(timeValidationTimer.current);
-      void cancelCameraImuTimeValidation();
-      void stopArkitSession();
-      void setArkitKeepAwake(false);
-    };
   }, []);
   const updateCs = (patch: Partial<CaptureSettings>) => {
     setCs((cur) => {
@@ -175,13 +177,61 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const stopTemporaryValidationRecording = async (): Promise<string | null> => {
+    if (timeValidationStop.current) return timeValidationStop.current;
+    const stop = (async () => {
+      if (timeValidationStart.current) {
+        try { await timeValidationStart.current; } catch { return null; }
+      }
+      if (!timeValidationRecording.current) return timeValidationSessionDir.current;
+      timeValidationRecording.current = false;
+      const dir = await stopArkitRecording();
+      timeValidationSessionDir.current = dir;
+      return dir;
+    })();
+    timeValidationStop.current = stop;
+    return stop;
+  };
+
+  const cleanupTimeValidation = async () => {
+    if (timeValidationCleanup.current) return timeValidationCleanup.current;
+    const cleanup = (async () => {
+      let dir = timeValidationSessionDir.current;
+      try {
+        dir = await stopTemporaryValidationRecording() ?? dir;
+      } catch {}
+      await stopArkitSession().catch(() => {});
+      await setArkitKeepAwake(false).catch(() => {});
+      if (dir) await FileSystem.deleteAsync(dir, { idempotent: true }).catch(() => {});
+      timeValidationSessionDir.current = null;
+    })();
+    timeValidationCleanup.current = cleanup;
+    try { await cleanup; } finally { timeValidationCleanup.current = null; }
+  };
+
+  useEffect(() => () => {
+    timeValidationRun.current += 1;
+    if (timeValidationTimer.current) clearInterval(timeValidationTimer.current);
+    void cleanupTimeValidation();
+  }, []);
+
   const openTimeValidation = async () => {
     const run = ++timeValidationRun.current;
     setTimeValidationOpen(true);
     setTimeValidationPhase('preparing');
     setTimeValidationError('');
     try {
+      await cleanupTimeValidation();
+      timeValidationStart.current = null;
+      timeValidationStop.current = null;
+      timeValidationRecording.current = false;
+      timeValidationSessionDir.current = null;
+      const existing = await Camera.getCameraPermissionsAsync();
+      const permission = existing.granted ? existing : await Camera.requestCameraPermissionsAsync();
+      if (!permission.granted) throw new Error(t('capture.permissionBody'));
+      if (!await isArkitCaptureAvailable()) throw new Error(t('capture.unsupportedBody'));
       await setArkitCaptureSettings(JSON.stringify(cs));
+      await setArkitDisplayOrientation('landscapeRight');
       await setArkitKeepAwake(true);
       await startArkitSession();
       await new Promise((resolve) => setTimeout(resolve, 1200));
@@ -200,9 +250,7 @@ export const SettingsScreen: React.FC = () => {
       timeValidationTimer.current = null;
     }
     setTimeValidationOpen(false);
-    void cancelCameraImuTimeValidation();
-    void stopArkitSession();
-    void setArkitKeepAwake(false);
+    void cleanupTimeValidation();
   };
 
   const startTimeValidation = async () => {
@@ -216,8 +264,26 @@ export const SettingsScreen: React.FC = () => {
       const remaining = Math.max(0, 25 - Math.floor((Date.now() - startedAt) / 1000));
       setTimeValidationCountdown(remaining);
     }, 250);
+    let dir: string | null = null;
     try {
-      const result = await runCameraImuTimeValidation(25);
+      const start = startArkitRecording().then((sessionDir) => {
+        timeValidationRecording.current = true;
+        timeValidationSessionDir.current = sessionDir;
+        return sessionDir;
+      });
+      timeValidationStart.current = start;
+      dir = await start;
+      await new Promise((resolve) => setTimeout(resolve, 25_000));
+      if (timeValidationRun.current !== run) {
+        await cleanupTimeValidation();
+        return;
+      }
+      setTimeValidationPhase('analyzing');
+      dir = await stopTemporaryValidationRecording();
+      await stopArkitSession();
+      await setArkitKeepAwake(false);
+      if (!dir) throw new Error('Temporary RGB–IMU recording was not created');
+      const result = await analyzeCameraImuTimeValidation(dir);
       if (timeValidationRun.current !== run) return;
       setTimeValidationResult(result);
       setTimeValidationPhase('result');
@@ -230,6 +296,8 @@ export const SettingsScreen: React.FC = () => {
         clearInterval(timeValidationTimer.current);
         timeValidationTimer.current = null;
       }
+      if (dir) await FileSystem.deleteAsync(dir, { idempotent: true }).catch(() => {});
+      timeValidationSessionDir.current = null;
     }
   };
 
@@ -517,6 +585,13 @@ export const SettingsScreen: React.FC = () => {
               </View>
             ) : null}
 
+            {timeValidationPhase === 'analyzing' ? (
+              <View style={styles.validationStatus}>
+                <ActivityIndicator color={colors.accent} />
+                <Text style={styles.validationBody}>{t('settings.sensorSync.analyzing')}</Text>
+              </View>
+            ) : null}
+
             {timeValidationPhase === 'result' && timeValidationResult ? (
               <>
                 <Text style={styles.validationResultValue}>
@@ -532,7 +607,7 @@ export const SettingsScreen: React.FC = () => {
                     : t('settings.sensorSync.resultReview')}
                 </Text>
                 <View style={styles.validationActions}>
-                  <Pressable style={styles.validationSecondary} onPress={() => { void startTimeValidation(); }}>
+                  <Pressable style={styles.validationSecondary} onPress={() => { void openTimeValidation(); }}>
                     <Text style={styles.validationSecondaryLabel}>{t('settings.sensorSync.measureAgain')}</Text>
                   </Pressable>
                   <Pressable style={styles.validationPrimary} onPress={closeTimeValidation}>

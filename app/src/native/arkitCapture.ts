@@ -115,8 +115,7 @@ interface ArkitCaptureNativeModule {
   getThermalState(): Promise<ThermalState>;
   getPowerState(): Promise<PowerState>;
   getMemoryFootprintMB(): Promise<number>;
-  runCameraImuTimeValidation(durationSeconds: number): Promise<CameraImuTimeValidationResult>;
-  cancelCameraImuTimeValidation(): Promise<void>;
+  analyzeCameraImuTimeValidation(sessionDir: string): Promise<CameraImuTimeValidationResult>;
   getCameraImuTimeValidation(): Promise<CameraImuTimeValidationResult | null>;
   startVoiceCommands(): Promise<void>;
   stopVoiceCommands(): Promise<void>;
@@ -216,19 +215,13 @@ export async function getArkitPowerState(): Promise<PowerState> {
   return nativeModule.getPowerState();
 }
 
-/** Run a short RGB-IMU residual validation using real ARFrame pixels and Core
- * Motion samples. The native side persists the latest successful result for
- * this device model. */
-export async function runCameraImuTimeValidation(
-  durationSeconds = 25,
+/** Analyze a temporary clip produced by the normal recorder and persist the
+ * latest successful RGB-IMU residual result for this device model. */
+export async function analyzeCameraImuTimeValidation(
+  sessionDir: string,
 ): Promise<CameraImuTimeValidationResult> {
   if (!nativeModule) throw new Error('ArkitCapture native module unavailable');
-  return nativeModule.runCameraImuTimeValidation(durationSeconds);
-}
-
-export async function cancelCameraImuTimeValidation(): Promise<void> {
-  if (!nativeModule) return;
-  return nativeModule.cancelCameraImuTimeValidation();
+  return nativeModule.analyzeCameraImuTimeValidation(sessionDir);
 }
 
 export async function getCameraImuTimeValidation(): Promise<CameraImuTimeValidationResult | null> {
