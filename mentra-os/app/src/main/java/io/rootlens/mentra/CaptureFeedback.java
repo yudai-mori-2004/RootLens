@@ -30,6 +30,7 @@ final class CaptureFeedback {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ArrayDeque<PlaybackRequest> QUEUE = new ArrayDeque<>();
     private static boolean playing;
+    private static MediaPlayer activePlayer;
 
     static void started(Context context) {
         enqueue(context, new ToneStep[]{
@@ -167,6 +168,7 @@ final class CaptureFeedback {
             return;
         }
         final MediaPlayer player = new MediaPlayer();
+        activePlayer = player;
         try (AssetFileDescriptor asset = request.context.getResources()
                 .openRawResourceFd(request.voiceResource)) {
             if (asset == null) throw new IOException("Voice resource has no file descriptor");
@@ -175,10 +177,13 @@ final class CaptureFeedback {
                     asset.getFileDescriptor(), asset.getStartOffset(), asset.getLength());
             player.setVolume(0.65f, 0.65f);
             player.setOnCompletionListener(completed -> {
+                if (activePlayer == completed) activePlayer = null;
+                Log.i(TAG, "Mentra voice playback completed");
                 completed.release();
                 finishPlayback(request.context, audio, previousVolume);
             });
             player.setOnErrorListener((failedPlayer, what, extra) -> {
+                if (activePlayer == failedPlayer) activePlayer = null;
                 Log.e(TAG, "Mentra voice playback failed: what=" + what + " extra=" + extra);
                 failedPlayer.release();
                 finishPlayback(request.context, audio, previousVolume);
@@ -186,8 +191,11 @@ final class CaptureFeedback {
             });
             player.prepare();
             player.start();
+            Log.i(TAG, "Mentra voice playback started: resource=" + request.voiceResource
+                    + " duration_ms=" + player.getDuration());
         } catch (IOException | RuntimeException error) {
             Log.e(TAG, "Could not play Mentra voice resource", error);
+            if (activePlayer == player) activePlayer = null;
             player.release();
             finishPlayback(request.context, audio, previousVolume);
         }

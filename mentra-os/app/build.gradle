@@ -30,8 +30,8 @@ android {
         applicationId "io.rootlens.mentra"
         minSdk 30
         targetSdk 30
-        versionCode 6
-        versionName "0.1.5"
+        versionCode 7
+        versionName "0.1.6"
         buildConfigField "String", "ROOTLENS_SERVER_URL", javaString(
                 rootLensEnv["EXPO_PUBLIC_SERVER_URL"] ?: "https://www.rootlens.io")
         buildConfigField "String", "SUPABASE_URL", javaString(
