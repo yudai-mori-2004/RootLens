@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="true" />
@@ -8,6 +9,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Provisioned with adb on the managed Mentra appliance; this APK is not Play-distributed. -->
+    <uses-permission
+        android:name="android.permission.READ_LOGS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
@@ -32,9 +38,22 @@
             <intent-filter>
                 <action android:name="io.rootlens.mentra.START" />
                 <action android:name="io.rootlens.mentra.STOP" />
+                <action android:name="io.rootlens.mentra.TOGGLE" />
                 <action android:name="io.rootlens.mentra.PROBE" />
                 <action android:name="io.rootlens.mentra.STATUS" />
                 <action android:name="io.rootlens.mentra.UPLOAD" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".FieldControlBootReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 
@@ -46,5 +65,9 @@
             android:name=".UploadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".FieldControlService"
+            android:directBootAware="true"
+            android:exported="false" />
     </application>
 </manifest>

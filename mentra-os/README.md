@@ -104,10 +104,36 @@ passwordは保存せず、取得したaccess/refresh tokenだけをAndroid Keyst
 cd mentra-os
 bash gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell pm grant io.rootlens.mentra.debug android.permission.READ_LOGS
+adb shell pm grant io.rootlens.mentra.debug android.permission.CAMERA
+adb shell am start -W \
+  -a io.rootlens.mentra.FIELD_READY \
+  -n io.rootlens.mentra.debug/io.rootlens.mentra.MainActivity
 ```
 
-画面がsleep中でも、Activityを前面へ起動してからcamera foreground serviceを開始すれば収録できる。
-標準Mentra SYSTEM/HOMEアプリの物理ボタン統合は、次のActivity intentを発行する。
+`READ_LOGS`は、Bluetooth未接続時にもMentra MCUのタッチ操作を端末内で受け取るための固定端末用
+セットアップ権限である。付与されていない場合、常駐通知は`field controls need setup`を表示し、
+物理操作可能な状態であると扱わない。Play配布を前提とした権限ではない。
+
+### 現場での開始・停止
+
+初回セットアップ後はスマートフォン、Bluetooth、ADBを必要としない。
+
+1. Mentra Liveの電源を入れて装着する。
+2. つるのタッチ面を約1秒長押しする。
+3. 開始音を確認して作業を始める。最大5時間のsessionを30分以下の独立clipへ自動分割する。
+4. 終了時に同じタッチ面をもう一度約1秒長押しする。
+5. 停止音が鳴るまで待つ。停止音はMP4とsidecarの確定が完了した後に鳴る。
+
+入力はMentra標準ASG clientがMCUから受け取る`long_press (3)`を端末内で購読する。1.5秒以内の
+重複イベントは無視する。カメラボタン長押しは、Bluetooth未接続時に標準ASG client自身の
+動画録画も開始してカメラが競合するため、RootLens操作には使用しない。タッチ面のlong pressは
+標準側ではBLE転送だけを行い、未接続時にもローカル撮影を開始しない。
+
+アプリ更新後と端末boot後にはfield-control foreground serviceを自動起動する。画面がsleep中でも、
+長押しを受けるとActivityを前面へ起動してからcamera foreground serviceを開始する。
+
+開発時にはActivity intentでも同じ操作を行える。
 
 ```sh
 adb shell am start -W \
@@ -117,7 +143,8 @@ adb shell am start -W \
 ```
 
 通常Androidアプリのbackground broadcastだけでsleep中にcameraを開くと、OSのbackground
-camera制限により `CAMERA_DISABLED` になる。物理ボタン統合は必ずActivityをforegroundにする。
+camera制限により `CAMERA_DISABLED` になる。field-control serviceは長押しごとにActivityを
+foregroundへ移してからcapture serviceへtoggleを渡す。
 
 ## アップロード
 

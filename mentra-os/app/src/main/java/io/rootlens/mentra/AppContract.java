@@ -3,6 +3,8 @@ package io.rootlens.mentra;
 final class AppContract {
     static final String ACTION_START = "io.rootlens.mentra.START";
     static final String ACTION_STOP = "io.rootlens.mentra.STOP";
+    static final String ACTION_TOGGLE = "io.rootlens.mentra.TOGGLE";
+    static final String ACTION_FIELD_READY = "io.rootlens.mentra.FIELD_READY";
     static final String ACTION_PROBE = "io.rootlens.mentra.PROBE";
     static final String ACTION_STATUS = "io.rootlens.mentra.STATUS";
     static final String ACTION_UPLOAD = "io.rootlens.mentra.UPLOAD";
@@ -21,8 +23,10 @@ final class AppContract {
     static final long VIDEO_TO_IMU_OFFSET_NS = 73_500_000L;
 
     static final String CHANNEL_ID = "rootlens_capture";
+    static final String FIELD_CONTROL_CHANNEL_ID = "rootlens_field_control";
     static final int NOTIFICATION_ID = 4102;
     static final int UPLOAD_NOTIFICATION_ID = 4103;
+    static final int FIELD_CONTROL_NOTIFICATION_ID = 4104;
 
     private AppContract() {}
 }

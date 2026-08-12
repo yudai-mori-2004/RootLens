@@ -39,6 +39,8 @@ public final class CaptureService extends Service {
     private int currentSegmentSeconds;
     private int bitrateBps;
     private boolean manualStopRequested;
+    private boolean sessionActive;
+    private boolean startFeedbackPlayed;
 
     @Override
     public void onCreate() {
@@ -84,6 +86,14 @@ public final class CaptureService extends Service {
     private void handle(String action, Intent intent) {
         if (AppContract.ACTION_START.equals(action)) {
             startSession(intent);
+        } else if (AppContract.ACTION_TOGGLE.equals(action)) {
+            if (sessionActive) {
+                stopCurrent(true);
+            } else {
+                Intent start = new Intent();
+                start.putExtra(AppContract.EXTRA_DURATION_SECONDS, AppContract.MAX_SESSION_SECONDS);
+                startSession(start);
+            }
         } else if (AppContract.ACTION_STOP.equals(action)) {
             stopCurrent(true);
         } else if (AppContract.ACTION_PROBE.equals(action)) {
@@ -122,6 +132,8 @@ public final class CaptureService extends Service {
 
         remainingSeconds = requested;
         manualStopRequested = false;
+        sessionActive = true;
+        startFeedbackPlayed = false;
         if (!wakeLock.isHeld()) wakeLock.acquire(AppContract.MAX_SESSION_SECONDS * 1000L + 60_000L);
         wakeCameraAccessPath();
         writeStatus("starting", "Starting " + requested + " second session", null);
@@ -172,6 +184,10 @@ public final class CaptureService extends Service {
                 : "HAL UNKNOWN / empirical mapping only";
         writeStatus("recording", "Recording " + currentSegmentSeconds + "s segment; " + guarantee, directory);
         updateNotification("Recording · " + guarantee);
+        if (!startFeedbackPlayed) {
+            startFeedbackPlayed = true;
+            CaptureFeedback.started();
+        }
         automaticStop = () -> serial.execute(() -> stopCurrent(false));
         mainHandler.postDelayed(automaticStop, currentSegmentSeconds * 1000L);
     }
@@ -236,10 +252,17 @@ public final class CaptureService extends Service {
     }
 
     private void finishSession(String state, String message) {
+        boolean wasActive = sessionActive;
+        sessionActive = false;
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         if (screenWakeLock != null && screenWakeLock.isHeld()) screenWakeLock.release();
         writeStatus(state, message == null ? state : message, null);
         updateNotification(message == null ? state : message);
+        if ("failed".equals(state)) {
+            CaptureFeedback.failed();
+        } else if (wasActive && ("complete".equals(state) || "idle".equals(state))) {
+            CaptureFeedback.stopped();
+        }
         stopForegroundAndSelf();
     }
 

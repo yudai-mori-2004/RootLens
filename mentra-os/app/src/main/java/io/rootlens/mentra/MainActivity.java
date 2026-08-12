@@ -23,7 +23,6 @@ public final class MainActivity extends Activity {
     private final ExecutorService accountWorker = Executors.newSingleThreadExecutor();
     private RootLensAuth auth;
     private TextView accountStatus;
-    private boolean handledLaunchIntent;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +31,7 @@ public final class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                         | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
         auth = new RootLensAuth(this);
+        startForegroundService(new Intent(this, FieldControlService.class));
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -120,29 +120,8 @@ public final class MainActivity extends Activity {
 
         if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        Intent intent = getIntent();
-        if (handledLaunchIntent) return;
-        String action = intent.getAction();
-        if (AppContract.ACTION_START.equals(action)) {
-            handledLaunchIntent = true;
-            int duration = intent.getIntExtra(AppContract.EXTRA_DURATION_SECONDS, 30);
-            new Handler(Looper.getMainLooper()).postDelayed(() -> startCapture(duration), 500L);
-        } else if (AppContract.ACTION_STOP.equals(action)
-                || AppContract.ACTION_PROBE.equals(action)
-                || AppContract.ACTION_STATUS.equals(action)) {
-            handledLaunchIntent = true;
-            send(action);
-        } else if (AppContract.ACTION_UPLOAD.equals(action)) {
-            handledLaunchIntent = true;
-            Intent upload = new Intent(this, UploadService.class);
-            upload.setAction(action);
-            startForegroundService(upload);
+        } else {
+            handleLaunchIntent(getIntent());
         }
     }
 
@@ -150,7 +129,39 @@ public final class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handledLaunchIntent = false;
+        handleLaunchIntent(intent);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST
+                && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            handleLaunchIntent(getIntent());
+        }
+    }
+
+    private void handleLaunchIntent(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        intent.setAction(Intent.ACTION_MAIN);
+        if (AppContract.ACTION_START.equals(action)) {
+            int duration = intent.getIntExtra(AppContract.EXTRA_DURATION_SECONDS, 30);
+            new Handler(Looper.getMainLooper()).postDelayed(() -> startCapture(duration), 500L);
+        } else if (AppContract.ACTION_TOGGLE.equals(action)) {
+            new Handler(Looper.getMainLooper()).postDelayed(
+                    () -> send(AppContract.ACTION_TOGGLE), 250L);
+        } else if (AppContract.ACTION_STOP.equals(action)
+                || AppContract.ACTION_PROBE.equals(action)
+                || AppContract.ACTION_STATUS.equals(action)) {
+            send(action);
+        } else if (AppContract.ACTION_UPLOAD.equals(action)) {
+            Intent upload = new Intent(this, UploadService.class);
+            upload.setAction(action);
+            startForegroundService(upload);
+        }
     }
 
     private void send(String action) {
