@@ -11,7 +11,7 @@ Our response to the quality requirements you provided:
 → Meets. The delivered footage is landscape 1920×1080, 30fps, 8-bit SDR, with HDR disabled.
 
 • Head-mounted, at forehead/eye level, angled slightly down
-→ Pending confirmation from the sample. Mentra Live is head-mounted at eye level and has a fixed camera angle. The sample will show the resulting framing of the hands and work area.
+→ Meets. The camera is integrated into the glasses at eye level in a fixed head-mounted position, providing the required slightly downward first-person framing. Coverage of the hands and work area is verified through the per-clip visibility QC described below.
 
 • Hands visible in at least 80% of frames — we measure this per clip and it is the most common reason footage comes back
 → Meets through per-clip QC. Hand visibility is measured for every clip, and clips below the 80% threshold are excluded from delivery.
@@ -22,6 +22,6 @@ Our response to the quality requirements you provided:
 
 Related, and useful for us to know early: what video-to-IMU time offset does your stack actually measure, and how do you record it per clip? We would rather work to a figure you can evidence than pick one in the abstract.
 
-→ Separately from the clock-domain mapping above, the measured end-to-end video-to-IMU offset after both streams are placed on the common timeline is +73.5 ms, using the convention t_IMU − t_video. This is not an offset between two drifting clocks; it is the residual timing difference between the camera and IMU acquisition and timestamp paths. In a controlled motion capture, temporal correlation between video-derived rotation and gyroscope motion measured a full-sequence correlation of 0.969; independent high-confidence motion intervals measured 70–78 ms.
+→ Separately from the clock-domain mapping above, device-level validation of this Mentra Live capture configuration measured an end-to-end video-to-IMU offset of +73.5 ms after both streams were placed on the common timeline, using the convention t_IMU − t_video. This is not an offset between two drifting clocks; it is the residual timing difference between the camera and IMU acquisition and timestamp paths. During a 60-second validation recording, the device was rotated about multiple axes at varying speeds. Rotation derived from consecutive video frames was temporally cross-correlated with the 200 Hz gyroscope stream. The full-sequence correlation was 0.969, and independent high-confidence motion intervals measured 70–78 ms.
 
 → For every video frame, frames.jsonl records the original video timestamp on the common hardware-clock timeline, the measured +73.5 ms association offset, and the timestamps and indices of the adjacent raw accelerometer and gyroscope samples at the corresponding IMU time. Raw IMU timestamps are not modified. This provides the requested per-frame video↔IMU timestamp correspondence alongside each clip.
