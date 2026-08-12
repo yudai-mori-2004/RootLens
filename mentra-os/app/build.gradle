@@ -1,0 +1,67 @@
+apply plugin: "com.android.application"
+
+def rootLensEnv = [:]
+def sharedEnv = rootProject.file("../app/.env")
+if (sharedEnv.isFile()) {
+    sharedEnv.eachLine { line ->
+        def trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith("#") && trimmed.contains("=")) {
+            def split = trimmed.indexOf("=")
+            def key = trimmed.substring(0, split).trim()
+            def value = trimmed.substring(split + 1).trim()
+            if ((value.startsWith('"') && value.endsWith('"'))
+                    || (value.startsWith("'") && value.endsWith("'"))) {
+                value = value.substring(1, value.length() - 1)
+            }
+            rootLensEnv[key] = value
+        }
+    }
+}
+
+def javaString = { String value ->
+    '"' + (value ?: '').replace('\\', '\\\\').replace('"', '\\"') + '"'
+}
+
+android {
+    namespace "io.rootlens.mentra"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "io.rootlens.mentra"
+        minSdk 30
+        targetSdk 30
+        versionCode 1
+        versionName "0.1.0"
+        buildConfigField "String", "ROOTLENS_SERVER_URL", javaString(
+                rootLensEnv["EXPO_PUBLIC_SERVER_URL"] ?: "https://www.rootlens.io")
+        buildConfigField "String", "SUPABASE_URL", javaString(
+                rootLensEnv["EXPO_PUBLIC_SUPABASE_URL"] ?: "")
+        buildConfigField "String", "SUPABASE_ANON_KEY", javaString(
+                rootLensEnv["EXPO_PUBLIC_SUPABASE_ANON_KEY"] ?: "")
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    lint {
+        // This APK is side-loaded onto the fixed Android 11 Mentra appliance, not distributed via Play.
+        disable "ExpiredTargetSdkVersion"
+    }
+}

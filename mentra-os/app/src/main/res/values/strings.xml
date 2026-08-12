@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">RootLens Mentra</string>
+    <string name="capture_title">RootLens Mentra capture\n1080p30 SDR + raw IMU</string>
+    <string name="probe_hardware">Probe hardware</string>
+    <string name="start_short_capture">Start 30-second capture</string>
+    <string name="start_five_hour_capture">Start 5-hour capture (30-minute clips)</string>
+    <string name="stop_capture">Stop capture</string>
+    <string name="upload_account_signed_in">Upload account: signed in</string>
+    <string name="upload_account_signed_out">Upload account: signed out</string>
+    <string name="login_id_hint">RootLens login ID</string>
+    <string name="password_hint">Password</string>
+    <string name="sign_in_for_upload">Sign in for upload</string>
+    <string name="signing_in">Signing in…</string>
+    <string name="sign_in_failed">Sign-in failed: %1$s</string>
+    <string name="upload_all_pending">Upload all pending clips</string>
+    <string name="upload_requested">Upload requested; see notification / upload_state.json</string>
+</resources>

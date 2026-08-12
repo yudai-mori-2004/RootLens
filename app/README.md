@@ -4,6 +4,9 @@ An iPhone app (React Native + Expo, with native Swift modules) that records
 egocentric video of real work together with ARKit measurements, and uploads the
 raw recording sessions that become robot-learning training data.
 
+Mentra Live用のAndroid capture stackは、iPhone/ARKit実装と分離して
+[`mentra-os/`](../mentra-os/README.md) に置く。
+
 The recording rig is an iPhone Pro mounted on the worker's head. Recording is
 hands-free: an open-palm gesture starts a session and a thumbs-up gesture stops
 it, with voice guidance, so the wearer never touches the screen while working.
