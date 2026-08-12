@@ -70,5 +70,9 @@
             android:name=".FieldControlService"
             android:directBootAware="true"
             android:exported="false" />
+        <service
+            android:name=".AccountProvisioningService"
+            android:exported="true"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

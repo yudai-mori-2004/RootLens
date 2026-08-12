@@ -153,8 +153,19 @@ foregroundへ移してからcapture serviceへtoggleを渡す。
 
 ## アップロード
 
-アプリ画面でRootLens運営発行アカウントへsign inし、`Upload all pending clips` を押す。
-完了したクリップだけを対象に、次を順番に行う。
+固定端末の初回セットアップ時は、資格情報をshell引数やログへ出さないQR provisioning scriptを使う。
+
+```sh
+cd mentra-os
+scripts/provision-from-qr.sh ../web/accounts-out/bakery_01.png
+```
+
+scriptはQRをPC上でdecodeし、mode 0600の一時JSONをアプリ専用外部directoryへpushする。
+端末は資格情報を読み取ると直ちにJSONを削除し、取得したaccess/refresh tokenだけをAndroid
+KeystoreのAES-GCM鍵で暗号化して保持する。statusにはlogin IDと成否だけを残し、password/tokenは
+書かない。
+
+アプリ画面で`Upload all pending clips`を押すと、完了したclipだけを対象に次を順番に行う。
 
 1. `POST /api/v1/raw-uploads` で `recordingConfig=mentra` のpresigned URLを取得。
 2. 必須4ファイル（`rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json`）をR2へstreaming PUT。

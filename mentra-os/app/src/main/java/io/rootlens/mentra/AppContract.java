@@ -8,6 +8,7 @@ final class AppContract {
     static final String ACTION_PROBE = "io.rootlens.mentra.PROBE";
     static final String ACTION_STATUS = "io.rootlens.mentra.STATUS";
     static final String ACTION_UPLOAD = "io.rootlens.mentra.UPLOAD";
+    static final String ACTION_PROVISION_ACCOUNT = "io.rootlens.mentra.PROVISION_ACCOUNT";
 
     static final String EXTRA_DURATION_SECONDS = "duration_seconds";
     static final String EXTRA_BITRATE_BPS = "bitrate_bps";
@@ -27,6 +28,7 @@ final class AppContract {
     static final int NOTIFICATION_ID = 4102;
     static final int UPLOAD_NOTIFICATION_ID = 4103;
     static final int FIELD_CONTROL_NOTIFICATION_ID = 4104;
+    static final int PROVISION_NOTIFICATION_ID = 4105;
 
     private AppContract() {}
 }

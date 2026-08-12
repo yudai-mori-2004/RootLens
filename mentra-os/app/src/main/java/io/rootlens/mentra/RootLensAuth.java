@@ -56,7 +56,7 @@ final class RootLensAuth {
             JSONObject response = authRequest("password", new JSONObject()
                     .put("email", email)
                     .put("password", password));
-            saveSession(response);
+            saveSession(response, loginId.trim());
         } catch (JSONException error) {
             throw new IOException("Authentication response was invalid", error);
         }
@@ -74,7 +74,7 @@ final class RootLensAuth {
         try {
             JSONObject response = authRequest("refresh_token", new JSONObject()
                     .put("refresh_token", refreshToken));
-            saveSession(response);
+            saveSession(response, session.optString("login_id", ""));
             return response.getString("access_token");
         } catch (JSONException error) {
             throw new IOException("Token refresh response was invalid", error);
@@ -121,7 +121,11 @@ final class RootLensAuth {
         }
     }
 
-    private void saveSession(JSONObject response) throws IOException {
+    String loginId() throws IOException {
+        return loadSession().optString("login_id", "");
+    }
+
+    private void saveSession(JSONObject response, String loginId) throws IOException {
         String access = response.optString("access_token", "");
         String refresh = response.optString("refresh_token", "");
         long expiresInSeconds = response.optLong("expires_in", 3600);
@@ -130,6 +134,7 @@ final class RootLensAuth {
             JSONObject stored = new JSONObject()
                     .put("access_token", access)
                     .put("refresh_token", refresh)
+                    .put("login_id", loginId)
                     .put("expires_at_ms", System.currentTimeMillis() + expiresInSeconds * 1000L);
             preferences.edit().putString(PREF_SESSION, encrypt(stored.toString())).apply();
         } catch (JSONException | GeneralSecurityException error) {
