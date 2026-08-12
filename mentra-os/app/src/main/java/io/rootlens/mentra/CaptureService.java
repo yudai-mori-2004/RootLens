@@ -186,7 +186,7 @@ public final class CaptureService extends Service {
         updateNotification("Recording · " + guarantee);
         if (!startFeedbackPlayed) {
             startFeedbackPlayed = true;
-            CaptureFeedback.started();
+            CaptureFeedback.started(this);
         }
         automaticStop = () -> serial.execute(() -> stopCurrent(false));
         mainHandler.postDelayed(automaticStop, currentSegmentSeconds * 1000L);
@@ -259,9 +259,9 @@ public final class CaptureService extends Service {
         writeStatus(state, message == null ? state : message, null);
         updateNotification(message == null ? state : message);
         if ("failed".equals(state)) {
-            CaptureFeedback.failed();
+            CaptureFeedback.failed(this);
         } else if (wasActive && ("complete".equals(state) || "idle".equals(state))) {
-            CaptureFeedback.stopped();
+            CaptureFeedback.stopped(this);
         }
         stopForegroundAndSelf();
     }

@@ -125,6 +125,11 @@ adb shell am start -W \
 4. 終了時に同じタッチ面をもう一度約1秒長押しする。
 5. 停止音が鳴るまで待つ。停止音はMP4とsidecarの確定が完了した後に鳴る。
 
+開始時は短い高音、停止確定時は下降する2音を再生する。Mentraでは通常のAndroid
+`STREAM_MUSIC`だけではスピーカーへ出力されないため、標準ASG serviceへI2S開始を要求し、
+notification audioを再生してからI2Sを停止する。再生中だけnotification volumeを上げ、終了後に
+元の値へ戻す。エラー時は低い3音を鳴らす。
+
 入力はMentra標準ASG clientがMCUから受け取る`long_press (3)`を端末内で購読する。1.5秒以内の
 重複イベントは無視する。カメラボタン長押しは、Bluetooth未接続時に標準ASG client自身の
 動画録画も開始してカメラが競合するため、RootLens操作には使用しない。タッチ面のlong pressは

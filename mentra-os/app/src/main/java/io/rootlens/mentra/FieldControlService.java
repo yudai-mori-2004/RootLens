@@ -126,7 +126,7 @@ public final class FieldControlService extends Service {
             startActivity(toggle);
         } catch (RuntimeException error) {
             Log.e(TAG, "Could not open RootLens capture activity", error);
-            CaptureFeedback.failed();
+            CaptureFeedback.failed(this);
         }
     }
 
