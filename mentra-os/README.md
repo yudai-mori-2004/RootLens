@@ -166,10 +166,11 @@ scriptはQRをPC上でdecodeし、mode 0600の一時JSONをアプリ専用外部
 KeystoreのAES-GCM鍵で暗号化して保持する。statusにはlogin IDと成否だけを残し、password/tokenは
 書かない。
 
-アプリ画面で`Upload all pending clips`を押すと、完了したclipだけを対象に次を順番に行う。
+録画セッションが正常終了すると、完了した未送信clipを対象に次を自動実行する。
 
 1. `POST /api/v1/raw-uploads` で `recordingConfig=mentra` のpresigned URLを取得。
-2. 必須4ファイル（`rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json`）をR2へstreaming PUT。
+2. 必須4ファイル（`rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json`）を
+   `rootlens-raw-mentra/raw/<content_hash>/`へstreaming PUT。
    各成功後に `upload_state.json` を更新。内部QA用`sync_report.json`はアップロードしない。
 3. 全PUT後に `POST /api/clips` で登録。
 
@@ -187,5 +188,5 @@ persisted Jobとして再送を予約し、Wi-Fi接続後に途中checkpointか�
 | `upload_complete.mp3` | 全pending clipのR2 PUTとAPI登録完了後 |
 | `upload_paused.mp3` | Wi-Fi未接続を検出して再送Jobを予約した後 |
 
-PUTは再試行でき、アプリ再起動後は成功済みファイルを飛ばす。production APIが
-`mentra` manifestに対応するコードをdeployするまではend-to-end uploadを実行しない。
+PUTは再試行でき、アプリ再起動後は成功済みファイルを飛ばす。画面の
+`Upload all pending clips`は手動再送にも利用できる。

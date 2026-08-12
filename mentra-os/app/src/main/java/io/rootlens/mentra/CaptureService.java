@@ -262,6 +262,11 @@ public final class CaptureService extends Service {
             CaptureFeedback.failed(this);
         } else if (wasActive && ("complete".equals(state) || "idle".equals(state))) {
             CaptureFeedback.stopped(this);
+            if ("complete".equals(state)) {
+                Intent upload = new Intent(this, UploadService.class)
+                        .setAction(AppContract.ACTION_UPLOAD);
+                startForegroundService(upload);
+            }
         }
         stopForegroundAndSelf();
     }
