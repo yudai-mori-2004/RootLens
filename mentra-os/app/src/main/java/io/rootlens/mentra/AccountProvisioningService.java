@@ -82,7 +82,7 @@ public final class AccountProvisioningService extends Service {
             Log.e(TAG, "Account provisioning failed", error);
             writeStatus(directory, "error", loginId, error.getMessage());
             updateNotification("Sign-in failed");
-            CaptureFeedback.failed(this);
+            CaptureFeedback.errorTone(this);
         } finally {
             stopForeground(false);
             stopSelf();

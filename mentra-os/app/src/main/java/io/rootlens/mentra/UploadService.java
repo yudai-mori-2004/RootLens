@@ -6,6 +6,8 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -85,7 +87,14 @@ public final class UploadService extends Service {
             finish("Sign in before upload");
             return;
         }
+        if (!hasValidatedWifi()) {
+            UploadRetryJobService.schedule(this);
+            CaptureFeedback.uploadPaused(this);
+            finish("Waiting for Wi-Fi");
+            return;
+        }
 
+        CaptureFeedback.uploadStarted(this);
         int completed = 0;
         for (File directory : pending) {
             try {
@@ -95,10 +104,18 @@ public final class UploadService extends Service {
                 Log.e(TAG, "Upload failed for " + directory, error);
                 writeUploadState(directory, "error", error.getMessage(),
                         jsonArray(uploadedFiles(directory)));
+                if (hasValidatedWifi()) {
+                    CaptureFeedback.errorTone(this);
+                } else {
+                    UploadRetryJobService.schedule(this);
+                    CaptureFeedback.uploadPaused(this);
+                }
                 finish("Upload failed · " + directory.getName());
                 return;
             }
         }
+        UploadRetryJobService.cancel(this);
+        CaptureFeedback.uploadComplete(this);
         finish("Uploaded " + completed + " clip" + (completed == 1 ? "" : "s"));
     }
 
@@ -303,6 +320,15 @@ public final class UploadService extends Service {
         JSONArray result = new JSONArray();
         for (String value : values) result.put(value);
         return result;
+    }
+
+    private boolean hasValidatedWifi() {
+        ConnectivityManager connectivity = getSystemService(ConnectivityManager.class);
+        NetworkCapabilities capabilities = connectivity.getNetworkCapabilities(
+                connectivity.getActiveNetwork());
+        return capabilities != null
+                && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
     }
 
     private static final class NonRetryableUploadException extends IOException {

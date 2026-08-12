@@ -125,10 +125,11 @@ adb shell am start -W \
 4. 終了時に同じタッチ面をもう一度約1秒長押しする。
 5. 停止音が鳴るまで待つ。停止音はMP4とsidecarの確定が完了した後に鳴る。
 
-開始時は短い高音、停止確定時は下降する2音を再生する。Mentraでは通常のAndroid
+開始時は短い高音、停止確定時は下降する2音を再生し、その直後に状態を説明する日本語音声を流す。
+Mentraでは通常のAndroid
 `STREAM_MUSIC`だけではスピーカーへ出力されないため、標準ASG serviceへI2S開始を要求し、
 notification audioを再生してからI2Sを停止する。再生中だけnotification volumeを上げ、終了後に
-元の値へ戻す。エラー時は低い3音を鳴らす。
+元の値へ戻す。エラー時は低い3音に続けて録画失敗を案内する。
 
 入力はMentra標準ASG clientがMCUから受け取る`long_press (3)`を端末内で購読する。1.5秒以内の
 重複イベントは無視する。カメラボタン長押しは、Bluetooth未接続時に標準ASG client自身の
@@ -171,6 +172,20 @@ KeystoreのAES-GCM鍵で暗号化して保持する。statusにはlogin IDと成
 2. 必須4ファイル（`rgb.mp4`、`frames.jsonl`、`imu.jsonl`、`metadata.json`）をR2へstreaming PUT。
    各成功後に `upload_state.json` を更新。内部QA用`sync_report.json`はアップロードしない。
 3. 全PUT後に `POST /api/clips` で登録。
+
+送信開始、全clip完了、Wi-Fi待ちもそれぞれSEと日本語音声で案内する。Wi-Fiが利用できない場合は
+persisted Jobとして再送を予約し、Wi-Fi接続後に途中checkpointから再開する。
+
+音声assetは`app/src/main/res/raw/`に置く。
+
+| asset | 再生条件 |
+|---|---|
+| `capture_started.mp3` | cameraとIMUの収録開始後 |
+| `capture_saved.mp3` | MP4と全sidecarの確定後 |
+| `capture_failed.mp3` | 収録開始または収録中の失敗時 |
+| `upload_started.mp3` | Wi-Fiと認証を確認し、pending clipの送信を始める直前 |
+| `upload_complete.mp3` | 全pending clipのR2 PUTとAPI登録完了後 |
+| `upload_paused.mp3` | Wi-Fi未接続を検出して再送Jobを予約した後 |
 
 PUTは再試行でき、アプリ再起動後は成功済みファイルを飛ばす。production APIが
 `mentra` manifestに対応するコードをdeployするまではend-to-end uploadを実行しない。

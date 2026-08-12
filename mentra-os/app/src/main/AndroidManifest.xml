@@ -6,6 +6,7 @@
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="true" />
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -74,5 +75,9 @@
             android:name=".AccountProvisioningService"
             android:exported="true"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".UploadRetryJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 </manifest>
