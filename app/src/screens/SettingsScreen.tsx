@@ -425,11 +425,6 @@ export const SettingsScreen: React.FC = () => {
             onChange={(v) => updateCs({ imuRateHz: Number(v) as ImuRate })}
           />
           <SwitchRow
-            label={t('settings.capture.streamImu')}
-            value={cs.streamImu}
-            onChange={(v) => updateCs({ streamImu: v })}
-          />
-          <SwitchRow
             label={t('settings.capture.streamDepth')}
             value={cs.streamDepth}
             onChange={(v) => updateCs({ streamDepth: v })}

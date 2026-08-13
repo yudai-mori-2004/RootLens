@@ -34,10 +34,14 @@ import type {
 //   rgb.mp4                    wide (1x) RGB video
 //   frames.jsonl    per-frame hand landmarks + camera pose (4×4) + tracking state + IMU snapshot
 //   imu.jsonl                  accelerometer / gyro / device motion (at the configured rate; 100 Hz default)
-//   metadata.json              static facts: device model, OS, app version, camera FoV / resolution / intrinsics, config id
+//   metadata.json              delivered-file manifest, device/OS/app, camera/stream settings and measured stream ranges
 //   depth.tar                  LiDAR depth (Pro devices only): one 16-bit PNG (millimeters) per frame,
 //                              stream-appended into a single tar, plus per-frame confidence maps.
 //                              Non-LiDAR devices produce none, hence required:false ("upload when present").
+//   pointcloud.jsonl           ARKit raw feature points (when enabled)
+//   mesh.jsonl                 ARKit scene mesh (LiDAR + when enabled)
+//   arkit_imu.jsonl            one VIO-derived orientation/rotation row per ARFrame
+//   device_metrics.jsonl       battery/thermal/CPU/memory samples on the ARFrame timeline
 const OUTPUT_FILES: OutputFileSpec[] = [
   { name: 'rgb.mp4', contentType: 'video/mp4', required: true, isPrimaryVideo: true },
   { name: 'frames.jsonl', contentType: 'application/x-ndjson', required: true },

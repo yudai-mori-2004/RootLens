@@ -75,14 +75,19 @@ export async function loadCaptureSettings(): Promise<CaptureSettings> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULT_CAPTURE_SETTINGS };
-    return { ...DEFAULT_CAPTURE_SETTINGS, ...(JSON.parse(raw) as Partial<CaptureSettings>) };
+    return {
+      ...DEFAULT_CAPTURE_SETTINGS,
+      ...(JSON.parse(raw) as Partial<CaptureSettings>),
+      // ARKitデータ契約でimu.jsonlは必須。旧保存値falseもここで移行する。
+      streamImu: true,
+    };
   } catch {
     return { ...DEFAULT_CAPTURE_SETTINGS };
   }
 }
 
 export async function saveCaptureSettings(settings: CaptureSettings): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, streamImu: true }));
 }
 
 /** 保存済み設定を native へ反映する。 撮影画面が ARSession を起動する前に呼ぶ。 */

@@ -22,7 +22,7 @@ without post-hoc synchronization.
 | `rgb.mp4` | H.264 video from the rear wide camera, full-sensor 4:3 (1920x1440), fragmented MP4 so a crash loses at most the last 10 seconds |
 | `frames.jsonl` | One row per video frame: camera pose (4x4, ARKit world frame), intrinsics, tracking state, an IMU snapshot, and realtime hand landmarks. Row `i` corresponds to mp4 frame `i`; a row is written only after its frame lands in the mp4, so the pairing holds by construction |
 | `imu.jsonl` | Accelerometer, gyroscope, and device motion at the configured rate (100 Hz default) |
-| `metadata.json` | Static facts: device model, OS, app version, camera resolution and intrinsics, capture settings, thermal events, battery drain |
+| `metadata.json` | Delivered-file manifest, schema version, device/OS/app, camera sensor rate, requested/effective output rates, encoding/timebase, intrinsics, measured stream counts/ranges, thermal events, and battery drain |
 | `depth.tar` | LiDAR depth, one 16-bit PNG (millimeters) per frame under `depth/`, with the matching ARKit confidence map (8-bit, low/medium/high) under `confidence/`. LiDAR devices only |
 | `pointcloud.jsonl` | ARKit VIO feature points per frame, world coordinates, raw float32 bytes |
 | `mesh.jsonl` | ARKit scene-reconstruction mesh anchors, raw vertex and face buffers |

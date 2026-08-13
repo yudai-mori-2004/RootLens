@@ -232,7 +232,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     if let v = obj["depthRate"] as? Int { s.depthRate = v }
     if let v = obj["pointCloudRate"] as? Int { s.pointCloudRate = v }
     if let v = obj["imuRateHz"] as? Int { s.imuRateHz = v }
-    if let v = obj["streamImu"] as? Bool { s.streamImu = v }
+    // imu.jsonl はARKit upload contractの必須ファイル。旧設定にfalseが残っていても無効化しない。
+    s.streamImu = true
     if let v = obj["streamDepth"] as? Bool { s.streamDepth = v }
     if let v = obj["streamPointCloud"] as? Bool { s.streamPointCloud = v }
     if let v = obj["streamMesh"] as? Bool { s.streamMesh = v }
@@ -252,6 +253,11 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private var trackingPauseTotalNs: Int64 = 0
   private var recFrameStride = 1        // nominal stride for metadata (sessionFps / recordingRate)
   private var recordingSessionFps: Double = 30.0  // sensor fps captured at startRecording (for metadata)
+  private var effectiveRgbRate = 30
+  private var effectiveDepthRate = 30
+  private var effectivePointCloudRate = 30
+  private var recordingStartWallMs: Int64 = 0
+  private var recordingStopWallMs: Int64 = 0
   private var pointCloudFileHandle: FileHandle?
 
   // Session running state.
@@ -490,15 +496,19 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       return 30.0
     }()
     recordingSessionFps = sessionFps
-    recFrameStride = max(1, Int((sessionFps / Double(max(1, captureSettings.recordingRate))).rounded())) // nominal value for metadata
     // One deterministic sampler per stream. Depth / point cloud rates cap at the
     // RGB rate (a depth frame without its RGB row has no index to live under).
-    let rgbRate = max(1, captureSettings.recordingRate)
+    let nativeRate = max(1, Int(sessionFps.rounded()))
+    let rgbRate = min(max(1, captureSettings.recordingRate), nativeRate)
     let dRate = captureSettings.syncRate ? rgbRate : min(captureSettings.depthRate, rgbRate)
     let pRate = captureSettings.syncRate ? rgbRate : min(captureSettings.pointCloudRate, rgbRate)
+    effectiveRgbRate = rgbRate
+    effectiveDepthRate = max(1, dRate)
+    effectivePointCloudRate = max(1, pRate)
+    recFrameStride = max(1, Int((sessionFps / Double(effectiveRgbRate)).rounded()))
     rgbSampler.configure(targetFps: rgbRate)
-    depthSampler.configure(targetFps: max(1, dRate))
-    pcSampler.configure(targetFps: max(1, pRate))
+    depthSampler.configure(targetFps: effectiveDepthRate)
+    pcSampler.configure(targetFps: effectivePointCloudRate)
     rgbSampler.reset()
     depthSampler.reset()
     pcSampler.reset()
@@ -535,6 +545,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     self.pcRange = StreamRange()
     self.imuRange = StreamRange()
     self.arkitRange = StreamRange()
+    self.recordingStartWallMs = Int64(Date().timeIntervalSince1970 * 1000)
+    self.recordingStopWallMs = 0
     UIDevice.current.isBatteryMonitoringEnabled = true
 
     if !sessionRunning { startSession() }
@@ -553,6 +565,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
     }
     handTracker.setRecordingMode(false)
     stopMotionUpdates()
+    recordingStopWallMs = Int64(Date().timeIntervalSince1970 * 1000)
 
     // Drain in-flight video appends on the serial frameQueue and stop any further
     // appends before closing the writer. frameQueue.sync completes every enqueued
@@ -730,6 +743,33 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "pointcloud": pcRange.durationMs,
       "ar_frames": arkitRange.durationMs,
     ] as [String: Any]
+    let wallFormatter = ISO8601DateFormatter()
+    wallFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if recordingStartWallMs > 0 {
+      obj["created_at"] = wallFormatter.string(
+        from: Date(timeIntervalSince1970: Double(recordingStartWallMs) / 1000.0))
+    }
+    if recordingStopWallMs > 0 {
+      obj["stopped_at"] = wallFormatter.string(
+        from: Date(timeIntervalSince1970: Double(recordingStopWallMs) / 1000.0))
+    }
+    if recordingStartWallMs > 0, recordingStopWallMs >= recordingStartWallMs {
+      obj["actual_duration_ms"] = max(1, recordingStopWallMs - recordingStartWallMs)
+    }
+    let videoURL = dir.appendingPathComponent("rgb.mp4")
+    if let attrs = try? FileManager.default.attributesOfItem(atPath: videoURL.path),
+       let bytes = attrs[.size] as? NSNumber {
+      obj["video_bytes"] = bytes.int64Value
+    }
+    // Configのupload manifestに含まれ、実際にこのsessionへ生成されたものだけを列挙する。
+    // content hashはMP4確定後にJS層で計算する識別子で、ファイルとしては納品しない。
+    let deliveryNames = [
+      "rgb.mp4", "frames.jsonl", "imu.jsonl", "metadata.json", "depth.tar",
+      "pointcloud.jsonl", "mesh.jsonl", "arkit_imu.jsonl", "device_metrics.jsonl",
+    ]
+    obj["files"] = deliveryNames.filter {
+      FileManager.default.fileExists(atPath: dir.appendingPathComponent($0).path)
+    }
     do {
       let out = try JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys])
       try out.write(to: url, options: .atomic)
@@ -1345,8 +1385,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   /// metadata.json: static facts that never change within a session
   /// (recording_config / device_model / os / app_version / camera / capture
   /// settings), with the camera intrinsics (fx/fy/cx/cy) and, on LiDAR devices,
-  /// the depth intrinsics. calibration_baseline is reserved for the capture UI's
-  /// calibration step and stays null here.
+  /// the depth intrinsics.
   private func writeMetadataJson(into dir: URL, row: FrameRowData) {
     let url = dir.appendingPathComponent("metadata.json")
     // Row-major flat intrinsics: [fx 0 cx / 0 fy cy / 0 0 1].
@@ -1383,24 +1422,46 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       ]
     }
 
-    // recording_fps is the effective post-decimation rate (what the mp4 / jsonl actually carry); camera.fps is the sensor rate.
-    camera["recording_fps"] = fps / Double(max(1, recFrameStride))
+    // recording_fps is the configured output grid after capping at native fps;
+    // camera.fps is the selected ARKit sensor format rate.
+    camera["recording_fps"] = effectiveRgbRate
 
     let cs = captureSettings
     let dict: [String: Any] = [
+      "schema": "rootlens.arkit.raw.v1",
       "recording_config": "arkit",
       "device_model": currentDeviceModel(),
       "os_name": "iOS",
       "os_version": UIDevice.current.systemVersion,
       "app_version": "\(appVer) (\(appBuild))",
       "camera": camera,
+      "video": [
+        "codec": "video/avc",
+        "source_pixel_format": "420YpCbCr8BiPlanarFullRange",
+        "bit_depth": 8,
+        "hdr": false,
+        "audio": false,
+        "orientation": "landscape",
+      ],
+      "timestamp_timebase": [
+        "unit": "nanoseconds",
+        "clock": "system_uptime",
+        "video_source": "ARFrame.timestamp",
+        "imu_source": "CMDeviceMotion.timestamp",
+      ],
       "capture_settings": [
         "resolution": cs.resolution,
         "auto_focus": cs.autoFocus,
-        "recording_rate_hz": cs.recordingRate,
+        "auto_exposure": cs.autoExposure,
+        "requested_arkit_fps": cs.arkitFps,
+        "arkit_sensor_rate_hz": fps,
+        "requested_recording_rate_hz": cs.recordingRate,
+        "recording_rate_hz": effectiveRgbRate,
         "sync_rate": cs.syncRate,
-        "depth_rate_hz": cs.depthRate,
-        "point_cloud_rate_hz": cs.pointCloudRate,
+        "requested_depth_rate_hz": cs.depthRate,
+        "depth_rate_hz": effectiveDepthRate,
+        "requested_point_cloud_rate_hz": cs.pointCloudRate,
+        "point_cloud_rate_hz": effectivePointCloudRate,
         "imu_rate_hz": cs.imuRateHz,
         "streams": [
           "imu": cs.streamImu,
@@ -1410,7 +1471,6 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
         ],
         "frame_stride": recFrameStride,
       ],
-      "calibration_baseline": NSNull(),
     ]
 
     do {
