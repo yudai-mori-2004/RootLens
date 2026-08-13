@@ -71,7 +71,7 @@ app/
     │                        pipeline (hash → presigned R2 upload → registration).
     │                        Nothing here imports React
     ├── screens/             Capture, clip list, settings, login
-    ├── components/          Clip cards, the upload-consent modal
+    ├── components/          Clip cards, local upload consent, and remote Mentra review
     ├── services/            Auth (Supabase), capture settings, sound cues
     └── domain/              Gesture debouncing
 ```
@@ -80,11 +80,13 @@ A clip's identity is the SHA-256 of its raw mp4 bytes, computed on the device.
 It serves as the storage key and the database primary key, and gives end-to-end
 integrity for the video from device to consumer.
 
-Uploads are deliberate, never automatic: the wearer reviews each clip and
-records consent before anything leaves the device. The upload is stage-resumable
-(hash, upload, register), so a failed or interrupted upload retries without
-redoing finished work. Recording works fully offline and without an account;
-signing in is required only at upload time.
+For iPhone captures, the wearer reviews each local clip and records consent
+before upload. The upload is stage-resumable (hash, upload, register), so a
+failed or interrupted upload retries without redoing finished work. Mentra
+captures follow the field-device path: the glasses upload under the signed-in
+site account first, and the same account reviews the remote clip in this app.
+The resulting consent event is attached to that existing content-hash row;
+unreviewed Mentra clips never appear in the consented history or its totals.
 
 ## Development
 

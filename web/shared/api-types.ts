@@ -78,6 +78,16 @@ export interface ListClipsResponse {
   clips: ClipDto[];
 }
 
+/// PATCH /api/clips/:contentHash
+/// Mentra が先にアップロードしたクリップへ、 iPhone で取得した同意イベントを結び付ける。
+export interface AttachClipConsentRequest {
+  consentEventId: string;
+}
+
+export interface AttachClipConsentResponse {
+  clip: ClipDto;
+}
+
 /// DELETE /api/clips/:contentHash
 /// 撮影者がクリップを破棄する (= 行削除のみ。 R2 オブジェクトは残置)。
 export interface DeleteClipResponse {

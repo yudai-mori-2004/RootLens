@@ -20,14 +20,15 @@ import { getLegalDoc } from '../content/legalDocs.generated';
 import { getLocale, t } from '../i18n';
 
 /// 同意画面に表示する文言の版。 サーバの同意イベントに記録され、 「どの文言に同意したか」 を
-/// 後から特定する鍵になる。 表示文言 (SUMMARY_KEYS の i18n 文言) を変えたら必ず上げる。
+/// 後から特定する鍵になる。 対応する SUMMARY_KEYS の i18n 文言を変えたら必ず上げる。
 export const UPLOAD_CONSENT_SUMMARY_VERSION = 'upload-consent-2026-07-21.1';
+export const UPLOADED_REVIEW_CONSENT_SUMMARY_VERSION = 'uploaded-review-consent-2026-08-13.1';
 
 /// 同意が及ぶ範囲 (= 収集 / AI 学習利用 / 社外ライセンス・販売 / 越境提供)。 利用規約の利用目的条項と対。
 const UPLOAD_CONSENT_SCOPES = ['collection', 'ai_training_use', 'license_sale', 'cross_border'] as const;
 
 /// 画面に表示する文言を構成する i18n キー (= summaryHash の算出対象。 表示順に固定)。
-const SUMMARY_KEYS = [
+const UPLOAD_SUMMARY_KEYS = [
   'upload.consentTitle',
   'upload.consentCheckLocation',
   'upload.consentCheckNoThirdParty',
@@ -35,6 +36,16 @@ const SUMMARY_KEYS = [
   'upload.consentCheckTermsLink',
   'upload.consentCheckTermsSuffix',
   'upload.consentAndUpload',
+] as const;
+
+const UPLOADED_REVIEW_SUMMARY_KEYS = [
+  'glassesReview.consentTitle',
+  'upload.consentCheckLocation',
+  'upload.consentCheckNoThirdParty',
+  'upload.consentCheckTermsPrefix',
+  'upload.consentCheckTermsLink',
+  'upload.consentCheckTermsSuffix',
+  'glassesReview.consentConfirm',
 ] as const;
 
 /// 個別チェック 3 つ (= 場所の撮影許可 / 同意なき映り込みなし / 正本への同意)。
@@ -54,6 +65,8 @@ export async function recordUploadConsent(input: {
   clipLocalId: string;
   clipCreatedAt: number;
   recordingConfig?: string;
+  /** Mentra のように、アップロード後に別端末で確認する場合の表示文言を証跡へ反映する。 */
+  flow?: 'before-upload' | 'uploaded-review';
 }): Promise<string> {
   const session = getCurrentSession();
   if (!session) throw new Error('未認証: session がありません');
@@ -64,7 +77,13 @@ export async function recordUploadConsent(input: {
   const docVersion = `draft-${doc.hash.slice(0, 8)}`;
 
   // 表示した要約 (層1) のハッシュ = 表示 locale の文言を表示順に連結して SHA-256。
-  const summaryText = SUMMARY_KEYS.map((k) => t(k)).join('\n');
+  const summaryKeys = input.flow === 'uploaded-review'
+    ? UPLOADED_REVIEW_SUMMARY_KEYS
+    : UPLOAD_SUMMARY_KEYS;
+  const summaryVersion = input.flow === 'uploaded-review'
+    ? UPLOADED_REVIEW_CONSENT_SUMMARY_VERSION
+    : UPLOAD_CONSENT_SUMMARY_VERSION;
+  const summaryText = summaryKeys.map((k) => t(k)).join('\n');
   const summaryHash = bytesToHex(sha256(new TextEncoder().encode(summaryText)));
 
   const res = await fetch(`${SERVER_URL}/api/v1/consents`, {
@@ -79,7 +98,7 @@ export async function recordUploadConsent(input: {
       docSlug: 'terms-of-service',
       docVersion,
       docContentHash: doc.hash,
-      summaryVersion: UPLOAD_CONSENT_SUMMARY_VERSION,
+      summaryVersion,
       summaryHash,
       scopes: UPLOAD_CONSENT_SCOPES,
       checkboxResults: input.checks,

@@ -256,19 +256,28 @@ const ja = {
 
   // ── マイビデオ (= 旧 Collection / ポートフォリオ。 主婦向けに平易語) ──
   // 温かい挨拶 (= 作業感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
-  'portfolio.mission': 'ロボットが世界を学び、くらしを支えるパートナーになる。その未来を実現するために、あなたの毎日の作業風景が必要です。',
+  'portfolio.deviceLabel': '表示する映像',
+  'portfolio.devicePhone': 'スマートフォン',
+  'portfolio.deviceGlasses': 'スマートグラス',
   'portfolio.totalTime': '総撮影時間',
   'portfolio.uploadedLabel': '履歴',
+  'portfolio.glassesHistoryLabel': '同意済み',
   'portfolio.dailyLabel': '毎日の記録',
   'portfolio.pendingNotice': 'データの確認と同意が必要です。',
+  'portfolio.glassesPendingNotice': 'スマートグラスで撮影した映像を確認してください。',
   'portfolio.recordInvite': '右の丸いボタンから、きょうの作業を撮ってみましょう。',
   'portfolio.serverLoading': 'サーバから読み込んでいます…',
   'portfolio.serverEmpty': 'アップロード済みの動画はまだありません。',
+  'portfolio.glassesServerEmpty': 'スマートグラスの映像はまだありません。',
   'portfolio.serverErrorNetwork': '通信できませんでした。電波の良いところで再試行してください。',
   'portfolio.serverErrorAuth': '読み込みには、もう一度ログインが必要です。',
   'portfolio.serverErrorServer': 'サーバから読み込めませんでした。しばらくして再試行してください。',
   'portfolio.retry': '再試行',
   'portfolio.signedOutNote': 'ログインすると、アカウントの履歴と合計時間が表示されます。',
+  'glassesReview.consentTitle': 'スマートグラス映像の確認',
+  'glassesReview.consentConfirm': '同意して確定',
+  'glassesReview.consentSending': '同意を記録しています…',
+  'glassesReview.consentError': '同意を記録できませんでした。通信状態を確認して、もう一度お試しください。',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
@@ -464,19 +473,28 @@ const en: Record<TranslationKey, string> = {
   'tab.captureA11y': 'Start capture mode',
 
   // ── My Videos (= former Collection / Portfolio。 plain language) ──
-  'portfolio.mission': 'Robots will learn the world and become partners in daily life. To make that future real, we need the scenes of your everyday work.',
+  'portfolio.deviceLabel': 'Show footage from',
+  'portfolio.devicePhone': 'Smartphone',
+  'portfolio.deviceGlasses': 'Smart glasses',
   'portfolio.totalTime': 'Total capture time',
   'portfolio.uploadedLabel': 'History',
+  'portfolio.glassesHistoryLabel': 'Consented',
   'portfolio.dailyLabel': 'Daily record',
   'portfolio.pendingNotice': 'These videos need your review and consent.',
+  'portfolio.glassesPendingNotice': 'Review footage captured with your smart glasses.',
   'portfolio.recordInvite': 'Tap the round button on the right and capture today’s work.',
   'portfolio.serverLoading': 'Loading from server…',
   'portfolio.serverEmpty': 'No uploaded videos yet.',
+  'portfolio.glassesServerEmpty': 'No smart-glasses footage yet.',
   'portfolio.serverErrorNetwork': 'Could not connect. Try again with a better signal.',
   'portfolio.serverErrorAuth': 'Please sign in again to load.',
   'portfolio.serverErrorServer': 'Could not load from the server. Try again shortly.',
   'portfolio.retry': 'Retry',
   'portfolio.signedOutNote': 'Sign in to see this account’s history and total time.',
+  'glassesReview.consentTitle': 'Review smart-glasses footage',
+  'glassesReview.consentConfirm': 'Consent and confirm',
+  'glassesReview.consentSending': 'Recording consent…',
+  'glassesReview.consentError': 'Could not record consent. Check your connection and try again.',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { ja, en };

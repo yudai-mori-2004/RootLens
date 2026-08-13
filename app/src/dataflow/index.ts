@@ -49,6 +49,7 @@ export {
   registerClip,
   fetchMyClips,
   fetchClipMediaUrl,
+  attachClipConsent,
   ClipApiError,
 } from './steps';
 
