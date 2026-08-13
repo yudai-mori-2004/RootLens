@@ -55,7 +55,9 @@ public final class UploadService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         startForeground(AppContract.UPLOAD_NOTIFICATION_ID, notification("Scanning local clips", 0, 0));
-        worker.execute(this::uploadPending);
+        // Service は singleton だが start command は upload 中にも届く。 startId ごとに scan を
+        // 直列化し、古い command が後から届いた停止トリガーまで stopSelf しないようにする。
+        worker.execute(() -> uploadPending(startId));
         return START_NOT_STICKY;
     }
 
@@ -70,27 +72,32 @@ public final class UploadService extends Service {
         super.onDestroy();
     }
 
-    private void uploadPending() {
+    private void uploadPending(int startId) {
         File root = new File(getExternalFilesDir(null), "recordings");
+        cleanupDeletionTombstones(root);
         File[] candidates = root.listFiles(file -> file.isDirectory() && file.getName().startsWith("rec-"));
         if (candidates == null) candidates = new File[0];
         Arrays.sort(candidates, Comparator.comparing(File::getName));
         ArrayList<File> pending = new ArrayList<>();
         for (File candidate : candidates) {
-            if (hasRequiredFiles(candidate) && !isUploaded(candidate)) pending.add(candidate);
+            if (isUploaded(candidate)) {
+                deleteUploadedClip(candidate);
+            } else if (hasRequiredFiles(candidate)) {
+                pending.add(candidate);
+            }
         }
         if (pending.isEmpty()) {
-            finish("No pending clips");
+            finish("No pending clips", startId);
             return;
         }
         if (!auth.hasSession()) {
-            finish("Sign in before upload");
+            finish("Sign in before upload", startId);
             return;
         }
         if (!hasValidatedWifi()) {
             UploadRetryJobService.schedule(this);
             CaptureFeedback.uploadPaused(this);
-            finish("Waiting for Wi-Fi");
+            finish("Waiting for Wi-Fi", startId);
             return;
         }
 
@@ -104,19 +111,21 @@ public final class UploadService extends Service {
                 Log.e(TAG, "Upload failed for " + directory, error);
                 writeUploadState(directory, "error", error.getMessage(),
                         jsonArray(uploadedFiles(directory)));
+                // Wi-Fi は validated のままでも、R2/API timeoutや一時的5xxは起こり得る。
+                // どの失敗も persisted Jobへ渡し、次の撮影停止を待たなくても再走査する。
+                UploadRetryJobService.schedule(this);
                 if (hasValidatedWifi()) {
                     CaptureFeedback.errorTone(this);
                 } else {
-                    UploadRetryJobService.schedule(this);
                     CaptureFeedback.uploadPaused(this);
                 }
-                finish("Upload failed · " + directory.getName());
+                finish("Upload failed · " + directory.getName(), startId);
                 return;
             }
         }
         UploadRetryJobService.cancel(this);
         CaptureFeedback.uploadComplete(this);
-        finish("Uploaded " + completed + " clip" + (completed == 1 ? "" : "s"));
+        finish("Uploaded " + completed + " clip" + (completed == 1 ? "" : "s"), startId);
     }
 
     private void uploadClip(File directory, int completedClips, int totalClips)
@@ -159,6 +168,9 @@ public final class UploadService extends Service {
         postJson(RootLensAuth.trimTrailingSlash(BuildConfig.ROOTLENS_SERVER_URL) + "/api/clips",
                 registration);
         writeUploadState(directory, "uploaded", null, completedFiles);
+        // R2 PUTだけでは削除しない。/api/clips の登録成功（既存行の冪等応答を含む）を
+        // 確認してから、端末上のclip directoryを丸ごと削除する。
+        deleteUploadedClip(directory);
     }
 
     private JSONObject postJson(String endpoint, JSONObject body) throws IOException {
@@ -264,6 +276,52 @@ public final class UploadService extends Service {
         return result;
     }
 
+    private static void cleanupDeletionTombstones(File root) {
+        File[] tombstones = root.listFiles(file -> file.isDirectory()
+                && file.getName().startsWith("deleting-uploaded-"));
+        if (tombstones == null) return;
+        for (File tombstone : tombstones) {
+            if (!deleteRecursively(tombstone)) {
+                Log.w(TAG, "Could not finish local cleanup for " + tombstone);
+            }
+        }
+    }
+
+    /** uploaded markerを持つclipだけを、再試行可能なtombstoneへ移して削除する。 */
+    private static void deleteUploadedClip(File directory) {
+        if (!isUploaded(directory)) {
+            Log.e(TAG, "Refusing to delete clip without uploaded marker: " + directory);
+            return;
+        }
+        File root = directory.getParentFile();
+        if (root == null) {
+            Log.e(TAG, "Refusing to delete clip without recordings root: " + directory);
+            return;
+        }
+        File tombstone = new File(root, "deleting-uploaded-" + directory.getName()
+                + "-" + System.currentTimeMillis());
+        if (!directory.renameTo(tombstone)) {
+            // 元directoryとuploaded markerを残す。次のscanで安全に再試行できる。
+            Log.w(TAG, "Could not stage uploaded clip for local deletion: " + directory);
+            return;
+        }
+        if (!deleteRecursively(tombstone)) {
+            // tombstoneは次回scanの先頭で再削除する。upload対象には戻らない。
+            Log.w(TAG, "Uploaded clip cleanup will be retried: " + tombstone);
+        }
+    }
+
+    private static boolean deleteRecursively(File target) {
+        boolean success = true;
+        if (target.isDirectory()) {
+            File[] children = target.listFiles();
+            if (children == null) return false;
+            for (File child : children) success &= deleteRecursively(child);
+        }
+        if (target.exists() && !target.delete()) success = false;
+        return success;
+    }
+
     private static void writeUploadState(
             File directory, String state, String error, JSONArray uploadedFiles) {
         try {
@@ -305,11 +363,12 @@ public final class UploadService extends Service {
                 AppContract.UPLOAD_NOTIFICATION_ID, notification(text, progress, max));
     }
 
-    private void finish(String message) {
+    private void finish(String message, int startId) {
         getSystemService(NotificationManager.class).notify(
                 AppContract.UPLOAD_NOTIFICATION_ID, notification(message, 0, 0));
-        stopForeground(false);
-        stopSelf();
+        // upload中に別の撮影が停止して新しいstartIdが発行されていればfalseになり、
+        // queued scanが全過去clipをもう一度走査するまでServiceを維持する。
+        if (stopSelfResult(startId)) stopForeground(false);
     }
 
     private static String truncate(String value) {

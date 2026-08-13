@@ -173,6 +173,12 @@ KeystoreのAES-GCM鍵で暗号化して保持する。statusにはlogin IDと成
    `rootlens-raw-mentra/raw/<content_hash>/`へstreaming PUT。
    各成功後に `upload_state.json` を更新。内部QA用`sync_report.json`はアップロードしない。
 3. 全PUT後に `POST /api/clips` で登録。
+4. API登録の成功後にだけ、端末内の当該clip directoryを削除。削除途中で再起動しても、
+   tombstoneを次回scanで消し切る。
+
+`metadata.json` の `files` はR2に納品される上記4ファイルを列挙する。
+`camera_frames.raw.jsonl`、`sync_report.json`、`content_hash.txt`は端末内で整合性確認と
+アップロード処理に使う補助ファイルであり、R2には納品せず、登録成功時にclipと一緒に削除する。
 
 送信開始、全clip完了、Wi-Fi待ちもそれぞれSEと日本語音声で案内する。Wi-Fiが利用できない場合は
 persisted Jobとして再送を予約し、Wi-Fi接続後に途中checkpointから再開する。
@@ -188,5 +194,7 @@ persisted Jobとして再送を予約し、Wi-Fi接続後に途中checkpointか�
 | `upload_complete.mp3` | 全pending clipのR2 PUTとAPI登録完了後 |
 | `upload_paused.mp3` | Wi-Fi未接続を検出して再送Jobを予約した後 |
 
-PUTは再試行でき、アプリ再起動後は成功済みファイルを飛ばす。画面の
-`Upload all pending clips`は手動再送にも利用できる。
+PUTは再試行でき、アプリ再起動後は成功済みファイルを飛ばす。通信失敗はWi-Fi待ちJobへ
+必ず予約される。また、各撮影セッションの停止時には今回分だけでなく、端末に残る全pending
+clipを古い順に再走査する。upload中に次の撮影が開始・停止しても、その停止トリガーは直列queueに
+残り、進行中uploadの後に再走査される。画面の`Upload all pending clips`は手動再送にも利用できる。

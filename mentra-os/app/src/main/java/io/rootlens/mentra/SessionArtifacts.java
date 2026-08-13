@@ -186,9 +186,7 @@ final class SessionArtifacts {
                     .put("rgb.mp4")
                     .put("frames.jsonl")
                     .put("imu.jsonl")
-                    .put("camera_frames.raw.jsonl")
-                    .put("metadata.json")
-                    .put("content_hash.txt"));
+                    .put("metadata.json"));
         } catch (JSONException error) {
             throw new IOException("Metadata construction failed", error);
         }
