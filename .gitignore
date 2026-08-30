@@ -46,6 +46,19 @@ progress/
 *.tsbuildinfo
 .expo/
 .claude
+/.codex/config.toml
+/graphify-out/
+/tmp/
+**/.hallmark/
+
+# Personal application artifacts (PII; this repository is public)
+/document/applications/
+/output/docx/applications/
+/output/pdf/applications/
+/output/xlsx/applications/
+
+# Superseded RootaCap design explorations (canonical R7 lives in tools/rootcap/)
+/tools/rootcap-candidates/
 
 # Sensor session module build artifacts
 app/modules/sensor-session/android/build/
