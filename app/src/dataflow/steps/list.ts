@@ -20,6 +20,9 @@ export class ClipApiError extends Error {
   }
 }
 
+const mediaUrlCache = new Map<string, { url: string; expiresAtMs: number }>();
+const mediaUrlInflight = new Map<string, Promise<string>>();
+
 export async function fetchMyClips(): Promise<ServerClipStatus[]> {
   let res: Response;
   try {
@@ -42,6 +45,19 @@ export async function fetchMyClips(): Promise<ServerClipStatus[]> {
 /** 履歴再生 (= R2 の rgb.mp4 の presigned GET URL を取る)。 identifier は content hash。 */
 
 export async function fetchClipMediaUrl(contentHash: string): Promise<string> {
+  const cached = mediaUrlCache.get(contentHash);
+  if (cached && cached.expiresAtMs > Date.now() + 60_000) return cached.url;
+  const running = mediaUrlInflight.get(contentHash);
+  if (running) return running;
+
+  const request = fetchClipMediaUrlUncached(contentHash).finally(() => {
+    mediaUrlInflight.delete(contentHash);
+  });
+  mediaUrlInflight.set(contentHash, request);
+  return request;
+}
+
+async function fetchClipMediaUrlUncached(contentHash: string): Promise<string> {
   let res: Response;
   try {
     res = await fetch(`${SERVER_URL}/api/clips/${contentHash}/media`, {
@@ -58,8 +74,35 @@ export async function fetchClipMediaUrl(contentHash: string): Promise<string> {
     if (res.status === 401 || res.status === 403) throw new ClipApiError('unauthorized', detail);
     throw new ClipApiError('server', detail);
   }
-  const { url } = (await res.json()) as { url: string };
+  const { url, expiresAt } = (await res.json()) as { url: string; expiresAt?: string };
+  const parsedExpiry = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
+  mediaUrlCache.set(contentHash, {
+    url,
+    expiresAtMs: Number.isFinite(parsedExpiry) ? parsedExpiry : Date.now() + 50 * 60_000,
+  });
   return url;
+}
+
+/** 撮影者本人のクリップを R2 raw 一式とサーバ一覧から削除する。 */
+export async function deleteServerClip(contentHash: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${SERVER_URL}/api/clips/${contentHash}`, {
+      method: 'DELETE',
+      headers: await getAuthHeader(),
+    });
+  } catch (e) {
+    throw new ClipApiError('network', e instanceof Error ? e.message : String(e));
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const detail = `DELETE /api/clips/:contentHash ${res.status}: ${text.slice(0, 200)}`;
+    if (res.status === 404) throw new ClipApiError('not-found', detail);
+    if (res.status === 401 || res.status === 403) throw new ClipApiError('unauthorized', detail);
+    throw new ClipApiError('server', detail);
+  }
+  mediaUrlCache.delete(contentHash);
+  mediaUrlInflight.delete(contentHash);
 }
 
 /** Mentra がアップロード済みのクリップへ、 iPhone で取得した同意を結び付ける。 */

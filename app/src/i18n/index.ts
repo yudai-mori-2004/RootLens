@@ -84,6 +84,15 @@ const ja = {
 
 
   'settings.capture.resolution': '解像度',
+  'settings.capture.method': '撮影方法',
+  'settings.capture.method.arkit': 'iPhone ARKit',
+  'settings.capture.method.mentra': 'Mentra',
+  'settings.capture.method.iphone': 'iPhone',
+  'settings.capture.device': '撮影端末',
+  'settings.capture.mentraExternal': 'Mentra本体のボタンで撮影',
+  'settings.capture.camera': 'カメラ',
+  'settings.capture.ultraWideCamera': '超広角 0.5×',
+  'settings.capture.format': '収録形式',
   'settings.capture.res1440': '1440p',
   'settings.capture.autoFocus': 'オートフォーカス',
   'settings.capture.recordingRate': '書き出しレート',
@@ -95,9 +104,13 @@ const ja = {
   'settings.capture.streamDepth': '深度(LiDAR)',
   'settings.capture.streamPointCloud': '特徴点群',
   'settings.capture.streamMesh': '3Dメッシュ',
+  'settings.capture.orientation': '画面の向き',
+  'settings.capture.orientationRight': '端子が右',
+  'settings.capture.orientationLeft': '端子が左',
   'settings.capture.flow': '開始・終了の操作',
   'settings.capture.flowGesture': 'ジェスチャー',
   'settings.capture.flowVoice': '音声コマンド',
+  'settings.capture.flowHardwareButton': '音量ボタン',
   'settings.capture.cycleEnabled': '自動サイクル撮影',
   'settings.capture.cycleRecord': '連続撮影時間',
   'settings.capture.cyclePause': '休止時間',
@@ -105,6 +118,7 @@ const ja = {
 
   'settings.sensorSync.status': '測定状態',
   'settings.sensorSync.notMeasured': '未測定',
+  'settings.sensorSync.mentraManaged': 'Mentra本体で管理',
   'settings.sensorSync.offset': 'Video-to-IMU残差',
   'settings.sensorSync.repeatability': '区間ごとの再現性',
   'settings.sensorSync.quality': '測定品質',
@@ -118,9 +132,9 @@ const ja = {
   'settings.sensorSync.modalTitle': 'RGB–IMU同期検証',
   'settings.sensorSync.preparing': 'カメラとモーションセンサーを準備しています…',
   'settings.sensorSync.instructions': '明るく模様のある、動かない場所へカメラを向けます。開始後は端末の位置をなるべく変えず、左右・上下へ速度を変えながら繰り返し回してください。',
-  'settings.sensorSync.noCorrection': 'ARKitとCore Motionが付けた取得時刻の残差を検証します。収録データのタイムスタンプは変更しません。',
-  'settings.sensorSync.start': '25秒の測定を開始',
-  'settings.sensorSync.keepMoving': '位置を保ったまま、左右・上下へ不規則に回し続けてください。',
+  'settings.sensorSync.noCorrection': '本番と同じ撮影処理で映像とCore Motionの時間差を測ります。良好な結果はこの端末で再測定するまで使い回し、raw timestampは変更しません。',
+  'settings.sensorSync.start': '5分間の測定を開始',
+  'settings.sensorSync.keepMoving': '各1分に動きが入るよう、位置を保って左右・上下へ速度を変えながら回してください。',
   'settings.sensorSync.analyzing': '一時クリップを停止し、映像とIMUの同期残差を解析しています…',
   'settings.sensorSync.windows': '区間',
   'settings.sensorSync.resultGood': '区間ごとの結果が安定しています。この端末の最新の検証値として保存しました。',
@@ -173,6 +187,8 @@ const ja = {
   'capture.hud.countdown': 'まもなく撮影がはじまります。',
   'capture.hud.recordingHint': '終わるときは、両手で親指を立ててキープしてください。',
   'capture.hud.recordingHintVoice': '終わるときは、「撮影ストップ」と言ってください。',
+  'capture.hud.hardwareReady': '音量ボタンを押すと撮影を開始します。',
+  'capture.hud.hardwareRecording': '音量ボタンを押すと撮影を終了します。',
   'capture.hud.saving': '保存しています…',
 
   // ── Capture flow: 音声ガイド (TTS、 機内アナウンス調) ──
@@ -189,7 +205,6 @@ const ja = {
   // 自動終了の理由 (= 熱 / 空き容量 / 長時間の安全弁)。 終了フロー冒頭で 1 回だけ読む。
   'capture.tts.autoStopHot': '本体が熱くなったため、撮影を終了します。',
   'capture.tts.autoStopDisk': '空き容量が少なくなったため、撮影を終了します。',
-  'capture.tts.autoStopLong': '撮影が長くなったので、ここでいったん終了します。',
   'capture.tts.autoStopBattery': '電池が少なくなったため、撮影を終了します。',
   'capture.tts.autoStopBackground': 'アプリが中断されたため、撮影を終了しました。',
   'capture.tts.lowDisk': '本体の空き容量が少なめです。長い撮影は途中で終わることがあります。',
@@ -253,6 +268,7 @@ const ja = {
   'tab.home': 'マイビデオ',
   'tab.settings': '設定',
   'tab.captureA11y': '撮影モードを開始',
+  'tab.captureMentraHint': 'Mentra本体のボタンから撮影してください',
 
   // ── マイビデオ (= 旧 Collection / ポートフォリオ。 主婦向けに平易語) ──
   // 温かい挨拶 (= 作業感。 web くさい固定タイトルの代わりに、 時間帯であいさつ)
@@ -278,6 +294,11 @@ const ja = {
   'glassesReview.consentConfirm': '同意して確定',
   'glassesReview.consentSending': '同意を記録しています…',
   'glassesReview.consentError': '同意を記録できませんでした。通信状態を確認して、もう一度お試しください。',
+  'serverDelete.title': 'サーバから削除しますか？',
+  'serverDelete.message': '映像とセンサーデータをR2と履歴から完全に削除します。この操作は元に戻せません。',
+  'serverDelete.confirm': '完全に削除',
+  'serverDelete.deleting': '削除しています…',
+  'serverDelete.error': '削除できませんでした。通信状態を確認して、もう一度お試しください。',
 } as const;
 
 export type TranslationKey = keyof typeof ja;
@@ -306,6 +327,15 @@ const en: Record<TranslationKey, string> = {
 
 
   'settings.capture.resolution': 'Resolution',
+  'settings.capture.method': 'Capture method',
+  'settings.capture.method.arkit': 'iPhone ARKit',
+  'settings.capture.method.mentra': 'Mentra',
+  'settings.capture.method.iphone': 'iPhone',
+  'settings.capture.device': 'Capture device',
+  'settings.capture.mentraExternal': 'Use the button on the Mentra device',
+  'settings.capture.camera': 'Camera',
+  'settings.capture.ultraWideCamera': 'Ultra-wide 0.5×',
+  'settings.capture.format': 'Recording format',
   'settings.capture.res1440': '1440p',
   'settings.capture.autoFocus': 'Auto focus',
   'settings.capture.recordingRate': 'Recording rate',
@@ -317,9 +347,13 @@ const en: Record<TranslationKey, string> = {
   'settings.capture.streamDepth': 'Depth (LiDAR)',
   'settings.capture.streamPointCloud': 'Feature point cloud',
   'settings.capture.streamMesh': '3D mesh',
+  'settings.capture.orientation': 'Screen orientation',
+  'settings.capture.orientationRight': 'Port on right',
+  'settings.capture.orientationLeft': 'Port on left',
   'settings.capture.flow': 'Start / stop control',
   'settings.capture.flowGesture': 'Gestures',
   'settings.capture.flowVoice': 'Voice commands',
+  'settings.capture.flowHardwareButton': 'Volume buttons',
   'settings.capture.cycleEnabled': 'Auto cycle recording',
   'settings.capture.cycleRecord': 'Recording length',
   'settings.capture.cyclePause': 'Pause length',
@@ -327,6 +361,7 @@ const en: Record<TranslationKey, string> = {
 
   'settings.sensorSync.status': 'Measurement status',
   'settings.sensorSync.notMeasured': 'Not measured',
+  'settings.sensorSync.mentraManaged': 'Managed on the Mentra device',
   'settings.sensorSync.offset': 'Video-to-IMU residual',
   'settings.sensorSync.repeatability': 'Window repeatability',
   'settings.sensorSync.quality': 'Measurement quality',
@@ -340,9 +375,9 @@ const en: Record<TranslationKey, string> = {
   'settings.sensorSync.modalTitle': 'RGB–IMU sync validation',
   'settings.sensorSync.preparing': 'Preparing the camera and motion sensors…',
   'settings.sensorSync.instructions': 'Point the camera at a bright, textured, stationary scene. After starting, keep the device in place and repeatedly rotate it left/right and up/down at varied speeds.',
-  'settings.sensorSync.noCorrection': 'This checks the residual between acquisition timestamps from ARKit and Core Motion. It does not modify timestamps in captured data.',
-  'settings.sensorSync.start': 'Start 25-second measurement',
-  'settings.sensorSync.keepMoving': 'Keep the device in place and continue irregular left/right and up/down rotations.',
+  'settings.sensorSync.noCorrection': 'This measures the video–Core Motion offset through the same capture path as production. A good result is reused on this device until remeasurement; raw timestamps are not modified.',
+  'settings.sensorSync.start': 'Start 5-minute measurement',
+  'settings.sensorSync.keepMoving': 'Keep the device in place and rotate it left/right and up/down at varied speeds, with motion present in every minute.',
   'settings.sensorSync.analyzing': 'Closing the temporary clip and analyzing the RGB–IMU residual…',
   'settings.sensorSync.windows': 'windows',
   'settings.sensorSync.resultGood': 'The independent windows agree. This result is saved as the latest validation for this device.',
@@ -395,6 +430,8 @@ const en: Record<TranslationKey, string> = {
   'capture.hud.countdown': 'Recording starts in a moment.',
   'capture.hud.recordingHint': 'To finish, hold a thumbs-up with both hands.',
   'capture.hud.recordingHintVoice': 'To finish, say the stop command.',
+  'capture.hud.hardwareReady': 'Press a volume button to start recording.',
+  'capture.hud.hardwareRecording': 'Press a volume button to stop recording.',
   'capture.hud.saving': 'Saving…',
 
   // ── Capture flow: voice guidance (TTS, airline-announcement tone) ──
@@ -409,7 +446,6 @@ const en: Record<TranslationKey, string> = {
   'capture.tts.stopHintVoice': 'Say the stop command to finish recording.',
   'capture.tts.autoStopHot': 'The phone is getting hot, so recording will stop now.',
   'capture.tts.autoStopDisk': 'Storage is running low, so recording will stop now.',
-  'capture.tts.autoStopLong': 'This has been a long recording, so it will stop here.',
   'capture.tts.autoStopBattery': 'The battery is running low, so recording will stop now.',
   'capture.tts.autoStopBackground': 'The app was interrupted, so recording has stopped.',
   'capture.tts.lowDisk': 'Free storage is limited. A long recording may stop early.',
@@ -471,6 +507,7 @@ const en: Record<TranslationKey, string> = {
   'tab.home': 'My videos',
   'tab.settings': 'Settings',
   'tab.captureA11y': 'Start capture mode',
+  'tab.captureMentraHint': 'Start recording with the button on the Mentra device',
 
   // ── My Videos (= former Collection / Portfolio。 plain language) ──
   'portfolio.deviceLabel': 'Show footage from',
@@ -495,6 +532,11 @@ const en: Record<TranslationKey, string> = {
   'glassesReview.consentConfirm': 'Consent and confirm',
   'glassesReview.consentSending': 'Recording consent…',
   'glassesReview.consentError': 'Could not record consent. Check your connection and try again.',
+  'serverDelete.title': 'Delete from the server?',
+  'serverDelete.message': 'This permanently deletes the video and sensor data from R2 and removes it from your history. This cannot be undone.',
+  'serverDelete.confirm': 'Delete permanently',
+  'serverDelete.deleting': 'Deleting…',
+  'serverDelete.error': 'Could not delete the clip. Check your connection and try again.',
 };
 
 const dictionaries: Record<Locale, Record<string, string>> = { ja, en };

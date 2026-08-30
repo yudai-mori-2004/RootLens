@@ -21,7 +21,13 @@ public class ArkitCaptureModule: Module, ArkitCaptureControllerDelegate {
   public func definition() -> ModuleDefinition {
     Name("ArkitCapture")
 
-    Events("onHandTrack", "onThermalState", "onVoiceCommand", "onVoiceUnavailable", "onMarkerCommand")
+    Events(
+      "onHandTrack",
+      "onThermalState",
+      "onVoiceCommand",
+      "onVoiceUnavailable",
+      "onMarkerCommand"
+    )
 
     OnCreate {
       ArkitCaptureController.shared.delegate = self

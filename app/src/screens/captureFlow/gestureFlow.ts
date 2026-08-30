@@ -24,7 +24,19 @@ const STOP_TICK_INTERVAL_MS = 500;
 export const gestureFlow: CaptureFlow = {
   id: 'gesture',
   usesVoiceCommands: false,
+  usesHardwareCaptureEvents: false,
+  usesSpokenGuidance: true,
+  sessionEntrySfx: 'enter_capture',
+  postFinalizeSfx: 'rec_stop',
   displayLabelKey: 'settings.capture.flowGesture',
+
+  introTts() {
+    return t('capture.tts.intro');
+  },
+
+  afterIntro(ctx) {
+    ctx.setState({ kind: 'mounting' });
+  },
 
   isStillRecording(state) {
     return state.kind === 'stopping' || state.kind === 'stopping_confirm';
@@ -49,6 +61,10 @@ export const gestureFlow: CaptureFlow = {
 
   stopHintTts() {
     return t('capture.tts.stopHint');
+  },
+
+  cycleResumeTts() {
+    return t('capture.tts.cycleResume');
   },
 
   afterDonePrompt(ctx) {
@@ -96,6 +112,10 @@ export const gestureFlow: CaptureFlow = {
       return { transitioned: true, armedSince: 0 };
     }
     return { transitioned: false, armedSince: since };
+  },
+
+  tickCaptureControl() {
+    return false;
   },
 
   tickFlowState(ctx, cur) {
@@ -152,7 +172,7 @@ export const gestureFlow: CaptureFlow = {
       }
       // シーケンス (ピロン → TTS → ぴっぴっぴ) が最後まで鳴り切り、 今も立て続けている → 停止確定。
       if (ctx.stopSeq.isDone()) {
-        ctx.finalizeWithReason(null);
+        ctx.finalize();
         return;
       }
       if (cur.lostSince !== 0) ctx.setState({ ...cur, lostSince: 0 }); // フリッカー復帰

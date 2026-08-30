@@ -37,8 +37,8 @@ extension Notification.Name {
 /// listener. Used by HandTracker, snapshots, and the recorded MP4's transform.
 enum DisplayOrientation {
   case portrait        // UIInterfaceOrientation.portrait
-  case landscapeLeft   // usb-c on the left; 180° from the sensor orientation
-  case landscapeRight  // usb-c on the right; same as the sensor orientation
+  case landscapeLeft   // usb-c on the right; 180° from the sensor orientation
+  case landscapeRight  // usb-c on the left; same as the sensor orientation
 
   var cgImageOrientation: CGImagePropertyOrientation {
     switch self {
@@ -178,7 +178,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   private let motionManager = CMMotionManager()
   private let motionQueue = OperationQueue()
 
-  private static let timeValidationDefaultsPrefix = "io.rootlens.camera-imu-time-validation.v1."
+  private static let timeValidationDefaultsPrefix = "io.rootlens.camera-imu-time-validation.v2."
 
   // MARK: - Capture settings (set from JS; apply from the next startSession / startRecording)
 
@@ -1534,7 +1534,8 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
   ) -> [String: Any] {
     let value = makeTimeValidationDictionary(estimate)
     let key = Self.timeValidationDefaultsPrefix + currentDeviceModel()
-    if let data = try? JSONSerialization.data(withJSONObject: value) {
+    if estimate.quality == "good",
+       let data = try? JSONSerialization.data(withJSONObject: value) {
       UserDefaults.standard.set(data, forKey: key)
     }
     return value
@@ -1554,6 +1555,9 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "deviceModel": currentDeviceModel(),
       "osVersion": UIDevice.current.systemVersion,
       "measuredAt": measuredAt,
+      "algorithmVersion": CameraImuTimeCalibrator.algorithmVersion,
+      "searchRangeMinMs": CameraImuTimeCalibrator.searchRangeMinMs,
+      "searchRangeMaxMs": CameraImuTimeCalibrator.searchRangeMaxMs,
       "videoWidth": width,
       "videoHeight": height,
       "videoFps": fps,
@@ -1570,6 +1574,7 @@ final class ArkitCaptureController: NSObject, ARSessionDelegate {
       "rangeMinMs": estimate.rangeMinMs,
       "rangeMaxMs": estimate.rangeMaxMs,
       "peakCorrelation": estimate.peakCorrelation,
+      "signalPair": estimate.signalPair,
       "visualSampleCount": estimate.visualSampleCount,
       "gyroSampleCount": estimate.gyroSampleCount,
       "windowCount": estimate.windowCount,

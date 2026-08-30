@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { RootStackParamList } from './types';
 import { navigationHeaderOptions } from '../theme';
@@ -6,6 +6,11 @@ import { navigationHeaderOptions } from '../theme';
 import { LoginScreen } from '../screens/LoginScreen';
 import { MainTabs } from './MainTabs';
 import { CaptureScreen } from '../screens/CaptureScreen';
+import {
+  DEFAULT_CAPTURE_SETTINGS,
+  loadCaptureSettings,
+  subscribeCaptureSettings,
+} from '../services/captureSettings';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -19,26 +24,48 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // CaptureMode は MainTabs の上に push する fullscreen modal。
 
 export const RootNavigator: React.FC = () => {
+  const [displayOrientation, setDisplayOrientation] = useState(
+    DEFAULT_CAPTURE_SETTINGS.displayOrientation,
+  );
+
+  useEffect(() => {
+    let active = true;
+    loadCaptureSettings()
+      .then((settings) => {
+        if (active) setDisplayOrientation(settings.displayOrientation);
+      })
+      .catch(() => {});
+    const unsubscribe = subscribeCaptureSettings((settings) => {
+      setDisplayOrientation(settings.displayOrientation);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const nativeOrientation = displayOrientation === 'landscapeLeft'
+    ? 'landscape_left' as const
+    : 'landscape_right' as const;
+
   return (
     <Stack.Navigator
       initialRouteName="Main"
-      // アプリ全体を横持ちベースにする (= 常に landscape 動画を撮る前提の UI)。
-      // 撮影画面が landscape_right 固定なので、 他画面も同じ向きに固定する (= タブで逆さに持って
-      // いた人が撮影に入ると UI が 180° 回る、 を無くす)。
-      screenOptions={{ ...navigationHeaderOptions, orientation: 'landscape_right' }}
+      // アプリ全体とカメラの向きを同じ保存設定から決める。 設定変更時は navigator も即座に
+      // 180° 回転し、 撮影画面へ入った時だけ向きが変わる状態を作らない。
+      screenOptions={{ ...navigationHeaderOptions, orientation: nativeOrientation }}
     >
       <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen
         name="CaptureMode"
         component={CaptureScreen}
-        // 撮影画面は landscape_right に固定 (= native カメラ frame の向きと一致させる)。
-        // 他画面は landscape (左右どちらも可)。 react-native-screens がネイティブで強制する。
-        // ⚠ 映像が上下逆なら 'landscape_right' → 'landscape_left' に。
+        // CaptureMode も navigator と同じ保存設定へ固定する。 native camera backend には
+        // CaptureScreen が同じ DisplayOrientation を session 起動前に渡す。
         options={{
           headerShown: false,
           presentation: 'fullScreenModal',
-          orientation: 'landscape_right',
+          orientation: nativeOrientation,
           animation: 'none',
         }}
       />

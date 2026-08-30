@@ -19,7 +19,7 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "カメラで写真や動画を撮影するために使用します",
-        "NSMicrophoneUsageDescription": "撮影の開始・終了の音声コマンドを聞き取るために使用します。音声が保存されることはありません",
+        "NSMicrophoneUsageDescription": "iPhone撮影モードでは映像とともに現場音声を記録します。また、音声操作を選んだ場合は撮影の開始・終了コマンドの認識にも使用します",
         "NSPhotoLibraryUsageDescription": "端末の写真にアクセスするために使用します",
         "NSPhotoLibraryAddUsageDescription": "撮影した写真を保存するために使用します",
         "NSFaceIDUsageDescription": "セキュアな認証のために使用します",

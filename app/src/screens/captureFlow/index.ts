@@ -2,11 +2,12 @@
 
 import { gestureFlow } from './gestureFlow';
 import { voiceFlow } from './voiceFlow';
+import { hardwareButtonFlow } from './hardwareButtonFlow';
 import type { CaptureFlow, CaptureFlowId } from './types';
 
 export * from './types';
 
-export const CAPTURE_FLOWS: readonly CaptureFlow[] = [gestureFlow, voiceFlow];
+export const CAPTURE_FLOWS: readonly CaptureFlow[] = [gestureFlow, voiceFlow, hardwareButtonFlow];
 
 export const DEFAULT_CAPTURE_FLOW_ID: CaptureFlowId = 'gesture';
 

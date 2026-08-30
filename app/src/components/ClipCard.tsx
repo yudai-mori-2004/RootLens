@@ -209,6 +209,7 @@ export function formatDuration(ms: number | null | undefined): string | null {
 
 export function configLabel(id: string): string {
   if (id === 'arkit') return 'ARKit';
+  if (id === 'iphone') return 'iPhone';
   return id;
 }
 

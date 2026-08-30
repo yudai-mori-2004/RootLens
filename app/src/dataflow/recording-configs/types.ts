@@ -5,9 +5,10 @@
 // The upload steps never care which config produced a session; the config's
 // outputFiles list is the single authority on what gets uploaded.
 //
-// Current implementations:
-//   - arkit (iOS)  ← the arkit-capture native module
-// A future rig (smart glasses, ...) plugs in as another config here.
+// Current local implementations:
+//   - arkit  (iOS) ← ARKit + LiDAR/VIO backend
+//   - iphone (iOS) ← AVCapture + Core Motion backend
+// External devices are settings-level CaptureMethods, not fake local configs.
 //
 // ⚠ Dataflow layer: must not import react / react-native.
 
@@ -108,6 +109,15 @@ export interface RecordingConfig {
   /** file:// URI of the primary video (the MP4 the content hash is computed over). */
   primaryVideoUri(session: RecordingSession): string;
 
+  /** Optional config-owned finalization once the primary video's immutable
+   * content identity exists. Used when a metadata schema carries that identity;
+   * the pipeline never reaches into config-specific JSON itself. */
+  attachContentIdentity?(
+    session: RecordingSession,
+    identity: { contentHash: string; contentSize: number },
+    sink: EventSink,
+  ): Promise<void>;
+
   // ─── Realtime surface (what the gesture UX sits on; config-independent) ─────
   /** Subscribe to realtime hand tracking (~15-30 Hz). */
   subscribeHandTrack(listener: (e: HandTrackEvent) => void): HandTrackSubscription;
@@ -116,3 +126,22 @@ export interface RecordingConfig {
   /** Tell the native side the display orientation (fixed before recording starts). */
   setDisplayOrientation(orientation: DisplayOrientation): Promise<void>;
 }
+
+/** User-facing capture methods are broader than local recording configs:
+ * Mentra is selected and managed from this iPhone, but recording itself runs
+ * on the glasses. Keeping that distinction explicit prevents the UI from
+ * pretending an external device implements the iPhone session lifecycle. */
+export type CaptureMethodId = 'arkit' | 'mentra' | 'iphone';
+
+export type CaptureMethod =
+  | {
+      readonly id: 'arkit' | 'iphone';
+      readonly label: string;
+      readonly location: 'this_device';
+      readonly recordingConfigId: 'arkit' | 'iphone';
+    }
+  | {
+      readonly id: 'mentra';
+      readonly label: string;
+      readonly location: 'external_device';
+    };

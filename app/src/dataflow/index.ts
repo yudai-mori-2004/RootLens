@@ -34,11 +34,16 @@ export type {
   HandTrackEvent,
   DisplayOrientation,
   HandTrackSubscription,
+  CaptureMethod,
+  CaptureMethodId,
 } from './recording-configs';
 export {
   RECORDING_CONFIGS,
+  CAPTURE_METHODS,
   DEFAULT_RECORDING_CONFIG,
   getRecordingConfig,
+  getCaptureMethod,
+  recordingConfigForMethod,
   listAvailableConfigs,
 } from './recording-configs';
 
@@ -50,6 +55,7 @@ export {
   fetchMyClips,
   fetchClipMediaUrl,
   attachClipConsent,
+  deleteServerClip,
   ClipApiError,
 } from './steps';
 

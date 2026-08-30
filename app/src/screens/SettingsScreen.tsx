@@ -47,6 +47,11 @@ import {
   type ImuRate,
   type RecordingRate,
 } from '../services/captureSettings';
+import {
+  CAPTURE_METHODS,
+  type CaptureMethodId,
+  type DisplayOrientation,
+} from '../dataflow/recording-configs';
 import type { LegalDocKey } from '../content/legalDocs.generated';
 import { CAPTURE_FLOWS } from './captureFlow';
 import {
@@ -63,8 +68,21 @@ import {
   stopArkitSession,
   type CameraImuTimeValidationResult,
 } from '../native/arkitCapture';
+import {
+  IphoneCapturePreviewView,
+  analyzeIphoneCameraImuTimeValidation,
+  getIphoneCameraImuTimeValidation,
+  isIphoneCaptureAvailable,
+  setIphoneCaptureSettings,
+  setIphoneDisplayOrientation,
+  startIphoneRecording,
+  startIphoneSession,
+  stopIphoneRecording,
+  stopIphoneSession,
+} from '../native/iphoneCapture';
 
 type TimeValidationPhase = 'preparing' | 'ready' | 'running' | 'analyzing' | 'result' | 'error';
+const TIME_VALIDATION_DURATION_SECONDS = 300;
 
 export const SettingsScreen: React.FC = () => {
   const { provider, state } = useAuth();
@@ -80,7 +98,8 @@ export const SettingsScreen: React.FC = () => {
   const [timeValidationPhase, setTimeValidationPhase] = useState<TimeValidationPhase>('preparing');
   const [timeValidationResult, setTimeValidationResult] = useState<CameraImuTimeValidationResult | null>(null);
   const [timeValidationError, setTimeValidationError] = useState('');
-  const [timeValidationCountdown, setTimeValidationCountdown] = useState(25);
+  const [timeValidationCountdown, setTimeValidationCountdown] = useState(TIME_VALIDATION_DURATION_SECONDS);
+  const [timeValidationMethod, setTimeValidationMethod] = useState<'arkit' | 'iphone'>('arkit');
   const timeValidationRun = useRef(0);
   const timeValidationTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const timeValidationStart = useRef<Promise<string> | null>(null);
@@ -88,17 +107,32 @@ export const SettingsScreen: React.FC = () => {
   const timeValidationRecording = useRef(false);
   const timeValidationSessionDir = useRef<string | null>(null);
   const timeValidationCleanup = useRef<Promise<void> | null>(null);
+  const timeValidationMethodRef = useRef<'arkit' | 'iphone'>('arkit');
 
   // 撮影設定 (= Stera 同構成)。 保存は即時、 適用は次の撮影画面オープンから。
   const [cs, setCs] = useState<CaptureSettings>({ ...DEFAULT_CAPTURE_SETTINGS });
   useEffect(() => {
-    loadCaptureSettings().then(setCs).catch(() => {});
-    getCameraImuTimeValidation().then(setTimeValidationResult).catch(() => {});
+    loadCaptureSettings().then((settings) => {
+      setCs(settings);
+      if (settings.captureMethodId === 'iphone') {
+        getIphoneCameraImuTimeValidation().then(setTimeValidationResult).catch(() => {});
+      } else if (settings.captureMethodId === 'arkit') {
+        getCameraImuTimeValidation().then(setTimeValidationResult).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
   const updateCs = (patch: Partial<CaptureSettings>) => {
     setCs((cur) => {
       const next = { ...cur, ...patch };
       saveCaptureSettings(next).catch(() => {});
+      if (patch.captureMethodId) {
+        setTimeValidationResult(null);
+        if (patch.captureMethodId === 'iphone') {
+          getIphoneCameraImuTimeValidation().then(setTimeValidationResult).catch(() => {});
+        } else if (patch.captureMethodId === 'arkit') {
+          getCameraImuTimeValidation().then(setTimeValidationResult).catch(() => {});
+        }
+      }
       return next;
     });
   };
@@ -185,7 +219,9 @@ export const SettingsScreen: React.FC = () => {
       }
       if (!timeValidationRecording.current) return timeValidationSessionDir.current;
       timeValidationRecording.current = false;
-      const dir = await stopArkitRecording();
+      const dir = timeValidationMethodRef.current === 'iphone'
+        ? await stopIphoneRecording()
+        : await stopArkitRecording();
       timeValidationSessionDir.current = dir;
       return dir;
     })();
@@ -200,7 +236,11 @@ export const SettingsScreen: React.FC = () => {
       try {
         dir = await stopTemporaryValidationRecording() ?? dir;
       } catch {}
-      await stopArkitSession().catch(() => {});
+      if (timeValidationMethodRef.current === 'iphone') {
+        await stopIphoneSession().catch(() => {});
+      } else {
+        await stopArkitSession().catch(() => {});
+      }
       await setArkitKeepAwake(false).catch(() => {});
       if (dir) await FileSystem.deleteAsync(dir, { idempotent: true }).catch(() => {});
       timeValidationSessionDir.current = null;
@@ -221,7 +261,12 @@ export const SettingsScreen: React.FC = () => {
     setTimeValidationPhase('preparing');
     setTimeValidationError('');
     try {
+      const method = cs.captureMethodId === 'iphone' ? 'iphone' : 'arkit';
+      // A previous validation may still own the other camera backend. Tear it
+      // down while the ref still points at that owner, then select the new one.
       await cleanupTimeValidation();
+      timeValidationMethodRef.current = method;
+      setTimeValidationMethod(method);
       timeValidationStart.current = null;
       timeValidationStop.current = null;
       timeValidationRecording.current = false;
@@ -229,11 +274,25 @@ export const SettingsScreen: React.FC = () => {
       const existing = await Camera.getCameraPermissionsAsync();
       const permission = existing.granted ? existing : await Camera.requestCameraPermissionsAsync();
       if (!permission.granted) throw new Error(t('capture.permissionBody'));
-      if (!await isArkitCaptureAvailable()) throw new Error(t('capture.unsupportedBody'));
-      await setArkitCaptureSettings(JSON.stringify(cs));
-      await setArkitDisplayOrientation('landscapeRight');
+      if (method === 'iphone') {
+        const currentMic = await Camera.getMicrophonePermissionsAsync();
+        const mic = currentMic.granted ? currentMic : await Camera.requestMicrophonePermissionsAsync();
+        if (!mic.granted) throw new Error(t('capture.permissionBody'));
+      }
+      const available = method === 'iphone'
+        ? await isIphoneCaptureAvailable()
+        : await isArkitCaptureAvailable();
+      if (!available) throw new Error(t('capture.unsupportedBody'));
+      if (method === 'iphone') {
+        await setIphoneCaptureSettings(JSON.stringify(cs));
+        await setIphoneDisplayOrientation(cs.displayOrientation);
+      } else {
+        await setArkitCaptureSettings(JSON.stringify(cs));
+        await setArkitDisplayOrientation(cs.displayOrientation);
+      }
       await setArkitKeepAwake(true);
-      await startArkitSession();
+      if (method === 'iphone') await startIphoneSession();
+      else await startArkitSession();
       await new Promise((resolve) => setTimeout(resolve, 1200));
       if (timeValidationRun.current === run) setTimeValidationPhase('ready');
     } catch (error) {
@@ -255,35 +314,43 @@ export const SettingsScreen: React.FC = () => {
 
   const startTimeValidation = async () => {
     const run = ++timeValidationRun.current;
-    setTimeValidationCountdown(25);
+    setTimeValidationCountdown(TIME_VALIDATION_DURATION_SECONDS);
     setTimeValidationError('');
     setTimeValidationPhase('running');
     const startedAt = Date.now();
     if (timeValidationTimer.current) clearInterval(timeValidationTimer.current);
     timeValidationTimer.current = setInterval(() => {
-      const remaining = Math.max(0, 25 - Math.floor((Date.now() - startedAt) / 1000));
+      const remaining = Math.max(
+        0,
+        TIME_VALIDATION_DURATION_SECONDS - Math.floor((Date.now() - startedAt) / 1000),
+      );
       setTimeValidationCountdown(remaining);
     }, 250);
     let dir: string | null = null;
     try {
-      const start = startArkitRecording().then((sessionDir) => {
+      const start = (timeValidationMethodRef.current === 'iphone'
+        ? startIphoneRecording()
+        : startArkitRecording()).then((sessionDir) => {
         timeValidationRecording.current = true;
         timeValidationSessionDir.current = sessionDir;
         return sessionDir;
       });
       timeValidationStart.current = start;
       dir = await start;
-      await new Promise((resolve) => setTimeout(resolve, 25_000));
+      await new Promise((resolve) => setTimeout(resolve, TIME_VALIDATION_DURATION_SECONDS * 1000));
       if (timeValidationRun.current !== run) {
         await cleanupTimeValidation();
         return;
       }
       setTimeValidationPhase('analyzing');
       dir = await stopTemporaryValidationRecording();
-      await stopArkitSession();
+      if (timeValidationMethodRef.current === 'iphone') await stopIphoneSession();
+      else await stopArkitSession();
       await setArkitKeepAwake(false);
       if (!dir) throw new Error('Temporary RGB–IMU recording was not created');
-      const result = await analyzeCameraImuTimeValidation(dir);
+      const result = timeValidationMethodRef.current === 'iphone'
+        ? await analyzeIphoneCameraImuTimeValidation(dir)
+        : await analyzeCameraImuTimeValidation(dir);
       if (timeValidationRun.current !== run) return;
       setTimeValidationResult(result);
       setTimeValidationPhase('result');
@@ -360,6 +427,24 @@ export const SettingsScreen: React.FC = () => {
         </Section>
 
         <Section title={t('settings.section.capture')}>
+          <SegmentRow
+            label={t('settings.capture.method')}
+            value={cs.captureMethodId}
+            options={CAPTURE_METHODS.map((method) => ({
+              value: method.id,
+              label: method.id === 'arkit'
+                ? t('settings.capture.method.arkit')
+                : method.id === 'mentra'
+                  ? t('settings.capture.method.mentra')
+                  : t('settings.capture.method.iphone'),
+            }))}
+            onChange={(value) => updateCs({ captureMethodId: value as CaptureMethodId })}
+          />
+          {cs.captureMethodId === 'mentra' ? (
+            <Row label={t('settings.capture.device')} value={t('settings.capture.mentraExternal')} />
+          ) : null}
+          {cs.captureMethodId === 'arkit' ? (
+            <>
           <SegmentRow
             label={t('settings.capture.resolution')}
             value={cs.resolution}
@@ -439,13 +524,48 @@ export const SettingsScreen: React.FC = () => {
             value={cs.streamMesh}
             onChange={(v) => updateCs({ streamMesh: v })}
           />
-          {/* 撮影フロー (= 開始・終了の指示方法)。 選択肢は registry から自動生成 (= 新フロー追加時に
-              ここを触らない)。 gesture = サムズアップ / voice = 音声コマンド。 */}
+            </>
+          ) : null}
+          {cs.captureMethodId === 'iphone' ? (
+            <>
+              <Row label={t('settings.capture.camera')} value={t('settings.capture.ultraWideCamera')} />
+              <Row label={t('settings.capture.format')} value="1920×1080 · 30 fps · AAC" mono />
+              <SwitchRow
+                label={t('settings.capture.autoFocus')}
+                value={cs.autoFocus}
+                onChange={(v) => updateCs({ autoFocus: v })}
+              />
+              <SegmentRow
+                label={t('settings.capture.imuRate')}
+                value={String(cs.imuRateHz)}
+                options={[
+                  { value: '50', label: '50 Hz' },
+                  { value: '100', label: '100 Hz' },
+                  { value: '200', label: '200 Hz' },
+                ]}
+                onChange={(v) => updateCs({ imuRateHz: Number(v) as ImuRate })}
+              />
+            </>
+          ) : null}
+          {cs.captureMethodId !== 'mentra' ? (
+            <>
+          <SegmentRow
+            label={t('settings.capture.orientation')}
+            value={cs.displayOrientation}
+            options={[
+              { value: 'landscapeRight', label: t('settings.capture.orientationLeft') },
+              { value: 'landscapeLeft', label: t('settings.capture.orientationRight') },
+            ]}
+            onChange={(v) => updateCs({ displayOrientation: v as DisplayOrientation })}
+          />
+          {/* 撮影フロー (= 開始・終了の指示方法)。選択肢はregistryから自動生成。
+              gesture / voice / hardware-buttonは同じCaptureFlow interfaceのpeer。 */}
           <SegmentRow
             label={t('settings.capture.flow')}
             value={cs.captureFlow}
             options={CAPTURE_FLOWS.map((f) => ({ value: f.id, label: t(f.displayLabelKey) }))}
             onChange={(v) => updateCs({ captureFlow: v as CaptureSettings['captureFlow'] })}
+            layout="stacked"
           />
           {/* 自動サイクル撮影 (= N 分録画 → 休止 → 再開のループ)。 有効時のみ分数を出す。 */}
           <SwitchRow
@@ -473,9 +593,16 @@ export const SettingsScreen: React.FC = () => {
               onChange={(v) => updateCs({ cyclePauseMinutes: v })}
             />
           ) : null}
+            </>
+          ) : null}
         </Section>
 
         <Section title={t('settings.section.sensorSync')}>
+          {cs.captureMethodId === 'mentra' ? (
+            <Row label={t('settings.sensorSync.status')} value={t('settings.sensorSync.mentraManaged')} />
+          ) : null}
+          {cs.captureMethodId !== 'mentra' ? (
+            <>
           {timeValidationResult ? (
             <>
               <Row
@@ -513,6 +640,8 @@ export const SettingsScreen: React.FC = () => {
               : t('settings.sensorSync.measure')}
             onPress={() => { void openTimeValidation(); }}
           />
+            </>
+          ) : null}
         </Section>
 
         {/* ── 開発者向け (= debug provider 時のみ表示) ── */}
@@ -543,11 +672,15 @@ export const SettingsScreen: React.FC = () => {
         visible={timeValidationOpen}
         animationType="fade"
         presentationStyle="fullScreen"
-        supportedOrientations={['landscape-right']}
+        supportedOrientations={[
+          cs.displayOrientation === 'landscapeLeft' ? 'landscape-left' : 'landscape-right',
+        ]}
         onRequestClose={closeTimeValidation}
       >
         <View style={styles.validationRoot}>
-          {ArkitCapturePreviewView ? (
+          {timeValidationMethod === 'iphone' && IphoneCapturePreviewView ? (
+            <IphoneCapturePreviewView style={StyleSheet.absoluteFill} />
+          ) : timeValidationMethod === 'arkit' && ArkitCapturePreviewView ? (
             <ArkitCapturePreviewView style={StyleSheet.absoluteFill} />
           ) : (
             <View style={[StyleSheet.absoluteFill, styles.validationPreviewFallback]} />
@@ -646,7 +779,13 @@ const SFX_NAMES: SfxName[] = [
 const Section: React.FC<{ title: string; tone?: 'normal' | 'muted'; children: React.ReactNode }> = ({
   title, tone, children,
 }) => {
-  const items = React.Children.toArray(children).filter(Boolean);
+  const flatten = (nodes: React.ReactNode): React.ReactNode[] =>
+    React.Children.toArray(nodes).flatMap((node) =>
+      React.isValidElement(node) && node.type === React.Fragment
+        ? flatten(node.props.children)
+        : [node],
+    ).filter(Boolean);
+  const items = flatten(children);
   return (
     <View>
       <View style={styles.sectionPill}>
@@ -778,10 +917,11 @@ const SegmentRow: React.FC<{
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (v: string) => void;
-}> = ({ label, value, options, onChange }) => (
-  <View style={styles.segmentRow}>
+  layout?: 'inline' | 'stacked';
+}> = ({ label, value, options, onChange, layout = 'inline' }) => (
+  <View style={[styles.segmentRow, layout === 'stacked' && styles.segmentRowStacked]}>
     <Text style={styles.rowLabelInline}>{label}</Text>
-    <View style={styles.segmentControl}>
+    <View style={[styles.segmentControl, layout === 'stacked' && styles.segmentControlStacked]}>
       {options.map((opt) => {
         const active = opt.value === value;
         return (
@@ -790,6 +930,7 @@ const SegmentRow: React.FC<{
             onPress={() => onChange(opt.value)}
             style={({ pressed }) => [
               styles.segmentBtn,
+              layout === 'stacked' && styles.segmentBtnStacked,
               active && styles.segmentBtnActive,
               pressed && !active && styles.segmentBtnPressed,
             ]}
@@ -930,6 +1071,16 @@ const styles = StyleSheet.create({
   segmentControl: {
     flexDirection: 'row',
     gap: 6,
+    flexShrink: 1,
+  },
+  segmentRowStacked: {
+    alignItems: 'stretch',
+    flexDirection: 'column',
+    gap: spacing.sm,
+  },
+  segmentControlStacked: {
+    width: '100%',
+    flexShrink: 0,
   },
   stepper: {
     flexDirection: 'row',
@@ -968,6 +1119,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: 'transparent',
+  },
+  segmentBtnStacked: {
+    flex: 1,
+    minWidth: 0,
   },
   // 選択は LP の差し色でべた塗り (黄地 + 黒文字)
   segmentBtnActive: {

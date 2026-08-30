@@ -70,6 +70,9 @@ export interface PowerState {
 /** Result of a diagnostic comparison between pixel motion and Core Motion.
  * It reports the observable residual; capture timestamps are not rewritten. */
 export interface CameraImuTimeValidationResult {
+  algorithmVersion?: number;
+  searchRangeMinMs?: number;
+  searchRangeMaxMs?: number;
   deviceModel: string;
   osVersion: string;
   measuredAt: string;
@@ -78,8 +81,8 @@ export interface CameraImuTimeValidationResult {
   videoFps: number;
   cameraType: string;
   imuRateHz: number;
-  videoTimestampSource: 'ARFrame.timestamp';
-  imuTimestampSource: 'CMDeviceMotion.timestamp';
+  videoTimestampSource: 'ARFrame.timestamp' | 'CMSampleBuffer.presentationTimeStamp';
+  imuTimestampSource: 'CMDeviceMotion.timestamp' | 'CMGyroData.timestamp';
   method: 'pixel_motion_vs_processed_rotation_rate';
   measurementKind: 'residual_validation';
   timestampCorrectionApplied: false;
@@ -89,6 +92,7 @@ export interface CameraImuTimeValidationResult {
   rangeMinMs: number;
   rangeMaxMs: number;
   peakCorrelation: number;
+  signalPair?: string;
   visualSampleCount: number;
   gyroSampleCount: number;
   windowCount: number;

@@ -4,7 +4,7 @@ import Foundation
 import Vision
 
 /// Measures the residual offset between the timestamps attached to recorded camera
-/// images and `CMDeviceMotion.timestamp`. Capture itself goes through the production
+/// images and the Core Motion gyroscope timestamp. Capture itself goes through the production
 /// recorder; this analyzer runs only after the temporary clip has closed. ARKit pose
 /// is deliberately not used because it is already the output of a visual-inertial
 /// estimator.
@@ -13,6 +13,10 @@ import Vision
 ///   physical image motion at video timestamp `t` matches IMU samples at
 ///   `t + videoToImuOffsetMs`.
 final class CameraImuTimeCalibrator {
+
+  static let algorithmVersion = 3
+  static let searchRangeMinMs = -1_000.0
+  static let searchRangeMaxMs = 1_000.0
 
   struct Estimate {
     let videoToImuOffsetMs: Double
@@ -25,6 +29,7 @@ final class CameraImuTimeCalibrator {
     let windowCount: Int
     let durationSeconds: Double
     let quality: String
+    let signalPair: String
   }
 
   enum CalibrationError: LocalizedError {
@@ -53,17 +58,81 @@ final class CameraImuTimeCalibrator {
   private struct VisualInterval {
     let startTimestampNs: Int64
     let endTimestampNs: Int64
+    let normalizedXSpeed: Double
+    let normalizedYSpeed: Double
     let normalizedSpeed: Double
   }
 
   private struct GyroPoint {
     let timestampNs: Int64
+    let x: Double
+    let y: Double
+    let z: Double
     let magnitude: Double
+  }
+
+  private struct GyroPrefixes {
+    let x: [Double]
+    let y: [Double]
+    let z: [Double]
+    let magnitude: [Double]
+
+    init(_ points: [GyroPoint]) {
+      var x = [0.0]
+      var y = [0.0]
+      var z = [0.0]
+      var magnitude = [0.0]
+      x.reserveCapacity(points.count + 1)
+      y.reserveCapacity(points.count + 1)
+      z.reserveCapacity(points.count + 1)
+      magnitude.reserveCapacity(points.count + 1)
+      for point in points {
+        x.append(x.last! + point.x)
+        y.append(y.last! + point.y)
+        z.append(z.last! + point.z)
+        magnitude.append(magnitude.last! + point.magnitude)
+      }
+      self.x = x
+      self.y = y
+      self.z = z
+      self.magnitude = magnitude
+    }
+  }
+
+  private enum SignalPair: String, CaseIterable {
+    case imageXGyroX = "image_x_vs_gyro_x"
+    case imageXGyroY = "image_x_vs_gyro_y"
+    case imageXGyroZ = "image_x_vs_gyro_z"
+    case imageYGyroX = "image_y_vs_gyro_x"
+    case imageYGyroY = "image_y_vs_gyro_y"
+    case imageYGyroZ = "image_y_vs_gyro_z"
+    case imageMagnitudeGyroMagnitude = "image_magnitude_vs_gyro_magnitude"
+
+    func visualValue(_ value: VisualInterval) -> Double {
+      switch self {
+      case .imageXGyroX, .imageXGyroY, .imageXGyroZ:
+        return value.normalizedXSpeed
+      case .imageYGyroX, .imageYGyroY, .imageYGyroZ:
+        return value.normalizedYSpeed
+      case .imageMagnitudeGyroMagnitude:
+        return value.normalizedSpeed
+      }
+    }
+
+    func gyroPrefix(_ value: GyroPrefixes) -> [Double] {
+      switch self {
+      case .imageXGyroX, .imageYGyroX: return value.x
+      case .imageXGyroY, .imageYGyroY: return value.y
+      case .imageXGyroZ, .imageYGyroZ: return value.z
+      case .imageMagnitudeGyroMagnitude: return value.magnitude
+      }
+    }
   }
 
   private struct CorrelationPeak {
     let offsetMs: Double
     let correlation: Double
+    let signalPair: SignalPair
   }
 
   private var previousFrame: (buffer: CVPixelBuffer, timestampNs: Int64)?
@@ -139,9 +208,13 @@ final class CameraImuTimeCalibrator {
 
   private static func readFrameTimestamps(from url: URL) throws -> [Int64] {
     let rows = try readJsonLines(from: url)
-    let timestamps = rows.compactMap { ($0["timestamp_ns"] as? NSNumber)?.int64Value }
+    let timestamps = rows.compactMap {
+      ($0["video_frame_timestamp_canonical_ns"] as? NSNumber)?.int64Value
+        ?? ($0["camera_timestamp_mapped_input_port_clock_ns"] as? NSNumber)?.int64Value
+    }
     guard timestamps.count == rows.count else {
-      throw CalibrationError.invalidRecording("frames.jsonl contains a row without timestamp_ns")
+      throw CalibrationError.invalidRecording(
+        "frames.jsonl contains a row without an input-port canonical timestamp")
     }
     return timestamps
   }
@@ -149,13 +222,21 @@ final class CameraImuTimeCalibrator {
   private static func readGyro(from url: URL) throws -> [GyroPoint] {
     let rows = try readJsonLines(from: url)
     return rows.compactMap { row in
-      guard let timestamp = (row["timestamp_ns"] as? NSNumber)?.int64Value,
-            let gyro = row["gyro"] as? [String: Any],
-            let x = (gyro["x"] as? NSNumber)?.doubleValue,
-            let y = (gyro["y"] as? NSNumber)?.doubleValue,
-            let z = (gyro["z"] as? NSNumber)?.doubleValue else { return nil }
+      guard let timestamp = (row["timestamp_ns"] as? NSNumber)?.int64Value else { return nil }
+      let values: [String: Any]?
+      if row["sensor"] as? String == "gyroscope" {
+        values = row
+      } else {
+        values = row["gyro"] as? [String: Any]
+      }
+      guard let values,
+            let x = (values["x"] as? NSNumber)?.doubleValue,
+            let y = (values["y"] as? NSNumber)?.doubleValue,
+            let z = (values["z"] as? NSNumber)?.doubleValue else { return nil }
       let magnitude = sqrt(x * x + y * y + z * z)
-      return magnitude.isFinite ? GyroPoint(timestampNs: timestamp, magnitude: magnitude) : nil
+      return magnitude.isFinite
+        ? GyroPoint(timestampNs: timestamp, x: x, y: y, z: z, magnitude: magnitude)
+        : nil
     }
   }
 
@@ -199,10 +280,16 @@ final class CameraImuTimeCalibrator {
 
       let dt = Double(dtNs) / 1_000_000_000.0
       let normalizedSpeed = displacement / diagonal / dt
-      guard normalizedSpeed.isFinite else { return }
+      let normalizedXSpeed = Double(transform.tx) / diagonal / dt
+      let normalizedYSpeed = Double(transform.ty) / diagonal / dt
+      guard normalizedSpeed.isFinite,
+            normalizedXSpeed.isFinite,
+            normalizedYSpeed.isFinite else { return }
       visual.append(VisualInterval(
         startTimestampNs: previous.timestampNs,
         endTimestampNs: timestampNs,
+        normalizedXSpeed: normalizedXSpeed,
+        normalizedYSpeed: normalizedYSpeed,
         normalizedSpeed: normalizedSpeed))
     } catch {
       // A single registration failure is normal under blur or feature-poor
@@ -240,10 +327,8 @@ final class CameraImuTimeCalibrator {
       throw CalibrationError.insufficientMotion
     }
 
-    let prefix = gyro.reduce(into: [0.0]) { partial, point in
-      partial.append(partial.last! + point.magnitude)
-    }
-    guard let globalPeak = bestOffset(visual: visual, gyro: gyro, gyroPrefix: prefix) else {
+    let prefixes = GyroPrefixes(gyro)
+    guard let globalPeak = bestOffset(visual: visual, gyro: gyro, gyroPrefixes: prefixes) else {
       throw CalibrationError.weakCorrelation(0)
     }
     guard globalPeak.correlation >= 0.30 else {
@@ -267,7 +352,11 @@ final class CameraImuTimeCalibrator {
       }
       guard subset.count >= 12,
             standardDeviation(subset.map(\.normalizedSpeed)) >= 0.002,
-            let peak = bestOffset(visual: subset, gyro: gyro, gyroPrefix: prefix),
+            let peak = bestOffset(
+              visual: subset,
+              gyro: gyro,
+              gyroPrefixes: prefixes,
+              signalPair: globalPeak.signalPair),
             peak.correlation >= 0.25 else { continue }
       windowOffsets.append(peak.offsetMs)
     }
@@ -288,7 +377,8 @@ final class CameraImuTimeCalibrator {
       gyroSampleCount: gyro.count,
       windowCount: windowOffsets.count,
       durationSeconds: Double(span) / 1_000_000_000.0,
-      quality: quality)
+      quality: quality,
+      signalPair: globalPeak.signalPair.rawValue)
   }
 
   /// Searches the delay that makes image-motion speed over each frame interval
@@ -296,21 +386,16 @@ final class CameraImuTimeCalibrator {
   private static func bestOffset(
     visual: [VisualInterval],
     gyro: [GyroPoint],
-    gyroPrefix: [Double]
+    gyroPrefixes: GyroPrefixes,
+    signalPair forcedSignalPair: SignalPair? = nil
   ) -> CorrelationPeak? {
-    let minOffsetMs = -150.0
-    let maxOffsetMs = 150.0
-    let stepMs = 0.5
-    let count = Int(((maxOffsetMs - minOffsetMs) / stepMs).rounded()) + 1
-    var correlations = [Double](repeating: -.infinity, count: count)
-
-    for index in 0..<count {
-      let offsetMs = minOffsetMs + Double(index) * stepMs
+    func correlation(at offsetMs: Double, signalPair: SignalPair) -> Double {
       let offsetNs = Int64((offsetMs * 1_000_000.0).rounded())
       var imageValues: [Double] = []
       var imuValues: [Double] = []
       imageValues.reserveCapacity(visual.count)
       imuValues.reserveCapacity(visual.count)
+      let gyroPrefix = signalPair.gyroPrefix(gyroPrefixes)
 
       for sample in visual {
         let start = sample.startTimestampNs + offsetNs
@@ -319,14 +404,48 @@ final class CameraImuTimeCalibrator {
         let hi = lowerBound(gyro, timestampNs: end)
         guard hi > lo else { continue }
         let meanGyro = (gyroPrefix[hi] - gyroPrefix[lo]) / Double(hi - lo)
-        imageValues.append(sample.normalizedSpeed)
+        imageValues.append(signalPair.visualValue(sample))
         imuValues.append(meanGyro)
       }
       if imageValues.count >= 20 {
-        correlations[index] = pearson(imageValues, imuValues)
+        return pearson(imageValues, imuValues)
       }
+      return -.infinity
     }
 
+    // The recorder first maps AVCaptureSession.synchronizationClock into the
+    // host-time clock used by Core Motion. This search measures only the
+    // remaining end-to-end sensor/pipeline residual.
+    let coarseStepMs = 2.0
+    let coarseCount = Int(((searchRangeMaxMs - searchRangeMinMs) / coarseStepMs).rounded()) + 1
+    var coarseBestOffset = searchRangeMinMs
+    var coarseBestCorrelation = -Double.infinity
+    var coarseBestSignalPair = forcedSignalPair ?? .imageMagnitudeGyroMagnitude
+    let signalPairs = forcedSignalPair.map { [$0] } ?? SignalPair.allCases
+    for index in 0..<coarseCount {
+      let offset = searchRangeMinMs + Double(index) * coarseStepMs
+      for signalPair in signalPairs {
+        let value = correlation(at: offset, signalPair: signalPair)
+        if value.isFinite, abs(value) > coarseBestCorrelation {
+          coarseBestOffset = offset
+          coarseBestCorrelation = abs(value)
+          coarseBestSignalPair = signalPair
+        }
+      }
+    }
+    guard coarseBestCorrelation.isFinite else { return nil }
+
+    let fineStepMs = 0.25
+    let fineMinMs = max(searchRangeMinMs, coarseBestOffset - 4.0)
+    let fineMaxMs = min(searchRangeMaxMs, coarseBestOffset + 4.0)
+    let fineCount = Int(((fineMaxMs - fineMinMs) / fineStepMs).rounded()) + 1
+    var correlations = [Double](repeating: -.infinity, count: fineCount)
+    for index in 0..<fineCount {
+      let value = correlation(
+        at: fineMinMs + Double(index) * fineStepMs,
+        signalPair: coarseBestSignalPair)
+      if value.isFinite { correlations[index] = abs(value) }
+    }
     guard let bestIndex = correlations.indices.max(by: { correlations[$0] < correlations[$1] }),
           correlations[bestIndex].isFinite else { return nil }
 
@@ -342,8 +461,9 @@ final class CameraImuTimeCalibrator {
       }
     }
     return CorrelationPeak(
-      offsetMs: minOffsetMs + refinedIndex * stepMs,
-      correlation: correlations[bestIndex])
+      offsetMs: fineMinMs + refinedIndex * fineStepMs,
+      correlation: correlations[bestIndex],
+      signalPair: coarseBestSignalPair)
   }
 
   private static func lowerBound(_ points: [GyroPoint], timestampNs: Int64) -> Int {

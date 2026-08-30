@@ -14,7 +14,7 @@
 
 ## 1. Summary (non-binding)
 
-> - **What we collect**: **video** of housework and work tasks (no audio is recorded), sensor data such as hand motion, device info, account info, and the information needed to pay filming fees.
+> - **What we collect**: **video** of housework and work tasks (including audio in recording modes that support audio capture), sensor data such as hand motion, device info, account info, and the information needed to pay filming fees.
 > - **What we use it for**: building training data for AI and robots and **providing/selling it to companies in and outside Japan**. Revenue funds the filming fees paid to the cooperating sites and staff.
 > - **Privacy processing**: faces etc. are blurred before sharing, but you may not become fully unidentifiable (we do not say "anonymized").
 > - **Your rights**: you may request disclosure, correction, deletion, suspension of use, and withdrawal of consent. However, data already used for training cannot be removed from past training.
@@ -33,7 +33,7 @@ RootLens ("we"; entity formation in progress; until then the operating individua
 This policy applies to the handling of personal data across our app, website, and data-sale service. It concerns not only the recording user but also representatives of cooperating businesses and **people who may be captured** in recordings (see "9. Third parties, children, private spaces").
 
 ## 3. Information we collect
-- **Video** from the head-mounted camera (no audio is recorded)
+- **Video** from the head-mounted camera and **audio** captured by recording modes that support audio recording
 - Sensor data per capture configuration (hand pose, IMU, LiDAR, etc.)
 - Device/technical info (model, OS, app version, capture settings)
 - Account information (account identifiers we issue, login credentials)
@@ -143,3 +143,4 @@ contact@rootlens.io
 | 2026-07-12 (7) | Added to section 8 that blurred data is still treated as personal data, handled on consent, with requests still available (the section stated only the negative) |
 | 2026-07-12 (8) | Rewrote the section 8 addition in plain terms: dropped the boilerplate request list (correction does not fit footage) in favor of what a person can actually do (withdraw, pre-training deletion, honest post-training limits per section 11) |
 | 2026-07-12 (9) | Parenthetical cleanup: promoted main statements disguised as asides (core of the business, license terms, fee exceptions, training irreversibility) into full sentences; simplified account identifiers to account ID in the Japanese original |
+| 2026-08-21 | Aligned the policy with the approved legal policy and tester consent by stating that audio-capable recording modes capture audio with video |

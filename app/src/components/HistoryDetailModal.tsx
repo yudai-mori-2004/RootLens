@@ -7,6 +7,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   type ImageSourcePropType,
   Modal,
@@ -29,12 +30,15 @@ interface Props {
   /** モック用の差し替えサムネ。 実クリップは内部でフレームを解決する。 */
   thumbSource?: ImageSourcePropType;
   onClose: () => void;
+  onDelete: (clip: ServerClipStatus) => Promise<void>;
 }
 
-export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource, onClose }) => {
+export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource, onClose, onDelete }) => {
   const t = useT();
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaError, setMediaError] = useState<null | ClipApiError['kind']>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
   // 動画ロード中のつなぎ表示。 履歴タイルが同じ key で解決済みならキャッシュから即返る。
   const frame = useUploadedClipFrame(
     clip ? clip.contentHash : null,
@@ -45,6 +49,8 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
   useEffect(() => {
     setMediaUrl(null);
     setMediaError(null);
+    setDeleting(false);
+    setDeleteError(false);
     if (!visible || !clip) return;
     let cancelled = false;
     (async () => {
@@ -65,6 +71,27 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
   const createdMs = clip.createdAt ? new Date(clip.createdAt).getTime() : null;
   const dur = formatDuration(clip.durationMs);
   const sizeMb = clip.contentSize != null ? `${(clip.contentSize / 1_000_000).toFixed(0)} MB` : null;
+  const remove = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteError(false);
+    try {
+      await onDelete(clip);
+    } catch {
+      setDeleting(false);
+      setDeleteError(true);
+    }
+  };
+  const requestDelete = () => {
+    Alert.alert(
+      t('serverDelete.title'),
+      t('serverDelete.message'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('serverDelete.confirm'), style: 'destructive', onPress: () => void remove() },
+      ],
+    );
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape']}>
@@ -126,6 +153,26 @@ export const HistoryDetailModal: React.FC<Props> = ({ visible, clip, thumbSource
             {clip.deviceModel ? <MetaRow label={t('history.device')} value={clip.deviceModel} /> : null}
 
             <View style={styles.spacer} />
+
+            {deleteError ? <Text style={styles.deleteErrorText}>{t('serverDelete.error')}</Text> : null}
+            <Pressable
+              onPress={requestDelete}
+              disabled={deleting}
+              style={({ pressed }) => [
+                styles.deleteBtn,
+                deleting && styles.deleteBtnDisabled,
+                pressed && !deleting && styles.closeBtnPressed,
+              ]}
+            >
+              {deleting ? (
+                <View style={styles.deleteBtnRow}>
+                  <ActivityIndicator size="small" color={colors.danger} />
+                  <Text style={styles.deleteBtnLabel}>{t('serverDelete.deleting')}</Text>
+                </View>
+              ) : (
+                <Text style={styles.deleteBtnLabel}>{t('common.delete')}</Text>
+              )}
+            </Pressable>
 
             <Pressable
               onPress={onClose}
@@ -234,6 +281,18 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   spacer: { flex: 1, minHeight: spacing.md },
+  deleteErrorText: { ...typography.caption, fontSize: 11.5, color: colors.danger, marginBottom: spacing.sm },
+  deleteBtn: {
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  deleteBtnDisabled: { opacity: 0.35 },
+  deleteBtnRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  deleteBtnLabel: { ...typography.captionMedium, color: colors.danger },
 
   closeBtn: {
     borderRadius: radii.full,

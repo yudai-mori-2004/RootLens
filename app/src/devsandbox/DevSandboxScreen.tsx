@@ -34,6 +34,7 @@ import {
   type RecordingConfig,
 } from '../dataflow';
 import { ArkitCapturePreviewView } from '../native/arkitCapture';
+import { IphoneCapturePreviewView } from '../native/iphoneCapture';
 // console にもミラーする sink (= Metro ログでも追える)
 const sink = teeToConsole(storeEventSink, 'sandbox');
 
@@ -241,7 +242,11 @@ export const DevSandboxScreen: React.FC = () => {
   // 選択直後 (= session 起動前) に arkit の ARSCNView を mount するとカメラ競合になるため、
   // activeConfigId 基準にして session ハンドオフ完了まで preview を貼り替えない。
   // native 未登録 (= 未ビルド) なら null。
-  const PreviewView = activeConfigId === 'arkit' ? ArkitCapturePreviewView : null;
+  const PreviewView = activeConfigId === 'arkit'
+    ? ArkitCapturePreviewView
+    : activeConfigId === 'iphone'
+      ? IphoneCapturePreviewView
+      : null;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

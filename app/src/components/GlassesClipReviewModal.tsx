@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   type ImageSourcePropType,
   Modal,
@@ -29,6 +30,7 @@ interface Props {
   clip: ServerClipStatus | null;
   onClose: () => void;
   onConsent: (clip: ServerClipStatus, checks: UploadConsentChecks) => Promise<void>;
+  onDelete: (clip: ServerClipStatus) => Promise<void>;
 }
 
 const INITIAL_CHECKS: UploadConsentChecks = {
@@ -37,7 +39,7 @@ const INITIAL_CHECKS: UploadConsentChecks = {
   terms_agreed: false,
 };
 
-export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose, onConsent }) => {
+export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose, onConsent, onDelete }) => {
   const t = useT();
   const locale = useLocale();
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
@@ -46,8 +48,10 @@ export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose
   const [sending, setSending] = useState(false);
   const [consentError, setConsentError] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
   const frame = useUploadedClipFrame(
-    clip ? `review-${clip.contentHash}` : null,
+    clip ? clip.contentHash : null,
     clip ? clip.contentHash : null,
   );
   const poster: ImageSourcePropType | undefined = frame ? { uri: frame } : undefined;
@@ -59,6 +63,8 @@ export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose
     setSending(false);
     setConsentError(false);
     setShowTerms(false);
+    setDeleting(false);
+    setDeleteError(false);
     if (!visible || !clip) return;
 
     let cancelled = false;
@@ -88,6 +94,27 @@ export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose
       setSending(false);
       setConsentError(true);
     }
+  };
+  const remove = async () => {
+    if (deleting || sending) return;
+    setDeleting(true);
+    setDeleteError(false);
+    try {
+      await onDelete(clip);
+    } catch {
+      setDeleting(false);
+      setDeleteError(true);
+    }
+  };
+  const requestDelete = () => {
+    Alert.alert(
+      t('serverDelete.title'),
+      t('serverDelete.message'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('serverDelete.confirm'), style: 'destructive', onPress: () => void remove() },
+      ],
+    );
   };
 
   return (
@@ -173,6 +200,7 @@ export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose
             {consentError ? (
               <Text style={styles.consentErrorText}>{t('glassesReview.consentError')}</Text>
             ) : null}
+            {deleteError ? <Text style={styles.deleteErrorText}>{t('serverDelete.error')}</Text> : null}
             <Pressable
               onPress={() => void confirm()}
               disabled={!allChecked || sending}
@@ -189,6 +217,24 @@ export const GlassesClipReviewModal: React.FC<Props> = ({ visible, clip, onClose
                 </View>
               ) : (
                 <Text style={styles.primaryBtnLabel}>{t('glassesReview.consentConfirm')}</Text>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={requestDelete}
+              disabled={deleting || sending}
+              style={({ pressed }) => [
+                styles.deleteBtn,
+                (deleting || sending) && styles.primaryBtnDisabled,
+                pressed && !deleting && !sending && styles.pressedDim,
+              ]}
+            >
+              {deleting ? (
+                <View style={styles.btnRow}>
+                  <ActivityIndicator size="small" color={colors.danger} />
+                  <Text style={styles.deleteBtnLabel}>{t('serverDelete.deleting')}</Text>
+                </View>
+              ) : (
+                <Text style={styles.deleteBtnLabel}>{t('common.delete')}</Text>
               )}
             </Pressable>
             <Pressable onPress={onClose} style={({ pressed }) => [styles.closeBtn, pressed && styles.pressedDim]}>
@@ -282,6 +328,7 @@ const styles = StyleSheet.create({
   termsLink: { color: colors.ink, textDecorationLine: 'underline', fontFamily: fonts.sansSemibold },
   spacer: { flex: 1, minHeight: spacing.md },
   consentErrorText: { ...typography.caption, fontSize: 11.5, color: colors.danger, marginBottom: spacing.sm },
+  deleteErrorText: { ...typography.caption, fontSize: 11.5, color: colors.danger, marginBottom: spacing.sm },
   primaryBtn: {
     borderRadius: radii.full,
     backgroundColor: colors.ink,
@@ -292,6 +339,15 @@ const styles = StyleSheet.create({
   primaryBtnPressed: { opacity: 0.78 },
   primaryBtnLabel: { fontFamily: fonts.sansSemibold, fontSize: 13, color: colors.textOnInk },
   btnRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  deleteBtn: {
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  deleteBtnLabel: { ...typography.captionMedium, color: colors.danger },
   closeBtn: { alignItems: 'center', paddingVertical: 10, marginTop: 3 },
   closeBtnLabel: { ...typography.captionMedium, color: colors.textMute },
   pressedDim: { opacity: 0.55 },

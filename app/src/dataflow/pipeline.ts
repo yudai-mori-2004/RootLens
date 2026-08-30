@@ -256,6 +256,7 @@ export async function advanceClip(clipId: string, sink: EventSink): Promise<void
       const hashed = await computeContentHash(rawMp4Uri, progressSink, (f) => {
         patchProgress(hashFractionToProgress(f));
       });
+      await config.attachContentIdentity?.(session, hashed, progressSink);
       memLog('hash-done');
       dataflowStore.getState().renameClipId(clipId, hashed.contentHash);
       clipId = hashed.contentHash;

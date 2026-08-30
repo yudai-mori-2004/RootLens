@@ -34,6 +34,7 @@ final class ArkitCapturePreviewView: ExpoView {
     addSubview(scnView)
     scnView.session = ArkitCaptureController.shared.arSession
     scnView.automaticallyUpdatesLighting = true
+    HardwareCaptureEventController.shared.registerHostView(self)
     // Screen-dim support for long recordings: stop rendering at 60 fps under a
     // black screen, saving the GPU and bandwidth heat.
     NotificationCenter.default.addObserver(
@@ -42,7 +43,10 @@ final class ArkitCapturePreviewView: ExpoView {
 
   required init?(coder: NSCoder) { fatalError("init(coder:) not supported") }
 
-  deinit { NotificationCenter.default.removeObserver(self) }
+  deinit {
+    HardwareCaptureEventController.shared.unregisterHostView(self)
+    NotificationCenter.default.removeObserver(self)
+  }
 
   @objc private func onDimChanged(_ n: Notification) {
     let dimmed = (n.userInfo?["dimmed"] as? Bool) ?? false

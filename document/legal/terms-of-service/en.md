@@ -25,9 +25,10 @@ The Service lets you record everyday activities such as housework from a first-p
 
 ## 5. Data we record
 
-While you record, the app captures the following. Audio is not recorded.
+While you record, the app captures the following. Some recording modes also record audio with the video.
 
 - Camera video
+- Audio (when using a recording mode that supports audio capture)
 - Sensor data such as hand motion, device motion, and depth (depending on the recording mode)
 - Device information such as model, OS, and app version
 
@@ -106,3 +107,4 @@ contact@rootlens.io
 ---
 
 Effective date: July 6, 2026
+Revised: August 21, 2026 (added recording modes that capture audio)

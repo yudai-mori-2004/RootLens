@@ -12,8 +12,9 @@
 
 import type { SfxName } from '../../services/captureSounds';
 import type { TranslationKey } from '../../i18n';
+import type { CaptureFlowId } from '../../domain/captureFlowId';
 
-export type CaptureFlowId = 'gesture' | 'voice';
+export type { CaptureFlowId } from '../../domain/captureFlowId';
 
 export type AdjustDirection = 'up' | 'down';
 
@@ -34,6 +35,7 @@ export type CaptureState =
   | { kind: 'stopping_confirm'; startTs: number; lostSince: number }        // gesture フロー所有
   | { kind: 'voice_prompt' }                                                 // voice フロー所有 (開始コマンド案内 TTS 中)
   | { kind: 'awaiting_start_command' }                                       // voice フロー所有
+  | { kind: 'awaiting_hardware_button' }                                     // hardware-button フロー所有
   | { kind: 'finalizing' }
   | { kind: 'cycle_pausing'; startTs: number }
   | { kind: 'cycle_resuming' };
@@ -71,13 +73,16 @@ export interface FlowTickCtx {
   /** 直近の音声コマンド (= 鮮度・TTS 再生中ゲート適用済み)。 読んだら consumeVoiceCommand で消費する。 */
   voiceCommand: 'start' | 'stop' | null;
   consumeVoiceCommand(): void;
+  /** AVKitの物理capture event。 選択中フローだけが消費し、 native callbackはstateを直接動かさない。 */
+  hardwareCaptureEvent: boolean;
+  consumeHardwareCaptureEvent(): void;
   /** 現 state が待っている発話が自然に言い終わったか。 */
   speechDone(): boolean;
   setState(next: CaptureState): void;
   /** voiced state へ入る前の sentinel (= awaitedSpeechSeqRef = 0)。 */
   clearAwaitedSpeech(): void;
-  /** 理由 TTS 付きで finalizing へ (= 理由は finalizing 冒頭で 1 回読まれる)。 */
-  finalizeWithReason(reasonTts: string | null): void;
+  /** finalizingへ移る。 immediateSfxはキューをclearした直後に鳴らすため、停止操作へ即応できる。 */
+  finalize(options?: { reasonTts?: string | null; immediateSfx?: SfxName | null }): void;
   audio: FlowAudio;
   stopSeq: StopSeqController;
 }
@@ -101,16 +106,22 @@ export interface FlowHud {
 
 export interface CaptureFlow {
   id: CaptureFlowId;
+  /** 撮影画面入場時の読み上げ。 nullのフローは無音でafterIntroへ進む。 */
+  introTts(): string | null;
+  /** 入場案内完了後。 装着待ちへ進むか、フロー固有待機へ直行するかを決める。 */
+  afterIntro(ctx: FlowTickCtx): void;
   /** 装着案内のあとの最初の案内へ (= フローの分岐点はここから始まる)。 */
   initialPrompt(ctx: FlowTickCtx): void;
   /** キャリブレーション途中離脱・エラー時に戻る待機 state。 */
   calibrationIdleState(): CaptureState;
   /** キャリブレーション確定時の TTS (= gesture は「開始します」、 voice は位置確認のみ)。 */
-  calibrationConfirmedTts(): string;
+  calibrationConfirmedTts(): string | null;
   /** クリップ完了時の案内 TTS。 */
-  donePromptTts(): string;
+  donePromptTts(): string | null;
   /** 録画が乗ってきた頃に 1 回だけ読む、 終了方法の案内 TTS。 */
-  stopHintTts(): string;
+  stopHintTts(): string | null;
+  /** 自動サイクル再開時の案内。 nullなら無音でafterCycleResumeへ進む。 */
+  cycleResumeTts(): string | null;
   /** クリップ完了案内のあとの待機へ。 */
   afterDonePrompt(ctx: FlowTickCtx): void;
   /** サイクル休止明けの再開案内のあとへ。 */
@@ -124,6 +135,8 @@ export interface CaptureFlow {
    * 遷移した場合は { transitioned: true }。 継続なら armedSince (= デバウンス継続値) を返す。
    */
   tickRecordingStop(ctx: FlowTickCtx, armedSince: number): { transitioned: boolean; armedSince: number };
+  /** フロー専用の外部操作入力。 hardware-button以外はfalseを返す。 */
+  tickCaptureControl(ctx: FlowTickCtx, cur: CaptureState): boolean;
   /** フロー固有 state の tick (= gesture の palm_prompt / awaiting_palm / stopping* 、 voice の
    *  voice_prompt / awaiting_start_command)。 CaptureScreen の dispatcher が該当 state kind を
    *  この関数へ流す。 */
@@ -140,6 +153,14 @@ export interface CaptureFlow {
   hud(state: CaptureState): FlowHud | null;
   /** このフローが音声コマンドのリスナーを必要とするか (= マイク・音声認識の起動)。 */
   usesVoiceCommands: boolean;
+  /** AVCaptureEventInteractionを所有するフローか。 */
+  usesHardwareCaptureEvents: boolean;
+  /** 熱・容量等の共通案内を含め、TTSを使うフローか。 */
+  usesSpokenGuidance: boolean;
+  /** カメラsession起動時の入場音。物理ボタンフローは操作時の開始・終了音だけなのでnull。 */
+  sessionEntrySfx: SfxName | null;
+  /** 保存完了後に鳴らす停止音。 操作時に即時再生するフローはnull。 */
+  postFinalizeSfx: SfxName | null;
   /** 設定画面のセグメントに出す表示名の i18n キー。 新フロー追加時に SettingsScreen を編集せず
    *  registry のみで反映されるように、 各フローが自分のラベルを供給する。 */
   displayLabelKey: TranslationKey;

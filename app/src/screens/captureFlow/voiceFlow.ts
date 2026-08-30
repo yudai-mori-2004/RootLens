@@ -6,8 +6,9 @@
 // 現場動機: サムズアップの検知率に個体差があり、 全く通らない装着者がいた (2026-07-18 実店舗)。
 // 音声認識は個体差の吸収が済んだ成熟技術なので、 開始・終了を声に任せる。
 //
-// マイクは端末内の音声認識 (= コマンドの聞き取り) だけに使い、 音声が保存されることはない
-// (録画クリップに音声トラックは無い)。 コマンドの照合とゲート (TTS 再生中は無視) は
+// 音声認識の結果は端末内でコマンド照合にだけ使い、文字起こしとしては保存しない。
+// 録画クリップ自体に音声トラックが入るかは RecordingConfig の契約が決める。
+// コマンドの照合とゲート (TTS 再生中は無視) は
 // CaptureScreen 側のリスナーが済ませ、 ここへは 'start' | 'stop' だけが届く。
 
 import { t } from '../../i18n';
@@ -16,7 +17,19 @@ import type { CaptureFlow, CaptureState } from './types';
 export const voiceFlow: CaptureFlow = {
   id: 'voice',
   usesVoiceCommands: true,
+  usesHardwareCaptureEvents: false,
+  usesSpokenGuidance: true,
+  sessionEntrySfx: 'enter_capture',
+  postFinalizeSfx: 'rec_stop',
   displayLabelKey: 'settings.capture.flowVoice',
+
+  introTts() {
+    return t('capture.tts.intro');
+  },
+
+  afterIntro(ctx) {
+    ctx.setState({ kind: 'mounting' });
+  },
 
   isStillRecording() {
     // 声の停止は state 'recording' → 'finalizing' に直行 (gesture の stopping* を経由しない)。
@@ -43,6 +56,10 @@ export const voiceFlow: CaptureFlow = {
 
   stopHintTts() {
     return t('capture.tts.stopHintVoice');
+  },
+
+  cycleResumeTts() {
+    return t('capture.tts.cycleResume');
   },
 
   afterDonePrompt(ctx) {
@@ -77,10 +94,14 @@ export const voiceFlow: CaptureFlow = {
     if (ctx.voiceCommand === 'stop') {
       ctx.consumeVoiceCommand();
       // 終了宣言は finalizing 冒頭の理由読み上げに乗せる (= 保存と並行して再生される)。
-      ctx.finalizeWithReason(t('capture.tts.stoppingConfirm'));
+      ctx.finalize({ reasonTts: t('capture.tts.stoppingConfirm') });
       return { transitioned: true, armedSince: 0 };
     }
     return { transitioned: false, armedSince: 0 };
+  },
+
+  tickCaptureControl() {
+    return false;
   },
 
   tickFlowState(ctx, cur) {

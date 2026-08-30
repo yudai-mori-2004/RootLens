@@ -18,8 +18,9 @@
 //   2. 撮影 (= 開始・終了の指示はフローが決める。 captureFlow/ 参照)
 //        - gesture フロー: キャリブ確定 → 即カウントダウン → 録画。 サムズアップ保持で停止
 //        - voice フロー: キャリブ確定 → 開始コマンド待ち。 「さつえいスタート / ストップ」 で開始・終了
-//        - 1 本 ~100 分の長時間録画を想定した守り: 録画が乗ったら画面消灯 (タップで復帰)、
-//          熱 critical / 空き容量低下 / 120 分で理由を読み上げて自動終了
+//        - hardware-button フロー: iOSの物理capture eventで録画をトグル。案内は開始・終了SFXのみ
+//        - 長時間録画を想定した守り: 録画が乗ったら画面消灯 (タップで復帰)、
+//          熱 critical / 空き容量低下で理由を読み上げて自動終了
 //
 // ⚠ 録画停止後の自動アップロードは行わない。 クリップは state 'recorded' でローカル一覧
 //    (マイビデオ) に積まれ、 ユーザーがプレビュー確認 → 「アップロード」 した時に advanceClip が
@@ -63,14 +64,22 @@ import {
   type ThermalState,
 } from '../native/arkitCapture';
 import {
+  startHardwareCaptureEvents,
+  stopHardwareCaptureEvents,
+  subscribeHardwareCaptureEvent,
+} from '../native/captureControl';
+import { IphoneCapturePreviewView } from '../native/iphoneCapture';
+import {
   DEFAULT_RECORDING_CONFIG,
   RECORDING_CONFIGS,
   getRecordingConfig,
+  recordingConfigForMethod,
   enqueueRecording,
   storeEventSink,
   teeToConsole,
   type RecordingConfig,
   type HandTrackEvent,
+  type DisplayOrientation,
 } from '../dataflow';
 import { playSfx, preloadCaptureSounds, unloadCaptureSounds, type SfxName } from '../services/captureSounds';
 import { enqueueSfx, enqueueSpeak, enqueuePause, clearAudioQueue, getLastSpeechDone, isVoiceCommandGateClosed } from '../services/captureAudio';
@@ -133,13 +142,12 @@ const MARKER_START_KINDS: CaptureState['kind'][] = [
   'voice_prompt', 'awaiting_start_command',
 ];
 
-// ── 長時間録画 (= 1 本 ~100 分想定) の守り ──
+// ── 長時間録画の守り ──
 // 熱源はカメラ ISP + ARKit + 手ポーズ推論で録画中は止められない。 削れる最大の発熱源が画面なので、
 // 録画が乗ったら消灯する (= 輝度 0 + プレビュー描画停止。 タップで復帰)。 加えて、 続行できない状況
-// (= 熱 critical / 空き容量枯渇 / 停止し忘れ) は理由を 1 回読み上げて通常の終了フローで安全に畳む。
+// (= 熱 critical / 空き容量枯渇) は理由を 1 回読み上げて通常の終了フローで安全に畳む。
 const DIM_AFTER_MS = 15_000;            // 録画開始からこの時間で画面消灯
 const REDIM_AFTER_TAP_MS = 8_000;       // タップ復帰からの再消灯
-const MAX_RECORDING_MS = 120 * 60_000;  // 停止し忘れの安全弁 (= 100 分撮影 + 余裕)
 const LOW_DISK_WARN_BYTES = 12 * 1024 ** 3;  // 録画開始時にこれ未満なら一言注意
 const LOW_DISK_STOP_BYTES = 2 * 1024 ** 3;   // 録画中にこれを切ったら自動終了 (= writer が死ぬ前に)
 const LOW_BATTERY_WARN_LEVEL = 0.35;         // 録画開始時にこれ未満 (未充電) なら一言注意
@@ -212,8 +220,10 @@ function calibAdjustText(d: AdjustDirection): string {
 // 効果音 (handoff が積む) の後に続けたいので clearAudioQueue しない (= keep)。
 function entryCue(s: CaptureState, flow: CaptureFlow): { sfx?: SfxName; tts?: string; keep?: boolean } | null {
   switch (s.kind) {
-    case 'announcing':
-      return { tts: t('capture.tts.intro'), keep: true };
+    case 'announcing': {
+      const intro = flow.introTts();
+      return intro ? { tts: intro, keep: true } : null;
+    }
     // next_task_announcing は二部構成 (お疲れさま → 間 → 続けるなら) なので state→audio effect で個別に積む。
     case 'adjust_needed':
       return { tts: calibAdjustText(s.direction) };
@@ -221,9 +231,14 @@ function entryCue(s: CaptureState, flow: CaptureFlow): { sfx?: SfxName; tts?: st
       // 検出ビープ (detect_palm) はジェスチャー確定時に即時再生する専用 effect が鳴らす
       // (= キュー非経由で不発しない + アイコン表示と同期)。 確定 TTS はフローが決める
       // (= gesture は「開始します」、 voice は位置確認のみ)。
-      return { tts: flow.calibrationConfirmedTts() };
-    case 'cycle_resuming':
-      return { tts: t('capture.tts.cycleResume') };
+      {
+        const confirmed = flow.calibrationConfirmedTts();
+        return confirmed ? { tts: confirmed } : null;
+      }
+    case 'cycle_resuming': {
+      const resume = flow.cycleResumeTts();
+      return resume ? { tts: resume } : null;
+    }
     default:
       // 上に無い state はすべてフローが決める (= フロー固有 state と、 gesture の palm 案内 / voice の
       // 開始コマンド案内など、 フローごとに文言・cue が違うもの)。
@@ -269,8 +284,13 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
 
   // 撮影構成の切替はキャリブレーション待機中のみ可能 (= DevSandbox と同じ要領)。
   // selectedConfigId = ユーザーが選んだ構成 (= 切替目標)。 activeConfigId = 実際に session が
-  // 稼働中の構成 (= preview / hand-track はこちらを使う)。 現状の構成は arkit のみ。
+  // 稼働中の構成 (= preview / hand-track はこちらを使う)。
   const [selectedConfigId, setSelectedConfigId] = useState<string>(DEFAULT_RECORDING_CONFIG.id);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [displayOrientation, setDisplayOrientation] = useState<DisplayOrientation>(
+    'landscapeRight',
+  );
+  const [externalCaptureSelected, setExternalCaptureSelected] = useState(false);
   const [activeConfigId, setActiveConfigId] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
   const [availByConfig, setAvailByConfig] = useState<Record<string, boolean>>({});
@@ -281,7 +301,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const sessionOpRef = useRef<Promise<void>>(Promise.resolve());
   const runningConfigRef = useRef<RecordingConfig | null>(null);
 
-  // 起動直後は announcing から始める (= TTS 「手のひらを上向きに 3 秒キープ」 を最後まで言わせる)
+  // 起動直後は announcing。読み上げの有無と次stateは選択中CaptureFlowが決める。
   const [state, setState] = useState<CaptureState>({ kind: 'announcing' });
   const [error, setError] = useState<string | null>(null);
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
@@ -298,6 +318,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 印刷マーカー (ROOTLENS QR) の直近検出時刻と再武装状態。 提示 1 回 = 1 トグルにするため、
   // 一度発火したらマーカーが MARKER_REARM_GAP_MS 以上見えなくなるまで次を受け付けない。
   const markerRef = useRef({ lastSeenAt: 0, armed: true });
+  // native の音量キーイベントは ref に積み、 状態遷移の単一ドライバ (= tickState) が消費する。
+  // seq/consumed に分けることで React effect と ticker が同じ state を直接動かさない。
+  const hardwareCaptureRef = useRef({ seq: 0, consumed: 0, at: 0 });
   // 時間方向の平滑化 (= 5/5 実装の GestureStabilizer 相当、 ~167ms)。 単フレームのノイズで
   // hold が崩れる/ちらつくのを防ぐ。 両手要件は「2 手揃った frame gesture だけを投入」で担保する。
   const gestureStabilizerRef = useRef(new GestureStabilizer(5));
@@ -310,6 +333,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const freeDiskRef = useRef<number | null>(null);
   const powerRef = useRef<PowerState | null>(null);
   const autoStopReasonRef = useRef<string | null>(null); // finalizing 冒頭で 1 回読む自動終了の理由
+  const immediateFinalizeSfxRef = useRef<SfxName | null>(null);
   const [dimmed, setDimmed] = useState(false);
   const wakeUntilRef = useRef(0); // タップ復帰後、 この時刻までは再消灯しない
 
@@ -325,14 +349,32 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     loadCaptureSettings()
       .then((s) => {
+        const selected = recordingConfigForMethod(s.captureMethodId);
+        setExternalCaptureSelected(!selected);
+        if (selected) setSelectedConfigId(selected.id);
+        setDisplayOrientation(s.displayOrientation);
         cycleRef.current = {
           enabled: s.cycleEnabled,
           recordMs: Math.max(1, s.cycleRecordMinutes) * 60_000,
           pauseMs: Math.max(1, s.cyclePauseMinutes) * 60_000,
         };
         setFlowId(getCaptureFlow(s.captureFlow).id);
+        setSettingsLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => setSettingsLoaded(true));
+  }, []);
+
+  // One owner decides whether the shared iOS audio session must keep an input
+  // route. The iPhone RGB+IMU config records AAC even in gesture mode; the
+  // voice flow also needs input even when ARKit is selected.
+  useEffect(() => {
+    if (!settingsLoaded || externalCaptureSelected) return;
+    const allowsRecordingIOS = selectedConfigId === 'iphone'
+      || getCaptureFlow(flowId).usesVoiceCommands;
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS }).catch(() => {});
+  }, [flowId, selectedConfigId, settingsLoaded]);
+  useEffect(() => () => {
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});
   }, []);
 
   // 音声コマンド (= voice フローのみ)。 native の常設リスナーを起動し、 直近の一致を ref に置く。
@@ -340,10 +382,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const voiceCmdRef = useRef<{ cmd: 'start' | 'stop'; at: number } | null>(null);
   useEffect(() => {
     if (!getCaptureFlow(flowId).usesVoiceCommands) return;
-    // expo-av は効果音を鳴らすたびに自分の audio mode でセッションを再構成する。
-    // allowsRecordingIOS を立てないと category が playback に戻り、 マイク入力が無音化する
-    // (= 認識器はエラーも出さず沈黙する)。 再生と録音の共存はこのフラグが正規の調整点。
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: true }).catch(() => {});
     startArkitVoiceCommands().catch((e) =>
       sink({ step: 'capture', level: 'warn', message: `音声コマンド開始失敗: ${errMsg(e)}` }),
     );
@@ -364,7 +402,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       unavailableSub.remove();
       voiceCmdRef.current = null;
       stopArkitVoiceCommands().catch(() => {});
-      Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});
     };
   }, [flowId]);
 
@@ -377,6 +414,28 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     });
     return () => sub.remove();
   }, []);
+
+  // 物理ボタンフローだけが iOS の camera capture event を所有する。 gesture / voice の補助入力には
+  // しない (= 開始・終了 UI の戦略を CaptureFlow 単位で完全に分離する)。 interaction を外すと
+  // volume +/- は通常のシステム音量操作へ戻る。
+  useEffect(() => {
+    const flow = getCaptureFlow(flowId);
+    if (!flow.usesHardwareCaptureEvents || externalCaptureSelected || activeConfigId !== config.id) return;
+    const sub = subscribeHardwareCaptureEvent(() => {
+      hardwareCaptureRef.current.seq += 1;
+      hardwareCaptureRef.current.at = Date.now();
+    });
+    startHardwareCaptureEvents().catch((e) => {
+      const message = `物理撮影ボタン開始失敗: ${errMsg(e)}`;
+      sink({ step: 'capture', level: 'error', message });
+      setError(message);
+    });
+    return () => {
+      sub.remove();
+      hardwareCaptureRef.current.consumed = hardwareCaptureRef.current.seq;
+      stopHardwareCaptureEvents().catch(() => {});
+    };
+  }, [activeConfigId, config.id, externalCaptureSelected, flowId]);
 
   const recordingStartedRef = useRef(false);
   // 終了方法の案内 (= 録画開始から数秒後に 1 回だけ)
@@ -419,6 +478,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
 
   // 権限確認 + 全撮影構成の利用可否判定 (= スイッチャ表示用)
   useEffect(() => {
+    if (!settingsLoaded) return;
     let cancelled = false;
     (async () => {
       try {
@@ -431,6 +491,16 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         } else {
           setPermission('granted');
         }
+        if (selectedConfigId === 'iphone') {
+          const existingMicrophone = await Camera.getMicrophonePermissionsAsync();
+          const microphone = existingMicrophone.granted
+            ? existingMicrophone
+            : await Camera.requestMicrophonePermissionsAsync();
+          if (!microphone.granted) {
+            if (!cancelled) setPermission('denied');
+            return;
+          }
+        }
         const entries = await Promise.all(
           RECORDING_CONFIGS.map(async (c) => [c.id, await c.isAvailable().catch(() => false)] as const),
         );
@@ -440,13 +510,13 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [externalCaptureSelected, settingsLoaded, selectedConfigId]);
 
   // 撮影構成の session ハンドオフ (= DevSandbox と同じ直列化)。 config が変わるたびに
   // 「旧 session 完全停止 (await) → カメラ解放待ち → 新 session 開始」 を直列実行する。
   // permission 許可後のみ動く。
   useEffect(() => {
-    if (permission !== 'granted') return;
+    if (permission !== 'granted' || !settingsLoaded || externalCaptureSelected) return;
     let cancelled = false;
     const target = config;
     sessionOpRef.current = sessionOpRef.current
@@ -477,18 +547,21 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         await applyCaptureSettingsToNative().catch((e) =>
           sink({ step: 'capture', level: 'warn', message: `撮影設定の適用失敗: ${errMsg(e)}` }),
         );
+        // UI と native frame / preview / MP4 transform は同じ保存値を使う。 session 起動前に
+        // 適用して、 最初の preview frame だけ旧向きになる状態も避ける。
+        await target.setDisplayOrientation(displayOrientation);
         await target.startSession(sink);
         runningConfigRef.current = target;
         if (cancelled) return;
-        // session が安定した後に進入効果音を積む (= camera 再構成での切れを避ける)。 setActiveConfigId
-        // (= 案内 TTS のトリガ) より「先に」 積むので、 enter 音 → 案内 TTS の順が確定する。
-        enqueueSfx('enter_capture');
+        // 入場音の有無もフローが所有する。物理ボタンフローは押下時の開始・終了音だけにする。
+        const entrySfx = getCaptureFlow(flowId).sessionEntrySfx;
+        if (entrySfx) enqueueSfx(entrySfx);
         setActiveConfigId(target.id);
       })
       .catch((e) => sink({ step: 'capture', level: 'error', message: `session 切替失敗: ${errMsg(e)}` }))
       .finally(() => { if (!cancelled) setSwitching(false); });
     return () => { cancelled = true; };
-  }, [config, permission]);
+  }, [config, displayOrientation, externalCaptureSelected, flowId, permission, settingsLoaded]);
 
   // アンマウント時に稼働中 session を停止する。
   useEffect(() => {
@@ -498,12 +571,6 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       if (running) running.stopSession(sink).catch(() => {});
     };
   }, []);
-
-  // 画面が landscapeRight に固定されるので、 native にも landscapeRight を固定で渡す (= 変化リスナー無し)。
-  // ⚠ 上の lock を LANDSCAPE_LEFT に変えるなら、 ここも 'landscapeLeft' に揃えること。
-  useEffect(() => {
-    config.setDisplayOrientation('landscapeRight').catch(() => {});
-  }, [config]);
 
   // 熱状態の購読 (= native は録画中のみ発火) + 空き容量 / 電池の初期値。
   useEffect(() => {
@@ -548,7 +615,10 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       if (next !== 'background') return;
       const cur = stateRef.current;
       if (cur.kind === 'recording' || flowRef.current.isStillRecording(cur)) {
-        autoStopReasonRef.current = t('capture.tts.autoStopBackground');
+        autoStopReasonRef.current = flowRef.current.usesSpokenGuidance
+          ? t('capture.tts.autoStopBackground')
+          : null;
+        immediateFinalizeSfxRef.current = flowRef.current.postFinalizeSfx === null ? 'rec_stop' : null;
         setState({ kind: 'finalizing' });
       } else if (cur.kind === 'precapture_countdown') {
         // まだ録画が始まっていない → 開始せずフローの待機に戻す (= 復帰したらやり直し)。
@@ -617,11 +687,15 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   // 撮影中の open_palm / キャリブ中の thumbs_up は無関係なので鳴らさない。 音はパー/サムズ共通 (= 好評の音)。
   const prevShownRef = useRef<'open_palm' | 'thumbs_up' | null>(null);
   useEffect(() => {
+    if (flowRef.current.usesHardwareCaptureEvents) {
+      prevShownRef.current = null;
+      return;
+    }
     const shown = relevantGesture(currentGesture, state.kind, !everRecordedRef.current);
     const prev = prevShownRef.current;
     prevShownRef.current = shown;
     if (shown && shown !== prev) playSfx('detect_palm');
-  }, [currentGesture, state.kind]);
+  }, [currentGesture, flowId, state.kind]);
 
   // state→audio (一方向): state.kind が変わったら、 その state の入場 cue を鳴らす。
   // 状態遷移はしない (= 遷移は ticker が getLastSpeechDone を見て決める)。 TTS を積んだら seq を
@@ -631,7 +705,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     // 撮影完了後の案内: 「お疲れさま → 少し間 → 続けるなら手のひらを」 の二部構成。 待つのは最後の発話の seq。
     if (state.kind === 'next_task_announcing') {
       clearAudioQueue();
-      awaitedSpeechSeqRef.current = enqueueSpeak(flowRef.current.donePromptTts());
+      const donePrompt = flowRef.current.donePromptTts();
+      if (donePrompt) awaitedSpeechSeqRef.current = enqueueSpeak(donePrompt);
       return;
     }
     const cue = entryCue(state, flowRef.current);
@@ -686,11 +761,17 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           sessionDirRef.current = session.sessionDir;
           // 録画開始の合図は countdown_end (= precapture_countdown 末尾で 1 度だけ鳴る) で完結。
           // 空き容量 / 電池が心もとない時だけ一言 (= 長時間撮影は途中終了があり得ると先に伝える)。
-          if (freeDiskRef.current !== null && freeDiskRef.current < LOW_DISK_WARN_BYTES) {
+          if (flowRef.current.usesSpokenGuidance
+              && freeDiskRef.current !== null
+              && freeDiskRef.current < LOW_DISK_WARN_BYTES) {
             enqueueSpeak(t('capture.tts.lowDisk'));
           }
           const power = powerRef.current;
-          if (power !== null && power.level >= 0 && !power.charging && power.level < LOW_BATTERY_WARN_LEVEL) {
+          if (flowRef.current.usesSpokenGuidance
+              && power !== null
+              && power.level >= 0
+              && !power.charging
+              && power.level < LOW_BATTERY_WARN_LEVEL) {
             enqueueSpeak(t('capture.tts.lowBattery'));
           }
         } catch (e: any) {
@@ -705,6 +786,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         try {
           // 停止確定 → 残っている案内音声 (「このままキープ…」 等) を捨てて停止音を即鳴らせるようにする。
           clearAudioQueue();
+          const immediateSfx = immediateFinalizeSfxRef.current;
+          immediateFinalizeSfxRef.current = null;
+          if (immediateSfx) void playSfx(immediateSfx);
           // 自動終了 (= 熱 / 容量 / 長時間) はここで理由を 1 回だけ読む (= 保存と並行して再生される)。
           const autoStopReason = autoStopReasonRef.current;
           autoStopReasonRef.current = null;
@@ -732,22 +816,27 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           recordingStartedRef.current = false;
           sessionDirRef.current = null;
 
-          // 停止音 (= 撮影終了) が鳴り終わってから次タスク提案へ進む (= 音と表示のズレを無くす)。
-          await enqueueSfx('rec_stop');
-          if (stateRef.current.kind !== 'finalizing') return;
-          // 終了の合図のあと少し間を置いてから次の案内へ (= 畳みかけない)。
-          await delay(900);
-          if (stateRef.current.kind !== 'finalizing') return;
+          // 読み上げフローは保存完了後に停止音を鳴らす。物理ボタンフローは押下時に即時再生済み。
+          const postFinalizeSfx = flowRef.current.postFinalizeSfx;
+          if (postFinalizeSfx) {
+            await enqueueSfx(postFinalizeSfx);
+            if (stateRef.current.kind !== 'finalizing') return;
+            await delay(900);
+            if (stateRef.current.kind !== 'finalizing') return;
+          }
           awaitedSpeechSeqRef.current = 0; // 前 state の完了 seq との誤一致防止
           // 計画的なサイクル区切りなら休止へ (= ARKit 停止で冷却)。 それ以外は従来どおり次タスク案内。
           if (cycleStopRef.current) {
             cycleStopRef.current = false;
             setState({ kind: 'cycle_pausing', startTs: Date.now() });
-          } else {
+          } else if (flowRef.current.donePromptTts()) {
             setState({ kind: 'next_task_announcing' });
+          } else {
+            setState(flowRef.current.calibrationIdleState());
           }
         } catch (e: any) {
           recordingStartedRef.current = false;
+          immediateFinalizeSfxRef.current = null;
           setError(`${t('capture.recStopFailed')}: ${e?.message ?? e}`);
           setState(flowRef.current.calibrationIdleState());
         }
@@ -775,6 +864,7 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
     // フローに渡す操作の束 (= 遷移・音声・停止シーケンス)。 遷移の権限は ticker のままで、
     // フローはこの ctx 経由でしか状態を動かせない。
     const voice = voiceCmdRef.current;
+    const hardware = hardwareCaptureRef.current;
     const ctx: FlowTickCtx = {
       now,
       gesture,
@@ -782,11 +872,15 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       // 鮮度切れ (= 1.5 秒) の一致は捨てる。 TTS 中の一致はリスナー側で捨て済み。
       voiceCommand: voice && now - voice.at <= 1500 ? voice.cmd : null,
       consumeVoiceCommand: () => { voiceCmdRef.current = null; },
+      hardwareCaptureEvent:
+        hardware.seq !== hardware.consumed && now - hardware.at <= 1500,
+      consumeHardwareCaptureEvent: () => { hardware.consumed = hardware.seq; },
       speechDone,
       setState,
       clearAwaitedSpeech: () => { awaitedSpeechSeqRef.current = 0; },
-      finalizeWithReason: (reason) => {
-        autoStopReasonRef.current = reason;
+      finalize: (options = {}) => {
+        autoStopReasonRef.current = options.reasonTts ?? null;
+        immediateFinalizeSfxRef.current = options.immediateSfx ?? null;
         setState({ kind: 'finalizing' });
       },
       audio: { speak: enqueueSpeak, sfx: enqueueSfx, pause: enqueuePause, clear: clearAudioQueue },
@@ -805,37 +899,41 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       },
     };
 
-    // 印刷マーカーのトグル (= フロー非依存の決定的トリガー。 提示 1 回 = 1 トグル)。
-    // 発火後はマーカーが一度フレームから消える (= REARM_GAP 以上未検出) まで再武装しない:
-    // 開始トグル後にカードを出し続けても、 録画に入った瞬間の停止誤爆にならない。
+    // 印刷マーカーは gesture / voice の共通フォールバック。物理ボタンフローでは別入力を混ぜず、
+    // 選択した AVCaptureEventInteraction だけを開始・終了操作にする。
     const mk = markerRef.current;
     if (now - mk.lastSeenAt > MARKER_REARM_GAP_MS) mk.armed = true;
-    if (mk.armed && now - mk.lastSeenAt <= MARKER_ACTIVE_MS) {
+    const markerActive = mk.armed && now - mk.lastSeenAt <= MARKER_ACTIVE_MS;
+    if (!flowRef.current.usesHardwareCaptureEvents && markerActive) {
       if (MARKER_START_KINDS.includes(cur.kind)) {
-        mk.armed = false;
-        playSfx('detect_palm'); // 認識の即時フィードバック (以降はカウントダウン音が引き継ぐ)
+        playSfx('detect_palm');
         clearAudioQueue();
         awaitedSpeechSeqRef.current = 0;
         setState({ kind: 'precapture_countdown', startTs: now });
+        mk.armed = false;
         return;
       }
       if (cur.kind === 'recording' || flowRef.current.isStillRecording(cur)) {
-        mk.armed = false;
         playSfx('detect_palm');
-        ctx.finalizeWithReason(t('capture.tts.stoppingConfirm'));
+        ctx.finalize({ reasonTts: t('capture.tts.stoppingConfirm') });
+        mk.armed = false;
         return;
       }
     }
 
+    // フロー専用の外部入力。現状は hardware-button だけが実装し、イベントをここで直列消費する。
+    if (flowRef.current.tickCaptureControl(ctx, cur)) return;
+
     switch (cur.kind) {
       case 'announcing': {
-        // 取り付け案内を言い終わったら装着待ちへ。
-        if (speechDone()) setState({ kind: 'mounting' });
+        const intro = flowRef.current.introTts();
+        if (intro === null || speechDone()) flowRef.current.afterIntro(ctx);
         return;
       }
       case 'next_task_announcing': {
         // クリップ間は装着済みなので、 装着待ちを飛ばしてフローの待機へ (= 案内は done TTS に含む)。
-        if (speechDone()) flowRef.current.afterDonePrompt(ctx);
+        const donePrompt = flowRef.current.donePromptTts();
+        if (donePrompt === null || speechDone()) flowRef.current.afterDonePrompt(ctx);
         return;
       }
       case 'mounting': {
@@ -874,8 +972,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       case 'calibration_confirmed': {
         // 確定音 + TTS を言い終わって 500ms 経ったら、 フローの次段へ
         // (= gesture: 開始カウントダウン / voice: 開始コマンド待ち)。
+        const confirmed = flowRef.current.calibrationConfirmedTts();
         const done = getLastSpeechDone();
-        if (speechDone() && now - done.at >= 500) {
+        if (confirmed === null || (speechDone() && now - done.at >= 500)) {
           flowRef.current.afterCalibration(ctx);
         }
         return;
@@ -892,40 +991,41 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         // 開始カウントダウンは専用 timer (countdown driver effect) が駆動。 ここでは何もしない。
         return;
       case 'recording': {
-        // 長時間録画の安全弁 (= 手検出と無関係に判定)。 続行できない状況は理由を積んで終了フローへ。
-        // 判定順 = 危険度順: 熱 critical (放置すると OS がカメラごと殺す) > 容量 (writer が書けなく
-        // なる) > 電池 (突然死 = 台帳登録前に消える) > 長時間。
         const startedAt = recordingStartedAtRef.current;
         // 計画的なサイクル区切り (= 自動サイクル ON で連続撮影時間に到達)。 これは異常停止ではなく、
         // finalize 後に休止 → 再開へ進む (cycleStopRef で finalizing に伝える)。
         const cyc = cycleRef.current;
         if (cyc.enabled && startedAt > 0 && now - startedAt >= cyc.recordMs) {
-          autoStopReasonRef.current = t('capture.tts.cyclePause', { minutes: Math.max(1, Math.round(cyc.pauseMs / 60_000)) });
+          autoStopReasonRef.current = flowRef.current.usesSpokenGuidance
+            ? t('capture.tts.cyclePause', { minutes: Math.max(1, Math.round(cyc.pauseMs / 60_000)) })
+            : null;
+          immediateFinalizeSfxRef.current = flowRef.current.postFinalizeSfx === null ? 'rec_stop' : null;
           cycleStopRef.current = true;
           setState({ kind: 'finalizing' });
           return;
         }
         // 長時間録画の安全弁 (= 手検出と無関係に判定)。 続行できない状況は理由を積んで終了フローへ。
         // 判定順 = 危険度順: 熱 critical (放置すると OS がカメラごと殺す) > 容量 (writer が書けなく
-        // なる) > 電池 (突然死 = 台帳登録前に消える) > 長時間。
+        // なる) > 電池 (突然死 = 台帳登録前に消える)。
         const power = powerRef.current;
         const batteryLow =
           power !== null && power.level >= 0 && !power.charging && power.level <= LOW_BATTERY_STOP_LEVEL;
-        const autoStopReason =
-          thermalRef.current === 'critical' ? t('capture.tts.autoStopHot')
-          : freeDiskRef.current !== null && freeDiskRef.current < LOW_DISK_STOP_BYTES ? t('capture.tts.autoStopDisk')
-          : batteryLow ? t('capture.tts.autoStopBattery')
-          : startedAt > 0 && now - startedAt >= MAX_RECORDING_MS ? t('capture.tts.autoStopLong')
+        const autoStopKey =
+          thermalRef.current === 'critical' ? 'capture.tts.autoStopHot' as const
+          : freeDiskRef.current !== null && freeDiskRef.current < LOW_DISK_STOP_BYTES ? 'capture.tts.autoStopDisk' as const
+          : batteryLow ? 'capture.tts.autoStopBattery' as const
           : null;
-        if (autoStopReason) {
-          autoStopReasonRef.current = autoStopReason;
+        if (autoStopKey) {
+          autoStopReasonRef.current = flowRef.current.usesSpokenGuidance ? t(autoStopKey) : null;
+          immediateFinalizeSfxRef.current = flowRef.current.postFinalizeSfx === null ? 'rec_stop' : null;
           setState({ kind: 'finalizing' });
           return;
         }
         // 録画が乗ってきた頃に、 終了方法を 1 回だけ案内する (= 遷移を駆動しない副作用)。
         if (!stopHintSpokenRef.current && now - cur.startTs >= STOP_HINT_DELAY_MS) {
           stopHintSpokenRef.current = true;
-          enqueueSpeak(flowRef.current.stopHintTts());
+          const stopHint = flowRef.current.stopHintTts();
+          if (stopHint) enqueueSpeak(stopHint);
         }
         // 手が映っていない警告は出さない。 支払いが「手が映っている有効録画時間」 ベースなので、
         // 手を映すインセンティブは金銭側で立っており、 作業中の警告音は現場では驚かせるだけだった。
@@ -942,7 +1042,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
       case 'stopping':
       case 'stopping_confirm':
       case 'voice_prompt':
-      case 'awaiting_start_command': {
+      case 'awaiting_start_command':
+      case 'awaiting_hardware_button': {
         // フロー固有 state (= gesture のパー案内 / 停止保持、 voice の開始コマンド案内・待機)
         // はフローが tick する。
         flowRef.current.tickFlowState(ctx, cur);
@@ -955,7 +1056,9 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
         return;
       case 'cycle_resuming':
         // 再開案内を言い終わったらフローの最初の案内へ。
-        if (speechDone()) flowRef.current.afterCycleResume(ctx);
+        if (flowRef.current.cycleResumeTts() === null || speechDone()) {
+          flowRef.current.afterCycleResume(ctx);
+        }
         return;
     }
   }, []);
@@ -1034,7 +1137,8 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
           await config.startSession(sink);
           runningConfigRef.current = config;
           if (cancelled) return;
-          enqueueSfx('enter_capture');
+          const entrySfx = flowRef.current.sessionEntrySfx;
+          if (entrySfx) enqueueSfx(entrySfx);
           setActiveConfigId(config.id);
         })
         .then(() => {
@@ -1121,7 +1225,18 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
   const availKnown = Object.keys(availByConfig).length > 0;
   const noConfigAvailable = availKnown && RECORDING_CONFIGS.every((c) => !availByConfig[c.id]);
 
-  if (permission === 'pending' || available === null) {
+  if (settingsLoaded && externalCaptureSelected) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.eyebrow}>{t('settings.capture.method.mentra')}</Text>
+        <Text style={styles.body}>{t('tab.captureMentraHint')}</Text>
+        <Pressable style={styles.btn} onPress={() => navigation.goBack()}>
+          <Text style={styles.btnLabel}>{t('common.back')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  if (!settingsLoaded || permission === 'pending' || available === null) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
@@ -1157,7 +1272,11 @@ const CaptureBody: React.FC<Props> = ({ navigation }) => {
 
   // プレビューは「実際に稼働中の構成」 の native view を出す (= 切替完了後に swap)。
   // 構成が増えたらここに config id → native view の対応を足す。
-  const PreviewView = activeConfigId === 'arkit' ? ArkitCapturePreviewView : null;
+  const PreviewView = activeConfigId === 'arkit'
+    ? ArkitCapturePreviewView
+    : activeConfigId === 'iphone'
+      ? IphoneCapturePreviewView
+      : null;
 
   // ─── HUD (= 画面下の字幕。 今やることを平易な日本語 1 文で) ────────────
   // 頭部装着中は画面が見えない前提: 音声が主チャネル、 画面は「装着前の準備」 と

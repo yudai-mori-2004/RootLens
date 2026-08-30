@@ -6,4 +6,10 @@
 export { computeContentHash } from './hash';
 export { uploadToR2 } from './upload';
 export { registerClip } from './register';
-export { fetchMyClips, fetchClipMediaUrl, attachClipConsent, ClipApiError } from './list';
+export {
+  fetchMyClips,
+  fetchClipMediaUrl,
+  attachClipConsent,
+  deleteServerClip,
+  ClipApiError,
+} from './list';

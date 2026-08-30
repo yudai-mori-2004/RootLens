@@ -32,7 +32,8 @@ import { ClipPreviewModal } from '../components/ClipPreviewModal';
 import { GlassesClipReviewModal } from '../components/GlassesClipReviewModal';
 import { HistoryDetailModal } from '../components/HistoryDetailModal';
 import {
-  storeEventSink, enqueueAdvance, discardClip, fetchMyClips, attachClipConsent, ClipApiError,
+  storeEventSink, enqueueAdvance, discardClip, fetchMyClips, attachClipConsent,
+  deleteServerClip, ClipApiError,
   type Clip, type ServerClipStatus,
 } from '../dataflow';
 import { useClips } from '../clips/hooks';
@@ -360,6 +361,12 @@ export const CollectionScreen: React.FC = () => {
     setGlassesReviewTarget(null);
     server.refresh();
   }, [server.refresh]);
+  const onDeleteServerClip = useCallback(async (clip: ServerClipStatus) => {
+    await deleteServerClip(clip.contentHash);
+    setGlassesReviewTarget(null);
+    setHistoryTarget(null);
+    server.refresh();
+  }, [server.refresh]);
 
   return (
     <View style={styles.root}>
@@ -512,12 +519,14 @@ export const CollectionScreen: React.FC = () => {
         clip={historyTarget?.clip ?? null}
         thumbSource={historyTarget?.source}
         onClose={() => setHistoryTarget(null)}
+        onDelete={onDeleteServerClip}
       />
       <GlassesClipReviewModal
         visible={glassesReviewTarget !== null}
         clip={glassesReviewTarget}
         onClose={() => setGlassesReviewTarget(null)}
         onConsent={onGlassesConsent}
+        onDelete={onDeleteServerClip}
       />
     </View>
   );
@@ -568,7 +577,7 @@ const GlassesReviewCard: React.FC<{
   onOpen: () => void;
 }> = ({ clip, onOpen }) => {
   const t = useT();
-  const frame = useUploadedClipFrame(`pending-${clip.contentHash}`, clip.contentHash);
+  const frame = useUploadedClipFrame(clip.contentHash, clip.contentHash);
   return (
     <Pressable onPress={onOpen} style={({ pressed }) => [styles.reviewCard, pressed && styles.tilePressed]}>
       <View style={styles.reviewThumb}>
@@ -807,7 +816,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: colors.textMute,
   },
-  deviceOptionTextSelected: { color: colors.ink },
+  deviceOptionTextSelected: { color: colors.textOnInk },
 
   // ── 右面 ──
   main: {
@@ -929,7 +938,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansBold,
     fontSize: 9,
     letterSpacing: 0.5,
-    color: colors.ink,
+    color: colors.textOnInk,
   },
   reviewMeta: {
     flexDirection: 'row',
