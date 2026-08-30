@@ -20,19 +20,4 @@ R5の96 × 44 mm額当て曲面を変更せず再利用し、その中央下部�
 
 出力: `tools/rootcap/r6-forehead-magsafe/stl/forehead_magsafe_mount_three_hole_thin.stl`
 
-## R7 額曲面の置換版
-
-Blenderで作ったR7外形から旧額当てと額方向の食い込みを楕円体マスクで一度すべて除去し、R5と同じ額楕円から生成した新しい接触面へ置き換える。接触面は厚さ2.0 mm、幅96 mm、3穴を維持する。穴はM4用の直径4.5 mm貫通穴とし、額に接する内側の面には直径8.4 mm・深さ1.0 mmのねじ頭用窪みを設ける。左右の傾斜部でも外側へ貫通しないよう、窪みの底は額楕円へ追従させる。上側の角は半径8 mm、下端は角丸なしとする。三角形化の弦誤差を含めても額へ食い込まないよう、接触面全体を理論額面から0.10 mm外側へ置く。
-
-曲面と除去マスクの正本: `RootaCap_R7_forehead_replacement.scad`
-
-結合処理: `rebuild_r7_forehead.py`
-
-STL書き出し後の局所的な退化面修復: `repair_r7_export.py`
-
-手調整済みSTLの外形を再生成せず、3個のねじ頭用窪みだけを反対面へ移す処理: `flip_r7_counterbores_manifold.py`
-
-最終出力:
-
-- `stl/RootaCap_R7_forehead_rebuilt_counterbore_final.stl`
-- `RootaCap_R7_forehead_rebuilt_counterbore_final.blend`
+R7は `../r7-forehead-magsafe/` に分離した。このフォルダにはR6の正本と生成物だけを置く。
