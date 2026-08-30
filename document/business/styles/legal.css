@@ -1,0 +1,142 @@
+html {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif;
+}
+
+h1 {
+  margin: 0 0 9mm;
+  text-align: center;
+  font-size: 16pt;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+}
+
+h2 {
+  margin: 5mm 0 1.2mm;
+  font-size: 10.5pt;
+  font-weight: 600;
+  line-height: 1.8;
+}
+
+h3 {
+  margin: 7mm 0 2mm;
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+p {
+  margin: 0 0 2.2mm;
+  line-height: 1.85;
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+ol,
+ul {
+  margin: 0 0 2.2mm 6mm;
+  padding-left: 5mm;
+}
+
+li {
+  margin: 0 0 1.2mm;
+  padding-left: 1mm;
+  line-height: 1.85;
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+li > ol,
+li > ul {
+  margin-top: 1.2mm;
+}
+
+ol ol {
+  list-style: none;
+  counter-reset: subitem;
+}
+
+ol ol > li {
+  position: relative;
+  counter-increment: subitem;
+}
+
+ol ol > li::before {
+  position: absolute;
+  left: -6mm;
+  content: "(" counter(subitem) ")";
+}
+
+hr {
+  margin: 8mm 0;
+}
+
+table {
+  margin: 3mm 0 0;
+  table-layout: fixed;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  font-size: 9.5pt;
+}
+
+th,
+td {
+  padding: 2.2mm 2.5mm;
+  line-height: 1.6;
+}
+
+th {
+  background: #f3f3f3;
+  font-weight: 600;
+}
+
+th:first-child,
+td:first-child {
+  width: 40mm;
+}
+
+blockquote {
+  margin: 4mm 0;
+  padding: 3mm 4mm;
+  border-left: 1mm solid #aaa;
+  background: #f7f7f7;
+}
+
+.variant-compact h1 {
+  margin-bottom: 6mm;
+  font-size: 14pt;
+}
+
+.variant-compact h2 {
+  margin-top: 3mm;
+  line-height: 1.55;
+}
+
+.variant-compact p,
+.variant-compact li {
+  margin-bottom: 1.2mm;
+  font-size: 9.3pt;
+  line-height: 1.58;
+}
+
+.variant-compact ol,
+.variant-compact ul {
+  margin-bottom: 1.2mm;
+}
+
+.variant-compact blockquote {
+  margin: 2.5mm 0;
+  padding: 2mm 3mm;
+}
+
+.variant-compact hr {
+  margin: 5mm 0;
+}
+
+.variant-compact table {
+  font-size: 8.8pt;
+}
+
+.variant-compact th,
+.variant-compact td {
+  padding: 1.4mm 2mm;
+  line-height: 1.4;
+}

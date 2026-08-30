@@ -1,68 +1,87 @@
-# business — 営業運用ドキュメント
+# business — 営業・同意ドキュメント
 
-撮影協力店を獲得・運用するためのテンプレート (HTML) とビルドスクリプト。実データ (契約済みの店舗情報、押印スキャン、月次入金) は本 repo には置かず、Obsidian vault (`rootlens-vault/RESOURCE_MANAGEMENT/`) 側で管理する。
+撮影協力店との基本合意、撮影参加者の個人同意、案件別の説明資料を管理する。正本はすべてMarkdownで、PDFは共通ビルドから生成する。
 
-契約・同意・プライバシーポリシーを主体非依存な形へ育てるための検討ログは [legal-design-notes.md](legal-design-notes.md) にある (保留中)。
+## 正本と出力
+
+- 正本：`document/business/documents/`
+- 画像：`document/business/assets/`
+- スタイル：`document/business/styles/`
+- PDF出力：`output/pdf/business/`
+- 実際の署名・電子同意記録・支払記録：リポジトリ外の管理領域
+
+PDF生成時だけOSの一時ディレクトリにHTMLを作成する。一時HTMLは生成後に削除され、正本や成果物として保持しない。
 
 ## ディレクトリ
 
+```text
+document/business/
+├── assets/                         # 文書で使う画像
+├── documents/
+│   ├── current/                    # 現在使用する文書
+│   │   ├── agreements/             # 店舗・事業所との基本合意
+│   │   ├── consents/               # 撮影参加者本人の同意
+│   │   └── notices/                # 案件・国別の追加説明
+│   └── archive/
+│       └── flyers/                 # 過去条件のフライヤー。配布しない
+├── models/                         # ビジネスモデルの背景メモ
+├── notes/                          # 設計・検討メモ
+├── scripts/build.mjs               # Markdown → 一時HTML → PDF
+├── styles/                         # レイアウト別の共通CSS
+├── package.json
+└── README.md
+
+output/pdf/business/
+├── current/                        # 現行文書のPDF
+└── archive/                        # 過去資料のPDF
 ```
-business/
-├── models/                        # ビジネスモデルの経済モデルと対象を書く
-│   ├── labor-supply.md            # 労働提供型 (moodai がスタッフを送る)
-│   └── data-cooperation.md        # 撮影協力型 (店のスタッフが装着) — 現行アクティブ
-├── templates/                     # 印刷物のソースコード (HTML) + ビルド成果物 (PDF)
-│   ├── assets/                    # 全モデル共通の画像 (headset.png / rootlens_R.png / qr_rootlens.png)
-│   ├── shared/                    # モデル横断のテンプレ
-│   │   └── recording-consent.html   # 撮影同意書 (スタッフ本人の同意) (labor-supply / data-cooperation 共通)
-│   ├── labor-supply/
-│   │   ├── flyer.html             # 店主向けピッチ (A4)
-│   │   └── agreement.html         # 店との合意書 (A4 x 2)
-│   └── data-cooperation/
-│       ├── flyer-direct.html      # 店主向けピッチ (直販)
-│       ├── flyer-referral.html   # 店主向けピッチ (代理店経由)
-│       ├── agreement-direct.html  # 店との合意書 (直販, 1,000円/時)
-│       ├── agreement-referral.html # 店との合意書 (代理店経由, 800円/時)
-│       └── referral-commission.html # 代理店との合意書 (200円/時 手数料)
-└── build.sh                       # HTML → PDF (chrome headless)
-```
+
+## 現行文書
+
+| 用途 | Markdown正本 |
+|---|---|
+| 店舗・事業所との基本合意 | `documents/current/agreements/site-cooperation.md` |
+| 撮影参加者本人の同意 | `documents/current/consents/participant-consent.md` |
+| 米国にある提供先への追加説明・同意 | `documents/current/notices/foreign-transfer-us.md` |
+
+案件ごとの協力費、提供先、納品条件などは基本合意書に固定せず、案件別の提示・記録で管理する。外国移転を伴う案件では、個人同意に加えて該当国の説明を表示し、その文書版と同意日時を記録する。
 
 ## ビルド
 
+```bash
+cd document/business
+npm ci
+npm run build
 ```
-./build.sh                         # 全 HTML を PDF 化
-./build.sh labor-supply            # labor-supply 配下だけ
-./build.sh data-cooperation        # data-cooperation 配下だけ
-./build.sh shared                  # shared 配下だけ
+
+対象を絞る場合は、`documents/` からの相対パスを渡す。
+
+```bash
+npm run build -- current
+npm run build -- current/consents/participant-consent.md
+npm run build -- archive/flyers
 ```
 
-依存: macOS の Google Chrome (`/Applications/Google Chrome.app`)、python3。
+必要環境：Node.js、npm、macOS版Google Chrome。固定ポートやPythonのローカルサーバは使用しない。
 
-## モデル追加時の手順
+## 文書を追加する
 
-1. `models/<new-model>.md` を書く (対象、経済モデル、想定リスク、テンプレ一覧)
-2. `templates/<new-model>/` を作り、必要な HTML を配置
-3. 共通アセットは `templates/assets/` を `../assets/foo.png` で参照
-4. 撮影同意書のような横断テンプレは `templates/shared/` に置く
-5. `./build.sh <new-model>` でビルド確認
+1. `documents/current/` の適切な分類へMarkdownを追加する。
+2. front matterで `layout`、`page`、`margin`、`page_numbers` を指定する。
+3. 共通画像は、文書から `assets/` への相対パスで参照する。
+4. `npm run build -- <対象>` でPDFを生成する。
+5. PDFをレンダリングし、全ページの改ページ、欠落、画像、署名欄を目視確認する。
 
-## 実データの置き場 (vault 側)
+旧フライヤーは現行化せず、冒頭にアーカイブ表示を付けて `documents/archive/flyers/` に保存する。旧合意書や旧運用マニュアルは正本として残さない。
 
-契約済みの店舗ごとの記録・押印スキャン・月次入金は本 repo に入れず、
-`rootlens-vault/RESOURCE_MANAGEMENT/` 配下で管理する:
+## 電子同意の記録
 
-- `COLLECTION_SITES/<店名>/page.md` — 店の metadata + 契約モデル + 紹介元
-- `COLLECTION_SITES/<店名>/signed-agreement.pdf` — 押印スキャン
-- `COLLECTION_SITES/<店名>/recording-consents/` — スタッフごとの同意書スキャン
-- `PAYMENTS/<YYYY-MM>.md` — 月次の振込ログ
+同意画面では、本人が確認した本文と追加説明を表示し、少なくとも次を改変されにくい形で記録する。
 
-## 使い分けクイックリファレンス
+- 同意者を特定する情報
+- 勤務先または撮影場所
+- 同意日時
+- 同意した文書のパスまたは種別と文書版
+- 外国移転を伴う場合は、国別説明の文書版と同意結果
 
-| ピッチする相手 | 使うテンプレ |
-|--------------|-------------|
-| 店主に直接、moodai の営業として | `data-cooperation/flyer-direct.html` |
-| 代理店 (紹介元) が持って回る、他店向け | `data-cooperation/flyer-referral.html` |
-| スタッフにヘッドギアをつけて働いてもらう契約 (直販) | `data-cooperation/agreement-direct.html` |
-| スタッフにヘッドギアをつけて働いてもらう契約 (代理店経由) | `data-cooperation/agreement-referral.html` |
-| 代理店に紹介手数料を払う契約 | `data-cooperation/referral-commission.html` |
-| 撮影対象になるスタッフ本人からの同意 | `shared/recording-consent.html` |
+店舗ごとの合意、参加者の電子同意、支払記録は本リポジトリへ保存しない。

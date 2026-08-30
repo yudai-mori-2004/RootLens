@@ -1,0 +1,107 @@
+html {
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+}
+
+h1 {
+  margin: 0 0 5mm;
+  padding: 6mm 7mm;
+  background: #111;
+  color: #fff;
+  font-size: 23pt;
+  line-height: 1.3;
+}
+
+h2 {
+  margin: 5mm 0 2mm;
+  padding-left: 3mm;
+  border-left: 1.5mm solid #111;
+  font-size: 13pt;
+}
+
+h3 {
+  margin: 3mm 0 1mm;
+  font-size: 11pt;
+}
+
+p,
+li {
+  margin: 0 0 1.8mm;
+  font-size: 9.2pt;
+  line-height: 1.6;
+}
+
+ul,
+ol {
+  margin: 0 0 3mm 5mm;
+  padding-left: 4mm;
+}
+
+img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 48mm;
+  margin: 3mm auto;
+}
+
+blockquote {
+  margin: 4mm 0;
+  padding: 3mm 4mm;
+  border: 0.35mm solid #111;
+  background: #f1f1f1;
+  font-weight: 600;
+}
+
+table {
+  margin: 3mm 0;
+  font-size: 9pt;
+}
+
+th,
+td {
+  padding: 2mm 2.5mm;
+  line-height: 1.5;
+}
+
+.variant-compact h1 {
+  margin-bottom: 3.5mm;
+  padding: 4.5mm 6mm;
+  font-size: 20pt;
+}
+
+.variant-compact h2 {
+  margin: 3mm 0 1.5mm;
+}
+
+.variant-compact p,
+.variant-compact li {
+  margin-bottom: 1.2mm;
+  font-size: 8.6pt;
+  line-height: 1.45;
+}
+
+.variant-compact ul,
+.variant-compact ol {
+  margin-bottom: 2mm;
+}
+
+.variant-compact img {
+  max-height: 38mm;
+  margin: 2mm auto;
+}
+
+.variant-compact blockquote {
+  margin: 2.5mm 0;
+  padding: 2mm 3mm;
+}
+
+.variant-compact table {
+  margin: 2mm 0;
+  font-size: 8.5pt;
+}
+
+.variant-compact th,
+.variant-compact td {
+  padding: 1.5mm 2mm;
+  line-height: 1.35;
+}

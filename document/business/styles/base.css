@@ -1,0 +1,85 @@
+* {
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+html {
+  background: #fff;
+  color: #111;
+  font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: 10.5pt;
+  line-break: strict;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  width: 100%;
+}
+
+h1,
+h2,
+h3 {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+p,
+li {
+  orphans: 2;
+  widows: 2;
+}
+
+img {
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+hr {
+  border: 0;
+  border-top: 0.25mm solid #aaa;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 0.25mm solid #999;
+  text-align: left;
+  vertical-align: top;
+}
+
+input[type="checkbox"] {
+  width: 4mm;
+  height: 4mm;
+  margin: 0 2mm 0 0;
+  border: 0.25mm solid #111;
+  appearance: none;
+  -webkit-appearance: none;
+  vertical-align: -0.7mm;
+}
+
+ul:has(> li > input[type="checkbox"]) {
+  margin-left: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+li:has(> input[type="checkbox"]) {
+  padding-left: 0;
+  list-style: none;
+}
+
+li:has(> input[type="checkbox"])::marker {
+  content: "";
+}

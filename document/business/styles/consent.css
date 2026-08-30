@@ -1,0 +1,84 @@
+h1 {
+  margin: 0 0 6mm;
+  text-align: center;
+  font-size: 17pt;
+  letter-spacing: 0.12em;
+}
+
+h2 {
+  margin: 4mm 0 1.5mm;
+  padding-left: 3mm;
+  border-left: 1mm solid #111;
+  font-size: 11pt;
+}
+
+p,
+li {
+  margin: 0 0 1.7mm;
+  font-size: 9.5pt;
+  line-height: 1.65;
+}
+
+ul,
+ol {
+  margin: 0 0 2mm 5mm;
+  padding-left: 4mm;
+}
+
+blockquote {
+  margin: 3mm 0;
+  padding: 2.5mm 4mm;
+  border: 0.35mm solid #111;
+  background: #f5f5f5;
+}
+
+table {
+  margin-top: 3mm;
+  table-layout: fixed;
+  font-size: 9pt;
+  break-inside: avoid;
+}
+
+th,
+td {
+  padding: 2mm 2.5mm;
+  line-height: 1.5;
+}
+
+th:first-child,
+td:first-child {
+  width: 38mm;
+}
+
+.variant-participant h1 {
+  margin-bottom: 8mm;
+  font-size: 18pt;
+}
+
+.variant-participant h2 {
+  margin-top: 6mm;
+  margin-bottom: 2mm;
+  font-size: 12pt;
+}
+
+.variant-participant p,
+.variant-participant li {
+  margin-bottom: 2.2mm;
+  font-size: 10.5pt;
+  line-height: 1.75;
+}
+
+.variant-participant h2:nth-of-type(4) {
+  margin-top: 0;
+  break-before: page;
+  page-break-before: always;
+}
+
+.variant-participant table {
+  font-size: 10pt;
+}
+
+.variant-participant th,
+.variant-participant td {
+  padding: 3mm;
+}

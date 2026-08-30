@@ -1,0 +1,12 @@
+{
+  "name": "rootlens-business-documents",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
+  "dependencies": {
+    "marked": "^17.0.5",
+    "puppeteer-core": "^25.8.0"
+  }
+}

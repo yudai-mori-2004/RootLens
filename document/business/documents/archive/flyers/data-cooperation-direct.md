@@ -1,230 +1,45 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<style>
-  @page { size:A4; margin:0; }
-  *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  :root{
-    --ink:#111111;
-    --ink2:#333333;
-    --gray:#555555;
-    --soft:#777777;
-    --line:#BFBFBF;
-    --line2:#DDDDDD;
-    --tint:#EEEEEE;
-    --tint2:#F5F5F5;
-    --paper:#FFFFFF;
-  }
-  html,body{ width:210mm; height:297mm; overflow:hidden; background:var(--paper); color:var(--ink);
-    font-family:"Noto Sans CJK JP","Hiragino Sans",sans-serif; font-weight:400;
-    -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision;
-    line-break:strict; word-break:normal; overflow-wrap:normal; }
-  .sheet{ position:relative; width:210mm; height:297mm; overflow:hidden; background:var(--paper);
-    display:flex; flex-direction:column; }
+---
+title: 撮影協力チラシ（旧・直販版）
+layout: handout
+variant: compact
+page: A4
+margin: 12mm 14mm 12mm
+page_numbers: false
+---
 
-  /* ---------------- HERO ---------------- */
-  .hero{ position:relative; flex:none; height:59mm; overflow:visible; z-index:5;
-    background:var(--ink); color:#fff; }
-  .heroPad{ position:relative; z-index:6; padding:6.5mm 14mm 0 14mm; height:100%; }
-  .brand{ display:flex; align-items:center; gap:5px; margin-bottom:2.5mm; }
-  .brand img{ width:10mm; height:10mm; filter:grayscale(1) brightness(2); }
-  .brand .wm{ font-size:12.5pt; font-weight:900; color:#fff; letter-spacing:.01em; }
-  .pill{ display:inline-block; background:#fff; color:var(--ink); font-size:9pt; font-weight:900;
-    letter-spacing:.14em; padding:1.6mm 5mm; border-radius:99px; }
-  .hero h1{ margin-top:3.5mm; font-weight:900; font-size:23pt; line-height:1.34; color:#fff;
-    letter-spacing:.01em; }
-  .hero h1 .hl{ position:relative; display:inline-block; z-index:0; color:var(--ink); background:#fff;
-    padding:0 2mm; }
-  .hero .sub{ margin-top:2.5mm; font-size:10pt; font-weight:700; color:#fff; letter-spacing:.03em; opacity:.85; line-height:1.5; }
+# ロボット研究の未来に、現場から関わってみませんか？
 
-  /* ---------------- BODY ---------------- */
-  .bodyPad{ position:relative; z-index:5; padding:3.6mm 14mm 0 14mm; flex:1; display:flex; flex-direction:column; }
-  .lead{ font-size:9.2pt; line-height:1.65; color:var(--ink2); }
-  .lead b{ font-weight:800; color:var(--ink); border-bottom:1.5px solid var(--ink); }
+> **アーカイブ資料です。** 「500円×売り先数」、音声を録音しない運用、撮影禁止マーカーなど、現在と異なる条件を含むため配布には使用しません。
 
-  /* 3 STEPS */
-  .steps{ margin-top:3.2mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
-  .step{ position:relative; background:var(--paper); border:1.5px solid var(--ink);
-    border-radius:3px; padding:2.6mm 4.6mm 2.6mm; }
-  .step .num{ display:inline-block; font-size:14pt; font-weight:900; letter-spacing:.02em; color:var(--ink);
-    padding-bottom:.5mm; border-bottom:2.5px solid var(--ink); }
-  .step h3{ margin-top:1.8mm; font-size:11.5pt; font-weight:900; color:var(--ink); line-height:1.32; }
-  .step p{ margin-top:1.6mm; font-size:8.5pt; line-height:1.55; color:var(--ink2); }
+日本の現場の作業映像を、ロボット・AIの学習データとして活かす旧営業案内です。RootLensは、国内外の研究開発企業への現場データ提供を提案していました。
 
-  /* デバイス */
-  .devices{ position:relative; margin-top:3.6mm; border:1.5px solid var(--ink); border-radius:3px;
-    padding:3.2mm 6mm 3mm; display:grid; grid-template-columns:1fr 1fr; gap:6mm; }
-  .devices .tag{ position:absolute; top:-3.2mm; left:8mm; background:var(--ink); color:#fff; font-size:8.5pt;
-    font-weight:900; letter-spacing:.12em; padding:1mm 4mm; }
-  .dev{ display:flex; align-items:center; gap:4mm; }
-  .dev .shot{ flex:none; width:28mm; height:19mm; background:#fff; border:1px solid var(--line2);
-    border-radius:2px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-  .dev .shot img{ width:100%; height:100%; object-fit:cover; filter:grayscale(1) contrast(1.05); }
-  .dev .shot.contain img{ width:auto; height:auto; max-width:100%; max-height:100%; object-fit:contain; }
-  .dev .tx{ flex:1; }
-  .dev h4{ font-size:10.5pt; font-weight:900; color:var(--ink); }
-  .dev p{ margin-top:1.2mm; font-size:8.1pt; line-height:1.55; color:var(--ink2); }
+## 現場に合わせた機材
 
-  /* 還元の設計 */
-  .scheme{ position:relative; margin-top:3.4mm; background:var(--ink); color:#fff; border-radius:3px;
-    padding:3.2mm 6mm 2.4mm; }
-  .scheme .tag{ position:absolute; top:-3.2mm; left:8mm; background:#fff; color:var(--ink);
-    border:1.5px solid var(--ink); font-size:8.5pt; font-weight:900; letter-spacing:.12em; padding:.8mm 4mm; }
-  .scheme .top{ display:flex; align-items:center; gap:7mm; padding-bottom:1.8mm;
-    border-bottom:1px solid rgba(255,255,255,.35); }
-  .scheme .formula{ flex:none; font-size:16.5pt; font-weight:900; color:#fff; letter-spacing:.02em; white-space:nowrap; }
-  .scheme .formula .u{ font-size:10pt; }
-  .scheme .ex{ flex:1; font-size:8.2pt; line-height:1.55; color:#fff; opacity:.92; }
-  .scheme .ex .note{ display:block; margin-top:.8mm; font-size:7.4pt; opacity:.75; }
-  .scheme .bottom{ padding-top:1.6mm; font-size:8.2pt; line-height:1.55; color:#fff; }
-  .scheme .bottom b{ font-size:9.5pt; font-weight:900; margin-right:2mm; }
+| RootCap | RootGlass |
+|---|---|
+| ![RootCap](../../../assets/device_rootcap.jpg) | ![RootGlass](../../../assets/device_rootglass.jpg) |
+| スマートフォンを頭部に装着する構成 | 軽量なメガネ型の構成 |
 
-  /* 撮影実績 */
-  .proof{ position:relative; margin-top:2.9mm; border:1.5px solid var(--ink); border-radius:3px;
-    background:var(--tint2); padding:2.8mm 7mm 2.8mm 7mm; display:flex; align-items:center; gap:6mm; }
-  .proof .tag{ position:absolute; top:-3.2mm; left:8mm; background:var(--ink); color:#fff; font-size:8.5pt;
-    font-weight:900; letter-spacing:.12em; padding:1mm 4mm; }
-  .proof .ph{ flex:none; width:16mm; background:#fff; padding:1.6mm 1.6mm 1.2mm; border-radius:2px;
-    transform:rotate(2deg); box-shadow:3px 4px 0 rgba(17,17,17,.18); }
-  .proof .ph img{ width:100%; display:block; filter:grayscale(1) contrast(1.05); }
-  .proof .ph .cap{ padding:1.3mm 0 .3mm; text-align:center; font-size:7.6pt; font-weight:700; color:var(--ink); }
-  .proof .tx{ flex:1; }
-  .proof .tx h3{ font-size:11.5pt; font-weight:900; color:var(--ink); line-height:1.45; }
-  .proof .tx p{ margin-top:1.8mm; font-size:8.6pt; line-height:1.68; color:var(--ink2); }
+## 進め方
 
-  /* FAQ */
-  .faqTitle{ margin-top:2.2mm; font-size:12.5pt; font-weight:900; color:var(--ink); }
-  .faqTitle .mk{ position:relative; z-index:0; display:inline-block; padding:0 1mm; }
-  .faqTitle .mk::before{ content:""; position:absolute; left:0; right:0; bottom:0; height:3mm; z-index:-1;
-    background:var(--tint); }
-  .faq{ margin-top:2mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:5mm; }
-  .qa{ background:var(--paper); border:1px solid var(--line); border-radius:3px; padding:2.4mm 4.2mm 2.4mm; color:var(--ink); }
-  .qa .q{ display:block; font-size:9pt; font-weight:900; color:var(--ink);
-    padding-bottom:1.5mm; margin-bottom:1.9mm; border-bottom:1.5px solid var(--ink); }
-  .qa .q::before{ content:"Q. "; }
-  .qa p{ font-size:8.2pt; line-height:1.5; color:var(--ink2); }
+1. **撮影** — スタッフがRootCapまたはRootGlassを着用し、作業の様子を撮影します。
+2. **提供** — 撮影した映像を、ロボット・AIの研究開発企業へ学習用データとして提供します。
+3. **還元** — 同じ映像を複数企業へ販売し、売り先が増えるほど還元も増える旧設計でした。
 
-  /* CTA */
-  .cta{ margin:auto -14mm 0; background:var(--ink); color:#fff;
-    padding:2.6mm 14mm 2.6mm; display:flex; align-items:center; gap:7mm; }
-  .cta .big{ flex:1.1; font-size:11.5pt; font-weight:900; line-height:1.4; color:#fff; }
-  .cta .ct{ flex:1; }
-  .cta .tel{ font-size:14pt; font-weight:900; letter-spacing:.02em; color:#fff; }
-  .cta .tel .lb, .cta .ml .lb{ font-size:8pt; font-weight:900; opacity:.7; margin-right:2mm; letter-spacing:.14em; color:#fff; }
-  .cta .ml{ margin-top:1.2mm; font-size:10pt; font-weight:700; color:#fff; }
-  .cta .nm{ margin-top:1mm; font-size:8.4pt; font-weight:600; opacity:.75; color:#fff; }
-  .cta .qr{ flex:none; text-align:center; }
-  .cta .qr img{ display:block; width:16mm; height:16mm; background:#fff; padding:1.2mm; border-radius:2px; }
-  .cta .qr .lb{ margin-top:1.5mm; font-size:7.5pt; font-weight:700; color:#fff; opacity:.85; letter-spacing:.06em; }
-</style>
-</head>
-<body>
-<div class="sheet">
+## 旧還元設計
 
-  <!-- ===== HERO ===== -->
-  <div class="hero">
-    <div class="heroPad">
-      <div class="brand"><img src="../assets/rootlens_R.png" alt="RootLens"><span class="wm">RootLens</span></div>
-      <span class="pill">大阪大学発スタートアップ</span>
-      <h1>ロボット研究の未来に、<br><span class="hl">現場から</span>関わってみませんか？</h1>
-      <div class="sub">日本の現場の作業映像を、ロボット・AI の学習データとして活かす取り組みです。</div>
-    </div>
-  </div>
+**500円 × 売り先数 × 承認時間**
 
-  <!-- ===== BODY ===== -->
-  <div class="bodyPad">
-    <div class="lead">RootLens は、現場で働く方の作業映像を、<b>ロボット・AI の研究開発を行う国内外の企業</b>へ提供する事業を運営しております。現場の作業映像を求める企業は世界的に増え始めており、現在、複数の海外 AI 企業と日本の現場データの提供に向けた協議を進めております。映像の用途は研究開発に限られ、店名や個人名が公表されることはありません。</div>
+映像が1社に売れれば1時間500円、3社なら1,500円とし、承認時間は買い手企業に受け入れられた映像時間を指していました。最初は5時間の試験撮影を案内していました。
 
-    <!-- デバイス -->
-    <div class="devices">
-      <div class="tag">現場に合わせて選べます</div>
-      <div class="dev">
-        <div class="shot"><img src="../assets/device_rootcap.jpg" alt="RootCap"></div>
-        <div class="tx">
-          <h4>RootCap</h4>
-          <p>スマートフォンを頭部に装着する構成で、重さがあります。</p>
-        </div>
-      </div>
-      <div class="dev">
-        <div class="shot contain"><img src="../assets/device_rootglass.jpg" alt="RootGlass"></div>
-        <div class="tx">
-          <h4>RootGlass</h4>
-          <p>メガネ型で軽量、負担の少ない装着感です。</p>
-        </div>
-      </div>
-    </div>
+## 撮影実績
 
-    <!-- STEPS -->
-    <div class="steps">
-      <div class="step">
-        <div class="num">01</div>
-        <h3>撮影</h3>
-        <p>スタッフの方に RootCap または RootGlass を着用いただき、黙々と作業に取り組む様子を撮影します。</p>
-      </div>
-      <div class="step">
-        <div class="num">02</div>
-        <h3>提供</h3>
-        <p>撮影した映像は、ロボット・AI の研究開発を行う企業へ、学習用データとして提供します。</p>
-      </div>
-      <div class="step">
-        <div class="num">03</div>
-        <h3>還元</h3>
-        <p>同じ映像は、複数の企業へ販売できます。売り先が増えるほど、同じ撮影時間でも還元が増えていきます。</p>
-      </div>
-    </div>
+箕面市のベーカリー「サトウカエデ」で、仕込みや包装などの厨房業務を撮影していました。
 
-    <!-- 還元の設計 -->
-    <div class="scheme">
-      <div class="tag">還元の設計</div>
-      <div class="top">
-        <div class="formula">500<span class="u">円</span> × 売り先数 × 承認時間</div>
-        <p class="ex">映像が 1 社に売れれば 1 時間 <span style="white-space:nowrap">500円</span>、3 社なら <span style="white-space:nowrap">1,500円</span>。売り先の数だけ還元が積み上がる設計です。<span class="note">※承認時間 = 買い手企業に受け入れられた映像の時間</span></p>
-      </div>
-      <div class="bottom"><b>まずは 5 時間のお試し撮影から。</b>機材はご用意し、設定から装着までご説明に伺います。</div>
-    </div>
+## 当時の案内
 
-    <!-- 撮影実績 -->
-    <div class="proof">
-      <div class="tag">撮影実績</div>
-      <div class="tx">
-        <h3>箕面市のベーカリー「サトウカエデ」さまにて撮影を行っています。</h3>
-        <p>仕込みや包装などの厨房業務を、営業に支障のない形で毎日撮影しています。撮影の進め方や現場での運用は、実例をもとにご説明できます。</p>
-      </div>
-      <div class="ph"><img src="../assets/photo_satokaede.jpg" alt="サトウカエデでの撮影風景"><div class="cap">撮影風景</div></div>
-    </div>
+- 本人の判断でいつでも撮影を開始・停止できること
+- 撮影はバックヤード等に限定し、顔をぼかし、音声は録音しないこと
+- 専用シールの周囲をぼかすこと
 
-    <!-- FAQ -->
-    <div class="faqTitle">よくある<span class="mk">ご質問</span></div>
-    <div class="faq">
-      <div class="qa">
-        <span class="q">スタッフの負担について</span>
-        <p>RootCap は頭部に機材を取り付ける構造のため、人によっては重いと感じる場合がございます。RootGlass はメガネ型で軽量です。撮影の開始・停止は、いつでもスタッフ本人のご判断で行えます。</p>
-      </div>
-      <div class="qa">
-        <span class="q">プライバシーについて</span>
-        <p>プライバシーを最大限保護するため、撮影はバックヤードや作業場に限定します。音声は録音しません。映り込んだ顔にはぼかし処理を行います。</p>
-      </div>
-      <div class="qa">
-        <span class="q">映したくない場所について</span>
-        <p>ピンポイントで映したくないもの（スタッフ名簿など）の付近に専用のシールを貼っていただくことで、その周囲にモザイクをかけることが可能です。</p>
-      </div>
-    </div>
-
-    <!-- CTA -->
-    <div class="cta">
-      <div class="big">まずはお気軽に<br>ご連絡ください。</div>
-      <div class="ct">
-        <div class="tel"><span class="lb">TEL</span>090-6751-4015</div>
-        <div class="ml"><span class="lb">MAIL</span>contact@rootlens.io</div>
-        <div class="nm">担当: 森 雄大</div>
-      </div>
-      <div class="qr">
-        <img src="../assets/qr_rootlens.png" alt="rootlens.io">
-        <div class="lb">rootlens.io</div>
-      </div>
-    </div>
-  </div>
-</div>
-</body>
-</html>
+お問い合わせ：RootLens 森 雄大 / contact@rootlens.io / rootlens.io
