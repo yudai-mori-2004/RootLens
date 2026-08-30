@@ -1,0 +1,147 @@
+{
+  "schema": "rootlens.claru.boundaries.v1",
+  "saved_at": "2026-08-25T02:11:36.353Z",
+  "source": {
+    "directory_name": "rec-1787515949653",
+    "metadata_sha256": "4f550ffd75521f73165ec6e31bed8407ecfaf0bd09475160e3911ab5a17f7c22",
+    "files": {
+      "rgb.mp4": {
+        "size_bytes": 12742068565
+      },
+      "frames.jsonl": {
+        "size_bytes": 272631915
+      },
+      "imu.jsonl": {
+        "size_bytes": 351694443
+      },
+      "metadata.json": {
+        "size_bytes": 2025
+      }
+    },
+    "metadata": {
+      "schema": "rootlens.iphone.raw.v1",
+      "created_at": "2026-08-23T20:12:29Z",
+      "device_model": "iPhone13,1",
+      "video_frame_count": 252432,
+      "accelerometer_sample_count": 846255,
+      "gyroscope_sample_count": 846255
+    }
+  },
+  "segment_count": 19,
+  "segments": [
+    {
+      "id": "65983b41-a066-4d98-813c-42f1a88c277b",
+      "label": "clip-001",
+      "startSeconds": 323.488,
+      "endSeconds": 544.981
+    },
+    {
+      "id": "d227f26c-022e-4e65-999c-57562826881c",
+      "label": "clip-002",
+      "startSeconds": 693.349,
+      "endSeconds": 1000.518
+    },
+    {
+      "id": "d7d081e5-144f-46ef-adba-bf8d969f05cb",
+      "label": "clip-003",
+      "startSeconds": 1039.436,
+      "endSeconds": 1251.526
+    },
+    {
+      "id": "0a8ac50f-6712-4244-a657-d5e50aa53bec",
+      "label": "clip-004",
+      "startSeconds": 1271.583,
+      "endSeconds": 1717.706
+    },
+    {
+      "id": "85aea194-2aee-4d7a-8611-4dbd0bc8e3c2",
+      "label": "clip-005",
+      "startSeconds": 1867.003,
+      "endSeconds": 2385.079
+    },
+    {
+      "id": "16e3390a-14f2-4732-9e4c-08ac1240f122",
+      "label": "clip-006",
+      "startSeconds": 2385.724,
+      "endSeconds": 2508.802
+    },
+    {
+      "id": "4e933716-6fbe-47e3-bfb9-59cf8483db09",
+      "label": "clip-007",
+      "startSeconds": 2652.447,
+      "endSeconds": 2788.557
+    },
+    {
+      "id": "d82fa582-01ca-4158-8567-8768ee53070a",
+      "label": "clip-008",
+      "startSeconds": 2848.823,
+      "endSeconds": 3173.952
+    },
+    {
+      "id": "2c57e909-2b22-4acd-881b-db6e041a7c97",
+      "label": "clip-009",
+      "startSeconds": 3359.025,
+      "endSeconds": 3774.55
+    },
+    {
+      "id": "8e963d77-edc3-4e27-b7a2-67952918ed45",
+      "label": "clip-010",
+      "startSeconds": 3897.811,
+      "endSeconds": 4210.38
+    },
+    {
+      "id": "e96251c8-a0de-4848-95ff-447540941dfb",
+      "label": "clip-011",
+      "startSeconds": 4224.217,
+      "endSeconds": 4591.231
+    },
+    {
+      "id": "a708a680-413d-44ce-9b45-0e9c097c5e37",
+      "label": "clip-012",
+      "startSeconds": 4593.195,
+      "endSeconds": 4957.995
+    },
+    {
+      "id": "f9b5c3c9-08af-4edd-94cb-78e136fb932e",
+      "label": "clip-013",
+      "startSeconds": 5006.303,
+      "endSeconds": 5587.514
+    },
+    {
+      "id": "3a71ce34-e615-466b-9b89-043442b70e29",
+      "label": "clip-014",
+      "startSeconds": 5589.012,
+      "endSeconds": 5808.713
+    },
+    {
+      "id": "2206f6e5-b508-4748-9d8c-0005fa2a7988",
+      "label": "clip-015",
+      "startSeconds": 5866.969,
+      "endSeconds": 6344.783
+    },
+    {
+      "id": "92228fc4-358b-4196-a2db-23a1deb5c65f",
+      "label": "clip-016",
+      "startSeconds": 6352.372,
+      "endSeconds": 7063.68
+    },
+    {
+      "id": "d7bc90c9-9f28-411c-9a27-0e6fdc34c3a3",
+      "label": "clip-017",
+      "startSeconds": 7064.841,
+      "endSeconds": 7875.308
+    },
+    {
+      "id": "557fd9d1-fd62-45e0-b2cb-b8efa49e040c",
+      "label": "clip-018",
+      "startSeconds": 7882.545,
+      "endSeconds": 8035.492
+    },
+    {
+      "id": "ef12113d-1c32-4b90-af9e-31ead8719617",
+      "label": "clip-019",
+      "startSeconds": 8059.179,
+      "endSeconds": 8364.003
+    }
+  ]
+}

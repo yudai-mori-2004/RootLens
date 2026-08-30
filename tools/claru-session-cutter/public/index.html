@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>タスク境界の確認 — RootLens</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="identity">
+          <h1>境界入力</h1>
+        </div>
+        <div class="session-chip" id="sessionChip">
+          <span class="signal" aria-hidden="true"></span>
+          <span id="sessionName">収録未選択</span>
+        </div>
+        <button class="quiet-button" id="changeSource" aria-label="収録を変更">変更</button>
+      </header>
+
+      <div class="workspace" id="workspace" hidden>
+        <section class="viewer-column" aria-label="動画プレビューと境界入力">
+          <div class="viewer-frame">
+            <video id="video" preload="metadata" playsinline></video>
+            <div class="timecode" id="timecode">00:00:00.000</div>
+            <div class="shuttle-indicator" id="shuttleIndicator" hidden>2倍速</div>
+          </div>
+
+          <div class="timeline-block">
+            <div class="timeline-labels">
+              <span>全体</span>
+              <span id="durationLabel">00:00:00</span>
+            </div>
+            <div class="timeline" id="timeline">
+              <div class="segment-layer" id="segmentLayer"></div>
+              <div class="draft-range" id="draftRange"></div>
+              <input id="scrubber" type="range" min="0" max="1" step="0.001" value="0" aria-label="動画位置" />
+            </div>
+          </div>
+
+          <div class="transport-deck">
+            <button class="play-button" id="playToggle" title="Space" aria-label="再生または一時停止"><span id="playIcon">▶</span></button>
+            <div class="speed-display" aria-live="polite" aria-label="右矢印長押しの再生倍率">
+              <kbd>→</kbd>
+              <strong id="forwardRate">2×</strong>
+              <span><kbd>↑</kbd><kbd>↓</kbd></span>
+            </div>
+          </div>
+
+          <div class="boundary-deck">
+            <div class="boundary-readout">
+              <label for="startInput">開始</label>
+              <input id="startInput" inputmode="decimal" placeholder="00:00:00.000" aria-describedby="snapReport" />
+              <button id="markStart"><kbd>S</kbd> 現在位置</button>
+            </div>
+            <div class="boundary-readout">
+              <label for="endInput">終了</label>
+              <input id="endInput" inputmode="decimal" placeholder="00:00:00.000" />
+              <button id="markEnd"><kbd>E</kbd> 現在位置</button>
+            </div>
+          </div>
+
+          <output class="snap-report" id="snapReport" hidden></output>
+        </section>
+
+        <aside class="clip-rail" aria-label="区間一覧">
+          <div class="rail-heading">
+            <h2>区間一覧</h2>
+            <span class="clip-count" id="clipCount">0件</span>
+          </div>
+          <div class="delivery-total" id="deliveryTotal">00:00:00 / 05:00:00</div>
+
+          <div class="new-clip-form">
+            <div class="draft-summary" aria-live="polite">
+              <span id="draftDuration">未設定</span>
+              <span id="draftStatus">開始・終了を指定</span>
+            </div>
+            <button class="add-clip-button" id="addClip">区間を追加</button>
+          </div>
+
+          <div class="clip-list" id="clipList">
+            <div class="empty-clips">0</div>
+          </div>
+
+          <button class="export-button" id="exportButton" disabled>
+            <span>検証して書き出す</span>
+          </button>
+        </aside>
+      </div>
+    </main>
+
+    <div class="source-gate" id="sourceGate">
+      <div class="gate-card">
+        <h2>収録フォルダを選択</h2>
+        <button class="primary-button" id="chooseSource">フォルダを選択</button>
+        <button class="path-button" id="enterPath">パスを入力</button>
+        <div class="gate-error" id="gateError" role="alert"></div>
+      </div>
+    </div>
+
+    <div class="export-overlay" id="exportOverlay" hidden>
+      <div class="export-card" id="exportCard" data-state="loading" aria-live="polite">
+        <p class="export-phase" id="exportPhase">入力を検証中</p>
+        <h2 id="exportMessage">書き出しを準備しています</h2>
+        <div class="progress-track" role="progressbar" aria-label="書き出し進捗" aria-valuemin="0" aria-valuemax="100"><div id="progressFill"></div></div>
+        <p id="progressDetail">0%</p>
+        <div class="export-complete" id="exportComplete" hidden>
+          <p id="outputPath"></p>
+          <button class="primary-button" id="revealOutput">Finderで表示</button>
+          <button class="path-button" id="closeExport">編集画面へ戻る</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="undo-toast" id="undoToast" role="status" hidden>
+      <span>区間を削除</span>
+      <button id="undoRemove">元に戻す</button>
+    </div>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

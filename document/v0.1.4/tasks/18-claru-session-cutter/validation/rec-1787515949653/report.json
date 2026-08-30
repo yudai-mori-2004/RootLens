@@ -1,0 +1,2295 @@
+{
+  "schema": "rootlens.claru.exported_clip_validation.v1",
+  "output_root": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613",
+  "clip_count": 19,
+  "overall_status": "pass",
+  "counts": {
+    "pass": 19,
+    "review": 0,
+    "fail": 0
+  },
+  "sample_fps": 5.0,
+  "correlation_search_seconds": 0.1,
+  "clips": [
+    {
+      "clip": "clip-001",
+      "status": "pass",
+      "content_hash": "694db7adfd46900956ab0e777304c6dcc1beee5f4dd2a5bd14e2163bc822f0f4",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/694db7adfd46900956ab0e777304c6dcc1beee5f4dd2a5bd14e2163bc822f0f4",
+      "media": {
+        "duration_seconds": 222.978021,
+        "size_bytes": 337518727,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.997084613487026,
+        "video_packets": 6688,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 10452
+      },
+      "frame_intervals": {
+        "median_ms": 33.335648,
+        "p99_ms": 33.354309820000005,
+        "max_ms": 33.35695,
+        "estimated_hz": 29.997916944647365
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 22439,
+          "intervals": {
+            "median_ms": 9.943,
+            "p99_ms": 9.944,
+            "max_ms": 9.94475,
+            "estimated_hz": 100.57326762546515
+          }
+        },
+        "gyroscope": {
+          "sample_count": 22439,
+          "intervals": {
+            "median_ms": 9.943,
+            "p99_ms": 9.944,
+            "max_ms": 9.9445,
+            "estimated_hz": 100.57326762546515
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 112.22193589248971,
+          "mean_spatial_stddev": 55.841531368756925,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 77.54194486239712,
+          "mean_spatial_stddev": 57.17754429584294,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -5.394857340423194,
+          "correlation": 0.9843315661837712
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -5.394857340423194,
+            "correlation": 0.9843315661837712
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -13.46266853869913,
+            "correlation": 0.8973883891179492
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -15.91170565117312,
+            "correlation": -0.8319001063302981
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 4.363013035623592,
+            "correlation": 0.7441881617566972
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -1.6573586579270863,
+            "correlation": 0.3976497017778845
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 13.791775975184754,
+        "usable_visual_intervals": 448,
+        "median_ransac_inlier_ratio": 0.6686176142697882
+      },
+      "segmentation": {
+        "source_selected_start_ms": 323488,
+        "source_selected_end_ms": 544981,
+        "source_exported_start_ms": 322033,
+        "source_exported_end_ms": 545011,
+        "keyframe_preroll_ms": 1455,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-002",
+      "status": "pass",
+      "content_hash": "fe4621dfa175ff9646d6368c9ec5fe53d87fdfebf9a6afed2a87c950f2cdbd5a",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/fe4621dfa175ff9646d6368c9ec5fe53d87fdfebf9a6afed2a87c950f2cdbd5a",
+      "media": {
+        "duration_seconds": 308.501333,
+        "size_bytes": 467051246,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996920234062213,
+        "video_packets": 9253,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 14461
+      },
+      "frame_intervals": {
+        "median_ms": 33.3357755,
+        "p99_ms": 33.35393739,
+        "max_ms": 33.358162,
+        "estimated_hz": 29.997802211021014
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 31038,
+          "intervals": {
+            "median_ms": 9.943,
+            "p99_ms": 9.944,
+            "max_ms": 9.945209,
+            "estimated_hz": 100.57326762546515
+          }
+        },
+        "gyroscope": {
+          "sample_count": 31038,
+          "intervals": {
+            "median_ms": 9.943,
+            "p99_ms": 9.944,
+            "max_ms": 9.945209,
+            "estimated_hz": 100.57326762546515
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 117.05735796039095,
+          "mean_spatial_stddev": 52.06867313723417,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 104.86187384259259,
+          "mean_spatial_stddev": 56.762006167097546,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 1.485737885834956,
+          "correlation": 0.9681137531233476
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 1.485737885834956,
+            "correlation": 0.9681137531233476
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -9.12039006745965,
+            "correlation": 0.8181318254602339
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 17.283594139312115,
+            "correlation": 0.7715122764515944
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -1.7283948404085911,
+            "correlation": -0.7305796246625827
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -5.478194271771926,
+            "correlation": 0.47503556753077336
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 17.40492261659893,
+        "usable_visual_intervals": 486,
+        "median_ransac_inlier_ratio": 0.5653774213859772
+      },
+      "segmentation": {
+        "source_selected_start_ms": 693349,
+        "source_selected_end_ms": 1000518,
+        "source_exported_start_ms": 692070,
+        "source_exported_end_ms": 1000571,
+        "keyframe_preroll_ms": 1279,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-003",
+      "status": "pass",
+      "content_hash": "3869eba7af4e4ab1a68e4e0a05c6e19094a2ed8ab5261ff1eaefef2d0f09738d",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/3869eba7af4e4ab1a68e4e0a05c6e19094a2ed8ab5261ff1eaefef2d0f09738d",
+      "media": {
+        "duration_seconds": 213.461333,
+        "size_bytes": 323228775,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996954386074517,
+        "video_packets": 6402,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 10006
+      },
+      "frame_intervals": {
+        "median_ms": 33.33568,
+        "p99_ms": 33.353939,
+        "max_ms": 33.358211,
+        "estimated_hz": 29.99788814867433
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 21479,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.944875,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 21479,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.944875,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 102.94393274176954,
+          "mean_spatial_stddev": 58.075333810069466,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 55.30109831532921,
+          "mean_spatial_stddev": 43.24313276889291,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 150 >= 150\n[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 1250 >= 1250\n[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 2350 >= 2350\n[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3450 >= 3450\n[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3480 >= 3480\n[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3500 >= 3500\n[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 4600 >= 4600\n[null @ 0x7dac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 5700 >= 5700\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -1.091372521886618,
+          "correlation": 0.9767583685642258
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -1.091372521886618,
+            "correlation": 0.9767583685642258
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -6.250479283832583,
+            "correlation": 0.7989982168484123
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 4.201643222980582,
+            "correlation": 0.7309309923046994
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -12.56759405700899,
+            "correlation": 0.6507484839817193
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -11.336584855011102,
+            "correlation": -0.6505835733762131
+          }
+        ],
+        "supporting_candidate_count": 5,
+        "supporting_offset_max_deviation_ms": 10.452122506813165,
+        "usable_visual_intervals": 373,
+        "median_ransac_inlier_ratio": 0.6025641025641025
+      },
+      "segmentation": {
+        "source_selected_start_ms": 1039436,
+        "source_selected_end_ms": 1251526,
+        "source_exported_start_ms": 1038105,
+        "source_exported_end_ms": 1251566,
+        "keyframe_preroll_ms": 1331,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-004",
+      "status": "pass",
+      "content_hash": "a66211903a8d8333e045e5b7a731add739918cb9e1a32404b4514522313740bd",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/a66211903a8d8333e045e5b7a731add739918cb9e1a32404b4514522313740bd",
+      "media": {
+        "duration_seconds": 447.616,
+        "size_bytes": 677847988,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996983768204448,
+        "video_packets": 13426,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 20982
+      },
+      "frame_intervals": {
+        "median_ms": 33.335692,
+        "p99_ms": 33.35435452,
+        "max_ms": 33.357041,
+        "estimated_hz": 29.9978773501987
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 45027,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 45027,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 89.36291943158434,
+          "mean_spatial_stddev": 52.71684303338376,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 109.77358310828188,
+          "mean_spatial_stddev": 55.63461812600756,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0x8e7027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 7818 >= 7818\n[null @ 0x8e7027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 7821 >= 7821\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -3.325496515209843,
+          "correlation": 0.9883427035765499
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -3.325496515209843,
+            "correlation": 0.9883427035765499
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 0.01317463168859504,
+            "correlation": 0.900660816318961
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -7.340196758783796,
+            "correlation": -0.8478328856667909
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": -3.974660491189362,
+            "correlation": 0.7907848958823961
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -17.09991524534615,
+            "correlation": 0.45755334355772487
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 3.690118255584194,
+        "usable_visual_intervals": 871,
+        "median_ransac_inlier_ratio": 0.7333333333333333
+      },
+      "segmentation": {
+        "source_selected_start_ms": 1271583,
+        "source_selected_end_ms": 1717706,
+        "source_exported_start_ms": 1270130,
+        "source_exported_end_ms": 1717746,
+        "keyframe_preroll_ms": 1453,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-005",
+      "status": "pass",
+      "content_hash": "ed3d6b3ef8eb97f1ca1bf677a0902a6b418996b542aa9af3b8ccd80f27e06314",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/ed3d6b3ef8eb97f1ca1bf677a0902a6b418996b542aa9af3b8ccd80f27e06314",
+      "media": {
+        "duration_seconds": 518.95099,
+        "size_bytes": 785675047,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996916673090265,
+        "video_packets": 15566,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 24325
+      },
+      "frame_intervals": {
+        "median_ms": 33.33579,
+        "p99_ms": 33.35384308,
+        "max_ms": 33.358676,
+        "estimated_hz": 29.997789162938687
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 52200,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 52200,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 118.63729716435185,
+          "mean_spatial_stddev": 69.38978288342797,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 124.5231004050926,
+          "mean_spatial_stddev": 68.61544762823657,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0x8ed027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 5655 >= 5655\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -2.775201108579273,
+          "correlation": 0.9743582447757053
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -2.775201108579273,
+            "correlation": 0.9743582447757053
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 1.239194299621339,
+            "correlation": 0.8490385008878499
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 2.399088793569962,
+            "correlation": 0.7885400525705055
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -21.40909407949073,
+            "correlation": -0.6882172171818739
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": 3.4009033825056965,
+            "correlation": 0.5113264484247446
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 20.64109067501176,
+        "usable_visual_intervals": 1021,
+        "median_ransac_inlier_ratio": 0.5968992248062015
+      },
+      "segmentation": {
+        "source_selected_start_ms": 1867003,
+        "source_selected_end_ms": 2385079,
+        "source_exported_start_ms": 1866190,
+        "source_exported_end_ms": 2385141,
+        "keyframe_preroll_ms": 813,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-006",
+      "status": "pass",
+      "content_hash": "c910ce0a7f05b0d82108e8a0b5320ff047fd7b9009085035b2a71a95ea4800e0",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/c910ce0a7f05b0d82108e8a0b5320ff047fd7b9009085035b2a71a95ea4800e0",
+      "media": {
+        "duration_seconds": 124.603333,
+        "size_bytes": 188937563,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.997190522696563,
+        "video_packets": 3737,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 5840
+      },
+      "frame_intervals": {
+        "median_ms": 33.3357475,
+        "p99_ms": 33.3543121,
+        "max_ms": 33.359246,
+        "estimated_hz": 29.997827407350027
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 12544,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.944834,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 12545,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.944834,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 122.70670183899178,
+          "mean_spatial_stddev": 69.70644627188555,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 105.83040933641976,
+          "mean_spatial_stddev": 51.52585473397309,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -1.7259568698282706,
+          "correlation": 0.967754463987773
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -1.7259568698282706,
+            "correlation": 0.967754463987773
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -12.68994441741353,
+            "correlation": 0.8869397323018503
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": -3.0963074232490926,
+            "correlation": 0.8361528101802959
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -8.300379944218184,
+            "correlation": -0.7822699272824793
+          },
+          {
+            "pair": "translate_x_vs_gyro_x",
+            "offset_ms": -3.6388643945945414,
+            "correlation": -0.42345190338708455
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 6.991600733679892,
+        "usable_visual_intervals": 194,
+        "median_ransac_inlier_ratio": 0.5428193289018031
+      },
+      "segmentation": {
+        "source_selected_start_ms": 2385724,
+        "source_selected_end_ms": 2508802,
+        "source_exported_start_ms": 2384243,
+        "source_exported_end_ms": 2508847,
+        "keyframe_preroll_ms": 1481,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-007",
+      "status": "pass",
+      "content_hash": "111c5a4057259166d6c0611eb61d8b6f94bb55e4f2283bd27d29b6000dfeb83f",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/111c5a4057259166d6c0611eb61d8b6f94bb55e4f2283bd27d29b6000dfeb83f",
+      "media": {
+        "duration_seconds": 136.333333,
+        "size_bytes": 206542589,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.99706558419328,
+        "video_packets": 4089,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 6390
+      },
+      "frame_intervals": {
+        "median_ms": 33.33565350000001,
+        "p99_ms": 33.35477534,
+        "max_ms": 33.357442,
+        "estimated_hz": 29.99791199533556
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 13725,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.944875,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 13725,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 122.73495968364197,
+          "mean_spatial_stddev": 65.33713070274591,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 106.73349405221192,
+          "mean_spatial_stddev": 55.59294975063485,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -2.1881183612400044,
+          "correlation": 0.9631464996291543
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -2.1881183612400044,
+            "correlation": 0.9631464996291543
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 0.11388142215066498,
+            "correlation": 0.8929957256272305
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 1.6979390395592273,
+            "correlation": 0.7762192949358723
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": 3.3835845513889864,
+            "correlation": -0.6637316826419066
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -2.1978361778295756,
+            "correlation": 0.6569592732098665
+          }
+        ],
+        "supporting_candidate_count": 5,
+        "supporting_offset_max_deviation_ms": 3.2697031292383216,
+        "usable_visual_intervals": 436,
+        "median_ransac_inlier_ratio": 0.6344845630559917
+      },
+      "segmentation": {
+        "source_selected_start_ms": 2652447,
+        "source_selected_end_ms": 2788557,
+        "source_exported_start_ms": 2652270,
+        "source_exported_end_ms": 2788603,
+        "keyframe_preroll_ms": 177,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-008",
+      "status": "pass",
+      "content_hash": "80498b2426c822c9563239800db84bbbc35fec35d8daaac6a65ad84fe8a599bc",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/80498b2426c822c9563239800db84bbbc35fec35d8daaac6a65ad84fe8a599bc",
+      "media": {
+        "duration_seconds": 325.696,
+        "size_bytes": 493079531,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996929375639713,
+        "video_packets": 9769,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 15267
+      },
+      "frame_intervals": {
+        "median_ms": 33.335744500000004,
+        "p99_ms": 33.35335463,
+        "max_ms": 33.357023,
+        "estimated_hz": 29.99783010695921
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 32766,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.94434876,
+            "max_ms": 9.945916,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 32766,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944334,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 96.70843901105967,
+          "mean_spatial_stddev": 53.37530790451913,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 111.18731738683127,
+          "mean_spatial_stddev": 47.52408369936008,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -1.7447455179398499,
+          "correlation": 0.9742833815528301
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -1.7447455179398499,
+            "correlation": 0.9742833815528301
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -7.020045968243019,
+            "correlation": 0.8492379361835608
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": -4.672006546542673,
+            "correlation": 0.8202281586600635
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": 2.9585058660528363,
+            "correlation": -0.7528822745069376
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -17.71328714124796,
+            "correlation": 0.4545948427720749
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 6.166881898294098,
+        "usable_visual_intervals": 444,
+        "median_ransac_inlier_ratio": 0.5073545316893793
+      },
+      "segmentation": {
+        "source_selected_start_ms": 2848823,
+        "source_selected_end_ms": 3173952,
+        "source_exported_start_ms": 2848290,
+        "source_exported_end_ms": 3173986,
+        "keyframe_preroll_ms": 533,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-009",
+      "status": "pass",
+      "content_hash": "f30057a1bc09043bcbc58349ce51611925bc07fc9d74e8fa9c50e6312000e03a",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/f30057a1bc09043bcbc58349ce51611925bc07fc9d74e8fa9c50e6312000e03a",
+      "media": {
+        "duration_seconds": 416.234667,
+        "size_bytes": 630388092,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996876576728095,
+        "video_packets": 12485,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 19511
+      },
+      "frame_intervals": {
+        "median_ms": 33.335708,
+        "p99_ms": 33.354006,
+        "max_ms": 33.356951,
+        "estimated_hz": 29.997862952243285
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 41872,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 41872,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 115.14146942515434,
+          "mean_spatial_stddev": 55.684251533603906,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 105.60974971064815,
+          "mean_spatial_stddev": 56.64028058635485,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -2.1303755793189145,
+          "correlation": 0.9881361397551165
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -2.1303755793189145,
+            "correlation": 0.9881361397551165
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -6.955008410370572,
+            "correlation": 0.8592197839875204
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": -7.210933226585314,
+            "correlation": 0.7987449283282652
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -0.045005989857360006,
+            "correlation": -0.7118617026303021
+          },
+          {
+            "pair": "translate_y_vs_gyro_x",
+            "offset_ms": 22.769866350792864,
+            "correlation": 0.3421507567097625
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 4.497686004987383,
+        "usable_visual_intervals": 1168,
+        "median_ransac_inlier_ratio": 0.7536663420890135
+      },
+      "segmentation": {
+        "source_selected_start_ms": 3359025,
+        "source_selected_end_ms": 3774550,
+        "source_exported_start_ms": 3358342,
+        "source_exported_end_ms": 3774576,
+        "keyframe_preroll_ms": 683,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-010",
+      "status": "pass",
+      "content_hash": "c25566bfd4010ad7506e8a2819bc1602eafea2f589f833f424c11c218be6c49a",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/c25566bfd4010ad7506e8a2819bc1602eafea2f589f833f424c11c218be6c49a",
+      "media": {
+        "duration_seconds": 314.027343,
+        "size_bytes": 475182197,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.99697450623411,
+        "video_packets": 9419,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 14720
+      },
+      "frame_intervals": {
+        "median_ms": 33.3357565,
+        "p99_ms": 33.35326815,
+        "max_ms": 33.357706,
+        "estimated_hz": 29.997819308525365
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 31593,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 31593,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 114.43293769290123,
+          "mean_spatial_stddev": 59.294182479909665,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 109.61517836934154,
+          "mean_spatial_stddev": 63.51510028138398,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0xc3cc1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 6139 >= 6139\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 0.8193184212897366,
+          "correlation": 0.985065002201876
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 0.8193184212897366,
+            "correlation": 0.985065002201876
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 5.2498990722892644,
+            "correlation": 0.8018467703497616
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 7.095057886333269,
+            "correlation": 0.7934181989661431
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -5.496759349618281,
+            "correlation": -0.7335396012395783
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": 2.289238959615303,
+            "correlation": 0.5015902021457502
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 8.531368096407782,
+        "usable_visual_intervals": 502,
+        "median_ransac_inlier_ratio": 0.5517761790179951
+      },
+      "segmentation": {
+        "source_selected_start_ms": 3897811,
+        "source_selected_end_ms": 4210380,
+        "source_exported_start_ms": 3896397,
+        "source_exported_end_ms": 4210424,
+        "keyframe_preroll_ms": 1414,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-011",
+      "status": "pass",
+      "content_hash": "acba598613f7d04c5ea53b2d253c736e7dd5323381f0293e262270fd12173a9a",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/acba598613f7d04c5ea53b2d253c736e7dd5323381f0293e262270fd12173a9a",
+      "media": {
+        "duration_seconds": 368.832,
+        "size_bytes": 558556804,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.997017380537052,
+        "video_packets": 11063,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 17289
+      },
+      "frame_intervals": {
+        "median_ms": 33.335729,
+        "p99_ms": 33.35341575,
+        "max_ms": 33.356863,
+        "estimated_hz": 29.99784405494777
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 37104,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945084,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 37104,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.94525,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 118.92671595293208,
+          "mean_spatial_stddev": 60.31334903760614,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 107.07984445730453,
+          "mean_spatial_stddev": 54.94236374783516,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0xadd01f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 7161 >= 7161\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -0.1409430072352733,
+          "correlation": 0.9767177048340923
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -0.1409430072352733,
+            "correlation": 0.9767177048340923
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": -8.774443776440732,
+            "correlation": 0.7690410025655952
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 8.684283248747226,
+            "correlation": 0.7539253062899595
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -0.2975662610446793,
+            "correlation": -0.6482940794633195
+          },
+          {
+            "pair": "translate_y_vs_gyro_x",
+            "offset_ms": -3.947220578608069,
+            "correlation": 0.5699277154743407
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 8.903537882887202,
+        "usable_visual_intervals": 322,
+        "median_ransac_inlier_ratio": 0.49446838379189967
+      },
+      "segmentation": {
+        "source_selected_start_ms": 4224217,
+        "source_selected_end_ms": 4591231,
+        "source_exported_start_ms": 4222430,
+        "source_exported_end_ms": 4591262,
+        "keyframe_preroll_ms": 1787,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-012",
+      "status": "pass",
+      "content_hash": "43e5ed9b29fec47b34d710c1ff799820bbfa6ab35558dd981a09654220f76e58",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/43e5ed9b29fec47b34d710c1ff799820bbfa6ab35558dd981a09654220f76e58",
+      "media": {
+        "duration_seconds": 365.573646,
+        "size_bytes": 553457562,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996990725964565,
+        "video_packets": 10965,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 17136
+      },
+      "frame_intervals": {
+        "median_ms": 33.335664,
+        "p99_ms": 33.35381137,
+        "max_ms": 33.356733,
+        "estimated_hz": 29.997902546653936
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 36776,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.94575,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 36776,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.94575,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 113.27082404192386,
+          "mean_spatial_stddev": 57.967283883794906,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 119.85489682998973,
+          "mean_spatial_stddev": 78.420018012815,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0x940c1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3918 >= 3918\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 0.5827165866576781,
+          "correlation": 0.9783564950487948
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 0.5827165866576781,
+            "correlation": 0.9783564950487948
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -4.847886618942988,
+            "correlation": 0.856211732116691
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 0.8145211231414066,
+            "correlation": 0.7437382558781848
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -3.941511159141825,
+            "correlation": -0.7094202463551345
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": 6.512574532675362,
+            "correlation": 0.45128910868197464
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 3.168489332700915,
+        "usable_visual_intervals": 463,
+        "median_ransac_inlier_ratio": 0.4804270462633452
+      },
+      "segmentation": {
+        "source_selected_start_ms": 4593195,
+        "source_selected_end_ms": 4957995,
+        "source_exported_start_ms": 4592468,
+        "source_exported_end_ms": 4958042,
+        "keyframe_preroll_ms": 727,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-013",
+      "status": "pass",
+      "content_hash": "f16d27eda5d4206e1a4a1749b10076b4358babc696fd9ead8f100bc6c7d0fd97",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/f16d27eda5d4206e1a4a1749b10076b4358babc696fd9ead8f100bc6c7d0fd97",
+      "media": {
+        "duration_seconds": 583.05,
+        "size_bytes": 882683356,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.99699841344711,
+        "video_packets": 17489,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 27330
+      },
+      "frame_intervals": {
+        "median_ms": 33.3357215,
+        "p99_ms": 33.35414203,
+        "max_ms": 33.357946,
+        "estimated_hz": 29.99785080397915
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 58647,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945084,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 58648,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945084,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 121.76075308641975,
+          "mean_spatial_stddev": 53.02814566258793,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 110.11534947273664,
+          "mean_spatial_stddev": 59.503326984227,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 3.76996645342334,
+          "correlation": 0.9436482090491815
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 3.76996645342334,
+            "correlation": 0.9436482090491815
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 12.87428707087375,
+            "correlation": 0.7641398165018964
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -24.89429393192665,
+            "correlation": -0.6419449450472967
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": 5.588410061241269,
+            "correlation": 0.5729131454770191
+          },
+          {
+            "pair": "translate_x_vs_gyro_y",
+            "offset_ms": -7.102481066259445,
+            "correlation": 0.44227618695159604
+          }
+        ],
+        "supporting_candidate_count": 3,
+        "supporting_offset_max_deviation_ms": 28.66426038534999,
+        "usable_visual_intervals": 989,
+        "median_ransac_inlier_ratio": 0.4895238095238095
+      },
+      "segmentation": {
+        "source_selected_start_ms": 5006303,
+        "source_selected_end_ms": 5587514,
+        "source_exported_start_ms": 5004510,
+        "source_exported_end_ms": 5587560,
+        "keyframe_preroll_ms": 1793,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-014",
+      "status": "pass",
+      "content_hash": "df31cf44b77b276e696bac81fac09c6d1f451478c597db0b05cd5c0fb8e7fa8a",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/df31cf44b77b276e696bac81fac09c6d1f451478c597db0b05cd5c0fb8e7fa8a",
+      "media": {
+        "duration_seconds": 220.181333,
+        "size_bytes": 333646057,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996820446045998,
+        "video_packets": 6604,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 10321
+      },
+      "frame_intervals": {
+        "median_ms": 33.335766,
+        "p99_ms": 33.35410134,
+        "max_ms": 33.35682,
+        "estimated_hz": 29.99781075977075
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 22157,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945084,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 22157,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.944,
+            "max_ms": 9.945084,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 101.16790776105968,
+          "mean_spatial_stddev": 55.40514443200649,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 109.82573948688271,
+          "mean_spatial_stddev": 64.3861664383873,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0xa1ac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 150 >= 150\n[null @ 0xa1ac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 1250 >= 1250\n[null @ 0xa1ac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 2350 >= 2350\n[null @ 0xa1ac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3450 >= 3450\n[null @ 0xa1ac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3498 >= 3498\n[null @ 0xa1ac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 4600 >= 4600\n[null @ 0xa1ac1b700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 5700 >= 5700\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 3.0049351232718773,
+          "correlation": 0.9125001233025679
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 3.0049351232718773,
+            "correlation": 0.9125001233025679
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 17.80347786013257,
+            "correlation": 0.8478688504384537
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -4.390510542730248,
+            "correlation": -0.748649915223151
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -23.561392369873165,
+            "correlation": 0.6305608185514484
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -1.6428791698483665,
+            "correlation": 0.48281712846661284
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 22.86860466014398,
+        "usable_visual_intervals": 393,
+        "median_ransac_inlier_ratio": 0.5725190839694656
+      },
+      "segmentation": {
+        "source_selected_start_ms": 5589012,
+        "source_selected_end_ms": 5808713,
+        "source_exported_start_ms": 5588568,
+        "source_exported_end_ms": 5808750,
+        "keyframe_preroll_ms": 444,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-015",
+      "status": "pass",
+      "content_hash": "722750f7bb4720b521b42d2743fd690236dfb5654d116182c630fd2da0cfd4ab",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/722750f7bb4720b521b42d2743fd690236dfb5654d116182c630fd2da0cfd4ab",
+      "media": {
+        "duration_seconds": 478.248646,
+        "size_bytes": 724046599,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.99686334646081,
+        "video_packets": 14345,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 22417
+      },
+      "frame_intervals": {
+        "median_ms": 33.3357315,
+        "p99_ms": 33.35443141,
+        "max_ms": 33.357812,
+        "estimated_hz": 29.997841805271317
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 48109,
+          "intervals": {
+            "median_ms": 9.943,
+            "p99_ms": 9.944,
+            "max_ms": 9.945125,
+            "estimated_hz": 100.57326762546515
+          }
+        },
+        "gyroscope": {
+          "sample_count": 48109,
+          "intervals": {
+            "median_ms": 9.943,
+            "p99_ms": 9.944,
+            "max_ms": 9.945084,
+            "estimated_hz": 100.57326762546515
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 129.38888647762346,
+          "mean_spatial_stddev": 65.14538070633864,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 112.92119003986623,
+          "mean_spatial_stddev": 55.757320122591366,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 509 >= 509\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 1659 >= 1659\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 2759 >= 2759\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3859 >= 3859\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 4959 >= 4959\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 4980 >= 4980\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 5009 >= 5009\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 6109 >= 6109\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 7209 >= 7209\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 8309 >= 8309\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 9459 >= 9459\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 10559 >= 10559\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 11659 >= 11659\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 12759 >= 12759\n[null @ 0xa6b027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 13909 >= 13909\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 5.33397156980792,
+          "correlation": 0.8759872306048869
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 5.33397156980792,
+            "correlation": 0.8759872306048869
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 15.178772848344018,
+            "correlation": 0.8027116642389573
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 8.303253897856726,
+            "correlation": 0.7352395460519929
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -0.8408287835121857,
+            "correlation": -0.6836058104413015
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -4.059995813611217,
+            "correlation": 0.49565990613842925
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 8.360160114511695,
+        "usable_visual_intervals": 820,
+        "median_ransac_inlier_ratio": 0.594765651727677
+      },
+      "segmentation": {
+        "source_selected_start_ms": 5866969,
+        "source_selected_end_ms": 6344783,
+        "source_exported_start_ms": 5866597,
+        "source_exported_end_ms": 6344845,
+        "keyframe_preroll_ms": 372,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-016",
+      "status": "pass",
+      "content_hash": "1bb83ede30200705b7bdf1a77e8e9871d103eb0668d4d0a1bb7e644d437b26cb",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/1bb83ede30200705b7bdf1a77e8e9871d103eb0668d4d0a1bb7e644d437b26cb",
+      "media": {
+        "duration_seconds": 713.067343,
+        "size_bytes": 1079747766,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996984734341073,
+        "video_packets": 21389,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 33425
+      },
+      "frame_intervals": {
+        "median_ms": 33.335725499999995,
+        "p99_ms": 33.35368191,
+        "max_ms": 33.357248,
+        "estimated_hz": 29.997847204495375
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 71721,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.946125,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 71721,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.946125,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 77.60479658564813,
+          "mean_spatial_stddev": 54.54919866528989,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 114.91771891075103,
+          "mean_spatial_stddev": 65.47955077304373,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": ""
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 2.8647624596583903,
+          "correlation": 0.980587481453161
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 2.8647624596583903,
+            "correlation": 0.980587481453161
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 3.866402158389186,
+            "correlation": 0.8482890424154939
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": 0.37257668483726275,
+            "correlation": -0.8191040144839983
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 4.702159405577095,
+            "correlation": 0.8125594172977659
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": 5.486594116224179,
+            "correlation": 0.4613085674103623
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 2.9930056241865253,
+        "usable_visual_intervals": 930,
+        "median_ransac_inlier_ratio": 0.6290398678933711
+      },
+      "segmentation": {
+        "source_selected_start_ms": 6352372,
+        "source_selected_end_ms": 7063680,
+        "source_exported_start_ms": 6350647,
+        "source_exported_end_ms": 7063714,
+        "keyframe_preroll_ms": 1725,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-017",
+      "status": "pass",
+      "content_hash": "d9b781f5a06d9cecb4091288b6bd077d39ea91dc7ced8028b27e7fe385d81e9b",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/d9b781f5a06d9cecb4091288b6bd077d39ea91dc7ced8028b27e7fe385d81e9b",
+      "media": {
+        "duration_seconds": 810.648021,
+        "size_bytes": 1227358135,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.99697760342456,
+        "video_packets": 24316,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 37998
+      },
+      "frame_intervals": {
+        "median_ms": 33.335752,
+        "p99_ms": 33.35372258,
+        "max_ms": 33.357718,
+        "estimated_hz": 29.997823357937147
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 81528,
+          "intervals": {
+            "median_ms": 9.945,
+            "p99_ms": 9.945,
+            "max_ms": 9.946209,
+            "estimated_hz": 100.55304172951232
+          }
+        },
+        "gyroscope": {
+          "sample_count": 81528,
+          "intervals": {
+            "median_ms": 9.945,
+            "p99_ms": 9.945,
+            "max_ms": 9.946,
+            "estimated_hz": 100.55304172951232
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 95.27055963863168,
+          "mean_spatial_stddev": 62.891816885366225,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 124.09259294624486,
+          "mean_spatial_stddev": 62.11031278678641,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0x89901f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 5383 >= 5383\n[null @ 0x89901f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 15205 >= 15205\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": 5.52071015592071,
+          "correlation": 0.8781704984468459
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": 5.52071015592071,
+            "correlation": 0.8781704984468459
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 14.919639241201798,
+            "correlation": 0.7956694777473304
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 20.91882245372949,
+            "correlation": 0.6099815091615206
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": -1.1459936238245523,
+            "correlation": 0.5956919056203471
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -8.131509761910998,
+            "correlation": -0.5783128809976179
+          }
+        ],
+        "supporting_candidate_count": 3,
+        "supporting_offset_max_deviation_ms": 9.398929085281088,
+        "usable_visual_intervals": 1362,
+        "median_ransac_inlier_ratio": 0.5224221453287197
+      },
+      "segmentation": {
+        "source_selected_start_ms": 7064841,
+        "source_selected_end_ms": 7875308,
+        "source_exported_start_ms": 7064720,
+        "source_exported_end_ms": 7875368,
+        "keyframe_preroll_ms": 121,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-018",
+      "status": "pass",
+      "content_hash": "cedeb86094159ddadeb167c9c05a134719c4993d185623f0f9f4f6e5ced2a58c",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/cedeb86094159ddadeb167c9c05a134719c4993d185623f0f9f4f6e5ced2a58c",
+      "media": {
+        "duration_seconds": 154.745677,
+        "size_bytes": 234062629,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996768286114403,
+        "video_packets": 4641,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 7253
+      },
+      "frame_intervals": {
+        "median_ms": 33.335703,
+        "p99_ms": 33.35355486,
+        "max_ms": 33.356188,
+        "estimated_hz": 29.997867451602865
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 15575,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.945875,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 15574,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.945875,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 103.42286062885802,
+          "mean_spatial_stddev": 62.72318086077667,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 134.38047858796295,
+          "mean_spatial_stddev": 64.69277930575606,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0xa2cc1f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 420 >= 420\n[null @ 0xa2cc1f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 1520 >= 1520\n[null @ 0xa2cc1f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 1524 >= 1524\n[null @ 0xa2cc1f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 1528 >= 1528\n[null @ 0xa2cc1f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 1570 >= 1570\n[null @ 0xa2cc1f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 2670 >= 2670\n[null @ 0xa2cc1f700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 3770 >= 3770\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -3.2268996324819037,
+          "correlation": 0.9856444139159937
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -3.2268996324819037,
+            "correlation": 0.9856444139159937
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": 4.78566840492905,
+            "correlation": 0.8321132316356884
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": 5.0833713963504366,
+            "correlation": 0.8141268641151347
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -7.775329743505737,
+            "correlation": -0.7711472903138898
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": 4.618632765704687,
+            "correlation": 0.41349024270897156
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 8.55471412972931,
+        "usable_visual_intervals": 305,
+        "median_ransac_inlier_ratio": 0.5258764607679466
+      },
+      "segmentation": {
+        "source_selected_start_ms": 7882545,
+        "source_selected_end_ms": 8035492,
+        "source_exported_start_ms": 7880802,
+        "source_exported_end_ms": 8035547,
+        "keyframe_preroll_ms": 1743,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    },
+    {
+      "clip": "clip-019",
+      "status": "pass",
+      "content_hash": "42219a9b2e3b98fac43cc85ece0643fd47465ab507165b511df3d90dce2ac6c4",
+      "folder": "/Users/forest/Downloads/RootLens-Claru-RF-20260825-112613/raw/42219a9b2e3b98fac43cc85ece0643fd47465ab507165b511df3d90dce2ac6c4",
+      "media": {
+        "duration_seconds": 305.219323,
+        "size_bytes": 462168495,
+        "video_codec": "h264",
+        "width": 1920,
+        "height": 1080,
+        "fps": 29.996887270026594,
+        "video_packets": 9155,
+        "audio_codec": "aac",
+        "audio_sample_rate": 48000,
+        "audio_channels": 1,
+        "audio_packets": 14307
+      },
+      "frame_intervals": {
+        "median_ms": 33.3356515,
+        "p99_ms": 33.353994,
+        "max_ms": 33.3572,
+        "estimated_hz": 29.997913795085122
+      },
+      "imu": {
+        "accelerometer": {
+          "sample_count": 30706,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.946166,
+            "estimated_hz": 100.56315366049878
+          }
+        },
+        "gyroscope": {
+          "sample_count": 30706,
+          "intervals": {
+            "median_ms": 9.944,
+            "p99_ms": 9.945,
+            "max_ms": 9.946,
+            "estimated_hz": 100.56315366049878
+          }
+        }
+      },
+      "endpoints": {
+        "start": {
+          "decoded_frames": 15,
+          "mean_luma": 114.67642631172839,
+          "mean_spatial_stddev": 55.31895403304546,
+          "black_frame_count": 0
+        },
+        "end": {
+          "decoded_frames": 15,
+          "mean_luma": 113.43178594393002,
+          "mean_spatial_stddev": 62.447935598493345,
+          "black_frame_count": 0
+        }
+      },
+      "full_decode": {
+        "passed": true,
+        "return_code": 0,
+        "stderr": "[null @ 0x72f027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 8463 >= 8463\n[null @ 0x72f027700] Application provided invalid, non monotonically increasing dts to muxer in stream 0: 8465 >= 8465\n"
+      },
+      "motion_alignment": {
+        "status": "pass",
+        "best": {
+          "pair": "rotation_vs_gyro_z",
+          "offset_ms": -1.5607583411825257,
+          "correlation": 0.9664470114424277
+        },
+        "top_candidates": [
+          {
+            "pair": "rotation_vs_gyro_z",
+            "offset_ms": -1.5607583411825257,
+            "correlation": 0.9664470114424277
+          },
+          {
+            "pair": "affine_motion_magnitude_vs_gyro_magnitude",
+            "offset_ms": -5.612427856594375,
+            "correlation": 0.8462474099161325
+          },
+          {
+            "pair": "translate_x_vs_gyro_z",
+            "offset_ms": -4.0300650843748365,
+            "correlation": 0.8038566665136848
+          },
+          {
+            "pair": "translate_y_vs_gyro_z",
+            "offset_ms": -0.0837009290297783,
+            "correlation": -0.7005251889632188
+          },
+          {
+            "pair": "translate_y_vs_gyro_y",
+            "offset_ms": 2.042243375952518,
+            "correlation": 0.34905206268504685
+          }
+        ],
+        "supporting_candidate_count": 4,
+        "supporting_offset_max_deviation_ms": 2.817016143815694,
+        "usable_visual_intervals": 642,
+        "median_ransac_inlier_ratio": 0.6512465564738292
+      },
+      "segmentation": {
+        "source_selected_start_ms": 8059179,
+        "source_selected_end_ms": 8364003,
+        "source_exported_start_ms": 8058820,
+        "source_exported_end_ms": 8364039,
+        "keyframe_preroll_ms": 359,
+        "video_reencoded": false,
+        "audio_reencoded": false,
+        "internal_cuts": 0
+      },
+      "metadata_contract": {
+        "video_clock_model_schema": "rootlens.camera_imu_clock_model.v1",
+        "clock_model_quality": "good",
+        "clock_model_contains_sensor_validity_residual": true,
+        "mapping_method_present": false,
+        "additional_video_to_imu_offset_ns": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "rootlens.claru.boundaries.v1",
+  "saved_at": "2026-08-25T07:23:12.396Z",
+  "source": {
+    "directory_name": "rec-1787263927087",
+    "metadata_sha256": "3c9b19a33a0f8ec7c80804a81e5f8557518dc8f11055bc16f29d57aaac02f094",
+    "files": {
+      "rgb.mp4": {
+        "size_bytes": 4020543221
+      },
+      "frames.jsonl": {
+        "size_bytes": 85745222
+      },
+      "imu.jsonl": {
+        "size_bytes": 110724038
+      },
+      "metadata.json": {
+        "size_bytes": 2024
+      }
+    },
+    "metadata": {
+      "schema": "rootlens.iphone.raw.v1",
+      "created_at": "2026-08-20T22:12:07Z",
+      "device_model": "iPhone13,1",
+      "video_frame_count": 79652,
+      "accelerometer_sample_count": 267041,
+      "gyroscope_sample_count": 267041
+    }
+  },
+  "segment_count": 4,
+  "segments": [
+    {
+      "id": "79f334b7-44e5-42f9-bee2-960f2538b333",
+      "label": "clip-001",
+      "startSeconds": 77.28399999999999,
+      "endSeconds": 704.587
+    },
+    {
+      "id": "a972d041-41dd-4425-9e44-32941d4e6e39",
+      "label": "clip-002",
+      "startSeconds": 782.692,
+      "endSeconds": 1398.063
+    },
+    {
+      "id": "e43fad0a-5aa3-41f6-af4c-87b682551af3",
+      "label": "clip-003",
+      "startSeconds": 1402.415,
+      "endSeconds": 2208.177
+    },
+    {
+      "id": "def87adc-8bab-414f-b355-ac469ed1b168",
+      "label": "clip-004",
+      "startSeconds": 2208.631,
+      "endSeconds": 2601.274
+    }
+  ]
+}

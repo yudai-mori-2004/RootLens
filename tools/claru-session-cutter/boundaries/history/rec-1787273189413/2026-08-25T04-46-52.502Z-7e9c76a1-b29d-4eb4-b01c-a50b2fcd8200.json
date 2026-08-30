@@ -1,0 +1,32 @@
+{
+  "schema": "rootlens.claru.boundaries.v1",
+  "saved_at": "2026-08-25T04:46:52.502Z",
+  "source": {
+    "directory_name": "rec-1787273189413",
+    "metadata_sha256": "df9606a2aec7875a7f93d73f325589e96be9a1d91f6543e22be09f3d9763643b",
+    "files": {
+      "rgb.mp4": {
+        "size_bytes": 3679970206
+      },
+      "frames.jsonl": {
+        "size_bytes": 78464068
+      },
+      "imu.jsonl": {
+        "size_bytes": 101445972
+      },
+      "metadata.json": {
+        "size_bytes": 2024
+      }
+    },
+    "metadata": {
+      "schema": "rootlens.iphone.raw.v1",
+      "created_at": "2026-08-21T00:46:29Z",
+      "device_model": "iPhone13,1",
+      "video_frame_count": 72904,
+      "accelerometer_sample_count": 244411,
+      "gyroscope_sample_count": 244411
+    }
+  },
+  "segment_count": 0,
+  "segments": []
+}

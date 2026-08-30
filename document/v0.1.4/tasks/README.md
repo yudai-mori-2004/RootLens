@@ -57,6 +57,10 @@ v0.1.4 (簡素化スプリント)
   16. claru-mentra-capture      🔄 新 Mentra Live単体の1080p30 SDR + raw IMU収録。
                                     per-frame RGB↔IMU timelineと同期証拠を保存し、未証明の
                                     single physical clockをfail-loudに扱う。
+  17. iphone-rgb-imu-capture    ✅ 新 設定上の第3撮影方法。iPhone超広角1080p30 + AAC + raw IMUを
+                                    ARKitなしで収録し、Mentraと同じ4ファイル契約で手動アップロードする。
+  18. claru-session-cutter      🔄 新 長時間iPhone収録をMacでpreviewし、人間が指定した連続タスク区間を
+                                    再エンコードなしで4ファイル契約へ切り出す。実機長時間収録の検証待ち。
 ```
 
 凡例: ✅ = 完了、 🔄 = 進行中 / 未着手、 新 = 新規追加。
