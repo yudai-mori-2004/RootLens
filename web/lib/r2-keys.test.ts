@@ -20,6 +20,12 @@ describe("Mentra raw upload contract", () => {
   });
 });
 
+describe("iPhone RGB+IMU raw upload contract", () => {
+  it("matches the Mentra delivered manifest exactly", () => {
+    expect(RAW_SESSION_MANIFEST.iphone).toEqual(RAW_SESSION_MANIFEST.mentra);
+  });
+});
+
 describe("ARKit raw upload contract", () => {
   it("presigns the complete current iPhone delivery manifest", () => {
     expect(RAW_SESSION_MANIFEST.arkit).toEqual([

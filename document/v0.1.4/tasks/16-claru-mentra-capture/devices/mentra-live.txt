@@ -8,7 +8,9 @@ Our response to the quality requirements you provided:
 → Meets by published device specifications. Apple specifies a 120° field of view for the iPhone 15 Pro 0.5x Ultra Wide camera. Mentra specifies a 119° field of view and landscape orientation for the fixed wide-angle camera used by Mentra Live.
 
 • Landscape orientation, 1080p, 30fps, 8-bit (HDR off)
-→ Meets. The delivered footage is landscape 1920×1080, 30fps, 8-bit SDR, with HDR disabled.
+→ Meets. The captured and delivered footage is landscape 1920×1080, 30fps, 8-bit SDR, with HDR disabled.
+The camera HAL performs the standard centered 4:3-to-16:9 aspect crop before encoding; no later crop or
+re-encoding stage changes the frame indices or timestamps.
 
 • Head-mounted, at forehead/eye level, angled slightly down
 → Meets. The camera is integrated into the glasses at eye level in a fixed head-mounted position, providing the required slightly downward first-person framing. Coverage of the hands and work area is verified through the per-clip visibility QC described below.

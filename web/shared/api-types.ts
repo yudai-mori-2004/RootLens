@@ -2,7 +2,7 @@
 // 認証は Authorization: Bearer <supabase JWT>。
 
 // ─── 撮影構成 ───────────────────────────────────────────────────
-export type RecordingConfig = "ultra_wide" | "arkit" | "mentra";
+export type RecordingConfig = "ultra_wide" | "arkit" | "mentra" | "iphone";
 
 // ─── ClipDto ─────────────────────────────────────────────────────
 // サーバの clip 行はアップロード完了後にしか作られないので、 状態機械は持たない
@@ -33,7 +33,7 @@ export interface CreateClipRequest {
   contentHash: string;
   /// rgb.mp4 (= raw、 blur 無し) のサイズ (bytes)
   contentSize: number;
-  /// 採用された撮影構成 (= 'ultra_wide' | 'arkit' | 'mentra')
+  /// 採用された撮影構成 (= 'ultra_wide' | 'arkit' | 'mentra' | 'iphone')
   recordingConfig: RecordingConfig;
   /// 録画尺 (ms)。 端末が record stop−start から算出。
   durationMs?: number;
@@ -93,7 +93,8 @@ export interface AttachClipConsentResponse {
 }
 
 /// DELETE /api/clips/:contentHash
-/// 撮影者がクリップを破棄する (= 行削除のみ。 R2 オブジェクトは残置)。
+/// 撮影者がクリップを破棄する (= R2 raw 一式 + DB 行)。
 export interface DeleteClipResponse {
   ok: true;
+  deletedObjects: number;
 }

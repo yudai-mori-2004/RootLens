@@ -78,10 +78,18 @@ final class SessionArtifacts {
     }
 
     static SessionArtifacts create(File recordingsRoot) throws IOException {
+        return create(recordingsRoot, "rec-");
+    }
+
+    static SessionArtifacts createCalibration(File recordingsRoot) throws IOException {
+        return create(recordingsRoot, "calibration-");
+    }
+
+    private static SessionArtifacts create(File recordingsRoot, String prefix) throws IOException {
         if (!recordingsRoot.exists() && !recordingsRoot.mkdirs()) {
             throw new IOException("Cannot create recordings directory: " + recordingsRoot);
         }
-        File directory = new File(recordingsRoot, "rec-" + DIRECTORY_FORMAT.format(new Date()));
+        File directory = new File(recordingsRoot, prefix + DIRECTORY_FORMAT.format(new Date()));
         if (!directory.mkdirs()) throw new IOException("Cannot create clip directory: " + directory);
         return new SessionArtifacts(directory);
     }
@@ -121,7 +129,9 @@ final class SessionArtifacts {
             long recorderStartElapsedNs,
             long recorderStartMonotonicNs,
             long recorderStopWallMs,
-            boolean recorderStopSucceeded) throws IOException {
+            boolean recorderStopSucceeded,
+            VideoImuCalibration calibration,
+            boolean audioRequired) throws IOException {
         try {
             cameraWriter.flush();
             cameraWriter.close();
@@ -136,7 +146,7 @@ final class SessionArtifacts {
         move(partialImu, imu);
         move(partialCameraFrames, new File(directory, "camera_frames.raw.jsonl"));
 
-        ExtractedVideo extracted = extractVideo(video);
+        ExtractedVideo extracted = extractVideo(video, audioRequired);
         Alignment alignment = align(cameraFrames, extracted.samples);
         if (alignment.pairedCount == 0) {
             throw new IOException("No Camera2 results can be aligned to MP4 samples");
@@ -146,8 +156,9 @@ final class SessionArtifacts {
                 alignment,
                 probe.androidElapsedRealtimeComparable(),
                 probe.json.optBoolean("single_hardware_timestamp_counter_confirmed", false));
-        writeFrames(extracted.samples, alignment, mapping, rawImu);
-        JSONObject syncReport = buildSyncReport(probe, rawImu, extracted, alignment, mapping);
+        writeFrames(extracted.samples, alignment, mapping, rawImu, calibration);
+        JSONObject syncReport = buildSyncReport(
+                probe, rawImu, extracted, alignment, mapping, calibration);
         writeJson(new File(directory, "sync_report.json"), syncReport);
 
         String contentHash = sha256(video);
@@ -165,10 +176,13 @@ final class SessionArtifacts {
             metadata.put("video", extracted.formatJson);
             metadata.put("video_cadence", extracted.cadenceJson);
             metadata.put("video_bytes", video.length());
+            metadata.put("audio", extracted.audioFormatJson == null
+                    ? JSONObject.NULL : extracted.audioFormatJson);
+            metadata.put("audio_sample_count", extracted.audioSampleCount);
             metadata.put("camera_result_count", cameraFrames.size());
             metadata.put("accelerometer_sample_count", rawImu.accelTimestamps().size());
             metadata.put("gyroscope_sample_count", rawImu.gyroTimestamps().size());
-            metadata.put("capture_configuration", new JSONObject()
+            JSONObject captureConfiguration = new JSONObject()
                     .put("width", AppContract.WIDTH)
                     .put("height", AppContract.HEIGHT)
                     .put("fps", AppContract.FPS)
@@ -176,11 +190,21 @@ final class SessionArtifacts {
                     .put("codec", "video/avc")
                     .put("bit_depth", 8)
                     .put("hdr", false)
-                    .put("audio", false)
+                    .put("audio", audioRequired)
                     .put("orientation", "landscape")
-                    .put("video_to_imu_offset_ns", AppContract.VIDEO_TO_IMU_OFFSET_NS)
+                    .put("video_to_imu_offset_ns", calibration.offsetNs)
                     .put("video_to_imu_offset_convention",
-                            "imu_event_timestamp_minus_video_event_timestamp"));
+                            VideoImuCalibration.CONVENTION)
+                    .put("video_to_imu_calibration", CalibrationStore.auditJson(calibration));
+            if (audioRequired) {
+                captureConfiguration
+                        .put("audio_source", "mic")
+                        .put("audio_codec", "audio/mp4a-latm")
+                        .put("audio_sample_rate_hz", AppContract.AUDIO_SAMPLE_RATE_HZ)
+                        .put("audio_channels", AppContract.AUDIO_CHANNELS)
+                        .put("audio_bitrate_bps", AppContract.AUDIO_BITRATE_BPS);
+            }
+            metadata.put("capture_configuration", captureConfiguration);
             metadata.put("device_probe", deliveryDeviceMetadata(probe.json));
             metadata.put("files", new JSONArray()
                     .put("rgb.mp4")
@@ -223,7 +247,8 @@ final class SessionArtifacts {
             ArrayList<VideoSample> samples,
             Alignment alignment,
             Mapping mapping,
-            RawImuRecorder rawImu) throws IOException {
+            RawImuRecorder rawImu,
+            VideoImuCalibration calibration) throws IOException {
         File output = new File(directory, "frames.jsonl");
         FrameRecord anchorFrame = cameraFrames.get(alignment.cameraStart);
         VideoSample anchorSample = samples.get(alignment.sampleStart);
@@ -238,7 +263,7 @@ final class SessionArtifacts {
                         ? anchorFrame.sensorTimestampNs + (sample.ptsNs - anchorSample.ptsNs)
                         : frame.sensorTimestampNs;
                 long mappedElapsedNs = videoTimestampInCameraDomainNs + mapping.cameraToElapsedOffsetNs;
-                long imuAssociationTimestampNs = mappedElapsedNs + AppContract.VIDEO_TO_IMU_OFFSET_NS;
+                long imuAssociationTimestampNs = mappedElapsedNs + calibration.offsetNs;
                 int accelBefore = rawImu.accelTimestamps().floorIndex(imuAssociationTimestampNs);
                 int gyroBefore = rawImu.gyroTimestamps().floorIndex(imuAssociationTimestampNs);
                 JSONObject row = new JSONObject();
@@ -265,9 +290,10 @@ final class SessionArtifacts {
                             ? frame.callbackMonotonicNs : JSONObject.NULL);
                     row.put("camera_timestamp_mapped_elapsed_realtime_ns", mappedElapsedNs);
                     row.put("camera_to_elapsed_offset_ns", mapping.cameraToElapsedOffsetNs);
-                    row.put("video_to_imu_offset_ns", AppContract.VIDEO_TO_IMU_OFFSET_NS);
+                    row.put("video_to_imu_offset_ns", calibration.offsetNs);
                     row.put("video_to_imu_offset_convention",
-                            "imu_event_timestamp_minus_video_event_timestamp");
+                            VideoImuCalibration.CONVENTION);
+                    row.put("video_to_imu_calibration_id", calibration.calibrationId);
                     row.put("imu_association_timestamp_ns", imuAssociationTimestampNs);
                     row.put("mapping_quality", mapping.quality);
                     row.put("exposure_time_ns", hasCameraResult
@@ -303,7 +329,8 @@ final class SessionArtifacts {
             RawImuRecorder rawImu,
             ExtractedVideo video,
             Alignment alignment,
-            Mapping mapping) throws IOException {
+            Mapping mapping,
+            VideoImuCalibration calibration) throws IOException {
         try {
             JSONObject clockAudit = probe.json.optJSONObject("clock_architecture_audit");
             boolean commonTimestampCounterConfirmed = clockAudit != null
@@ -353,11 +380,9 @@ final class SessionArtifacts {
                     .put("video_format", video.formatJson)
                     .put("video_cadence", video.cadenceJson)
                     .put("motion_based_video_gyro_validation", new JSONObject()
-                            .put("offset_ns", AppContract.VIDEO_TO_IMU_OFFSET_NS)
-                            .put("convention", "imu_event_timestamp_minus_video_event_timestamp")
-                            .put("best_fit_correlation", 0.9685364581)
-                            .put("high_confidence_segment_range_ns",
-                                    new JSONArray().put(70_000_000L).put(78_000_000L)))
+                            .put("offset_ns", calibration.offsetNs)
+                            .put("convention", VideoImuCalibration.CONVENTION)
+                            .put("calibration", CalibrationStore.auditJson(calibration)))
                     .put("claim_gate", commonTimestampCounterConfirmed
                             ? "The audited firmware uses one ARM hardware counter for camera and IMU timestamps. "
                                     + "Do not claim hardware-synchronized acquisition: IMU samples are software-timestamped "
@@ -502,22 +527,29 @@ final class SessionArtifacts {
         return total / evaluated;
     }
 
-    private static ExtractedVideo extractVideo(File video) throws IOException {
+    private static ExtractedVideo extractVideo(File video, boolean audioRequired) throws IOException {
         MediaExtractor extractor = new MediaExtractor();
         try {
             extractor.setDataSource(video.getAbsolutePath());
             int videoTrack = -1;
+            int audioTrack = -1;
             MediaFormat format = null;
+            MediaFormat audioFormat = null;
             for (int track = 0; track < extractor.getTrackCount(); track++) {
                 MediaFormat candidate = extractor.getTrackFormat(track);
                 String mime = candidate.getString(MediaFormat.KEY_MIME);
-                if (mime != null && mime.startsWith("video/")) {
+                if (mime != null && mime.startsWith("video/") && videoTrack < 0) {
                     videoTrack = track;
                     format = candidate;
-                    break;
+                } else if (mime != null && mime.startsWith("audio/") && audioTrack < 0) {
+                    audioTrack = track;
+                    audioFormat = candidate;
                 }
             }
             if (videoTrack < 0 || format == null) throw new IOException("MP4 has no video track");
+            if (audioRequired && (audioTrack < 0 || audioFormat == null)) {
+                throw new IOException("MP4 has no audio track");
+            }
             int width = format.getInteger(MediaFormat.KEY_WIDTH);
             int height = format.getInteger(MediaFormat.KEY_HEIGHT);
             String mime = format.getString(MediaFormat.KEY_MIME);
@@ -569,7 +601,64 @@ final class SessionArtifacts {
                 if (!extractor.advance()) break;
             }
             if (samples.isEmpty()) throw new IOException("MP4 video track has no samples");
-            return new ExtractedVideo(samples, formatJson, cadenceJson(samples));
+
+            if (!audioRequired) {
+                return new ExtractedVideo(
+                        samples, formatJson, cadenceJson(samples), null, 0);
+            }
+
+            String audioMime = audioFormat.getString(MediaFormat.KEY_MIME);
+            if (!MediaFormat.MIMETYPE_AUDIO_AAC.equals(audioMime)) {
+                throw new IOException("Recorded audio codec is " + audioMime
+                        + ", expected audio/mp4a-latm");
+            }
+
+            extractor.unselectTrack(videoTrack);
+            extractor.selectTrack(audioTrack);
+            extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+            int audioSampleCount = 0;
+            long firstAudioPtsUs = -1L;
+            long lastAudioPtsUs = -1L;
+            while (extractor.getSampleTrackIndex() >= 0) {
+                long ptsUs = extractor.getSampleTime();
+                if (firstAudioPtsUs < 0) firstAudioPtsUs = ptsUs;
+                lastAudioPtsUs = ptsUs;
+                audioSampleCount++;
+                if (!extractor.advance()) break;
+            }
+            int sampleRateHz = requiredInteger(
+                    audioFormat, MediaFormat.KEY_SAMPLE_RATE, "audio sample rate");
+            int channelCount = requiredInteger(
+                    audioFormat, MediaFormat.KEY_CHANNEL_COUNT, "audio channel count");
+            long firstVideoPtsUs = samples.get(0).ptsNs / 1_000L;
+            long lastVideoPtsUs = samples.get(samples.size() - 1).ptsNs / 1_000L;
+            AudioTrackContract.validate(
+                    sampleRateHz,
+                    channelCount,
+                    audioSampleCount,
+                    firstAudioPtsUs,
+                    lastAudioPtsUs,
+                    firstVideoPtsUs,
+                    lastVideoPtsUs);
+
+            JSONObject audioFormatJson = new JSONObject();
+            try {
+                audioFormatJson.put("mime", audioMime);
+                copyInteger(audioFormat, audioFormatJson, MediaFormat.KEY_SAMPLE_RATE,
+                        "sample_rate_hz");
+                copyInteger(audioFormat, audioFormatJson, MediaFormat.KEY_CHANNEL_COUNT,
+                        "channel_count");
+                copyInteger(audioFormat, audioFormatJson, MediaFormat.KEY_BIT_RATE,
+                        "bitrate_bps");
+                copyInteger(audioFormat, audioFormatJson, MediaFormat.KEY_AAC_PROFILE,
+                        "aac_profile");
+                audioFormatJson.put("sample_count", audioSampleCount);
+                audioFormatJson.put("pts_span_us", Math.max(0L, lastAudioPtsUs - firstAudioPtsUs));
+            } catch (JSONException error) {
+                throw new IOException("Audio format JSON failed", error);
+            }
+            return new ExtractedVideo(
+                    samples, formatJson, cadenceJson(samples), audioFormatJson, audioSampleCount);
         } finally {
             extractor.release();
         }
@@ -578,6 +667,11 @@ final class SessionArtifacts {
     private static void copyInteger(
             MediaFormat source, JSONObject destination, String sourceKey, String destinationKey) throws JSONException {
         if (source.containsKey(sourceKey)) destination.put(destinationKey, source.getInteger(sourceKey));
+    }
+
+    private static int requiredInteger(MediaFormat source, String key, String label) throws IOException {
+        if (!source.containsKey(key)) throw new IOException("MP4 is missing " + label);
+        return source.getInteger(key);
     }
 
     private static JSONObject cadenceJson(ArrayList<VideoSample> samples) throws IOException {
@@ -668,11 +762,20 @@ final class SessionArtifacts {
         final ArrayList<VideoSample> samples;
         final JSONObject formatJson;
         final JSONObject cadenceJson;
+        final JSONObject audioFormatJson;
+        final int audioSampleCount;
 
-        ExtractedVideo(ArrayList<VideoSample> samples, JSONObject formatJson, JSONObject cadenceJson) {
+        ExtractedVideo(
+                ArrayList<VideoSample> samples,
+                JSONObject formatJson,
+                JSONObject cadenceJson,
+                JSONObject audioFormatJson,
+                int audioSampleCount) {
             this.samples = samples;
             this.formatJson = formatJson;
             this.cadenceJson = cadenceJson;
+            this.audioFormatJson = audioFormatJson;
+            this.audioSampleCount = audioSampleCount;
         }
     }
 

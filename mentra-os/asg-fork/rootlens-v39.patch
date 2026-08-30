@@ -1,0 +1,1691 @@
+diff --git a/asg_client/app/src/main/AndroidManifest.xml b/asg_client/app/src/main/AndroidManifest.xml
+index 2774968163..6375fd48b1 100644
+--- a/asg_client/app/src/main/AndroidManifest.xml
++++ b/asg_client/app/src/main/AndroidManifest.xml
+@@ -37,6 +37,7 @@
+     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+ 
+     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
++    <uses-permission android:name="io.rootlens.mentra.permission.CAPTURE_CONTROL" />
+ 
+     <uses-permission android:name="android.permission.CAMERA" />
+     <uses-permission android:name="android.hardware.camera.full" />
+@@ -62,6 +63,11 @@
+     <!-- Add camera background permission -->
+     <uses-permission android:name="android.permission.CAMERA_BACKGROUND" />
+ 
++    <queries>
++        <package android:name="io.rootlens.mentra" />
++        <package android:name="io.rootlens.mentra.debug" />
++    </queries>
++
+ 
+     <!-- Application node is not neccessary for libraries -->
+     <application
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/audio/FeedbackVolumeController.java b/asg_client/app/src/main/java/com/mentra/asg_client/audio/FeedbackVolumeController.java
+new file mode 100644
+index 0000000000..a19abbff9d
+--- /dev/null
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/audio/FeedbackVolumeController.java
+@@ -0,0 +1,42 @@
++package com.mentra.asg_client.audio;
++
++import android.content.Context;
++import android.media.AudioManager;
++import android.util.Log;
++
++/** Converges the dedicated glasses feedback stream to its deterministic audible level. */
++public final class FeedbackVolumeController {
++    private static final String TAG = "FeedbackVolume";
++
++    private final AudioManager audioManager;
++
++    public FeedbackVolumeController(Context context) {
++        this((AudioManager) context.getApplicationContext().getSystemService(Context.AUDIO_SERVICE));
++    }
++
++    FeedbackVolumeController(AudioManager audioManager) {
++        this.audioManager = audioManager;
++    }
++
++    /**
++     * Ensure feedback is audible without accumulating state or applying relative adjustments.
++     *
++     * @return true only when this call changed the stream volume
++     */
++    public boolean ensureAudible() {
++        if (audioManager == null) {
++            Log.w(TAG, "AudioManager unavailable; cannot reconcile feedback volume");
++            return false;
++        }
++
++        int maximum = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION);
++        int current = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION);
++        if (current == maximum) {
++            return false;
++        }
++
++        audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, maximum, 0);
++        Log.i(TAG, "Feedback volume reconciled: " + current + " -> " + maximum);
++        return true;
++    }
++}
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/audio/I2SAudioController.java b/asg_client/app/src/main/java/com/mentra/asg_client/audio/I2SAudioController.java
+index 6108f10ae8..2a403d971b 100644
+--- a/asg_client/app/src/main/java/com/mentra/asg_client/audio/I2SAudioController.java
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/audio/I2SAudioController.java
+@@ -11,6 +11,9 @@ import android.util.Log;
+ import com.mentra.asg_client.service.core.AsgClientService;
+ 
+ import java.io.IOException;
++import java.util.ArrayDeque;
++import java.util.Arrays;
++import java.util.Deque;
+ 
+ /**
+  * Handles I2S audio playback for devices that route speaker output through the MCU.
+@@ -21,29 +24,68 @@ public class I2SAudioController {
+     private static final String TAG = "I2SAudioController";
+ 
+     private final Context context;
++    private final FeedbackVolumeController volumeController;
++    private final Deque<String> pendingAssets = new ArrayDeque<>();
+ 
+     private MediaPlayer mediaPlayer;
++    private boolean i2sPathOpen;
+ 
+     // Track if WE are actively controlling I2S (to prevent receiver feedback loop)
+     private static volatile boolean isControllingI2S = false;
+ 
+     public I2SAudioController(Context context) {
+         this.context = context.getApplicationContext();
++        this.volumeController = new FeedbackVolumeController(this.context);
+     }
+ 
+     public synchronized void playAsset(String assetName) {
+-        Log.i(TAG, "Playing I2S asset: " + assetName);
++        playAssets(assetName);
++    }
++
++    /** Play assets in order while keeping the I2S path open for the whole sequence. */
++    public synchronized void playAssets(String... assetNames) {
++        pendingAssets.clear();
++        if (assetNames != null) {
++            for (String assetName : assetNames) {
++                if (assetName != null && !assetName.isEmpty()) {
++                    pendingAssets.addLast(assetName);
++                }
++            }
++        }
++        if (pendingAssets.isEmpty()) {
++            Log.w(TAG, "Ignoring empty I2S playback sequence");
++            return;
++        }
++
++        Log.i(TAG, "Playing I2S asset sequence: " + Arrays.toString(assetNames));
+ 
+         // Mark that WE are controlling I2S - prevents receiver from reacting to our broadcasts
+         isControllingI2S = true;
+ 
+         stopCurrentPlayer();
++        closeI2SPath();
++
++        volumeController.ensureAudible();
+ 
+         if (!notifyI2SState(true)) {
+             Log.w(TAG, "Failed to start I2S path; skipping playback");
++            pendingAssets.clear();
+             isControllingI2S = false;
+             return;
+         }
++        i2sPathOpen = true;
++
++        playNextAsset();
++    }
++
++    private synchronized void playNextAsset() {
++        String assetName = pendingAssets.pollFirst();
++        if (assetName == null) {
++            finishPlayback();
++            return;
++        }
++
++        Log.i(TAG, "Playing I2S asset: " + assetName);
+ 
+         try {
+             AssetFileDescriptor afd = context.getAssets().openFd(assetName);
+@@ -54,25 +96,36 @@ public class I2SAudioController {
+             // STREAM_NOTIFICATION routes through system sounds which work with I2S
+             mediaPlayer.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
+ 
+-            // Set volume to maximum for this stream to ensure audio is audible
+-            mediaPlayer.setVolume(0.1f, 0.1f);
++            // Keep per-player gain at unity. Stream volume remains under Android's normal
++            // notification-volume control; attenuating here made quiet spoken cues inaudible.
++            mediaPlayer.setVolume(1.0f, 1.0f);
+ 
+             mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+             afd.close();
+ 
+             mediaPlayer.setOnCompletionListener(mp -> {
+-                Log.d(TAG, "I2S audio playback completed");
+-                mp.release();
+-                mediaPlayer = null;
+-                notifyI2SState(false);
+-                isControllingI2S = false;  // Release control
++                synchronized (I2SAudioController.this) {
++                    if (mp != mediaPlayer) {
++                        mp.release();
++                        return;
++                    }
++                    Log.d(TAG, "I2S audio asset completed");
++                    mp.release();
++                    mediaPlayer = null;
++                    playNextAsset();
++                }
+             });
+             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+-                Log.e(TAG, "MediaPlayer error - what=" + what + ", extra=" + extra);
+-                mp.release();
+-                mediaPlayer = null;
+-                notifyI2SState(false);
+-                isControllingI2S = false;  // Release control
++                synchronized (I2SAudioController.this) {
++                    Log.e(TAG, "MediaPlayer error - what=" + what + ", extra=" + extra);
++                    if (mp == mediaPlayer) {
++                        mp.release();
++                        mediaPlayer = null;
++                        playNextAsset();
++                    } else {
++                        mp.release();
++                    }
++                }
+                 return true;
+             });
+ 
+@@ -81,18 +134,20 @@ public class I2SAudioController {
+             Log.d(TAG, "I2S audio playback started");
+         } catch (IOException e) {
+             Log.e(TAG, "IOException while playing asset " + assetName, e);
+-            notifyI2SState(false);
+-            isControllingI2S = false;  // Release control on error
++            releaseFailedPlayer();
++            playNextAsset();
+         } catch (Exception e) {
+             Log.e(TAG, "Unexpected exception while playing asset " + assetName, e);
+-            notifyI2SState(false);
+-            isControllingI2S = false;  // Release control on error
++            releaseFailedPlayer();
++            playNextAsset();
+         }
+     }
+ 
+     public synchronized void stopPlayback() {
+         isControllingI2S = true;  // Mark as controlling before stopping
+-        stopCurrentPlayer();  // Now handles I2S path closing
++        pendingAssets.clear();
++        stopCurrentPlayer();
++        closeI2SPath();
+         isControllingI2S = false;  // Release control
+     }
+ 
+@@ -115,11 +170,29 @@ public class I2SAudioController {
+             }
+             mediaPlayer.release();
+             mediaPlayer = null;
++        }
++    }
+ 
+-            // Close I2S path only if we had a player running
+-            // This ensures cleanup even if app is killed during playback
+-            notifyI2SState(false);
++    private void finishPlayback() {
++        closeI2SPath();
++        isControllingI2S = false;
++        Log.d(TAG, "I2S audio playback sequence completed");
++    }
++
++    private void closeI2SPath() {
++        if (!i2sPathOpen) {
++            return;
++        }
++        notifyI2SState(false);
++        i2sPathOpen = false;
++    }
++
++    private void releaseFailedPlayer() {
++        if (mediaPlayer == null) {
++            return;
+         }
++        mediaPlayer.release();
++        mediaPlayer = null;
+     }
+ 
+     private boolean notifyI2SState(boolean playing) {
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/audio/RootLensFeedback.java b/asg_client/app/src/main/java/com/mentra/asg_client/audio/RootLensFeedback.java
+new file mode 100644
+index 0000000000..09ec36a532
+--- /dev/null
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/audio/RootLensFeedback.java
+@@ -0,0 +1,70 @@
++package com.mentra.asg_client.audio;
++
++import android.content.Context;
++import android.util.Log;
++
++import com.mentra.asg_client.io.hardware.core.HardwareManagerFactory;
++import com.mentra.asg_client.io.hardware.interfaces.IHardwareManager;
++
++/** Plays allowlisted RootLens feedback through the ASG-owned Mentra Live audio path. */
++public final class RootLensFeedback {
++  public static final String ACTION_PLAY = "io.rootlens.mentra.PLAY_ASG_FEEDBACK";
++  public static final String EXTRA_EVENT = "feedback_event";
++
++  private static final String TAG = "RootLensFeedback";
++
++  private RootLensFeedback() {}
++
++  /**
++   * Play one semantic feedback event. Arbitrary asset paths are deliberately not accepted.
++   *
++   * @return true when the event was accepted by the hardware audio owner
++   */
++  public static boolean play(Context context, String event) {
++    String[] assets = assetsFor(event);
++    if (assets == null) {
++      Log.w(TAG, "Ignoring unknown RootLens feedback event: " + event);
++      return false;
++    }
++
++    IHardwareManager hardwareManager = HardwareManagerFactory.getInstance(context);
++    if (!hardwareManager.supportsAudioPlayback()) {
++      Log.w(TAG, "Audio playback is unavailable for RootLens event: " + event);
++      return false;
++    }
++
++    Log.i(TAG, "Playing RootLens feedback: " + event);
++    hardwareManager.playAudioAssets(assets);
++    return true;
++  }
++
++  static String[] assetsFor(String event) {
++    if (event == null) {
++      return null;
++    }
++    switch (event) {
++      case "capture_start_received":
++        return new String[] {
++          AudioAssets.VIDEO_RECORDING_START, "rootlens/capture_start.mp3"
++        };
++      case "capture_stop_received":
++        return new String[] {
++          AudioAssets.VIDEO_RECORDING_STOP, "rootlens/capture_stop.mp3"
++        };
++      case "capture_failed":
++        return new String[] {"rootlens/capture_failed.mp3"};
++      case "calibration_gesture_step":
++        return new String[] {AudioAssets.CLICK_SOUND};
++      case "upload_started":
++        return new String[] {"rootlens/upload_started.mp3"};
++      case "upload_complete":
++        return new String[] {"rootlens/upload_complete.mp3"};
++      case "upload_unavailable":
++        return new String[] {"rootlens/upload_unavailable.mp3"};
++      case "calibration_instructions":
++        return new String[] {"rootlens/calibration_instructions.mp3"};
++      default:
++        return null;
++    }
++  }
++}
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/core/BaseHardwareManager.java b/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/core/BaseHardwareManager.java
+index 62c0eecb56..162db60cab 100644
+--- a/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/core/BaseHardwareManager.java
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/core/BaseHardwareManager.java
+@@ -99,6 +99,16 @@ public class BaseHardwareManager implements IHardwareManager {
+         Log.d(TAG, "playAudioAsset(" + assetName + ") called - no-op on base hardware");
+     }
+ 
++    @Override
++    public void playAudioAssets(String... assetNames) {
++        if (assetNames == null || assetNames.length == 0) {
++            return;
++        }
++        // Generic implementations cannot keep a device-specific route open. Prefer the final,
++        // semantically meaningful cue instead of starting assets that would interrupt each other.
++        playAudioAsset(assetNames[assetNames.length - 1]);
++    }
++
+     @Override
+     public void stopAudioPlayback() {
+         Log.d(TAG, "stopAudioPlayback() called - no-op on base hardware");
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/interfaces/IHardwareManager.java b/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/interfaces/IHardwareManager.java
+index 96f2b419d5..1bc1325286 100644
+--- a/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/interfaces/IHardwareManager.java
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/interfaces/IHardwareManager.java
+@@ -97,6 +97,13 @@ public interface IHardwareManager {
+      */
+     void playAudioAsset(String assetName);
+ 
++    /**
++     * Play audio assets in order. Hardware with a persistent audio route should keep it open
++     * between assets.
++     * @param assetNames Names of assets in playback order
++     */
++    void playAudioAssets(String... assetNames);
++
+     /**
+      * Stop any active MCU-managed audio playback.
+      */
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/managers/K900HardwareManager.java b/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/managers/K900HardwareManager.java
+index dacd4a07b3..15c47f61f2 100644
+--- a/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/managers/K900HardwareManager.java
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/io/hardware/managers/K900HardwareManager.java
+@@ -180,6 +180,15 @@ public class K900HardwareManager extends BaseHardwareManager {
+         }
+     }
+ 
++    @Override
++    public void playAudioAssets(String... assetNames) {
++        if (audioController != null) {
++            audioController.playAssets(assetNames);
++        } else {
++            Log.w(TAG, "Audio controller not available");
++        }
++    }
++
+     @Override
+     public void stopAudioPlayback() {
+         if (audioController != null) {
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/AsgClientService.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/AsgClientService.java
+index a887ec307c..aebfca1692 100644
+--- a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/AsgClientService.java
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/AsgClientService.java
+@@ -15,11 +15,13 @@ import android.os.Build;
+ import android.os.Handler;
+ import android.os.IBinder;
+ import android.os.Looper;
++import android.os.SystemClock;
+ import android.util.Log;
+ import android.util.Size;
+ 
+ import com.dev.api.DevApi;
+ import com.mentra.asg_client.SysControl;
++import com.mentra.asg_client.audio.RootLensFeedback;
+ import com.mentra.asg_client.camera.UvcStreamingState;
+ import com.mentra.asg_client.hardware.K900RgbLedController;
+ import com.mentra.asg_client.io.bluetooth.interfaces.BluetoothStateListener;
+@@ -117,9 +119,12 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+     // private AugmentosService augmentosService = null;
+     // private boolean isAugmentosBound = false;
+     private static AsgClientService instance;
+-    private boolean lastI2sPlaying = false;
++    private Boolean lastI2sPlaying;
+     private boolean lastUvcStreaming = false;
+     private boolean isConnected = false; // Track connection state based on heartbeat
++    private Handler hardwareControlHandler;
++    private TouchEventReconciler touchEventReconciler;
++    private final PeripheralWakeBoundary peripheralWakeBoundary = new PeripheralWakeBoundary();
+ 
+     // ---------------------------------------------
+     // WiFi State Management
+@@ -206,6 +211,9 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+         Log.d(TAG, "📊 Android API Level: " + Build.VERSION.SDK_INT);
+ 
+         instance = this;
++        hardwareControlHandler = new Handler(Looper.getMainLooper());
++        touchEventReconciler =
++                new TouchEventReconciler(hardwareControlHandler, () -> handleTouchEventControl(true));
+ 
+         try {
+             // Register for EventBus events
+@@ -221,6 +229,7 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+             // Initialize dependency injection container
+             Log.d(TAG, "🔧 Initializing service container");
+             initializeServiceContainer();
++            reconcilePeripheralBaseline("service initialized");
+ 
+             // Apply saved camera FOV on start (K900) so last user choice survives reboot
+             applySavedCameraFovOnStart();
+@@ -293,6 +302,11 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+                 return START_STICKY;
+             }
+ 
++            if (RootLensFeedback.ACTION_PLAY.equals(action)) {
++                RootLensFeedback.play(this, intent.getStringExtra(RootLensFeedback.EXTRA_EVENT));
++                return START_STICKY;
++            }
++
+             if (ACTION_UVC_STREAMING_CHANGED.equals(action)) {
+                 boolean streaming = intent.getBooleanExtra(EXTRA_UVC_STREAMING, false);
+                 handleUvcStreamingState(streaming);
+@@ -324,6 +338,15 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+                 Log.d(TAG, "⏭️ Not registered with EventBus - skipping unregistration");
+             }
+ 
++            // Leave the BES input plane usable before releasing the only serialized UART owner.
++            if (touchEventReconciler != null) {
++                touchEventReconciler.cancel();
++            }
++            handleTouchEventControl(true);
++            if (hardwareControlHandler != null) {
++                hardwareControlHandler.removeCallbacksAndMessages(null);
++            }
++
+             // Clean up service container
+             if (serviceContainer != null) {
+                 Log.d(TAG, "🧹 Cleaning up service container");
+@@ -366,10 +389,6 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+             Log.d(TAG, "🚨 Releasing RGB LED control authority back to BES");
+             sendRgbLedControlAuthority(false);
+             
+-            // Disable touch/swipe event reporting on service destroy
+-            Log.d(TAG, "🎯 Disabling touch event reporting on service destroy");
+-            handleTouchEventControl(true);
+-            
+             Log.d(TAG, "🎯 Disabling swipe volume control on service destroy");
+             handleSwipeVolumeControl(true);
+ 
+@@ -456,11 +475,14 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+         return hardwareManager;
+     }
+ 
+-    public void handleI2SAudioState(boolean playing) {
++    public synchronized void handleI2SAudioState(boolean playing) {
+         Log.i(TAG, "I2S audio state request: " + (playing ? "start" : "stop"));
+ 
+-        if (playing == lastI2sPlaying) {
++        if (lastI2sPlaying != null && playing == lastI2sPlaying) {
+             Log.d(TAG, "I2S state unchanged, skipping command");
++            if (!playing && touchEventReconciler != null) {
++                touchEventReconciler.request("I2S already stopped", 250L);
++            }
+             return;
+         }
+ 
+@@ -475,6 +497,9 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+             boolean sent = sendK900Command(payload.toString());
+             if (sent) {
+                 lastI2sPlaying = playing;
++                if (!playing && touchEventReconciler != null) {
++                    touchEventReconciler.request("I2S stopped", 250L);
++                }
+             }
+             Log.i(TAG, "I2S command sent (" + payload.toString() + ") result=" + sent);
+         } catch (JSONException e) {
+@@ -490,7 +515,7 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+      * Enable or disable touch event reporting
+      * @param enable true to enable touch events, false to disable
+      */
+-    public void handleTouchEventControl(boolean enable) {
++    public boolean handleTouchEventControl(boolean enable) {
+         Log.i(TAG, "Touch event control request: " + (enable ? "enable" : "disable"));
+ 
+         try {
+@@ -506,8 +531,10 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+             if (sent) {
+                 Log.i(TAG, "Touch event control command sent successfully");
+             }
++            return sent;
+         } catch (JSONException e) {
+             Log.e(TAG, "Failed to construct touch event control payload", e);
++            return false;
+         }
+     }
+ 
+@@ -537,26 +564,41 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+ 
+     private boolean sendK900Command(String payload) {
+         if (serviceContainer == null || serviceContainer.getServiceManager() == null) {
+-            Log.w(TAG, "ServiceContainer not initialized; cannot send I2S command");
++            Log.w(TAG, "ServiceContainer not initialized; cannot send K900 command");
+             return false;
+         }
+ 
+         var bluetoothManager = serviceContainer.getServiceManager().getBluetoothManager();
+         if (bluetoothManager == null) {
+-            Log.w(TAG, "Bluetooth manager unavailable; cannot send I2S command");
++            Log.w(TAG, "Bluetooth manager unavailable; cannot send K900 command");
+             return false;
+         }
+ 
+         if (!bluetoothManager.isConnected()) {
+-            Log.w(TAG, "Bluetooth manager not connected; cannot send I2S command");
++            Log.w(TAG, "Bluetooth manager not connected; cannot send K900 command");
+             return false;
+         }
+ 
+         boolean sent = bluetoothManager.sendData(payload.getBytes(StandardCharsets.UTF_8));
+-        Log.i(TAG, "I2S command sent (" + payload + ") result=" + sent);
++        Log.i(TAG, "K900 command sent (" + payload + ") result=" + sent);
+         return sent;
+     }
+ 
++    private void reconcilePeripheralBaseline(String reason) {
++        if (hardwareControlHandler == null) {
++            return;
++        }
++        hardwareControlHandler.post(() -> {
++            synchronized (AsgClientService.this) {
++                lastI2sPlaying = null;
++            }
++            handleI2SAudioState(false);
++            if (touchEventReconciler != null) {
++                touchEventReconciler.request(reason, 250L);
++            }
++        });
++    }
++
+     /**
+      * Send RGB LED control authority command to BES chipset.
+      * This tells BES whether MTK (our app) or BES should control the RGB LEDs.
+@@ -909,9 +951,8 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+             Log.d(TAG, "🚨 Claiming RGB LED control authority on Bluetooth connection");
+             sendRgbLedControlAuthority(true);
+             
+-            // Enable touch/swipe event reporting when Bluetooth connects
+-            Log.d(TAG, "🎯 Enabling touch event reporting on Bluetooth connection");
+-            handleTouchEventControl(true);
++            // A serial reconnect invalidates cached BES state; converge from first principles.
++            reconcilePeripheralBaseline("K900 serial connected");
+             
+             Log.d(TAG, "🎯 Enabling swipe volume control on Bluetooth connection");
+             handleSwipeVolumeControl(false);
+@@ -934,6 +975,11 @@ public class AsgClientService extends Service implements NetworkStateListener, B
+         Log.d(TAG, "📋 Data preview: " + incomingPayload.substring(0, Math.min(incomingPayload.length(), 100)) +
+                   (incomingPayload.length() > 100 ? "..." : ""));
+ 
++        if (peripheralWakeBoundary.observe(SystemClock.elapsedRealtime(), incomingPayload)
++                && touchEventReconciler != null) {
++            touchEventReconciler.request("K900 traffic after case/idle boundary");
++        }
++
+         // BLE/serial can deliver data before getInterfaceReferences() runs (e.g. right after
+         // MY_PACKAGE_REPLACED when the service is still in onCreate). Guard to avoid NPE.
+         final CommandProcessor processor = commandProcessor;
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/PeripheralWakeBoundary.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/PeripheralWakeBoundary.java
+new file mode 100644
+index 0000000000..950c6580b2
+--- /dev/null
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/PeripheralWakeBoundary.java
+@@ -0,0 +1,20 @@
++package com.mentra.asg_client.service.core;
++
++/** Detects MCU traffic that may follow a case/suspend boundary and require state reconciliation. */
++final class PeripheralWakeBoundary {
++  private static final long IDLE_BOUNDARY_MS = 30_000L;
++
++  private long lastPacketElapsedMs = -1L;
++
++  synchronized boolean observe(long nowElapsedMs, String payload) {
++    boolean firstPacket = lastPacketElapsedMs < 0L;
++    boolean afterIdle = !firstPacket
++        && nowElapsedMs - lastPacketElapsedMs >= IDLE_BOUNDARY_MS;
++    lastPacketElapsedMs = nowElapsedMs;
++    return firstPacket || afterIdle || isBatteryBoundary(payload);
++  }
++
++  private static boolean isBatteryBoundary(String payload) {
++    return payload != null && payload.contains("\"C\":\"hm_batv\"");
++  }
++}
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/TouchEventReconciler.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/TouchEventReconciler.java
+new file mode 100644
+index 0000000000..c3befb143f
+--- /dev/null
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/TouchEventReconciler.java
+@@ -0,0 +1,79 @@
++package com.mentra.asg_client.service.core;
++
++import android.os.Handler;
++import android.util.Log;
++
++/**
++ * Converges BES touch reporting to the enabled state after lifecycle and audio route changes.
++ *
++ * <p>The command is idempotent. A new request supersedes an older retry series, so callers can
++ * request reconciliation freely without building their own timing or retry state.
++ */
++final class TouchEventReconciler {
++  interface Sender {
++    boolean enableTouchReporting();
++  }
++
++  private static final String TAG = "TouchEventReconciler";
++  private static final long[] RETRY_DELAYS_MS = {0L, 250L, 1_000L, 3_000L};
++
++  private final Handler handler;
++  private final Sender sender;
++
++  private long generation;
++  private Runnable pending;
++
++  TouchEventReconciler(Handler handler, Sender sender) {
++    this.handler = handler;
++    this.sender = sender;
++  }
++
++  synchronized void request(String reason) {
++    request(reason, 0L);
++  }
++
++  synchronized void request(String reason, long initialDelayMs) {
++    long requestGeneration = ++generation;
++    cancelPending();
++    schedule(requestGeneration, reason, 0, Math.max(0L, initialDelayMs));
++  }
++
++  synchronized void cancel() {
++    ++generation;
++    cancelPending();
++  }
++
++  private synchronized void schedule(
++      long requestGeneration, String reason, int attempt, long delayMs) {
++    Runnable task = () -> attempt(requestGeneration, reason, attempt);
++    pending = task;
++    handler.postDelayed(task, delayMs);
++  }
++
++  private synchronized void attempt(long requestGeneration, String reason, int attempt) {
++    if (requestGeneration != generation) {
++      return;
++    }
++    pending = null;
++
++    if (sender.enableTouchReporting()) {
++      Log.i(TAG, "Touch reporting reconciled: " + reason + " attempt=" + (attempt + 1));
++      return;
++    }
++
++    int nextAttempt = attempt + 1;
++    if (nextAttempt >= RETRY_DELAYS_MS.length) {
++      Log.e(TAG, "Touch reporting reconciliation exhausted: " + reason);
++      return;
++    }
++    schedule(requestGeneration, reason, nextAttempt, RETRY_DELAYS_MS[nextAttempt]);
++  }
++
++  private void cancelPending() {
++    if (pending == null) {
++      return;
++    }
++    handler.removeCallbacks(pending);
++    pending = null;
++  }
++}
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java
+index 45b81b9027..cbbbcd49ec 100644
+--- a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/K900CommandHandler.java
+@@ -4,9 +4,11 @@ import android.content.Context;
+ import android.os.Handler;
+ import android.os.Looper;
+ import android.os.PowerManager;
++import android.os.SystemClock;
+ import android.util.Log;
+ 
+ import com.mentra.asg_client.audio.AudioAssets;
++import com.mentra.asg_client.audio.RootLensFeedback;
+ import com.mentra.asg_client.utils.WakeLockManager;
+ import com.mentra.asg_client.io.bes.BesOtaManager;
+ import com.mentra.asg_client.io.bes.log.BesLogManager;
+@@ -15,12 +17,10 @@ import com.mentra.asg_client.io.hardware.core.HardwareManagerFactory;
+ import com.mentra.asg_client.io.hardware.interfaces.IHardwareManager;
+ import com.mentra.asg_client.io.hardware.managers.K900HardwareManager;
+ import com.mentra.asg_client.io.media.core.MediaCaptureService;
+-import com.mentra.asg_client.settings.VideoSettings;
+ import com.mentra.asg_client.service.legacy.managers.AsgClientServiceManager;
+ import com.mentra.asg_client.service.communication.interfaces.ICommunicationManager;
+ import com.mentra.asg_client.service.system.interfaces.IConfigurationManager;
+ import com.mentra.asg_client.service.system.interfaces.IStateManager;
+-import com.mentra.asg_client.service.core.constants.BatteryConstants;
+ import com.mentra.asg_client.service.utils.SysProp;
+ import com.mentra.asg_client.SysControl;
+ 
+@@ -40,6 +40,8 @@ public class K900CommandHandler {
+     private final ICommunicationManager communicationManager;
+     private final IHardwareManager hardwareManager;
+     private final Handler mainHandler;
++    private RootLensButtonReducer.State buttonState = RootLensButtonReducer.State.idle();
++    private Runnable pendingButtonTimeout;
+ 
+     private BesLogManager mBesLogSession;
+ 
+@@ -163,23 +165,96 @@ public class K900CommandHandler {
+         }
+     }
+ 
+-    /**
+-     * Handle camera button short press
+-     * 1. Immediately send RGB LED authority claim
+-     * 2. After 5 seconds, activate blue LED
+-     */
++    /** Handle the dedicated RootLens capture toggle. */
+     private void handleCameraButtonShortPress() {
+-        Log.d(TAG, "📸 Camera button short pressed - handling with configurable mode");
+-
+-        handleConfigurableButtonPress(false); // false = short press
++        long nowNs = SystemClock.elapsedRealtimeNanos();
++        mainHandler.post(() -> dispatchButton(
++                RootLensButtonReducer.Event.normalPress(nowNs)));
+     }
+ 
+-    /**
+-     * Handle camera button long press
+-     */
++    /** Resolve one long-press sequence to upload or hidden calibration. */
+     private void handleCameraButtonLongPress() {
+-        Log.d(TAG, "📹 Camera button long pressed - handling with configurable mode");
+-        handleConfigurableButtonPress(true); // true = long press
++        if (serviceManager == null) return;
++        long nowNs = SystemClock.elapsedRealtimeNanos();
++        mainHandler.post(() -> dispatchButton(
++                RootLensButtonReducer.Event.longPress(nowNs)));
++    }
++
++    private void dispatchButton(RootLensButtonReducer.Event event) {
++        RootLensButtonReducer.Transition transition =
++                RootLensButtonReducer.reduce(buttonState, event);
++        if (transition.state == buttonState && transition.effects.isEmpty()) return;
++        buttonState = transition.state;
++        for (RootLensButtonReducer.Effect effect : transition.effects) {
++            switch (effect.type) {
++                case PLAY_STEP:
++                    RootLensFeedback.play(
++                            serviceManager.getContext(), "calibration_gesture_step");
++                    break;
++                case CANCEL_TIMEOUT:
++                    cancelButtonTimeout();
++                    break;
++                case ARM_TIMEOUT:
++                    armButtonTimeout(effect.revision, effect.deadlineNs);
++                    break;
++                case TOGGLE_CAPTURE:
++                    Log.d(TAG, "📸 Camera button short pressed - toggling RootLens capture");
++                    handleRootLensToggle(effect.commandIdNs);
++                    break;
++                case START_UPLOAD:
++                    deliverRootLensUpload(effect.commandIdNs);
++                    break;
++                case START_CALIBRATION:
++                    deliverRootLensCalibration(effect.commandIdNs);
++                    break;
++                default:
++                    throw new IllegalStateException(
++                            "Unhandled RootLens button effect " + effect.type);
++            }
++        }
++    }
++
++    private void armButtonTimeout(long revision, long deadlineNs) {
++        cancelButtonTimeout();
++        Runnable[] callback = new Runnable[1];
++        callback[0] = () -> {
++            if (pendingButtonTimeout != callback[0]) return;
++            pendingButtonTimeout = null;
++            dispatchButton(RootLensButtonReducer.Event.timeout(
++                    revision, SystemClock.elapsedRealtimeNanos()));
++        };
++        pendingButtonTimeout = callback[0];
++        long remainingNs = Math.max(0L, deadlineNs - SystemClock.elapsedRealtimeNanos());
++        long delayMs = (remainingNs + 999_999L) / 1_000_000L + 1L;
++        mainHandler.postDelayed(callback[0], delayMs);
++    }
++
++    private void cancelButtonTimeout() {
++        if (pendingButtonTimeout == null) return;
++        mainHandler.removeCallbacks(pendingButtonTimeout);
++        pendingButtonTimeout = null;
++    }
++
++    private void deliverRootLensUpload(long elapsedRealtimeNanos) {
++        boolean delivered = RootLensCaptureControl.upload(
++                serviceManager.getContext(), elapsedRealtimeNanos);
++        if (!delivered) {
++            RootLensFeedback.play(serviceManager.getContext(), "upload_unavailable");
++        }
++        Log.i(TAG, delivered
++                ? "Expired long-press sequence delivered RootLens upload command"
++                : "Expired long-press sequence upload failed closed");
++    }
++
++    private void deliverRootLensCalibration(long elapsedRealtimeNanos) {
++        boolean delivered = RootLensCaptureControl.calibrate(
++                serviceManager.getContext(), elapsedRealtimeNanos);
++        if (!delivered) {
++            RootLensFeedback.play(serviceManager.getContext(), "capture_failed");
++        }
++        Log.i(TAG, delivered
++                ? "Five-press calibration command delivered"
++                : "Five-press calibration command failed closed");
+     }
+ 
+     /**
+@@ -801,133 +876,16 @@ public class K900CommandHandler {
+         }
+     }
+ 
+-    /**
+-     * Handle button press with universal forwarding and gallery mode check
+-     * Button presses are ALWAYS forwarded to phone/apps
+-     * Local capture only happens when camera/gallery app is active
+-     * Also enables BES touch/swipe event listening
+-     */
+-    private void handleConfigurableButtonPress(boolean isLongPress) {
+-        if (serviceManager != null && serviceManager.getAsgSettings() != null) {
+-            String pressType = isLongPress ? "long" : "short";
+-            Log.d(TAG, "Handling " + pressType + " button press");
+-
+-            // ALWAYS send button press to phone/apps
+-            Log.d(TAG, "📱 Forwarding button press to phone/apps (universal forwarding)");
+-            sendButtonPressToPhone(isLongPress);
+-
+-            // Check if camera/gallery app is active for local capture
+-            handlePhotoCapture(isLongPress);
+-        }
+-    }
+-
+-    /**
+-     * Handle photo/video capture based on gallery mode state
+-     * Only captures if camera/gallery app is currently active OR if glasses are disconnected
+-     */
+-    private void handlePhotoCapture(boolean isLongPress) {
+-        // Check if gallery/camera app is active before capturing
+-        boolean isSaveInGalleryMode = serviceManager
+-            .getAsgSettings()
+-            .isSaveInGalleryMode();
+-
+-        // Check if glasses are connected to phone
+-        boolean isConnected = serviceManager.isConnected();
+-
+-        // LOG CONNECTION STATE FOR DEBUGGING
+-        Log.i(TAG, "📸 Photo capture decision - Gallery Mode: " + (isSaveInGalleryMode ? "ACTIVE" : "INACTIVE") +
+-                   ", Connection State: " + (isConnected ? "CONNECTED" : "DISCONNECTED"));
+-
+-        // Skip capture only if: camera app NOT running AND phone IS connected
+-        if (!isSaveInGalleryMode && isConnected) {
+-            Log.d(TAG, "📸 Camera app not active and connected to phone - skipping local capture (button press already forwarded to apps)");
+-            return;
+-        }
+-
+-        if (!isConnected) {
+-            Log.d(TAG, "📸 Disconnected from phone - proceeding with local capture regardless of gallery mode");
+-        } else {
+-            Log.d(TAG, "📸 Camera app active - proceeding with local capture");
+-        }
+-
+-        MediaCaptureService captureService = serviceManager.getMediaCaptureService();
+-        if (captureService == null) {
+-            Log.d(TAG, "MediaCaptureService is null, initializing");
+-            return;
+-        }
+-
+-        // Get LED setting
+-        boolean ledEnabled = serviceManager.getAsgSettings().getButtonCameraLedEnabled();
+-
+-        // Get current battery level (with null check)
+-        int batteryLevel = -1;
+-        if (stateManager != null) {
+-            batteryLevel = stateManager.getBatteryLevel();
+-        } else {
+-            Log.w(TAG, "⚠️ StateManager not available - cannot check battery level");
+-        }
+-
+-        if (isLongPress) {
+-            // Long press behavior:
+-            // - If video is recording, stop it (pause/stop with video stop feedback)
+-            // - If video is not recording, start it
+-            if (captureService.isRecordingVideo()) {
+-                Log.d(TAG, "⏹️ Stopping video recording (long press during recording)");
+-                captureService.stopVideoRecording();
+-            } else {
+-                Log.d(TAG, "📹 Starting video recording (long press) with LED: " + ledEnabled + ", battery: " + batteryLevel + "%");
+-
+-                // Check if battery is too low to start recording
+-                if (batteryLevel >= 0 && batteryLevel < BatteryConstants.MIN_BATTERY_LEVEL) {
+-                    Log.w(TAG, "🚫 Battery too low to start recording: " + batteryLevel + "% (minimum " + BatteryConstants.MIN_BATTERY_LEVEL + "% required)");
+-
+-                    // Play audio feedback
+-                    captureService.playBatteryLowSound();
+-
+-                    return;
+-                }
+-
+-                // Get saved video settings for button press
+-                VideoSettings videoSettings = serviceManager.getAsgSettings().getButtonVideoSettings();
+-                int maxRecordingTimeMinutes = serviceManager.getAsgSettings().getButtonMaxRecordingTimeMinutes();
+-                captureService.startVideoRecording(videoSettings, ledEnabled, maxRecordingTimeMinutes, batteryLevel);
+-            }
+-        } else {
+-            // Short press behavior
+-            // If video is recording, stop it. Otherwise take a photo.
+-            if (captureService.isRecordingVideo()) {
+-                Log.d(TAG, "⏹️ Stopping video recording (short press during recording)");
+-                captureService.stopVideoRecording();
+-            } else {
+-                Log.d(TAG, "📸 Taking photo locally (short press) with LED: " + ledEnabled);
+-                // Get saved photo size for button press
+-                String photoSize = serviceManager.getAsgSettings().getButtonPhotoSize();
+-                captureService.takePhotoLocally(photoSize, ledEnabled, true);
+-            }
+-        }
+-    }
+-
+-    /**
+-     * Send button press to phone via Bluetooth
+-     */
+-    private void sendButtonPressToPhone(boolean isLongPress) {
+-        if (serviceManager != null && serviceManager.getBluetoothManager() != null &&
+-                serviceManager.getBluetoothManager().isConnected()) {
+-            try {
+-                JSONObject buttonObject = new JSONObject();
+-                buttonObject.put("type", "button_press");
+-                buttonObject.put("buttonId", "camera");
+-                buttonObject.put("pressType", isLongPress ? "long" : "short");
+-                buttonObject.put("timestamp", System.currentTimeMillis());
+-
+-                String jsonString = buttonObject.toString();
+-                Log.d(TAG, "Formatted button press response: " + jsonString);
+-
+-                serviceManager.getBluetoothManager().sendData(jsonString.getBytes());
+-            } catch (JSONException e) {
+-                Log.e(TAG, "Error creating button press response", e);
+-            }
++    /** Deliver one physical short press to the dedicated RootLens capture app. */
++    private void handleRootLensToggle(long commandIdNs) {
++        boolean delivered = serviceManager != null && RootLensCaptureControl.toggle(
++                serviceManager.getContext(), commandIdNs);
++        if (!delivered && serviceManager != null) {
++            RootLensFeedback.play(serviceManager.getContext(), "capture_failed");
+         }
++        Log.i(TAG, delivered
++                ? "RootLens camera-button command delivered"
++                : "RootLens camera-button command failed closed");
+     }
+ 
+     /**
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducer.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducer.java
+new file mode 100644
+index 0000000000..4f4b17e6bd
+--- /dev/null
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducer.java
+@@ -0,0 +1,222 @@
++package com.mentra.asg_client.service.core.handlers;
++
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.List;
++
++/** Pure policy for capture toggle, upload, and the five-press calibration gesture. */
++final class RootLensButtonReducer {
++    static final int REQUIRED_CALIBRATION_PRESSES = 5;
++    static final long SEQUENCE_TIMEOUT_NS = 30_000_000_000L;
++    static final long MAX_GAP_NS = 8_000_000_000L;
++    static final long DUPLICATE_GUARD_NS = 1_000_000_000L;
++
++    enum Phase { IDLE, WAITING_FOR_NEXT_LONG_PRESS }
++    enum EventType { LONG_PRESS, NORMAL_PRESS, TIMEOUT }
++    enum EffectType {
++        PLAY_STEP,
++        CANCEL_TIMEOUT,
++        ARM_TIMEOUT,
++        TOGGLE_CAPTURE,
++        START_UPLOAD,
++        START_CALIBRATION
++    }
++
++    static final class State {
++        final Phase phase;
++        final int pressCount;
++        final long firstPressNs;
++        final long lastPressNs;
++        final long deadlineNs;
++        final long revision;
++
++        private State(
++                Phase phase,
++                int pressCount,
++                long firstPressNs,
++                long lastPressNs,
++                long deadlineNs,
++                long revision) {
++            this.phase = phase;
++            this.pressCount = pressCount;
++            this.firstPressNs = firstPressNs;
++            this.lastPressNs = lastPressNs;
++            this.deadlineNs = deadlineNs;
++            this.revision = revision;
++        }
++
++        static State idle() {
++            return new State(Phase.IDLE, 0, 0L, 0L, 0L, 0L);
++        }
++    }
++
++    static final class Event {
++        final EventType type;
++        final long atNs;
++        final long revision;
++
++        private Event(EventType type, long atNs, long revision) {
++            this.type = type;
++            this.atNs = atNs;
++            this.revision = revision;
++        }
++
++        static Event longPress(long atNs) {
++            return new Event(EventType.LONG_PRESS, atNs, 0L);
++        }
++
++        static Event normalPress(long atNs) {
++            return new Event(EventType.NORMAL_PRESS, atNs, 0L);
++        }
++
++        static Event timeout(long revision, long atNs) {
++            return new Event(EventType.TIMEOUT, atNs, revision);
++        }
++    }
++
++    static final class Effect {
++        final EffectType type;
++        final long revision;
++        final long deadlineNs;
++        final long commandIdNs;
++
++        private Effect(
++                EffectType type, long revision, long deadlineNs, long commandIdNs) {
++            this.type = type;
++            this.revision = revision;
++            this.deadlineNs = deadlineNs;
++            this.commandIdNs = commandIdNs;
++        }
++
++        static Effect now(EffectType type) {
++            return new Effect(type, 0L, 0L, 0L);
++        }
++
++        static Effect command(EffectType type, long commandIdNs) {
++            return new Effect(type, 0L, 0L, commandIdNs);
++        }
++
++        static Effect arm(State state) {
++            return new Effect(
++                    EffectType.ARM_TIMEOUT, state.revision, state.deadlineNs, 0L);
++        }
++    }
++
++    static final class Transition {
++        final State state;
++        final List<Effect> effects;
++
++        Transition(State state, List<Effect> effects) {
++            this.state = state;
++            this.effects = effects;
++        }
++    }
++
++    static Transition reduce(State state, Event event) {
++        switch (event.type) {
++            case LONG_PRESS:
++                return longPress(state, event.atNs);
++            case NORMAL_PRESS:
++                return normalPress(state, event.atNs);
++            case TIMEOUT:
++                return timeout(state, event.revision, event.atNs);
++            default:
++                return unchanged(state);
++        }
++    }
++
++    private static Transition longPress(State state, long nowNs) {
++        if (state.phase == Phase.IDLE) return begin(state, nowNs, false);
++
++        long gapNs = nowNs - state.lastPressNs;
++        if (gapNs >= 0L && gapNs < DUPLICATE_GUARD_NS) return unchanged(state);
++        if (gapNs < 0L || nowNs > state.deadlineNs) return begin(state, nowNs, true);
++
++        int nextCount = state.pressCount + 1;
++        if (nextCount == REQUIRED_CALIBRATION_PRESSES) {
++            return transition(idleAfter(state),
++                    Effect.now(EffectType.CANCEL_TIMEOUT),
++                    Effect.now(EffectType.PLAY_STEP),
++                    Effect.command(EffectType.START_CALIBRATION, state.firstPressNs));
++        }
++
++        State next = waiting(
++                nextCount,
++                state.firstPressNs,
++                nowNs,
++                state.revision + 1L);
++        return transition(next,
++                Effect.now(EffectType.CANCEL_TIMEOUT),
++                Effect.now(EffectType.PLAY_STEP),
++                Effect.arm(next));
++    }
++
++    private static Transition normalPress(State state, long nowNs) {
++        if (state.phase == Phase.IDLE) {
++            return transition(state, Effect.command(EffectType.TOGGLE_CAPTURE, nowNs));
++        }
++        if (nowNs > state.deadlineNs) {
++            return transition(idleAfter(state),
++                    Effect.now(EffectType.CANCEL_TIMEOUT),
++                    Effect.command(EffectType.START_UPLOAD, state.firstPressNs),
++                    Effect.command(EffectType.TOGGLE_CAPTURE, nowNs));
++        }
++        return transition(idleAfter(state),
++                Effect.now(EffectType.CANCEL_TIMEOUT),
++                Effect.command(EffectType.TOGGLE_CAPTURE, nowNs));
++    }
++
++    private static Transition timeout(State state, long revision, long nowNs) {
++        if (state.phase != Phase.WAITING_FOR_NEXT_LONG_PRESS
++                || state.revision != revision) {
++            return unchanged(state);
++        }
++        if (nowNs <= state.deadlineNs) {
++            return transition(state, Effect.arm(state));
++        }
++        return transition(idleAfter(state),
++                Effect.command(EffectType.START_UPLOAD, state.firstPressNs));
++    }
++
++    private static Transition begin(State state, long nowNs, boolean uploadExpiredSequence) {
++        State next = waiting(1, nowNs, nowNs, state.revision + 1L);
++        if (uploadExpiredSequence) {
++            return transition(next,
++                    Effect.now(EffectType.CANCEL_TIMEOUT),
++                    Effect.now(EffectType.PLAY_STEP),
++                    Effect.command(EffectType.START_UPLOAD, state.firstPressNs),
++                    Effect.arm(next));
++        }
++        return transition(next,
++                Effect.now(EffectType.PLAY_STEP),
++                Effect.arm(next));
++    }
++
++    private static State waiting(
++            int pressCount, long firstPressNs, long lastPressNs, long revision) {
++        long deadlineNs = Math.min(
++                lastPressNs + MAX_GAP_NS,
++                firstPressNs + SEQUENCE_TIMEOUT_NS);
++        return new State(
++                Phase.WAITING_FOR_NEXT_LONG_PRESS,
++                pressCount,
++                firstPressNs,
++                lastPressNs,
++                deadlineNs,
++                revision);
++    }
++
++    private static State idleAfter(State state) {
++        return new State(Phase.IDLE, 0, 0L, 0L, 0L, state.revision + 1L);
++    }
++
++    private static Transition transition(State state, Effect... effects) {
++        return new Transition(state, Collections.unmodifiableList(Arrays.asList(effects)));
++    }
++
++    private static Transition unchanged(State state) {
++        return new Transition(state, Collections.emptyList());
++    }
++
++    private RootLensButtonReducer() {}
++}
+diff --git a/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControl.java b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControl.java
+new file mode 100644
+index 0000000000..59ecad94df
+--- /dev/null
++++ b/asg_client/app/src/main/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControl.java
+@@ -0,0 +1,112 @@
++package com.mentra.asg_client.service.core.handlers;
++
++import android.content.ComponentName;
++import android.content.Context;
++import android.content.Intent;
++import android.content.pm.ApplicationInfo;
++import android.content.pm.PackageManager;
++import android.util.Log;
++
++/** Routes dedicated camera-button commands to an installed RootLens capture app. */
++final class RootLensCaptureControl {
++    private static final String TAG = "RootLensCaptureControl";
++    private static final String ACTION_TOGGLE = "io.rootlens.mentra.TOGGLE";
++    private static final String ACTION_UPLOAD = "io.rootlens.mentra.UPLOAD";
++    private static final String ACTION_CALIBRATE = "io.rootlens.mentra.CALIBRATE";
++    private static final String EXTRA_COMMAND_ID = "command_id";
++    private static final String RECEIVER_CLASS =
++            "io.rootlens.mentra.CaptureCommandReceiver";
++    private static final String[] ROOTLENS_PACKAGES = {
++            "io.rootlens.mentra",
++            "io.rootlens.mentra.debug"
++    };
++
++    private RootLensCaptureControl() {}
++
++    static boolean toggle(Context context, long pressElapsedNanos) {
++        Context appContext = context.getApplicationContext();
++        String packageName = activePackage(appContext.getPackageManager());
++        if (packageName == null) return false;
++
++        Intent command = new Intent(ACTION_TOGGLE)
++                .setComponent(new ComponentName(packageName, RECEIVER_CLASS))
++                .putExtra(EXTRA_COMMAND_ID, commandId(pressElapsedNanos));
++        try {
++            appContext.sendBroadcast(command);
++            Log.i(TAG, "Camera-button short press delivered to " + packageName);
++            return true;
++        } catch (RuntimeException error) {
++            Log.e(TAG, "Could not deliver camera-button short press", error);
++            return false;
++        }
++    }
++
++    static String commandId(long pressElapsedNanos) {
++        return "action-button-short:" + pressElapsedNanos;
++    }
++
++    static boolean upload(Context context, long pressElapsedNanos) {
++        Context appContext = context.getApplicationContext();
++        String packageName = activePackage(appContext.getPackageManager());
++        if (packageName == null) return false;
++
++        Intent command = new Intent(ACTION_UPLOAD)
++                .setComponent(new ComponentName(packageName, RECEIVER_CLASS))
++                .putExtra(EXTRA_COMMAND_ID, uploadCommandId(pressElapsedNanos));
++        try {
++            appContext.sendBroadcast(command);
++            Log.i(TAG, "Upload command delivered to " + packageName);
++            return true;
++        } catch (RuntimeException error) {
++            Log.e(TAG, "Could not deliver upload command", error);
++            return false;
++        }
++    }
++
++    static String uploadCommandId(long pressElapsedNanos) {
++        return "action-button-upload:" + pressElapsedNanos;
++    }
++
++    static boolean calibrate(Context context, long pressElapsedNanos) {
++        Context appContext = context.getApplicationContext();
++        String packageName = activePackage(appContext.getPackageManager());
++        if (packageName == null) return false;
++
++        Intent command = new Intent(ACTION_CALIBRATE)
++                .setComponent(new ComponentName(packageName, RECEIVER_CLASS))
++                .putExtra(EXTRA_COMMAND_ID, calibrationCommandId(pressElapsedNanos));
++        try {
++            appContext.sendBroadcast(command);
++            Log.i(TAG, "Hidden calibration command delivered to " + packageName);
++            return true;
++        } catch (RuntimeException error) {
++            Log.e(TAG, "Could not deliver hidden calibration command", error);
++            return false;
++        }
++    }
++
++    static String calibrationCommandId(long pressElapsedNanos) {
++        return "action-button-calibration:" + pressElapsedNanos;
++    }
++
++    private static String activePackage(PackageManager packageManager) {
++        for (String packageName : ROOTLENS_PACKAGES) {
++            if (isEnabled(packageManager, packageName)) return packageName;
++        }
++        return null;
++    }
++
++    private static boolean isEnabled(PackageManager packageManager, String packageName) {
++        try {
++            ApplicationInfo info = packageManager.getApplicationInfo(
++                    packageName, PackageManager.MATCH_DISABLED_COMPONENTS);
++            int state = packageManager.getApplicationEnabledSetting(packageName);
++            return info.enabled
++                    && state != PackageManager.COMPONENT_ENABLED_STATE_DISABLED
++                    && state != PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER
++                    && state != PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED;
++        } catch (PackageManager.NameNotFoundException ignored) {
++            return false;
++        }
++    }
++}
+diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/audio/FeedbackVolumeControllerTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/audio/FeedbackVolumeControllerTest.java
+new file mode 100644
+index 0000000000..f740125c80
+--- /dev/null
++++ b/asg_client/app/src/test/java/com/mentra/asg_client/audio/FeedbackVolumeControllerTest.java
+@@ -0,0 +1,33 @@
++package com.mentra.asg_client.audio;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import android.content.Context;
++import android.media.AudioManager;
++
++import androidx.test.core.app.ApplicationProvider;
++
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.robolectric.RobolectricTestRunner;
++import org.robolectric.annotation.Config;
++
++@RunWith(RobolectricTestRunner.class)
++@Config(sdk = 30)
++public class FeedbackVolumeControllerTest {
++    @Test
++    public void ensureAudible_convergesToMaximumAndIsIdempotent() {
++        Context context = ApplicationProvider.getApplicationContext();
++        AudioManager audioManager =
++                (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
++        int maximum = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION);
++        audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, 1, 0);
++
++        FeedbackVolumeController controller = new FeedbackVolumeController(audioManager);
++
++        assertThat(controller.ensureAudible()).isTrue();
++        assertThat(audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)).isEqualTo(maximum);
++        assertThat(controller.ensureAudible()).isFalse();
++        assertThat(audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)).isEqualTo(maximum);
++    }
++}
+diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/audio/RootLensFeedbackTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/audio/RootLensFeedbackTest.java
+new file mode 100644
+index 0000000000..9b4ddef7ed
+--- /dev/null
++++ b/asg_client/app/src/test/java/com/mentra/asg_client/audio/RootLensFeedbackTest.java
+@@ -0,0 +1,32 @@
++package com.mentra.asg_client.audio;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import java.util.Arrays;
++import org.junit.Test;
++
++public class RootLensFeedbackTest {
++  @Test
++  public void assetsFor_acceptsOnlySemanticAllowlist() {
++    assertThat(Arrays.asList(RootLensFeedback.assetsFor("capture_start_received")))
++        .containsExactly(AudioAssets.VIDEO_RECORDING_START, "rootlens/capture_start.mp3");
++    assertThat(Arrays.asList(RootLensFeedback.assetsFor("capture_stop_received")))
++        .containsExactly(AudioAssets.VIDEO_RECORDING_STOP, "rootlens/capture_stop.mp3");
++    assertThat(RootLensFeedback.assetsFor("capture_started")).isNull();
++    assertThat(RootLensFeedback.assetsFor("capture_saved"))
++        .isNull();
++    assertThat(Arrays.asList(RootLensFeedback.assetsFor("calibration_gesture_step")))
++        .containsExactly("click_sound.wav");
++    assertThat(Arrays.asList(RootLensFeedback.assetsFor("upload_started")))
++        .containsExactly("rootlens/upload_started.mp3");
++    assertThat(Arrays.asList(RootLensFeedback.assetsFor("upload_complete")))
++        .containsExactly("rootlens/upload_complete.mp3");
++    assertThat(Arrays.asList(RootLensFeedback.assetsFor("upload_unavailable")))
++        .containsExactly("rootlens/upload_unavailable.mp3");
++    assertThat(Arrays.asList(RootLensFeedback.assetsFor("calibration_instructions")))
++        .containsExactly("rootlens/calibration_instructions.mp3");
++    assertThat(RootLensFeedback.assetsFor("upload_paused")).isNull();
++    assertThat(RootLensFeedback.assetsFor("../../arbitrary.wav")).isNull();
++    assertThat(RootLensFeedback.assetsFor(null)).isNull();
++  }
++}
+diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/service/core/PeripheralWakeBoundaryTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/PeripheralWakeBoundaryTest.java
+new file mode 100644
+index 0000000000..b319fd88f7
+--- /dev/null
++++ b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/PeripheralWakeBoundaryTest.java
+@@ -0,0 +1,18 @@
++package com.mentra.asg_client.service.core;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import org.junit.Test;
++
++public class PeripheralWakeBoundaryTest {
++  @Test
++  public void observe_reconcilesFirstIdleAndBatteryPacketsWithoutAckLoop() {
++    PeripheralWakeBoundary boundary = new PeripheralWakeBoundary();
++
++    assertThat(boundary.observe(1_000L, "{\"C\":\"sr_swit\"}")).isTrue();
++    assertThat(boundary.observe(1_100L, "{\"C\":\"sr_swit\"}")).isFalse();
++    assertThat(boundary.observe(2_000L, "{\"C\":\"hm_batv\"}")).isTrue();
++    assertThat(boundary.observe(2_100L, "{\"C\":\"sr_swit\"}")).isFalse();
++    assertThat(boundary.observe(32_100L, "{\"C\":\"sr_tpevt\"}")).isTrue();
++  }
++}
+diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/service/core/TouchEventReconcilerTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/TouchEventReconcilerTest.java
+new file mode 100644
+index 0000000000..04a1a86fee
+--- /dev/null
++++ b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/TouchEventReconcilerTest.java
+@@ -0,0 +1,49 @@
++package com.mentra.asg_client.service.core;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import android.os.Handler;
++import android.os.Looper;
++
++import java.time.Duration;
++import java.util.concurrent.atomic.AtomicInteger;
++
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.robolectric.RobolectricTestRunner;
++import org.robolectric.Shadows;
++import org.robolectric.annotation.Config;
++
++@RunWith(RobolectricTestRunner.class)
++@Config(sdk = 33)
++public class TouchEventReconcilerTest {
++  @Test
++  public void request_retriesUntilHardwareAcceptsCommand() {
++    AtomicInteger attempts = new AtomicInteger();
++    TouchEventReconciler reconciler =
++        new TouchEventReconciler(
++            new Handler(Looper.getMainLooper()), () -> attempts.incrementAndGet() >= 3);
++
++    reconciler.request("test");
++    Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
++
++    assertThat(attempts.get()).isEqualTo(3);
++  }
++
++  @Test
++  public void newerRequest_supersedesPendingRetrySeries() {
++    AtomicInteger attempts = new AtomicInteger();
++    TouchEventReconciler reconciler =
++        new TouchEventReconciler(
++            new Handler(Looper.getMainLooper()), () -> {
++              attempts.incrementAndGet();
++              return true;
++            });
++
++    reconciler.request("old", 1_000L);
++    reconciler.request("new");
++    Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
++
++    assertThat(attempts.get()).isEqualTo(1);
++  }
++}
+diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducerTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducerTest.java
+new file mode 100644
+index 0000000000..39d0ea0ad3
+--- /dev/null
++++ b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensButtonReducerTest.java
+@@ -0,0 +1,144 @@
++package com.mentra.asg_client.service.core.handlers;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import org.junit.Test;
++
++public class RootLensButtonReducerTest {
++    private static final long SECOND = 1_000_000_000L;
++
++    @Test
++    public void fivePressesWithinOriginalLimitsTriggerCalibrationOnly() {
++        RootLensButtonReducer.State state = RootLensButtonReducer.State.idle();
++        for (int index = 0; index < 5; index++) {
++            RootLensButtonReducer.Transition transition = reduce(
++                    state, RootLensButtonReducer.Event.longPress(index * 3L * SECOND));
++            state = transition.state;
++            if (index < 4) {
++                assertThat(effect(transition, RootLensButtonReducer.EffectType.ARM_TIMEOUT))
++                        .isNotNull();
++                assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD))
++                        .isNull();
++            } else {
++                assertThat(effect(transition, RootLensButtonReducer.EffectType.START_CALIBRATION))
++                        .isNotNull();
++                assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD))
++                        .isNull();
++                assertThat(state.phase).isEqualTo(RootLensButtonReducer.Phase.IDLE);
++            }
++        }
++    }
++
++    @Test
++    public void eachIncompletePrefixTimesOutToExactlyOneUpload() {
++        for (int presses = 1; presses < 5; presses++) {
++            RootLensButtonReducer.State state = RootLensButtonReducer.State.idle();
++            for (int index = 0; index < presses; index++) {
++                state = reduce(state,
++                        RootLensButtonReducer.Event.longPress(index * 2L * SECOND)).state;
++            }
++            long revision = state.revision;
++            RootLensButtonReducer.Transition timeout = reduce(
++                    state,
++                    RootLensButtonReducer.Event.timeout(revision, state.deadlineNs + 1L));
++            assertThat(effect(timeout, RootLensButtonReducer.EffectType.START_UPLOAD)).isNotNull();
++            assertThat(timeout.state.phase).isEqualTo(RootLensButtonReducer.Phase.IDLE);
++            assertThat(reduce(timeout.state,
++                    RootLensButtonReducer.Event.timeout(revision, state.deadlineNs + 2L)).effects)
++                    .isEmpty();
++        }
++    }
++
++    @Test
++    public void originalBoundaryValuesRemainInclusive() {
++        RootLensButtonReducer.State state = RootLensButtonReducer.State.idle();
++        long[] presses = {0L, 8L * SECOND, 16L * SECOND, 24L * SECOND, 30L * SECOND};
++        RootLensButtonReducer.Transition transition = null;
++        for (long press : presses) {
++            transition = reduce(state, RootLensButtonReducer.Event.longPress(press));
++            state = transition.state;
++        }
++        assertThat(effect(transition, RootLensButtonReducer.EffectType.START_CALIBRATION))
++                .isNotNull();
++        assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD)).isNull();
++
++        state = reduce(RootLensButtonReducer.State.idle(),
++                RootLensButtonReducer.Event.longPress(0L)).state;
++        transition = reduce(state,
++                RootLensButtonReducer.Event.longPress(8L * SECOND + 1L));
++        assertThat(effect(transition, RootLensButtonReducer.EffectType.START_UPLOAD)).isNotNull();
++    }
++
++    @Test
++    public void duplicateFirmwareReportDoesNotAdvanceOrExtendDeadline() {
++        RootLensButtonReducer.State state = reduce(
++                RootLensButtonReducer.State.idle(),
++                RootLensButtonReducer.Event.longPress(10L * SECOND)).state;
++        RootLensButtonReducer.Transition duplicate = reduce(
++                state, RootLensButtonReducer.Event.longPress(10L * SECOND + 999_999_999L));
++        assertThat(duplicate.state).isSameAs(state);
++        assertThat(duplicate.effects).isEmpty();
++        assertThat(state.deadlineNs).isEqualTo(18L * SECOND);
++
++        RootLensButtonReducer.Transition distinct = reduce(
++                state, RootLensButtonReducer.Event.longPress(11L * SECOND));
++        assertThat(distinct.state.pressCount).isEqualTo(2);
++    }
++
++    @Test
++    public void totalDeadlineOverridesTheNextEightSecondGap() {
++        RootLensButtonReducer.State state = RootLensButtonReducer.State.idle();
++        long[] presses = {0L, 8L * SECOND, 16L * SECOND, 24L * SECOND};
++        for (long press : presses) {
++            state = reduce(state, RootLensButtonReducer.Event.longPress(press)).state;
++        }
++        assertThat(state.deadlineNs).isEqualTo(30L * SECOND);
++    }
++
++    @Test
++    public void normalPressBeforeDeadlineCancelsButAfterDeadlineCatchesUpUpload() {
++        RootLensButtonReducer.State pending = reduce(
++                RootLensButtonReducer.State.idle(),
++                RootLensButtonReducer.Event.longPress(0L)).state;
++        RootLensButtonReducer.Transition before = reduce(
++                pending, RootLensButtonReducer.Event.normalPress(8L * SECOND));
++        assertThat(effect(before, RootLensButtonReducer.EffectType.START_UPLOAD)).isNull();
++        assertThat(effect(before, RootLensButtonReducer.EffectType.TOGGLE_CAPTURE)).isNotNull();
++
++        RootLensButtonReducer.Transition after = reduce(
++                pending, RootLensButtonReducer.Event.normalPress(8L * SECOND + 1L));
++        assertThat(effect(after, RootLensButtonReducer.EffectType.START_UPLOAD)).isNotNull();
++        assertThat(effect(after, RootLensButtonReducer.EffectType.TOGGLE_CAPTURE)).isNotNull();
++    }
++
++    @Test
++    public void staleAndEarlyTimeoutsCannotUpload() {
++        RootLensButtonReducer.State first = reduce(
++                RootLensButtonReducer.State.idle(),
++                RootLensButtonReducer.Event.longPress(0L)).state;
++        RootLensButtonReducer.State second = reduce(
++                first, RootLensButtonReducer.Event.longPress(2L * SECOND)).state;
++        assertThat(reduce(second,
++                RootLensButtonReducer.Event.timeout(first.revision, 20L * SECOND)).effects)
++                .isEmpty();
++
++        RootLensButtonReducer.Transition early = reduce(second,
++                RootLensButtonReducer.Event.timeout(second.revision, second.deadlineNs));
++        assertThat(effect(early, RootLensButtonReducer.EffectType.START_UPLOAD)).isNull();
++        assertThat(effect(early, RootLensButtonReducer.EffectType.ARM_TIMEOUT)).isNotNull();
++    }
++
++    private static RootLensButtonReducer.Transition reduce(
++            RootLensButtonReducer.State state, RootLensButtonReducer.Event event) {
++        return RootLensButtonReducer.reduce(state, event);
++    }
++
++    private static RootLensButtonReducer.Effect effect(
++            RootLensButtonReducer.Transition transition,
++            RootLensButtonReducer.EffectType type) {
++        for (RootLensButtonReducer.Effect effect : transition.effects) {
++            if (effect.type == type) return effect;
++        }
++        return null;
++    }
++}
+diff --git a/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControlTest.java b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControlTest.java
+new file mode 100644
+index 0000000000..177bfaa74c
+--- /dev/null
++++ b/asg_client/app/src/test/java/com/mentra/asg_client/service/core/handlers/RootLensCaptureControlTest.java
+@@ -0,0 +1,25 @@
++package com.mentra.asg_client.service.core.handlers;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import org.junit.Test;
++
++public class RootLensCaptureControlTest {
++    @Test
++    public void commandId_isStableForTheSamePhysicalPress() {
++        assertThat(RootLensCaptureControl.commandId(123_456_789L))
++                .isEqualTo("action-button-short:123456789");
++    }
++
++    @Test
++    public void uploadCommandId_isSeparateFromCaptureToggle() {
++        assertThat(RootLensCaptureControl.uploadCommandId(123_456_789L))
++                .isEqualTo("action-button-upload:123456789");
++    }
++
++    @Test
++    public void calibrationCommandId_isSeparateFromUpload() {
++        assertThat(RootLensCaptureControl.calibrationCommandId(123_456_789L))
++                .isEqualTo("action-button-calibration:123456789");
++    }
++}
+

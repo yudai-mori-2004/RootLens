@@ -33,7 +33,7 @@ export const clips = pgTable(
     recordedAt: timestamp("recorded_at", { withTimezone: true }),
 
     // ── 撮影ファクト (端末申告) ───────────────────────────────────────
-    /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit' | 'mentra')。
+    /// 採用された撮影構成 ID (= 'ultra_wide' | 'arkit' | 'mentra' | 'iphone')。
     recordingConfig: text("recording_config").notNull(),
 
     /// 録画尺 (ms)。 端末申告。 現場 × 月の録画時間集計 (= 撮影協力費の明細) の元。

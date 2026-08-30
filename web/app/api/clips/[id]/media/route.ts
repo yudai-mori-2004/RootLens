@@ -2,7 +2,7 @@
 //
 // アップロード済みクリップの rgb.mp4 は端末から消えている (= 容量) ので、 マイビデオの
 // 履歴ポップは R2 から直接ストリーミング再生する。 バケットは撮影構成で決まる
-// (ultra_wide → raw / arkit → raw-arkit / mentra → raw-mentra)。
+// (ultra_wide → raw / arkit → raw-arkit / mentra → raw-mentra / iphone → raw既定、envで分離可)。
 // 所有チェックは (content_hash, account_id) の一致。
 
 import { NextResponse } from "next/server";
@@ -10,7 +10,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db/client";
 import { clips } from "@/db/schema";
 import { requireAccountId } from "@/lib/auth";
-import { presignRawGet, rawBucketFor, rawMp4Key } from "@/lib/r2";
+import { presignRawGet, rawBucketFor, rawMp4Key, rawObjectExists } from "@/lib/r2";
 import type { RecordingConfigId } from "@/lib/r2-keys";
 
 export async function GET(
@@ -35,10 +35,17 @@ export async function GET(
   }
   const clip = rows[0];
 
+  const recordingConfig = (clip.recordingConfig ?? "ultra_wide") as RecordingConfigId;
+  const bucket = rawBucketFor(recordingConfig);
+  const key = rawMp4Key(clip.contentHash);
+  if (!await rawObjectExists(key, bucket)) {
+    return NextResponse.json({ error: "clip media not found" }, { status: 404 });
+  }
+
   const expiresInSec = 3600;
   const url = await presignRawGet(
-    rawMp4Key(clip.contentHash),
-    rawBucketFor((clip.recordingConfig ?? "ultra_wide") as RecordingConfigId),
+    key,
+    bucket,
     expiresInSec,
   );
   return NextResponse.json({

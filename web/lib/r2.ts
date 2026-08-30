@@ -1,8 +1,16 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
   rawMp4Key,
   rawSessionFileKey,
+  rawSessionPrefix,
   RAW_SESSION_MANIFEST,
   type RecordingConfigId,
   type RawSessionFilename,
@@ -14,6 +22,7 @@ import {
 //   ultra_wide → R2_BUCKET_RAW        (= rootlens-raw)
 //   arkit      → R2_BUCKET_RAW_ARKIT  (= 既定 rootlens-raw-arkit、 env で上書き)
 //   mentra     → R2_BUCKET_RAW_MENTRA (= 既定 rootlens-raw-mentra、 env で上書き)
+//   iphone     → R2_BUCKET_RAW        (= rootlens-raw。ultra_wideと同じ既存iPhone raw bucket)
 
 if (!process.env.R2_ACCOUNT_ID) {
   throw new Error("R2_ACCOUNT_ID is not set.");
@@ -37,11 +46,16 @@ const r2 = new S3Client({
 const BUCKET_RAW = process.env.R2_BUCKET_RAW;
 const BUCKET_RAW_ARKIT = process.env.R2_BUCKET_RAW_ARKIT ?? "rootlens-raw-arkit";
 const BUCKET_RAW_MENTRA = process.env.R2_BUCKET_RAW_MENTRA ?? "rootlens-raw-mentra";
+// iPhone RGB+IMU is part of the existing iPhone raw dataset. This alias is
+// intentionally not configurable independently so app/server/ops cannot drift
+// onto a fourth bucket by environment accident.
+const BUCKET_RAW_IPHONE = BUCKET_RAW;
 
 /// 撮影構成 → アップロード先バケット。
 export function rawBucketFor(config: RecordingConfigId): string {
   if (config === "ultra_wide") return BUCKET_RAW;
   if (config === "arkit") return BUCKET_RAW_ARKIT;
+  if (config === "iphone") return BUCKET_RAW_IPHONE;
   return BUCKET_RAW_MENTRA;
 }
 
@@ -99,4 +113,56 @@ export async function presignRawGet(
   return await getSignedUrl(r2, cmd, { expiresIn: expiresInSec });
 }
 
-export { r2, BUCKET_RAW, BUCKET_RAW_ARKIT, BUCKET_RAW_MENTRA };
+/// presign だけでは存在しない key にも URL を作れるため、再生前の fail-fast に使う。
+export async function rawObjectExists(key: string, bucket: string): Promise<boolean> {
+  try {
+    await r2.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
+  } catch (error) {
+    const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+    if (status === 404) return false;
+    throw error;
+  }
+}
+
+/// content hash 配下の raw 一式を削除する。DB 行より先に R2 を消すことで、
+/// API が成功を返したのに実データだけ残る状態を作らない。prefix は content hash からのみ組み立てる。
+export async function deleteRawSession(contentHash: string, bucket: string): Promise<number> {
+  if (!/^[0-9a-f]{64}$/i.test(contentHash)) {
+    throw new Error("Invalid content hash for R2 deletion");
+  }
+
+  const prefix = rawSessionPrefix(contentHash);
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const page = await r2.send(new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    }));
+    for (const object of page.Contents ?? []) {
+      if (object.Key?.startsWith(prefix)) keys.push(object.Key);
+    }
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  for (let offset = 0; offset < keys.length; offset += 1000) {
+    const batch = keys.slice(offset, offset + 1000);
+    const result = await r2.send(new DeleteObjectsCommand({
+      Bucket: bucket,
+      Delete: {
+        Objects: batch.map((Key) => ({ Key })),
+        Quiet: false,
+      },
+    }));
+    if ((result.Errors ?? []).length > 0) {
+      const first = result.Errors![0];
+      throw new Error(`R2 deletion failed for ${first.Key}: ${first.Code} ${first.Message}`);
+    }
+  }
+
+  return keys.length;
+}
+
+export { r2, BUCKET_RAW, BUCKET_RAW_ARKIT, BUCKET_RAW_MENTRA, BUCKET_RAW_IPHONE };

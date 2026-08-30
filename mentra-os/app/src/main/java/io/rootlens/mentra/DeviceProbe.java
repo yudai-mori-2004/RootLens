@@ -1,6 +1,7 @@
 package io.rootlens.mentra;
 
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.hardware.Sensor;
@@ -13,6 +14,8 @@ import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaRecorder;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Environment;
 import android.os.StatFs;
@@ -163,6 +166,12 @@ final class DeviceProbe {
             root.put("gyroscope", sensorJson(sensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE)));
             root.put("avc_encoder", avcEncoderJson());
 
+            boolean hasMicrophone = context.getPackageManager()
+                    .hasSystemFeature(PackageManager.FEATURE_MICROPHONE);
+            JSONArray audioInputs = audioInputDevices(context);
+            root.put("has_microphone_feature", hasMicrophone);
+            root.put("audio_input_devices", audioInputs);
+
             StatFs storage = new StatFs(Environment.getExternalStorageDirectory().getAbsolutePath());
             root.put("storage_total_bytes", storage.getTotalBytes());
             root.put("storage_available_bytes", storage.getAvailableBytes());
@@ -173,11 +182,19 @@ final class DeviceProbe {
                     .put("codec", "video/avc")
                     .put("bit_depth", 8)
                     .put("hdr", false)
-                    .put("audio", false)
+                    .put("audio", true)
+                    .put("audio_source", "mic")
+                    .put("audio_codec", "audio/mp4a-latm")
+                    .put("audio_sample_rate_hz", AppContract.AUDIO_SAMPLE_RATE_HZ)
+                    .put("audio_channels", AppContract.AUDIO_CHANNELS)
+                    .put("audio_bitrate_bps", AppContract.AUDIO_BITRATE_BPS)
                     .put("imu_period_us", AppContract.IMU_PERIOD_US));
 
             if (!supportsTarget) throw new IOException("Camera does not expose 1920x1080 recording");
             if (!supports30) throw new IOException("Camera does not expose a fixed 30fps AE range");
+            if (!hasMicrophone || audioInputs.length() == 0) {
+                throw new IOException("Device does not expose a microphone input");
+            }
             return new Snapshot(selectedId, selected, timestampSource, root);
         } catch (JSONException | android.hardware.camera2.CameraAccessException error) {
             throw new IOException("Hardware probe failed", error);
@@ -194,6 +211,27 @@ final class DeviceProbe {
                 .put("max_delay_us", sensor.getMaxDelay())
                 .put("fifo_max_events", sensor.getFifoMaxEventCount())
                 .put("resolution", sensor.getResolution());
+    }
+
+    private static JSONArray audioInputDevices(Context context) throws JSONException {
+        AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        JSONArray devices = new JSONArray();
+        for (AudioDeviceInfo device : audio.getDevices(AudioManager.GET_DEVICES_INPUTS)) {
+            JSONObject value = new JSONObject()
+                    .put("id", device.getId())
+                    .put("type", device.getType())
+                    .put("product_name", device.getProductName().toString())
+                    .put("sample_rates_hz", intArray(device.getSampleRates()))
+                    .put("channel_counts", intArray(device.getChannelCounts()));
+            devices.put(value);
+        }
+        return devices;
+    }
+
+    private static JSONArray intArray(int[] values) {
+        JSONArray result = new JSONArray();
+        if (values != null) for (int value : values) result.put(value);
+        return result;
     }
 
     private static JSONObject avcEncoderJson() throws JSONException, IOException {

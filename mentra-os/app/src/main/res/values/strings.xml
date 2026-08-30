@@ -4,7 +4,7 @@
     <string name="capture_title">RootLens Mentra capture\n1080p30 SDR + raw IMU</string>
     <string name="probe_hardware">Probe hardware</string>
     <string name="start_short_capture">Start 30-second capture</string>
-    <string name="start_five_hour_capture">Start 5-hour capture (30-minute clips)</string>
+    <string name="start_five_hour_capture">Start 5-hour capture (30-minute clips, 3-minute intervals)</string>
     <string name="stop_capture">Stop capture</string>
     <string name="upload_account_signed_in">Upload account: signed in</string>
     <string name="upload_account_signed_out">Upload account: signed out</string>

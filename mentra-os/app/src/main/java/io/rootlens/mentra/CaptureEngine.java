@@ -37,6 +37,7 @@ final class CaptureEngine {
     private final Context context;
     private final long requestedDurationSeconds;
     private final int bitrateBps;
+    private final boolean calibrationCapture;
     private final Listener listener;
     private final HandlerThread cameraThread = new HandlerThread("rootlens-camera");
     private final AtomicBoolean terminal = new AtomicBoolean();
@@ -44,6 +45,7 @@ final class CaptureEngine {
 
     private Handler cameraHandler;
     private DeviceProbe.Snapshot probe;
+    private VideoImuCalibration calibration;
     private SessionArtifacts artifacts;
     private RawImuRecorder rawImu;
     private MediaRecorder recorder;
@@ -57,9 +59,19 @@ final class CaptureEngine {
     private int captureFailureCount;
 
     CaptureEngine(Context context, long requestedDurationSeconds, int bitrateBps, Listener listener) {
+        this(context, requestedDurationSeconds, bitrateBps, false, listener);
+    }
+
+    CaptureEngine(
+            Context context,
+            long requestedDurationSeconds,
+            int bitrateBps,
+            boolean calibrationCapture,
+            Listener listener) {
         this.context = context.getApplicationContext();
         this.requestedDurationSeconds = requestedDurationSeconds;
         this.bitrateBps = bitrateBps;
+        this.calibrationCapture = calibrationCapture;
         this.listener = listener;
     }
 
@@ -68,8 +80,11 @@ final class CaptureEngine {
         if (cameraHandler != null) throw new IOException("Capture engine cannot be reused");
         try {
             probe = DeviceProbe.inspect(context);
+            calibration = CalibrationStore.resolve(context, probe.cameraId);
             File root = new File(context.getExternalFilesDir(null), "recordings");
-            artifacts = SessionArtifacts.create(root);
+            artifacts = calibrationCapture
+                    ? SessionArtifacts.createCalibration(root)
+                    : SessionArtifacts.create(root);
             rawImu = new RawImuRecorder(context);
             rawImu.start(artifacts.partialImu);
             prepareRecorder();
@@ -99,8 +114,16 @@ final class CaptureEngine {
 
     private void prepareRecorder() throws IOException {
         recorder = new MediaRecorder();
+        boolean recordAudio = !calibrationCapture;
+        if (recordAudio) recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+        if (recordAudio) {
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+            recorder.setAudioSamplingRate(AppContract.AUDIO_SAMPLE_RATE_HZ);
+            recorder.setAudioChannels(AppContract.AUDIO_CHANNELS);
+            recorder.setAudioEncodingBitRate(AppContract.AUDIO_BITRATE_BPS);
+        }
         recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
         recorder.setVideoEncodingBitRate(bitrateBps);
         recorder.setVideoFrameRate(AppContract.FPS);
@@ -283,7 +306,9 @@ final class CaptureEngine {
                     recorderStartElapsedNs,
                     recorderStartMonotonicNs,
                     stopWallMs,
-                    recorderStopSucceeded);
+                    recorderStopSucceeded,
+                    calibration,
+                    !calibrationCapture);
             if (captureFailureCount > 0) {
                 SessionArtifacts.writeText(new File(directory, "camera_capture_failures.txt"),
                         Integer.toString(captureFailureCount) + "\n");

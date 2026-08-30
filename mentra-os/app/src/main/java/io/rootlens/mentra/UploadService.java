@@ -6,10 +6,14 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
+import android.util.AtomicFile;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -19,6 +23,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -40,23 +45,39 @@ public final class UploadService extends Service {
     private static final String[] UPLOAD_FILES = {
             "rgb.mp4", "frames.jsonl", "imu.jsonl", "metadata.json"
     };
+    private static final String RECEIPT_SCHEMA = "rootlens.mentra.upload_receipt.v1";
+    private static final String COMMAND_STATE = "rootlens_upload_commands";
+    private static final String LAST_COMMAND_ID = "last_command_id";
 
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private RootLensAuth auth;
+    private SharedPreferences commandState;
+    private boolean uploadRunning;
+    private int latestStartId;
 
     @Override
     public void onCreate() {
         super.onCreate();
         auth = new RootLensAuth(this);
+        commandState = getSharedPreferences(COMMAND_STATE, MODE_PRIVATE);
         getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel(
                 AppContract.CHANNEL_ID, "RootLens capture", NotificationManager.IMPORTANCE_LOW));
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        latestStartId = startId;
+        if (uploadRunning) {
+            Log.i(TAG, "Coalescing upload command while a scan is already running");
+            return START_NOT_STICKY;
+        }
         startForeground(AppContract.UPLOAD_NOTIFICATION_ID, notification("Scanning local clips", 0, 0));
-        // Service は singleton だが start command は upload 中にも届く。 startId ごとに scan を
-        // 直列化し、古い command が後から届いた停止トリガーまで stopSelf しないようにする。
+        if (!acceptCommand(intent)) {
+            finish("Duplicate upload command ignored", startId);
+            return START_NOT_STICKY;
+        }
+        uploadRunning = true;
         worker.execute(() -> uploadPending(startId));
         return START_NOT_STICKY;
     }
@@ -74,29 +95,32 @@ public final class UploadService extends Service {
 
     private void uploadPending(int startId) {
         File root = new File(getExternalFilesDir(null), "recordings");
-        cleanupDeletionTombstones(root);
+        boolean cleanupIncomplete = !cleanupDeletionTombstones(root);
         File[] candidates = root.listFiles(file -> file.isDirectory() && file.getName().startsWith("rec-"));
         if (candidates == null) candidates = new File[0];
         Arrays.sort(candidates, Comparator.comparing(File::getName));
         ArrayList<File> pending = new ArrayList<>();
         for (File candidate : candidates) {
-            if (isUploaded(candidate)) {
-                deleteUploadedClip(candidate);
+            if (isUploaded(candidate, true)) {
+                cleanupIncomplete |= !deleteUploadedClip(candidate);
             } else if (hasRequiredFiles(candidate)) {
                 pending.add(candidate);
             }
         }
         if (pending.isEmpty()) {
-            finish("No pending clips", startId);
+            if (cleanupIncomplete) {
+                CaptureFeedback.uploadUnavailable(this);
+            }
+            finish(cleanupIncomplete ? "Uploaded cleanup is incomplete" : "No pending clips", startId);
             return;
         }
         if (!auth.hasSession()) {
+            CaptureFeedback.uploadUnavailable(this);
             finish("Sign in before upload", startId);
             return;
         }
         if (!hasValidatedWifi()) {
-            UploadRetryJobService.schedule(this);
-            CaptureFeedback.uploadPaused(this);
+            CaptureFeedback.uploadUnavailable(this);
             finish("Waiting for Wi-Fi", startId);
             return;
         }
@@ -105,30 +129,26 @@ public final class UploadService extends Service {
         int completed = 0;
         for (File directory : pending) {
             try {
-                uploadClip(directory, completed, pending.size());
+                cleanupIncomplete |= !uploadClip(directory, completed, pending.size());
                 completed++;
             } catch (Throwable error) {
                 Log.e(TAG, "Upload failed for " + directory, error);
                 writeUploadState(directory, "error", error.getMessage(),
                         jsonArray(uploadedFiles(directory)));
-                // Wi-Fi は validated のままでも、R2/API timeoutや一時的5xxは起こり得る。
-                // どの失敗も persisted Jobへ渡し、次の撮影停止を待たなくても再走査する。
-                UploadRetryJobService.schedule(this);
-                if (hasValidatedWifi()) {
-                    CaptureFeedback.errorTone(this);
-                } else {
-                    CaptureFeedback.uploadPaused(this);
-                }
+                CaptureFeedback.uploadUnavailable(this);
                 finish("Upload failed · " + directory.getName(), startId);
                 return;
             }
         }
-        UploadRetryJobService.cancel(this);
-        CaptureFeedback.uploadComplete(this);
+        if (cleanupIncomplete) {
+            CaptureFeedback.uploadUnavailable(this);
+        } else {
+            CaptureFeedback.uploadComplete(this);
+        }
         finish("Uploaded " + completed + " clip" + (completed == 1 ? "" : "s"), startId);
     }
 
-    private void uploadClip(File directory, int completedClips, int totalClips)
+    private boolean uploadClip(File directory, int completedClips, int totalClips)
             throws IOException, JSONException {
         String contentHash = readSmallFile(new File(directory, "content_hash.txt")).trim();
         if (!contentHash.matches("[0-9a-f]{64}")) throw new IOException("Invalid content hash");
@@ -167,10 +187,10 @@ public final class UploadService extends Service {
         if (actualDurationMs > 0) registration.put("durationMs", actualDurationMs);
         postJson(RootLensAuth.trimTrailingSlash(BuildConfig.ROOTLENS_SERVER_URL) + "/api/clips",
                 registration);
-        writeUploadState(directory, "uploaded", null, completedFiles);
+        writeUploadedReceipt(directory, contentHash);
         // R2 PUTだけでは削除しない。/api/clips の登録成功（既存行の冪等応答を含む）を
         // 確認してから、端末上のclip directoryを丸ごと削除する。
-        deleteUploadedClip(directory);
+        return deleteUploadedClip(directory);
     }
 
     private JSONObject postJson(String endpoint, JSONObject body) throws IOException {
@@ -252,11 +272,26 @@ public final class UploadService extends Service {
         return true;
     }
 
-    private static boolean isUploaded(File directory) {
+    private static boolean isUploaded(File directory, boolean requireContentHashFile) {
         File state = new File(directory, "upload_state.json");
         if (!state.isFile()) return false;
         try {
-            return "uploaded".equals(new JSONObject(readSmallFile(state)).optString("state"));
+            JSONObject receipt = new JSONObject(readSmallFile(state));
+            if (!RECEIPT_SCHEMA.equals(receipt.optString("schema"))
+                    || !"uploaded".equals(receipt.optString("state"))
+                    || !receipt.optBoolean("registered", false)) return false;
+            String contentHash = receipt.optString("content_hash");
+            if (!contentHash.matches("[0-9a-f]{64}")) return false;
+            if (requireContentHashFile
+                    && !contentHash.equals(readSmallFile(
+                            new File(directory, "content_hash.txt")).trim())) return false;
+            JSONArray names = receipt.optJSONArray("uploaded_files");
+            if (names == null || names.length() != UPLOAD_FILES.length) return false;
+            Set<String> actual = new HashSet<>();
+            for (int index = 0; index < names.length(); index++) {
+                actual.add(names.getString(index));
+            }
+            return actual.equals(new HashSet<>(Arrays.asList(UPLOAD_FILES)));
         } catch (IOException | JSONException ignored) {
             return false;
         }
@@ -276,39 +311,64 @@ public final class UploadService extends Service {
         return result;
     }
 
-    private static void cleanupDeletionTombstones(File root) {
+    private static boolean cleanupDeletionTombstones(File root) {
         File[] tombstones = root.listFiles(file -> file.isDirectory()
                 && file.getName().startsWith("deleting-uploaded-"));
-        if (tombstones == null) return;
+        if (tombstones == null) return true;
+        boolean success = true;
         for (File tombstone : tombstones) {
-            if (!deleteRecursively(tombstone)) {
+            if (!deleteUploadedTombstone(tombstone)) {
                 Log.w(TAG, "Could not finish local cleanup for " + tombstone);
+                success = false;
             }
         }
+        return success;
     }
 
     /** uploaded markerを持つclipだけを、再試行可能なtombstoneへ移して削除する。 */
-    private static void deleteUploadedClip(File directory) {
-        if (!isUploaded(directory)) {
+    private static boolean deleteUploadedClip(File directory) {
+        if (!directory.getName().startsWith("rec-") || !isUploaded(directory, true)) {
             Log.e(TAG, "Refusing to delete clip without uploaded marker: " + directory);
-            return;
+            return false;
         }
         File root = directory.getParentFile();
-        if (root == null) {
+        if (root == null || !isDirectChild(root, directory)) {
             Log.e(TAG, "Refusing to delete clip without recordings root: " + directory);
-            return;
+            return false;
         }
         File tombstone = new File(root, "deleting-uploaded-" + directory.getName()
                 + "-" + System.currentTimeMillis());
         if (!directory.renameTo(tombstone)) {
             // 元directoryとuploaded markerを残す。次のscanで安全に再試行できる。
             Log.w(TAG, "Could not stage uploaded clip for local deletion: " + directory);
-            return;
+            return false;
         }
-        if (!deleteRecursively(tombstone)) {
+        if (!deleteUploadedTombstone(tombstone)) {
             // tombstoneは次回scanの先頭で再削除する。upload対象には戻らない。
             Log.w(TAG, "Uploaded clip cleanup will be retried: " + tombstone);
+            return false;
         }
+        return true;
+    }
+
+    private static boolean deleteUploadedTombstone(File tombstone) {
+        if (!tombstone.getName().startsWith("deleting-uploaded-")
+                || tombstone.getParentFile() == null
+                || !isDirectChild(tombstone.getParentFile(), tombstone)) return false;
+        File[] initial = tombstone.listFiles();
+        if (initial == null) return false;
+        if (initial.length == 0) return tombstone.delete();
+        // The receipt stays until every payload file is gone. A crash can therefore resume
+        // cleanup without treating a partially deleted clip as a new upload candidate.
+        if (!isUploaded(tombstone, false)) return false;
+        boolean success = true;
+        File receipt = new File(tombstone, "upload_state.json");
+        for (File child : initial) {
+            if (!child.equals(receipt)) success &= deleteRecursively(child);
+        }
+        if (!success) return false;
+        if (receipt.exists() && !receipt.delete()) return false;
+        return tombstone.delete();
     }
 
     private static boolean deleteRecursively(File target) {
@@ -320,6 +380,39 @@ public final class UploadService extends Service {
         }
         if (target.exists() && !target.delete()) success = false;
         return success;
+    }
+
+    private static boolean isDirectChild(File root, File child) {
+        try {
+            return root.getCanonicalFile().equals(child.getCanonicalFile().getParentFile());
+        } catch (IOException error) {
+            return false;
+        }
+    }
+
+    private static void writeUploadedReceipt(File directory, String contentHash)
+            throws IOException, JSONException {
+        JSONArray uploadedFiles = new JSONArray();
+        for (String name : UPLOAD_FILES) uploadedFiles.put(name);
+        JSONObject receipt = new JSONObject()
+                .put("schema", RECEIPT_SCHEMA)
+                .put("state", "uploaded")
+                .put("registered", true)
+                .put("content_hash", contentHash)
+                .put("updated_at_epoch_ms", System.currentTimeMillis())
+                .put("uploaded_files", uploadedFiles)
+                .put("error", JSONObject.NULL);
+        AtomicFile destination = new AtomicFile(new File(directory, "upload_state.json"));
+        FileOutputStream stream = null;
+        try {
+            stream = destination.startWrite();
+            stream.write((receipt.toString() + "\n").getBytes(StandardCharsets.UTF_8));
+            stream.getFD().sync();
+            destination.finishWrite(stream);
+        } catch (IOException error) {
+            if (stream != null) destination.failWrite(stream);
+            throw error;
+        }
     }
 
     private static void writeUploadState(
@@ -366,9 +459,26 @@ public final class UploadService extends Service {
     private void finish(String message, int startId) {
         getSystemService(NotificationManager.class).notify(
                 AppContract.UPLOAD_NOTIFICATION_ID, notification(message, 0, 0));
-        // upload中に別の撮影が停止して新しいstartIdが発行されていればfalseになり、
-        // queued scanが全過去clipをもう一度走査するまでServiceを維持する。
-        if (stopSelfResult(startId)) stopForeground(false);
+        mainHandler.post(() -> {
+            uploadRunning = false;
+            if (stopSelfResult(Math.max(startId, latestStartId))) stopForeground(false);
+        });
+    }
+
+    private boolean acceptCommand(Intent command) {
+        String commandId = command == null
+                ? null : command.getStringExtra(AppContract.EXTRA_COMMAND_ID);
+        if (commandId == null) return true;
+        if (commandId.equals(commandState.getString(LAST_COMMAND_ID, null))) {
+            Log.i(TAG, "Ignoring duplicate physical upload command");
+            return false;
+        }
+        if (!commandState.edit().putString(LAST_COMMAND_ID, commandId).commit()) {
+            Log.e(TAG, "Could not durably record physical upload command");
+            CaptureFeedback.uploadUnavailable(this);
+            return false;
+        }
+        return true;
     }
 
     private static String truncate(String value) {

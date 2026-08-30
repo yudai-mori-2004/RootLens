@@ -5,8 +5,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.Gravity;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -19,7 +17,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
-    private static final int CAMERA_PERMISSION_REQUEST = 100;
+    private static final int CAPTURE_PERMISSION_REQUEST = 100;
+    private static final String[] CAPTURE_PERMISSIONS = {
+            Manifest.permission.CAMERA,
+            Manifest.permission.RECORD_AUDIO
+    };
     private final ExecutorService accountWorker = Executors.newSingleThreadExecutor();
     private RootLensAuth auth;
     private TextView accountStatus;
@@ -31,8 +33,6 @@ public final class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
                         | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
         auth = new RootLensAuth(this);
-        startForegroundService(new Intent(this, FieldControlService.class));
-
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -118,50 +118,15 @@ public final class MainActivity extends Activity {
         scroll.addView(root);
         setContentView(scroll);
 
-        if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_REQUEST);
-        } else {
-            handleLaunchIntent(getIntent());
+        if (!hasCapturePermissions()) {
+            requestPermissions(CAPTURE_PERMISSIONS, CAPTURE_PERMISSION_REQUEST);
         }
     }
 
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        handleLaunchIntent(intent);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(
-            int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == CAMERA_PERMISSION_REQUEST
-                && grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            handleLaunchIntent(getIntent());
-        }
-    }
-
-    private void handleLaunchIntent(Intent intent) {
-        if (intent == null) return;
-        String action = intent.getAction();
-        intent.setAction(Intent.ACTION_MAIN);
-        if (AppContract.ACTION_START.equals(action)) {
-            int duration = intent.getIntExtra(AppContract.EXTRA_DURATION_SECONDS, 30);
-            new Handler(Looper.getMainLooper()).postDelayed(() -> startCapture(duration), 500L);
-        } else if (AppContract.ACTION_TOGGLE.equals(action)) {
-            new Handler(Looper.getMainLooper()).postDelayed(
-                    () -> send(AppContract.ACTION_TOGGLE), 250L);
-        } else if (AppContract.ACTION_STOP.equals(action)
-                || AppContract.ACTION_PROBE.equals(action)
-                || AppContract.ACTION_STATUS.equals(action)) {
-            send(action);
-        } else if (AppContract.ACTION_UPLOAD.equals(action)) {
-            Intent upload = new Intent(this, UploadService.class);
-            upload.setAction(action);
-            startForegroundService(upload);
-        }
+    private boolean hasCapturePermissions() {
+        return checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED;
     }
 
     private void send(String action) {

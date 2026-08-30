@@ -5,6 +5,8 @@ import { db } from "@/db/client";
 import { clips, consentEvents } from "@/db/schema";
 import { requireAccountId } from "@/lib/auth";
 import { clipToDto } from "@/lib/mapper";
+import { deleteRawSession, rawBucketFor } from "@/lib/r2";
+import type { RecordingConfigId } from "@/lib/r2-keys";
 import type {
   AttachClipConsentRequest,
   AttachClipConsentResponse,
@@ -122,7 +124,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   return NextResponse.json(body);
 }
 
-// DELETE /api/clips/:contentHash ─ 撮影者がクリップを破棄する。 R2 オブジェクトは別 worker で GC する。
+// DELETE /api/clips/:contentHash ─ 撮影者本人が raw と一覧行を破棄する。
+// R2 を先に消し、成功後だけ DB 行を消す。R2 失敗時は行を残して再試行可能にする。
 export async function DELETE(req: Request, ctx: Ctx) {
   let accountId: string;
   try {
@@ -141,8 +144,28 @@ export async function DELETE(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await db.delete(clips).where(eq(clips.contentHash, contentHash));
+  const clip = rows[0];
+  const recordingConfig = clip.recordingConfig as RecordingConfigId;
+  if (!["ultra_wide", "arkit", "mentra", "iphone"].includes(recordingConfig)) {
+    return NextResponse.json({ error: "Unsupported recording config" }, { status: 409 });
+  }
 
-  const body: DeleteClipResponse = { ok: true };
+  let deletedObjects: number;
+  try {
+    deletedObjects = await deleteRawSession(
+      clip.contentHash,
+      rawBucketFor(recordingConfig),
+    );
+  } catch (error) {
+    console.error(`[DELETE /api/clips/${contentHash}] R2 deletion failed`, error);
+    return NextResponse.json({ error: "Could not delete clip data" }, { status: 502 });
+  }
+
+  await db.delete(clips).where(and(
+    eq(clips.contentHash, contentHash),
+    eq(clips.accountId, accountId),
+  ));
+
+  const body: DeleteClipResponse = { ok: true, deletedObjects };
   return NextResponse.json(body);
 }

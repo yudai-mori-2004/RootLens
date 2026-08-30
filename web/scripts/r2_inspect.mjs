@@ -24,6 +24,7 @@ const bucketOf = (name) => {
   if (name === "raw") return process.env.R2_BUCKET_RAW;
   if (name === "arkit") return process.env.R2_BUCKET_RAW_ARKIT ?? "rootlens-raw-arkit";
   if (name === "mentra") return process.env.R2_BUCKET_RAW_MENTRA ?? "rootlens-raw-mentra";
+  if (name === "iphone") return process.env.R2_BUCKET_RAW;
   if (name === "processed") return process.env.R2_BUCKET_PROCESSED;
   throw new Error(`unknown bucket alias: ${name}`);
 };
@@ -42,6 +43,6 @@ if (cmd === "list") {
   writeFileSync(b, buf);
   console.log(`wrote ${buf.length} bytes → ${b}`);
 } else {
-  console.error("usage: list <raw|arkit|mentra|processed> <prefix>  |  get <raw|arkit|mentra|processed> <key> <localPath>");
+  console.error("usage: list <raw|arkit|mentra|iphone|processed> <prefix>  |  get <raw|arkit|mentra|iphone|processed> <key> <localPath>");
   process.exit(1);
 }
