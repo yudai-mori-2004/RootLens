@@ -15,7 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const LEGAL_DIR = join(__dirname, '../../document/legal');
 const OUT = join(__dirname, '../content/legalDocs.generated.ts');
 
-const DOCS = ['privacy-policy'];
+const DOCS = ['privacy-policy', 'terms-of-service'];
 const LOCALES = ['ja', 'en'];
 
 // 公開レンダリング用クリーニング: 正本 md は内部作業文書なので、本番公開では内部注記だけ除外する
