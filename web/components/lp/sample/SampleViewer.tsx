@@ -2,7 +2,7 @@
 
 // /sample の 4 パネル + タイムライン + サマリー全部乗せ。
 // - パイプライン切替 (arkit / mentra) はここで state 管理。 available=false のオプションは
-//   選択できるが、 選ぶとプレースホルダー表示 (assets が無い)。
+//   表示は残すが、 プレビューへは切り替えられない。
 // - trajectory / timeseries / summary を fetch でロードして子に流す。
 // - RGB が master、 他は slave (詳細は TimeContext / RgbPanel 参照)。
 
@@ -119,6 +119,7 @@ function Header({
             <button
               key={p.id}
               type="button"
+              disabled={!p.available}
               onClick={() => onChange(p.id)}
               style={{
                 padding: "8px 14px",
@@ -126,7 +127,7 @@ function Header({
                 border: `1px solid ${isActive ? "#ffe600" : "#2c3140"}`,
                 background: isActive ? "#ffe600" : "transparent",
                 color: isActive ? "#131519" : "#e8ebf2",
-                cursor: "pointer",
+                cursor: p.available ? "pointer" : "not-allowed",
                 fontSize: 13,
                 fontWeight: 600,
                 opacity: p.available ? 1 : 0.55,

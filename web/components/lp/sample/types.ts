@@ -116,7 +116,7 @@ export interface SessionOption {
 }
 
 /** ヘッダーの「収録スタック」 切替ボタンで表示するオプション。 arkit がデフォルト、
- *  今後 mentra 等を足すたびに配列に追加する。 available=false のものはプレースホルダー。 */
+ *  今後 mentra 等を足すたびに配列に追加する。 available=false のものは切替不可。 */
 export interface PipelineOption {
   id: string;
   label: string;
